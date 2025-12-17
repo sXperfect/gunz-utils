@@ -84,6 +84,15 @@ print(HttpStatus.from_fuzzy_int_string("missing"))  # HttpStatus.NOT_FOUND
 print(HttpStatus.from_fuzzy_int_string("404"))      # HttpStatus.NOT_FOUND
 ```
 
+## Documentation
+
+To build the documentation locally:
+
+```bash
+pip install .[docs]
+./scripts/build_docs.sh
+```
+
 ## Development
 
 To run the test suite:

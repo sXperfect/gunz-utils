@@ -16,6 +16,17 @@ classifiers = [
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx",
+    "furo",
+    "myst-parser",
+    "sphinx-autodoc-typehints",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/sXperfect/gunz-utils"
