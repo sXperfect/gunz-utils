@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gunz-utils"
+version = "0.1.0"
+description = "General purpose utilities for Python projects"
+authors = [
+  { name = "Yeremia Gunawan Adhisantoso", email = "adhisant@tnt.uni-hannover.de" },
+]
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/sXperfect/gunz-utils"
+"Bug Tracker" = "https://github.com/sXperfect/gunz-utils/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gunz_utils"]
