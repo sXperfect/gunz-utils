@@ -12,7 +12,7 @@ for creating enum members. It leverages modern Python 3.11+ features.
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
-__version__ = "1.0.1"
+__version__ = "1.0.0"
 
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
