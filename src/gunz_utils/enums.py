@@ -60,6 +60,33 @@ class BaseStrEnum(enum.StrEnum):
     __ALIASES__: ClassVar[dict[str, str]] = {}
 
     @classmethod
+    def _get_fuzzy_map(cls) -> dict[str, Self]:
+        """
+        Lazily builds and returns a mapping for fuzzy lookups.
+        Key is the normalized string or lowercase name.
+        Value is the enum member.
+        """
+        # Use a private attribute on the class itself to store the map
+        # We use getattr/setattr to avoid static type checker issues with
+        # dynamically added attributes on Enum classes.
+        if not hasattr(cls, "_fuzzy_lookup_map"):
+            lookup_map = {}
+            for member in cls:
+                # Add normalized value
+                val_norm = member.value.lower().replace("-", "_").replace(" ", "_")
+                if val_norm not in lookup_map:
+                    lookup_map[val_norm] = member
+
+                # Add lowercase name
+                name_lower = member.name.lower()
+                if name_lower not in lookup_map:
+                    lookup_map[name_lower] = member
+
+            setattr(cls, "_fuzzy_lookup_map", lookup_map)
+
+        return getattr(cls, "_fuzzy_lookup_map")
+
+    @classmethod
     def from_fuzzy_string(cls, value_str: str) -> Self:
         """
         Attempts to find a member by alias, normalized value, or case-insensitive name.
@@ -85,12 +112,15 @@ class BaseStrEnum(enum.StrEnum):
         # 2. Normalize separators and case for direct matching
         normalized_value_input = value_lower.replace("-", "_").replace(" ", "_")
 
-        for member in cls: 
-            member_value_normalized = member.value.lower().replace("-", "_").replace(" ", "_")
-            if member_value_normalized == normalized_value_input:
-                return member
-            if member.name.lower() == value_lower:
-                return member
+        # Optimization: Use cached lookup map instead of iterating
+        fuzzy_map = cls._get_fuzzy_map()
+
+        if normalized_value_input in fuzzy_map:
+            return fuzzy_map[normalized_value_input]
+
+        # Also check if the raw lower input matches a key (e.g. if it matched a name)
+        if value_lower in fuzzy_map:
+            return fuzzy_map[value_lower]
 
         valid_options = ", ".join(f"'{m.value}'" for m in cls)
         raise ValueError(
