@@ -57,3 +57,15 @@ def test_sanitize_filename_length():
     sanitized = sanitize_filename(long_name)
     assert len(sanitized) == 255
     assert sanitized == "a" * 255
+
+def test_sanitize_filename_windows_reserved():
+    """Test handling of Windows reserved filenames."""
+    reserved = ["CON", "PRN", "AUX", "NUL", "COM1", "LPT1"]
+    for name in reserved:
+        # Should now be prefixed with underscore
+        assert sanitize_filename(name) == f"_{name}"
+        assert sanitize_filename(f"{name}.txt") == f"_{name}.txt"
+        assert sanitize_filename(f"{name}.tar.gz") == f"_{name}.tar.gz"
+
+        # Case insensitive check
+        assert sanitize_filename(name.lower()) == f"_{name.lower()}"
