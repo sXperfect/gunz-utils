@@ -6,6 +6,15 @@ This module provides helpers for security-related tasks, such as sanitizing inpu
 """
 import re
 import os
+import functools
+
+# Pre-compile the regex for invalid characters (anything not alphanumeric, dot, or dash)
+_INVALID_CHARS_PATTERN = re.compile(r'[^\w\.\-]')
+
+@functools.lru_cache(maxsize=16)
+def _get_replacement_pattern(replacement: str) -> re.Pattern:
+    """Cache compiled patterns for collapsing multiple replacements."""
+    return re.compile(f"{re.escape(replacement)}+")
 
 def sanitize_filename(filename: str, replacement: str = "_") -> str:
     """
@@ -44,11 +53,13 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     # 2. Replace dangerous characters
     # Keep only alphanumeric, ., -, _
     # Using regex to replace anything that is NOT allowed
-    filename = re.sub(r'[^\w\.\-]', replacement, filename)
+    filename = _INVALID_CHARS_PATTERN.sub(replacement, filename)
 
     # 3. Collapse multiple replacements
     if replacement:
-        filename = re.sub(f"{re.escape(replacement)}+", replacement, filename)
+        # Use cached pattern for replacement
+        pattern = _get_replacement_pattern(replacement)
+        filename = pattern.sub(replacement, filename)
 
     # 4. Strip leading/trailing replacements or dots (dots can be dangerous at start/end)
     filename = filename.strip(replacement + ".")
