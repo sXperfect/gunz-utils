@@ -218,6 +218,20 @@ class BaseIntEnum(enum.IntEnum):
     __ALIASES__: ClassVar[dict[str, int]] = {}
 
     @classmethod
+    def _get_name_lookup_map(cls) -> dict[str, Self]:
+        """
+        Lazily builds and returns a mapping from lowercase name to enum member.
+        """
+        if not hasattr(cls, "_name_lookup_map"):
+            lookup_map = {}
+            for member in cls:
+                name_lower = member.name.lower()
+                if name_lower not in lookup_map:
+                    lookup_map[name_lower] = member
+            setattr(cls, "_name_lookup_map", lookup_map)
+        return getattr(cls, "_name_lookup_map")
+
+    @classmethod
     def from_fuzzy_int_string(cls, value_str: str) -> Self:
         """
         Attempts to find a member by alias (string->int), case-insensitive name, or
@@ -239,9 +253,10 @@ class BaseIntEnum(enum.IntEnum):
                 raise ValueError(f"Alias target '{int_target_value}' is not a valid member value for {cls.__name__}")
 
         # 2. Check for member name matches (case-insensitive)
-        for member in cls:
-            if member.name.lower() == value_lower:
-                return member
+        # Optimization: Use cached lookup map instead of iterating
+        name_map = cls._get_name_lookup_map()
+        if value_lower in name_map:
+            return name_map[value_lower]
 
         # 3. Try to convert to int if it's a string representation of a number
         try:
