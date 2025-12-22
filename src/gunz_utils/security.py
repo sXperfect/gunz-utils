@@ -77,8 +77,8 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     # See: https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
     # Windows checks the "base" name up to the first dot.
     # e.g. "CON.txt" and "CON.tar.gz" are both invalid.
-    # We use split('.')[0] instead of os.path.splitext because splitext only splits the last extension.
-    root = filename.split('.')[0]
+    # We use partition('.')[0] instead of os.path.splitext because splitext only splits the last extension.
+    root = filename.partition('.')[0]
     if root.upper() in {
         "CON", "PRN", "AUX", "NUL",
         "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
