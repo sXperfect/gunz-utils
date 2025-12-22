@@ -87,3 +87,66 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
         filename = replacement + filename
 
     return filename
+
+
+def safe_path_join(base_dir: str, *paths: str) -> str:
+    """
+    Safely join paths to a base directory, preventing path traversal.
+
+    This function ensures that the resulting path is contained within the
+    specified base directory. It resolves '..' components and symbolic links.
+
+    Parameters
+    ----------
+    base_dir : str
+        The base directory to which paths will be joined.
+    *paths : str
+        The path components to join.
+
+    Returns
+    -------
+    str
+        The absolute, resolved path.
+
+    Raises
+    ------
+    ValueError
+        If the resulting path is outside the base directory.
+    """
+    # Resolve the base directory to its absolute path
+    # Use realpath to resolve symlinks, preventing symlink attacks
+    base_path = os.path.realpath(base_dir)
+
+    # Join the paths
+    # Note: os.path.join will discard previous components if a component is absolute.
+    # We must check for this.
+    final_path = base_path
+    for p in paths:
+        # Prevent null byte injection
+        if "\0" in p:
+            raise ValueError("Null byte found in path component")
+
+        # Determine if the component is absolute
+        # If it is, we treat it as relative to the base (stripping root)
+        # OR we just reject it. os.path.join behavior with absolute paths is often a source of bugs.
+        # Here we will reject it if it resets the root, OR we can strip the leading slash.
+        # Safest is to strip leading slashes/drive letters to force relative join.
+        if os.path.isabs(p):
+            # Handle Windows drive letters (e.g. C:\) by splitting drive
+            # splitdrive returns ('', p) on non-Windows usually, or ('C:', '\path') on Windows
+            drive, p = os.path.splitdrive(p)
+            # Strip leading separators to ensure it's relative
+            p = p.lstrip(os.path.sep)
+
+        final_path = os.path.join(final_path, p)
+
+    # Resolve the final path
+    resolved_path = os.path.realpath(final_path)
+
+    # Check if the resolved path starts with the base path
+    # We use commonprefix to ensure we don't match partial folder names
+    # e.g. /var/www matching /var/www-secret
+    if os.path.commonpath([base_path, resolved_path]) != base_path:
+         raise ValueError(f"Path traversal detected: '{resolved_path}' is outside base '{base_path}'")
+
+    return resolved_path
