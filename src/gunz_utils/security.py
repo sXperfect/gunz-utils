@@ -147,6 +147,6 @@ def safe_path_join(base_dir: str, *paths: str) -> str:
     # We use commonprefix to ensure we don't match partial folder names
     # e.g. /var/www matching /var/www-secret
     if os.path.commonpath([base_path, resolved_path]) != base_path:
-         raise ValueError(f"Path traversal detected: '{resolved_path}' is outside base '{base_path}'")
+         raise ValueError("Path traversal detected: path is outside base directory")
 
     return resolved_path
