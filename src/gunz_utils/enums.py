@@ -69,7 +69,9 @@ class BaseStrEnum(enum.StrEnum):
         # Use a private attribute on the class itself to store the map
         # We use getattr/setattr to avoid static type checker issues with
         # dynamically added attributes on Enum classes.
-        if not hasattr(cls, "_fuzzy_lookup_map"):
+        try:
+            return getattr(cls, "_fuzzy_lookup_map")
+        except AttributeError:
             lookup_map = {}
             for member in cls:
                 # Add normalized value
@@ -83,8 +85,7 @@ class BaseStrEnum(enum.StrEnum):
                     lookup_map[name_lower] = member
 
             setattr(cls, "_fuzzy_lookup_map", lookup_map)
-
-        return getattr(cls, "_fuzzy_lookup_map")
+            return lookup_map
 
     @classmethod
     def from_fuzzy_string(cls, value_str: str) -> Self:
@@ -222,14 +223,16 @@ class BaseIntEnum(enum.IntEnum):
         """
         Lazily builds and returns a mapping from lowercase name to enum member.
         """
-        if not hasattr(cls, "_name_lookup_map"):
+        try:
+            return getattr(cls, "_name_lookup_map")
+        except AttributeError:
             lookup_map = {}
             for member in cls:
                 name_lower = member.name.lower()
                 if name_lower not in lookup_map:
                     lookup_map[name_lower] = member
             setattr(cls, "_name_lookup_map", lookup_map)
-        return getattr(cls, "_name_lookup_map")
+            return lookup_map
 
     @classmethod
     def from_fuzzy_int_string(cls, value_str: str) -> Self:
