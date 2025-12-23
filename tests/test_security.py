@@ -131,5 +131,19 @@ class TestSecurity(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Null byte found"):
                 safe_path_join(base, "image.png\0.php")
 
+    def test_safe_path_join_no_leakage(self):
+        """Test that exception messages do not leak paths."""
+        with tempfile.TemporaryDirectory() as tmp_path:
+            base = os.path.realpath(str(tmp_path))
+            try:
+                safe_path_join(base, "../etc/passwd")
+            except ValueError as e:
+                msg = str(e)
+                self.assertIn("Path traversal detected", msg)
+                self.assertNotIn(base, msg)
+                self.assertNotIn("/etc/passwd", msg)
+            else:
+                self.fail("ValueError not raised")
+
 if __name__ == "__main__":
     unittest.main()
