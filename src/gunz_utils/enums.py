@@ -110,18 +110,20 @@ class BaseStrEnum(enum.StrEnum):
             except ValueError:
                 raise ValueError(f"Alias target '{alias_target_value}' is not a valid member value for {cls.__name__}")
 
-        # 2. Normalize separators and case for direct matching
-        normalized_value_input = value_lower.replace("-", "_").replace(" ", "_")
-
+        # 2. Check for matches in the fuzzy map
         # Optimization: Use cached lookup map instead of iterating
         fuzzy_map = cls._get_fuzzy_map()
 
-        if normalized_value_input in fuzzy_map:
-            return fuzzy_map[normalized_value_input]
-
-        # Also check if the raw lower input matches a key (e.g. if it matched a name)
+        # Check raw lowercase input first (avoids normalization if unnecessary)
+        # This catches direct name matches or values that are already normalized
         if value_lower in fuzzy_map:
             return fuzzy_map[value_lower]
+
+        # 3. Normalize separators and case for fuzzy matching
+        normalized_value_input = value_lower.replace("-", "_").replace(" ", "_")
+
+        if normalized_value_input in fuzzy_map:
+            return fuzzy_map[normalized_value_input]
 
         valid_options = ", ".join(f"'{m.value}'" for m in cls)
         raise ValueError(
