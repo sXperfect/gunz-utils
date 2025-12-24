@@ -37,7 +37,7 @@ def type_checked(func: t.Optional[t.Callable] = None, **kwargs: t.Any) -> t.Call
     ...
     >>> my_func("string")
     TypeError: Validation error in 'my_func':
-    Argument 'a': Input should be a valid integer, unable to parse string as an integer (got 'string')
+    Argument 'a': Input should be a valid integer, unable to parse string as an integer (got type 'str')
     """
     def decorator(f: t.Callable) -> t.Callable:
         # Create the validated version of the function
@@ -65,7 +65,11 @@ def type_checked(func: t.Optional[t.Callable] = None, **kwargs: t.Any) -> t.Call
                     
                     loc_str = " -> ".join(clean_loc) if clean_loc else "input"
                     
-                    errors.append(f"Argument '{loc_str}': {msg} (got {input_val!r})")
+                    # SECURITY: Do not leak the actual input value in the error message
+                    # as it might be sensitive (e.g., a password).
+                    # Instead, show the type of the input.
+                    input_type = type(input_val).__name__
+                    errors.append(f"Argument '{loc_str}': {msg} (got type '{input_type}')")
 
                 error_msg = f"Validation error in '{f.__name__}':\n" + "\n".join(errors)
                 
