@@ -26,6 +26,11 @@ from typing import Self, TypeVar, ClassVar, Any
 T = TypeVar("T", bound="BaseStrEnum")
 
 # =============================================================================
+# CONSTANTS
+# =============================================================================
+_MAX_INPUT_LENGTH = 1024  # Security: Prevent DoS via long strings
+
+# =============================================================================
 # BASE ENUM IMPLEMENTATION
 # =============================================================================
 @enum.verify(enum.UNIQUE)
@@ -93,6 +98,10 @@ class BaseStrEnum(enum.StrEnum):
         Attempts to find a member by alias, normalized value, or case-insensitive name.
         Raises ValueError if no match is found.
         """
+        # Security check to prevent DoS via excessive string processing
+        if len(value_str) > _MAX_INPUT_LENGTH:
+            raise ValueError(f"Input string too long (max {_MAX_INPUT_LENGTH} chars)")
+
         value_lower = value_str.lower()
         _aliases = getattr(cls, "__ALIASES__", {})
 
@@ -242,6 +251,10 @@ class BaseIntEnum(enum.IntEnum):
         Attempts to find a member by alias (string->int), case-insensitive name, or
         string-to-int conversion.
         """
+        # Security check to prevent DoS via excessive string processing
+        if len(value_str) > _MAX_INPUT_LENGTH:
+            raise ValueError(f"Input string too long (max {_MAX_INPUT_LENGTH} chars)")
+
         value_lower = value_str.lower()
         _aliases = getattr(cls, "__ALIASES__", {})
 
