@@ -9,7 +9,8 @@ import os
 import functools
 
 # Pre-compile the regex for invalid characters (anything not alphanumeric, dot, or dash)
-_INVALID_CHARS_PATTERN = re.compile(r'[^\w\.\-]')
+# We use + to collapse multiple invalid characters in one go
+_INVALID_CHARS_PATTERN = re.compile(r'[^\w\.\-]+')
 
 @functools.lru_cache(maxsize=16)
 def _get_replacement_pattern(replacement: str) -> re.Pattern:
