@@ -80,9 +80,14 @@ class BaseStrEnum(enum.StrEnum):
             lookup_map = {}
             for member in cls:
                 # Add normalized value
-                val_norm = member.value.lower().replace("-", "_").replace(" ", "_")
+                val_lower = member.value.lower()
+                val_norm = val_lower.replace("-", "_").replace(" ", "_")
                 if val_norm not in lookup_map:
                     lookup_map[val_norm] = member
+
+                # Add raw lowercase value (optimization for inputs matching value but with separators)
+                if val_lower not in lookup_map:
+                    lookup_map[val_lower] = member
 
                 # Add lowercase name
                 name_lower = member.name.lower()
