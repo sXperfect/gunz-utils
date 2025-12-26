@@ -64,6 +64,9 @@ class BaseStrEnum(enum.StrEnum):
     #? Using dunder name to avoid it being treated as an Enum member
     __ALIASES__: ClassVar[dict[str, str]] = {}
 
+    # Lazily initialized map for fuzzy lookups
+    _fuzzy_lookup_map: ClassVar[dict[str, Any]]
+
     @classmethod
     def _get_fuzzy_map(cls) -> dict[str, Self]:
         """
@@ -75,7 +78,7 @@ class BaseStrEnum(enum.StrEnum):
         # We use getattr/setattr to avoid static type checker issues with
         # dynamically added attributes on Enum classes.
         try:
-            return getattr(cls, "_fuzzy_lookup_map")
+            return cls._fuzzy_lookup_map
         except AttributeError:
             lookup_map = {}
             for member in cls:
@@ -108,7 +111,7 @@ class BaseStrEnum(enum.StrEnum):
             raise ValueError(f"Input string too long (max {_MAX_INPUT_LENGTH} chars)")
 
         value_lower = value_str.lower()
-        _aliases = getattr(cls, "__ALIASES__", {})
+        _aliases = cls.__ALIASES__
 
         # 1. Check for defined aliases (string -> target_string_value)
         if value_lower in _aliases:
@@ -234,13 +237,16 @@ class BaseIntEnum(enum.IntEnum):
 
     __ALIASES__: ClassVar[dict[str, int]] = {}
 
+    # Lazily initialized map for name lookups
+    _name_lookup_map: ClassVar[dict[str, Any]]
+
     @classmethod
     def _get_name_lookup_map(cls) -> dict[str, Self]:
         """
         Lazily builds and returns a mapping from lowercase name to enum member.
         """
         try:
-            return getattr(cls, "_name_lookup_map")
+            return cls._name_lookup_map
         except AttributeError:
             lookup_map = {}
             for member in cls:
@@ -261,7 +267,7 @@ class BaseIntEnum(enum.IntEnum):
             raise ValueError(f"Input string too long (max {_MAX_INPUT_LENGTH} chars)")
 
         value_lower = value_str.lower()
-        _aliases = getattr(cls, "__ALIASES__", {})
+        _aliases = cls.__ALIASES__
 
         # 1. Check for aliases (string -> int_value)
         if value_lower in _aliases:
