@@ -46,8 +46,19 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     Raises
     ------
     ValueError
-        If the filename is empty after sanitization.
+        If the filename is empty after sanitization, or if the replacement
+        string contains path separators.
     """
+    # 0. Check for unsafe replacement characters
+    # We must disallow path separators in the replacement string to prevent
+    # accidental introduction of path traversal or directory creation.
+    # We check for standard separators (/ and \) explicitly to be safe across platforms.
+    if any(c in replacement for c in {"/", "\\"}):
+        raise ValueError("Replacement string contains path separators")
+
+    if os.sep in replacement or (os.path.altsep and os.path.altsep in replacement):
+        raise ValueError("Replacement string contains path separators")
+
     # 1. Get base name to avoid directories/path traversal via slashes
     filename = os.path.basename(filename)
 
