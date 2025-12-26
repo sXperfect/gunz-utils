@@ -74,6 +74,15 @@ class TestSecurity(unittest.TestCase):
             # Case insensitive check
             self.assertEqual(sanitize_filename(name.lower()), f"_{name.lower()}")
 
+    def test_sanitize_filename_unsafe_replacement(self):
+        """Test that sanitize_filename rejects unsafe replacement characters."""
+        unsafe_replacements = ["/", "\\", "foo/bar", "foo\\bar"]
+
+        for replacement in unsafe_replacements:
+            with self.subTest(replacement=replacement):
+                with self.assertRaisesRegex(ValueError, "Replacement string contains path separators"):
+                    sanitize_filename("file*name.txt", replacement=replacement)
+
     def test_safe_path_join_valid(self):
         """Test valid path joins."""
         with tempfile.TemporaryDirectory() as tmp_path:
