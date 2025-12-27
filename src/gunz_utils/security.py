@@ -75,9 +75,13 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
 
     # 3. Collapse multiple replacements
     if replacement:
-        # Use cached pattern for replacement
-        pattern = _get_replacement_pattern(replacement)
-        filename = pattern.sub(replacement, filename)
+        # Optimization: Only run regex if we actually have consecutive replacements
+        # This avoids unnecessary regex processing and string allocation for the common case
+        # where the replacement character appears singly (e.g. "my_file.txt")
+        if replacement * 2 in filename:
+            # Use cached pattern for replacement
+            pattern = _get_replacement_pattern(replacement)
+            filename = pattern.sub(replacement, filename)
 
     # 4. Strip leading/trailing replacements or dots (dots can be dangerous at start/end)
     filename = filename.strip(replacement + ".")
