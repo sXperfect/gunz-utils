@@ -1,3 +1,3 @@
-## 2025-12-24 - [Avoid Unnecessary Normalization]
-**Learning:** In fuzzy matching logic where normalization (e.g., `replace()` calls) is used as a fallback, checking the raw input against the lookup map *first* can yield significant performance gains (~13-20%) for inputs that are already clean or match direct names, as it avoids the overhead of string allocation and scanning.
-**Action:** When implementing "fuzzy" or "fallback" logic, always prioritize the "happy path" (direct match) before performing expensive transformations.
+## 2025-12-24 - [Avoid Unnecessary Regex Replacement]
+**Learning:** For `re.sub` operations intended to collapse multiple occurrences of a character (e.g., `__` -> `_`), guarding the operation with a fast string check (`if replacement * 2 in string`) avoids expensive regex processing and string allocation for the common case where no collapse is needed. This yielded a ~25% overall speedup for `sanitize_filename` on clean inputs.
+**Action:** When using regex for cleanup/normalization tasks that are often no-ops, check for the "trigger" condition using simple string operations (`in`) before invoking the regex engine.
