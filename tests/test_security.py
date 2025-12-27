@@ -2,7 +2,6 @@
 import unittest
 import os
 import tempfile
-import shutil
 from gunz_utils.security import sanitize_filename, safe_path_join
 
 class TestSecurity(unittest.TestCase):
