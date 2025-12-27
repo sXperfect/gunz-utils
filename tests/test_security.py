@@ -83,6 +83,18 @@ class TestSecurity(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Replacement string contains path separators"):
                     sanitize_filename("file*name.txt", replacement=replacement)
 
+    def test_sanitize_filename_input_too_long(self):
+        """Test that extremely long inputs are rejected to prevent DoS."""
+        # 4096 is max, so 4097 should fail
+        long_input = "a" * 4097
+        with self.assertRaisesRegex(ValueError, "Input filename too long"):
+            sanitize_filename(long_input)
+
+        # 4096 should pass (and be truncated to 255)
+        acceptable_input = "a" * 4096
+        result = sanitize_filename(acceptable_input)
+        self.assertEqual(len(result), 255)
+
     def test_safe_path_join_valid(self):
         """Test valid path joins."""
         with tempfile.TemporaryDirectory() as tmp_path:
