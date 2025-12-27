@@ -11,6 +11,7 @@ import functools
 # Pre-compile the regex for invalid characters (anything not alphanumeric, dot, or dash)
 # We use + to collapse multiple invalid characters in one go
 _INVALID_CHARS_PATTERN = re.compile(r'[^\w\.\-]+')
+_MAX_FILENAME_INPUT_LENGTH = 4096  # Security: limit input size to prevent DoS
 
 @functools.lru_cache(maxsize=16)
 def _get_replacement_pattern(replacement: str) -> re.Pattern:
@@ -23,11 +24,12 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
 
     This function ensures that the filename is safe to use in file system operations.
     It:
-    1. Removes any path components (directories).
-    2. Replaces dangerous characters with a replacement character (default: "_").
-    3. Prevents path traversal (e.g., "..").
-    4. Limits the length of the filename (255 chars).
-    5. Disallows empty filenames.
+    1. Checks input length to prevent DoS.
+    2. Removes any path components (directories).
+    3. Replaces dangerous characters with a replacement character (default: "_").
+    4. Prevents path traversal (e.g., "..").
+    5. Limits the length of the filename (255 chars).
+    6. Disallows empty filenames.
 
     Allowed characters: alphanumeric, underscore, dash, dot.
 
@@ -46,10 +48,14 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     Raises
     ------
     ValueError
-        If the filename is empty after sanitization, or if the replacement
-        string contains path separators.
+        If the filename is empty after sanitization, if the input is too long,
+        or if the replacement string contains path separators.
     """
-    # 0. Check for unsafe replacement characters
+    # 0. Check input length to prevent DoS via excessive string processing
+    if len(filename) > _MAX_FILENAME_INPUT_LENGTH:
+        raise ValueError(f"Input filename too long (max {_MAX_FILENAME_INPUT_LENGTH} chars)")
+
+    # 1. Check for unsafe replacement characters
     # We must disallow path separators in the replacement string to prevent
     # accidental introduction of path traversal or directory creation.
     # We check for standard separators (/ and \) explicitly to be safe across platforms.
@@ -59,7 +65,7 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     if os.sep in replacement or (os.path.altsep and os.path.altsep in replacement):
         raise ValueError("Replacement string contains path separators")
 
-    # 1. Get base name to avoid directories/path traversal via slashes
+    # 2. Get base name to avoid directories/path traversal via slashes
     filename = os.path.basename(filename)
 
     # 2. Replace dangerous characters
