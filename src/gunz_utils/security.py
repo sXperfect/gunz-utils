@@ -59,10 +59,7 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     # We must disallow path separators in the replacement string to prevent
     # accidental introduction of path traversal or directory creation.
     # We check for standard separators (/ and \) explicitly to be safe across platforms.
-    if any(c in replacement for c in {"/", "\\"}):
-        raise ValueError("Replacement string contains path separators")
-
-    if os.sep in replacement or (os.path.altsep and os.path.altsep in replacement):
+    if "/" in replacement or "\\" in replacement:
         raise ValueError("Replacement string contains path separators")
 
     # 2. Get base name to avoid directories/path traversal via slashes
