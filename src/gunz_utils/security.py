@@ -98,7 +98,13 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     # e.g. "CON.txt" and "CON.tar.gz" are both invalid.
     # We use partition('.')[0] instead of os.path.splitext because splitext only splits the last extension.
     root = filename.partition('.')[0]
-    if root.upper() in {
+
+    # Performance Optimization (⚡ Bolt):
+    # Instead of indiscriminately doing .upper() and looking up in a set,
+    # we first check if the length of `root` is 3 or 4, since all reserved names are exactly 3 or 4 chars.
+    # Using `==` with `or` is measurably faster than `in {3, 4}` for simple integer checks.
+    root_len = len(root)
+    if (root_len == 3 or root_len == 4) and root.upper() in {
         "CON", "PRN", "AUX", "NUL",
         "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
