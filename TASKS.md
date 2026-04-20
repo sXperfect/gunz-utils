@@ -7,3 +7,4 @@
 | [dos-protection-enum](tasks/done/2025-02-18-dos-protection-enum.md) | 2025-02-18 | Fix DoS risk in Enum utilities via input length validation | Done |
 | [optimize-enum-fuzzy-lookup](tasks/optimize_enum_fuzzy_lookup.md) | 2025-10-18 | Optimize BaseStrEnum fuzzy matching by caching raw values | Done |
 | [optimize-enum-access](tasks/optimize_enum_access.md) | 2025-10-27 | Optimize Enum Attribute Access | Done |
+| [fix-ci-system-error](tasks/fix_ci_system_error.md) | 2025-04-17 | Fix CI system error and unittest setup | Done |
