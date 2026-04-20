@@ -1,0 +1,200 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gunz_utils.validation &mdash; gunz-utils 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            gunz-utils
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">The Gunz Ecosystem</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://gunz-ml.pages.dev">Gunz-ML (SDK)</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://gunz-cm.pages.dev">Gunz-CM (Matrix)</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://gunz-utils.pages.dev">Gunz-Utils (Core)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts.html">Core Concepts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Technical Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">gunz-utils</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gunz_utils.validation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gunz_utils.validation</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Validation utilities.</span>
+
+<span class="sd">This module provides decorators and helpers to improve data validation</span>
+<span class="sd">and error reporting, wrapping underlying libraries like Pydantic.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">functools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">t</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_call</span><span class="p">,</span> <span class="n">ValidationError</span>
+
+<div class="viewcode-block" id="type_checked">
+<a class="viewcode-back" href="../../api.html#gunz_utils.validation.type_checked">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">type_checked</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">t</span><span class="o">.</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">t</span><span class="o">.</span><span class="n">Callable</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A wrapper around pydantic.validate_call that provides cleaner, user-friendly error messages.</span>
+
+<span class="sd">    It catches `pydantic.ValidationError` and re-raises it as a `TypeError` with a</span>
+<span class="sd">    formatted message indicating exactly which argument failed and why.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    func : Callable, optional</span>
+<span class="sd">        The function to decorate.</span>
+<span class="sd">    **kwargs :</span>
+<span class="sd">        Additional arguments passed to `pydantic.validate_call` (e.g., `config`).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Callable</span>
+<span class="sd">        The decorated function with validation logic.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; @type_checked</span>
+<span class="sd">    ... def my_func(a: int):</span>
+<span class="sd">    ...     pass</span>
+<span class="sd">    ...</span>
+<span class="sd">    &gt;&gt;&gt; my_func(&quot;string&quot;)</span>
+<span class="sd">    TypeError: Validation error in &#39;my_func&#39;:</span>
+<span class="sd">    Argument &#39;a&#39;: Input should be a valid integer, unable to parse string as an integer (got type &#39;str&#39;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decorator</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">Callable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">t</span><span class="o">.</span><span class="n">Callable</span><span class="p">:</span>
+        <span class="c1"># Create the validated version of the function</span>
+        <span class="n">validated_func</span> <span class="o">=</span> <span class="n">validate_call</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">t</span><span class="o">.</span><span class="n">Any</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">validated_func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">ValidationError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">errors</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">error</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">errors</span><span class="p">():</span>
+                    <span class="c1"># Extract location: usually (&#39;args&#39;, 0) or (&#39;kwargs&#39;, &#39;arg_name&#39;)</span>
+                    <span class="c1"># We want to present a clean name to the user.</span>
+                    <span class="n">loc</span> <span class="o">=</span> <span class="n">error</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;loc&quot;</span><span class="p">,</span> <span class="p">())</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="n">error</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;msg&quot;</span><span class="p">,</span> <span class="s2">&quot;Invalid input&quot;</span><span class="p">)</span>
+                    <span class="n">input_val</span> <span class="o">=</span> <span class="n">error</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">,</span> <span class="s2">&quot;unknown&quot;</span><span class="p">)</span>
+                    
+                    <span class="c1"># Simplify location string</span>
+                    <span class="c1"># Remove &#39;args&#39; or &#39;kwargs&#39; if they are the first element</span>
+                    <span class="n">clean_loc</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">loc</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">item</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;args&quot;</span><span class="p">,</span> <span class="s2">&quot;kwargs&quot;</span><span class="p">):</span>
+                            <span class="n">clean_loc</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
+                    
+                    <span class="n">loc_str</span> <span class="o">=</span> <span class="s2">&quot; -&gt; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">clean_loc</span><span class="p">)</span> <span class="k">if</span> <span class="n">clean_loc</span> <span class="k">else</span> <span class="s2">&quot;input&quot;</span>
+                    
+                    <span class="c1"># SECURITY: Do not leak the actual input value in the error message</span>
+                    <span class="c1"># as it might be sensitive (e.g., a password).</span>
+                    <span class="c1"># Instead, show the type of the input.</span>
+                    <span class="n">input_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">input_val</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
+                    <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Argument &#39;</span><span class="si">{</span><span class="n">loc_str</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2"> (got type &#39;</span><span class="si">{</span><span class="n">input_type</span><span class="si">}</span><span class="s2">&#39;)&quot;</span><span class="p">)</span>
+
+                <span class="n">error_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Validation error in &#39;</span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&#39;:</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">errors</span><span class="p">)</span>
+                
+                <span class="c1"># Re-raise as TypeError to be more Pythonic for type issues, </span>
+                <span class="c1"># effectively hiding the Pydantic trace from the end user unless they look closer.</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">wrapper</span>
+
+    <span class="k">if</span> <span class="n">func</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">decorator</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Yeremia Gunawan Adhisantoso.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
