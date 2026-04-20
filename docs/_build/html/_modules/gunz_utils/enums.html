@@ -1,0 +1,498 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gunz_utils.enums &mdash; gunz-utils 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            gunz-utils
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">The Gunz Ecosystem</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://gunz-ml.pages.dev">Gunz-ML (SDK)</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://gunz-cm.pages.dev">Gunz-CM (Matrix)</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://gunz-utils.pages.dev">Gunz-Utils (Core)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts.html">Core Concepts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Technical Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">gunz-utils</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">gunz_utils.enums</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for gunz_utils.enums</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Base Enum Utilities.</span>
+
+<span class="sd">This module provides custom base classes for StrEnum and IntEnum to handle</span>
+<span class="sd">common case-insensitive, separator-insensitive matching, and alias support</span>
+<span class="sd">for creating enum members. It leverages modern Python 3.11+ features.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># METADATA</span>
+<span class="c1"># =============================================================================</span>
+<span class="n">__author__</span> <span class="o">=</span> <span class="s2">&quot;Yeremia Gunawan Adhisantoso&quot;</span>
+<span class="n">__email__</span> <span class="o">=</span> <span class="s2">&quot;adhisant@tnt.uni-hannover.de&quot;</span>
+<span class="n">__license__</span> <span class="o">=</span> <span class="s2">&quot;Clear BSD&quot;</span>
+<span class="n">__version__</span> <span class="o">=</span> <span class="s2">&quot;1.0.0&quot;</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># STANDARD LIBRARY IMPORTS</span>
+<span class="c1"># =============================================================================</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Self</span><span class="p">,</span> <span class="n">TypeVar</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># TYPE VARIABLES</span>
+<span class="c1"># =============================================================================</span>
+<span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="s2">&quot;BaseStrEnum&quot;</span><span class="p">)</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># CONSTANTS</span>
+<span class="c1"># =============================================================================</span>
+<span class="n">_MAX_INPUT_LENGTH</span> <span class="o">=</span> <span class="mi">1024</span>  <span class="c1"># Security: Prevent DoS via long strings</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># BASE ENUM IMPLEMENTATION</span>
+<span class="c1"># =============================================================================</span>
+<div class="viewcode-block" id="BaseStrEnum">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseStrEnum">[docs]</a>
+<span class="nd">@enum</span><span class="o">.</span><span class="n">verify</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">UNIQUE</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BaseStrEnum</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">StrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A base class for StrEnum that provides robust matching and alias support.</span>
+
+<span class="sd">    Features:</span>
+<span class="sd">    - Case-insensitive matching.</span>
+<span class="sd">    - Separator-insensitive matching (treats spaces, dashes, underscores as same).</span>
+<span class="sd">    - Alias support via the `__ALIASES__` class attribute.</span>
+<span class="sd">    - Introspection helpers (names, values, items).</span>
+<span class="sd">    - Safe lookup (get_or_none).</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; class Color(BaseStrEnum):</span>
+<span class="sd">    ...     __ALIASES__ = {&quot;dark&quot;: &quot;dark_blue&quot;}</span>
+<span class="sd">    ...     DARK_BLUE = &quot;dark_blue&quot;</span>
+<span class="sd">    ...     LIGHT_GREEN = &quot;light green&quot;</span>
+<span class="sd">    ...</span>
+<span class="sd">    &gt;&gt;&gt; Color.from_fuzzy_string(&quot;DARK_BLUE&quot;) is Color.DARK_BLUE</span>
+<span class="sd">    True</span>
+<span class="sd">    &gt;&gt;&gt; Color.from_fuzzy_string(&quot;dark-blue&quot;) is Color.DARK_BLUE</span>
+<span class="sd">    True</span>
+<span class="sd">    &gt;&gt;&gt; Color.from_fuzzy_string(&quot;dark&quot;) is Color.DARK_BLUE</span>
+<span class="sd">    True</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="c1">#? Dictionary mapping lowercase aliases to actual enum values</span>
+    <span class="c1">#? Using dunder name to avoid it being treated as an Enum member</span>
+    <span class="n">__ALIASES__</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># Lazily initialized map for fuzzy lookups</span>
+    <span class="n">_fuzzy_lookup_map</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_fuzzy_map</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Self</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Lazily builds and returns a mapping for fuzzy lookups.</span>
+<span class="sd">        Key is the normalized string or lowercase name.</span>
+<span class="sd">        Value is the enum member.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Use a private attribute on the class itself to store the map</span>
+        <span class="c1"># We use getattr/setattr to avoid static type checker issues with</span>
+        <span class="c1"># dynamically added attributes on Enum classes.</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_fuzzy_lookup_map</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="n">lookup_map</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">:</span>
+                <span class="c1"># Add normalized value</span>
+                <span class="n">val_lower</span> <span class="o">=</span> <span class="n">member</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="n">val_norm</span> <span class="o">=</span> <span class="n">val_lower</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">val_norm</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">lookup_map</span><span class="p">:</span>
+                    <span class="n">lookup_map</span><span class="p">[</span><span class="n">val_norm</span><span class="p">]</span> <span class="o">=</span> <span class="n">member</span>
+
+                <span class="c1"># Add raw lowercase value (optimization for inputs matching value but with separators)</span>
+                <span class="k">if</span> <span class="n">val_lower</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">lookup_map</span><span class="p">:</span>
+                    <span class="n">lookup_map</span><span class="p">[</span><span class="n">val_lower</span><span class="p">]</span> <span class="o">=</span> <span class="n">member</span>
+
+                <span class="c1"># Add lowercase name</span>
+                <span class="n">name_lower</span> <span class="o">=</span> <span class="n">member</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">name_lower</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">lookup_map</span><span class="p">:</span>
+                    <span class="n">lookup_map</span><span class="p">[</span><span class="n">name_lower</span><span class="p">]</span> <span class="o">=</span> <span class="n">member</span>
+
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;_fuzzy_lookup_map&quot;</span><span class="p">,</span> <span class="n">lookup_map</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">lookup_map</span>
+
+<div class="viewcode-block" id="BaseStrEnum.from_fuzzy_string">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseStrEnum.from_fuzzy_string">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_fuzzy_string</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Attempts to find a member by alias, normalized value, or case-insensitive name.</span>
+<span class="sd">        Raises ValueError if no match is found.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Security check to prevent DoS via excessive string processing</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">value_str</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">_MAX_INPUT_LENGTH</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Input string too long (max </span><span class="si">{</span><span class="n">_MAX_INPUT_LENGTH</span><span class="si">}</span><span class="s2"> chars)&quot;</span><span class="p">)</span>
+
+        <span class="n">value_lower</span> <span class="o">=</span> <span class="n">value_str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="n">_aliases</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__ALIASES__</span>
+
+        <span class="c1"># 1. Check for defined aliases (string -&gt; target_string_value)</span>
+        <span class="k">if</span> <span class="n">value_lower</span> <span class="ow">in</span> <span class="n">_aliases</span><span class="p">:</span>
+            <span class="n">alias_target_value</span> <span class="o">=</span> <span class="n">_aliases</span><span class="p">[</span><span class="n">value_lower</span><span class="p">]</span>
+            
+            <span class="c1"># Check internal map first</span>
+            <span class="k">if</span> <span class="n">alias_target_value</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_value2member_map_</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_value2member_map_</span><span class="p">[</span><span class="n">alias_target_value</span><span class="p">]</span>
+
+            <span class="c1"># Fallback to instantiation (should work if valid member)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">alias_target_value</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Alias target &#39;</span><span class="si">{</span><span class="n">alias_target_value</span><span class="si">}</span><span class="s2">&#39; is not a valid member value for </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># 2. Check for matches in the fuzzy map</span>
+        <span class="c1"># Optimization: Use cached lookup map instead of iterating</span>
+        <span class="n">fuzzy_map</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_get_fuzzy_map</span><span class="p">()</span>
+
+        <span class="c1"># Check raw lowercase input first (avoids normalization if unnecessary)</span>
+        <span class="c1"># This catches direct name matches or values that are already normalized</span>
+        <span class="k">if</span> <span class="n">value_lower</span> <span class="ow">in</span> <span class="n">fuzzy_map</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">fuzzy_map</span><span class="p">[</span><span class="n">value_lower</span><span class="p">]</span>
+
+        <span class="c1"># 3. Normalize separators and case for fuzzy matching</span>
+        <span class="n">normalized_value_input</span> <span class="o">=</span> <span class="n">value_lower</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">normalized_value_input</span> <span class="ow">in</span> <span class="n">fuzzy_map</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">fuzzy_map</span><span class="p">[</span><span class="n">normalized_value_input</span><span class="p">]</span>
+
+        <span class="n">valid_options</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">m</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;&quot;</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">value_str</span><span class="si">}</span><span class="s2">&#39; is not a valid </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Please use one of: </span><span class="si">{</span><span class="n">valid_options</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BaseStrEnum.names">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseStrEnum.names">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">names</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a list of all member names.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">member</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="BaseStrEnum.values">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseStrEnum.values">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">values</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a list of all member values.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">member</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="BaseStrEnum.items">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseStrEnum.items">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">items</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a list of (name, value) tuples.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="n">member</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">member</span><span class="o">.</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="BaseStrEnum.get_or_none">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseStrEnum.get_or_none">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_or_none</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Safely attempts to get an enum member. Returns None if invalid.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="bp">cls</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">value</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">pass</span> 
+        
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_fuzzy_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">pass</span> 
+
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="BaseStrEnum.choices">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseStrEnum.choices">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">choices</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">values</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="OptionalBaseStrEnum">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.OptionalBaseStrEnum">[docs]</a>
+<span class="nd">@enum</span><span class="o">.</span><span class="n">verify</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">UNIQUE</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">OptionalBaseStrEnum</span><span class="p">(</span><span class="n">BaseStrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A base class for StrEnum that treats None as the NONE enum member.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">__ALIASES__</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__init_subclass__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init_subclass__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">&quot;NONE&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__members__</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Class </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> must define a NONE member when inheriting &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;from </span><span class="si">{</span><span class="n">OptionalBaseStrEnum</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. Example: NONE = &#39;none&#39;&quot;</span>
+            <span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_missing_</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">NONE</span>
+        
+        <span class="c1"># Try fuzzy match via helper, but do NOT retry cls(value) to avoid recursion</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_fuzzy_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">pass</span> <span class="c1"># let super raise</span>
+        
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_missing_</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="BaseIntEnum">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseIntEnum">[docs]</a>
+<span class="nd">@enum</span><span class="o">.</span><span class="n">verify</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">UNIQUE</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BaseIntEnum</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">IntEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A base class for IntEnum that provides string-based lookup and alias support.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; class ErrorCode(BaseIntEnum):</span>
+<span class="sd">    ...     __ALIASES__ = {&quot;missing&quot;: 404}</span>
+<span class="sd">    ...     NOT_FOUND = 404</span>
+<span class="sd">    ...</span>
+<span class="sd">    &gt;&gt;&gt; ErrorCode.from_fuzzy_int_string(&quot;missing&quot;) is ErrorCode.NOT_FOUND</span>
+<span class="sd">    True</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">__ALIASES__</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># Lazily initialized map for name lookups</span>
+    <span class="n">_name_lookup_map</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_name_lookup_map</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Self</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Lazily builds and returns a mapping from lowercase name to enum member.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_name_lookup_map</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="n">lookup_map</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">:</span>
+                <span class="n">name_lower</span> <span class="o">=</span> <span class="n">member</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">name_lower</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">lookup_map</span><span class="p">:</span>
+                    <span class="n">lookup_map</span><span class="p">[</span><span class="n">name_lower</span><span class="p">]</span> <span class="o">=</span> <span class="n">member</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;_name_lookup_map&quot;</span><span class="p">,</span> <span class="n">lookup_map</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">lookup_map</span>
+
+<div class="viewcode-block" id="BaseIntEnum.from_fuzzy_int_string">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseIntEnum.from_fuzzy_int_string">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_fuzzy_int_string</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Attempts to find a member by alias (string-&gt;int), case-insensitive name, or</span>
+<span class="sd">        string-to-int conversion.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Security check to prevent DoS via excessive string processing</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">value_str</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">_MAX_INPUT_LENGTH</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Input string too long (max </span><span class="si">{</span><span class="n">_MAX_INPUT_LENGTH</span><span class="si">}</span><span class="s2"> chars)&quot;</span><span class="p">)</span>
+
+        <span class="n">value_lower</span> <span class="o">=</span> <span class="n">value_str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="n">_aliases</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__ALIASES__</span>
+
+        <span class="c1"># 1. Check for aliases (string -&gt; int_value)</span>
+        <span class="k">if</span> <span class="n">value_lower</span> <span class="ow">in</span> <span class="n">_aliases</span><span class="p">:</span>
+            <span class="n">int_target_value</span> <span class="o">=</span> <span class="n">_aliases</span><span class="p">[</span><span class="n">value_lower</span><span class="p">]</span>
+            
+            <span class="k">if</span> <span class="n">int_target_value</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_value2member_map_</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_value2member_map_</span><span class="p">[</span><span class="n">int_target_value</span><span class="p">]</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">int_target_value</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Alias target &#39;</span><span class="si">{</span><span class="n">int_target_value</span><span class="si">}</span><span class="s2">&#39; is not a valid member value for </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># 2. Check for member name matches (case-insensitive)</span>
+        <span class="c1"># Optimization: Use cached lookup map instead of iterating</span>
+        <span class="n">name_map</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_get_name_lookup_map</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">value_lower</span> <span class="ow">in</span> <span class="n">name_map</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">name_map</span><span class="p">[</span><span class="n">value_lower</span><span class="p">]</span>
+
+        <span class="c1"># 3. Try to convert to int if it&#39;s a string representation of a number</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">int_value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value_str</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">int_value</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_value2member_map_</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_value2member_map_</span><span class="p">[</span><span class="n">int_value</span><span class="p">]</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">int_value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">pass</span> 
+
+        <span class="n">valid_options</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">m</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;&quot;</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">value_str</span><span class="si">}</span><span class="s2">&#39; is not a valid </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Please use one of: </span><span class="si">{</span><span class="n">valid_options</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BaseIntEnum.names">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseIntEnum.names">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">names</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">member</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="BaseIntEnum.values">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseIntEnum.values">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">values</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">member</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="BaseIntEnum.items">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseIntEnum.items">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">items</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="n">member</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">member</span><span class="o">.</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="BaseIntEnum.get_or_none">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseIntEnum.get_or_none">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_or_none</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="bp">cls</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">value</span>
+
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">pass</span> 
+        
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_fuzzy_int_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">pass</span> 
+
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="BaseIntEnum.choices">
+<a class="viewcode-back" href="../../api.html#gunz_utils.enums.BaseIntEnum.choices">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">choices</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">values</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Yeremia Gunawan Adhisantoso.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

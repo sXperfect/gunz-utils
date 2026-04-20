@@ -1,0 +1,310 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Reference &mdash; gunz-utils 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Core Concepts" href="concepts.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            gunz-utils
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">The Gunz Ecosystem</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://gunz-ml.pages.dev">Gunz-ML (SDK)</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://gunz-cm.pages.dev">Gunz-CM (Matrix)</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://gunz-utils.pages.dev">Gunz-Utils (Core)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Core Concepts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Technical Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-gunz_utils.enums">Enums</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gunz_utils.enums.BaseIntEnum"><code class="docutils literal notranslate"><span class="pre">BaseIntEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseIntEnum.choices"><code class="docutils literal notranslate"><span class="pre">BaseIntEnum.choices()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseIntEnum.from_fuzzy_int_string"><code class="docutils literal notranslate"><span class="pre">BaseIntEnum.from_fuzzy_int_string()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseIntEnum.get_or_none"><code class="docutils literal notranslate"><span class="pre">BaseIntEnum.get_or_none()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseIntEnum.items"><code class="docutils literal notranslate"><span class="pre">BaseIntEnum.items()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseIntEnum.names"><code class="docutils literal notranslate"><span class="pre">BaseIntEnum.names()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseIntEnum.values"><code class="docutils literal notranslate"><span class="pre">BaseIntEnum.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#gunz_utils.enums.BaseStrEnum"><code class="docutils literal notranslate"><span class="pre">BaseStrEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseStrEnum.choices"><code class="docutils literal notranslate"><span class="pre">BaseStrEnum.choices()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseStrEnum.from_fuzzy_string"><code class="docutils literal notranslate"><span class="pre">BaseStrEnum.from_fuzzy_string()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseStrEnum.get_or_none"><code class="docutils literal notranslate"><span class="pre">BaseStrEnum.get_or_none()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseStrEnum.items"><code class="docutils literal notranslate"><span class="pre">BaseStrEnum.items()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseStrEnum.names"><code class="docutils literal notranslate"><span class="pre">BaseStrEnum.names()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gunz_utils.enums.BaseStrEnum.values"><code class="docutils literal notranslate"><span class="pre">BaseStrEnum.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#gunz_utils.enums.OptionalBaseStrEnum"><code class="docutils literal notranslate"><span class="pre">OptionalBaseStrEnum</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-gunz_utils.validation">Validation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gunz_utils.validation.type_checked"><code class="docutils literal notranslate"><span class="pre">type_checked()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">gunz-utils</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">API Reference</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/api.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-reference">
+<h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading"></a></h1>
+<section id="module-gunz_utils.enums">
+<span id="enums"></span><h2>Enums<a class="headerlink" href="#module-gunz_utils.enums" title="Link to this heading"></a></h2>
+<p>Base Enum Utilities.</p>
+<p>This module provides custom base classes for StrEnum and IntEnum to handle
+common case-insensitive, separator-insensitive matching, and alias support
+for creating enum members. It leverages modern Python 3.11+ features.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseIntEnum">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">gunz_utils.enums.</span></span><span class="sig-name descname"><span class="pre">BaseIntEnum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseIntEnum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseIntEnum" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.IntEnum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">IntEnum</span></code></a></p>
+<p>A base class for IntEnum that provides string-based lookup and alias support.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">class</span><span class="w"> </span><span class="nc">ErrorCode</span><span class="p">(</span><span class="n">BaseIntEnum</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">__ALIASES__</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;missing&quot;</span><span class="p">:</span> <span class="mi">404</span><span class="p">}</span>
+<span class="gp">... </span>    <span class="n">NOT_FOUND</span> <span class="o">=</span> <span class="mi">404</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ErrorCode</span><span class="o">.</span><span class="n">from_fuzzy_int_string</span><span class="p">(</span><span class="s2">&quot;missing&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="n">ErrorCode</span><span class="o">.</span><span class="n">NOT_FOUND</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseIntEnum.choices">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">choices</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseIntEnum.choices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseIntEnum.choices" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseIntEnum.from_fuzzy_int_string">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_fuzzy_int_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Self" title="(in Python v3.14)"><span class="pre">Self</span></a></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseIntEnum.from_fuzzy_int_string"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseIntEnum.from_fuzzy_int_string" title="Link to this definition"></a></dt>
+<dd><p>Attempts to find a member by alias (string-&gt;int), case-insensitive name, or
+string-to-int conversion.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseIntEnum.get_or_none">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_or_none</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Self" title="(in Python v3.14)"><span class="pre">Self</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseIntEnum.get_or_none"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseIntEnum.get_or_none" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseIntEnum.items">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseIntEnum.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseIntEnum.items" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseIntEnum.names">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">names</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseIntEnum.names"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseIntEnum.names" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseIntEnum.values">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseIntEnum.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseIntEnum.values" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseStrEnum">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">gunz_utils.enums.</span></span><span class="sig-name descname"><span class="pre">BaseStrEnum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseStrEnum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseStrEnum" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.StrEnum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">StrEnum</span></code></a></p>
+<p>A base class for StrEnum that provides robust matching and alias support.</p>
+<p>Features:
+- Case-insensitive matching.
+- Separator-insensitive matching (treats spaces, dashes, underscores as same).
+- Alias support via the <cite>__ALIASES__</cite> class attribute.
+- Introspection helpers (names, values, items).
+- Safe lookup (get_or_none).</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">class</span><span class="w"> </span><span class="nc">Color</span><span class="p">(</span><span class="n">BaseStrEnum</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">__ALIASES__</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;dark&quot;</span><span class="p">:</span> <span class="s2">&quot;dark_blue&quot;</span><span class="p">}</span>
+<span class="gp">... </span>    <span class="n">DARK_BLUE</span> <span class="o">=</span> <span class="s2">&quot;dark_blue&quot;</span>
+<span class="gp">... </span>    <span class="n">LIGHT_GREEN</span> <span class="o">=</span> <span class="s2">&quot;light green&quot;</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Color</span><span class="o">.</span><span class="n">from_fuzzy_string</span><span class="p">(</span><span class="s2">&quot;DARK_BLUE&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="n">Color</span><span class="o">.</span><span class="n">DARK_BLUE</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Color</span><span class="o">.</span><span class="n">from_fuzzy_string</span><span class="p">(</span><span class="s2">&quot;dark-blue&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="n">Color</span><span class="o">.</span><span class="n">DARK_BLUE</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Color</span><span class="o">.</span><span class="n">from_fuzzy_string</span><span class="p">(</span><span class="s2">&quot;dark&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="n">Color</span><span class="o">.</span><span class="n">DARK_BLUE</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseStrEnum.choices">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">choices</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseStrEnum.choices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseStrEnum.choices" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseStrEnum.from_fuzzy_string">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_fuzzy_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Self" title="(in Python v3.14)"><span class="pre">Self</span></a></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseStrEnum.from_fuzzy_string"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseStrEnum.from_fuzzy_string" title="Link to this definition"></a></dt>
+<dd><p>Attempts to find a member by alias, normalized value, or case-insensitive name.
+Raises ValueError if no match is found.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseStrEnum.get_or_none">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_or_none</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Self" title="(in Python v3.14)"><span class="pre">Self</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseStrEnum.get_or_none"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseStrEnum.get_or_none" title="Link to this definition"></a></dt>
+<dd><p>Safely attempts to get an enum member. Returns None if invalid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseStrEnum.items">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseStrEnum.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseStrEnum.items" title="Link to this definition"></a></dt>
+<dd><p>Returns a list of (name, value) tuples.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseStrEnum.names">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">names</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseStrEnum.names"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseStrEnum.names" title="Link to this definition"></a></dt>
+<dd><p>Returns a list of all member names.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gunz_utils.enums.BaseStrEnum.values">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/gunz_utils/enums.html#BaseStrEnum.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.BaseStrEnum.values" title="Link to this definition"></a></dt>
+<dd><p>Returns a list of all member values.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="gunz_utils.enums.OptionalBaseStrEnum">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">gunz_utils.enums.</span></span><span class="sig-name descname"><span class="pre">OptionalBaseStrEnum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gunz_utils/enums.html#OptionalBaseStrEnum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.enums.OptionalBaseStrEnum" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#gunz_utils.enums.BaseStrEnum" title="gunz_utils.enums.BaseStrEnum"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseStrEnum</span></code></a></p>
+<p>A base class for StrEnum that treats None as the NONE enum member.</p>
+</dd></dl>
+
+</section>
+<section id="module-gunz_utils.validation">
+<span id="validation"></span><h2>Validation<a class="headerlink" href="#module-gunz_utils.validation" title="Link to this heading"></a></h2>
+<p>Validation utilities.</p>
+<p>This module provides decorators and helpers to improve data validation
+and error reporting, wrapping underlying libraries like Pydantic.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="gunz_utils.validation.type_checked">
+<span class="sig-prename descclassname"><span class="pre">gunz_utils.validation.</span></span><span class="sig-name descname"><span class="pre">type_checked</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a></span></span><a class="reference internal" href="_modules/gunz_utils/validation.html#type_checked"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gunz_utils.validation.type_checked" title="Link to this definition"></a></dt>
+<dd><p>A wrapper around pydantic.validate_call that provides cleaner, user-friendly error messages.</p>
+<p>It catches <cite>pydantic.ValidationError</cite> and re-raises it as a <cite>TypeError</cite> with a
+formatted message indicating exactly which argument failed and why.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>func</strong> (<em>Callable</em><em>, </em><em>optional</em>) – The function to decorate.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to <cite>pydantic.validate_call</cite> (e.g., <cite>config</cite>).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The decorated function with validation logic.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@type_checked</span>
+<span class="gp">... </span><span class="k">def</span><span class="w"> </span><span class="nf">my_func</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">my_func</span><span class="p">(</span><span class="s2">&quot;string&quot;</span><span class="p">)</span>
+<span class="go">TypeError: Validation error in &#39;my_func&#39;:</span>
+<span class="go">Argument &#39;a&#39;: Input should be a valid integer, unable to parse string as an integer (got type &#39;str&#39;)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="concepts.html" class="btn btn-neutral float-left" title="Core Concepts" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Yeremia Gunawan Adhisantoso.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
