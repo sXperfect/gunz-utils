@@ -1,12 +1,24 @@
-# -*- coding: utf-8 -*-
 """
 Security utilities.
 
 This module provides helpers for security-related tasks, such as sanitizing inputs.
 """
-import re
-import os
+
+# =============================================================================
+# METADATA
+# =============================================================================
+__author__ = "Yeremia Gunawan Adhisantoso"
+__email__ = "adhisant@tnt.uni-hannover.de"
+__license__ = "Clear BSD"
+__version__ = "1.0.0"
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import functools
+import os
+import re
+import typing as t
 
 # Pre-compile the regex for invalid characters (anything not alphanumeric, dot, or dash)
 # We use + to collapse multiple invalid characters in one go
@@ -51,58 +63,60 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
         If the filename is empty after sanitization, if the input is too long,
         or if the replacement string contains path separators.
     """
-    # 0. Check input length to prevent DoS via excessive string processing
+# 0. Check input length to prevent DoS via excessive string processing
+    #? Long inputs can cause regex backtracking, leading to CPU exhaustion
     if len(filename) > _MAX_FILENAME_INPUT_LENGTH:
         raise ValueError(f"Input filename too long (max {_MAX_FILENAME_INPUT_LENGTH} chars)")
 
     # 1. Check for unsafe replacement characters
-    # We must disallow path separators in the replacement string to prevent
-    # accidental introduction of path traversal or directory creation.
-    # We check for standard separators (/ and \) explicitly to be safe across platforms.
+    #? We must disallow path separators in the replacement string to prevent
+    #? accidental introduction of path traversal or directory creation.
+    #? We check for standard separators (/ and \) explicitly to be safe across platforms.
     if "/" in replacement or "\\" in replacement:
         raise ValueError("Replacement string contains path separators")
 
     # 2. Get base name to avoid directories/path traversal via slashes
+    #? os.path.basename strips any directory components, neutralizing ".." attacks
     filename = os.path.basename(filename)
 
-    # 2. Replace dangerous characters
-    # Keep only alphanumeric, ., -, _
-    # Using regex to replace anything that is NOT allowed
+    # 3. Replace dangerous characters
+    #? Keep only alphanumeric, ., -, _ using negated character class
+    #? The + in the regex collapses multiple invalid chars into one replacement
     filename = _INVALID_CHARS_PATTERN.sub(replacement, filename)
 
-    # 3. Collapse multiple replacements
+    # 4. Collapse multiple replacements
     if replacement:
-        # Optimization: Only run regex if we actually have consecutive replacements
-        # This avoids unnecessary regex processing and string allocation for the common case
-        # where the replacement character appears singly (e.g. "my_file.txt")
+        #? Optimization: Only run regex if we actually have consecutive replacements
+        #? This avoids unnecessary regex processing for the common case (e.g. "my_file.txt")
         if replacement * 2 in filename:
-            # Use cached pattern for replacement
+            #? Use cached pattern for replacement
             pattern = _get_replacement_pattern(replacement)
             filename = pattern.sub(replacement, filename)
 
-    # 4. Strip leading/trailing replacements or dots (dots can be dangerous at start/end)
+    # 5. Strip leading/trailing replacements or dots
+    #? Dots at boundaries can be dangerous (e.g., ".hidden" or "file..")
     filename = filename.strip(replacement + ".")
 
-    # 5. Check empty
+    # 6. Check empty
     if not filename:
         raise ValueError("Filename is empty after sanitization")
 
-    # 6. Check length (common filesystem limit)
+    # 7. Check length (common filesystem limit)
     if len(filename) > 255:
         filename = filename[:255]
 
-    # 7. Check for Windows reserved filenames
-    # CON, PRN, AUX, NUL, COM1-9, LPT1-9
-    # See: https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
-    # Windows checks the "base" name up to the first dot.
-    # e.g. "CON.txt" and "CON.tar.gz" are both invalid.
-    # We use partition('.')[0] instead of os.path.splitext because splitext only splits the last extension.
+    # 8. Check for Windows reserved filenames
+    #? CON, PRN, AUX, NUL, COM1-9, LPT1-9 are reserved on Windows
+    #? See: https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
+    #? Windows checks the "base" name up to the first dot.
+    #? e.g. "CON.txt" and "CON.tar.gz" are both invalid.
+    #? We use partition('.')[0] instead of os.path.splitext because splitext only splits the last extension.
     root = filename.partition('.')[0]
 
-    # Performance Optimization (⚡ Bolt):
-    # Instead of indiscriminately doing .upper() and looking up in a set,
-    # we first check if the length of `root` is 3 or 4, since all reserved names are exactly 3 or 4 chars.
-    # Using `==` with `or` is measurably faster than `in {3, 4}` for simple integer checks.
+    #? Performance Optimization (⚡ Bolt):
+    #? Instead of indiscriminately doing .upper() and looking up in a set,
+    #? we first check if the length of `root` is 3 or 4, since all reserved names are exactly 3 or 4 chars.
+    #? Using `==` with `or` is measurably faster than `in {3, 4}` for simple integer checks.
     root_len = len(root)
     if (root_len == 3 or root_len == 4) and root.upper() in {
         "CON", "PRN", "AUX", "NUL",
