@@ -10,3 +10,7 @@
 **Vulnerability:** Denial of Service (DoS) via excessive string processing (lowercasing, replacing) in fuzzy matching methods.
 **Learning:** Utility functions that perform string normalization on user input must enforce length limits to prevent resource exhaustion (CPU/Memory) on large payloads.
 **Prevention:** Enforce a strict maximum length (e.g., 1024 chars) at the entry point of string processing functions.
+## 2025-02-18 - Sanitization Fallbacks for Reserved Names
+**Vulnerability:** Windows reserved filename protection (e.g. CON) in `sanitize_filename` could be bypassed if the user provided an empty replacement string.
+**Learning:** Validation logic that depends on concatenation must ensure the resulting string is actually different/safe. Relying on caller-provided "replacement" strings without enforcing a safe default can negate the security check.
+**Prevention:** When sanitizing specifically for reserved keywords, enforce a hardcoded prefix or fallback (e.g. `_`) if the user-provided replacement is empty or unsafe.
