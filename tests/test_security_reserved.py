@@ -2,6 +2,7 @@
 import unittest
 from gunz_utils.security import sanitize_filename
 
+
 class TestSecurityReserved(unittest.TestCase):
     def test_sanitize_filename_reserved_with_empty_replacement(self):
         """
@@ -20,6 +21,7 @@ class TestSecurityReserved(unittest.TestCase):
 
     def test_sanitize_filename_reserved_with_valid_replacement(self):
         self.assertEqual(sanitize_filename("CON", replacement="-"), "-CON")
+
 
 if __name__ == "__main__":
     unittest.main()

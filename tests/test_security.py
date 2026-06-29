@@ -3,6 +3,7 @@ import os
 import tempfile
 from gunz_utils.security import sanitize_filename, safe_path_join
 
+
 class TestSecurity(unittest.TestCase):
     def test_sanitize_filename_valid(self):
         """Test standard valid filenames."""
@@ -78,7 +79,9 @@ class TestSecurity(unittest.TestCase):
 
         for replacement in unsafe_replacements:
             with self.subTest(replacement=replacement):
-                with self.assertRaisesRegex(ValueError, "Replacement string contains path separators"):
+                with self.assertRaisesRegex(
+                    ValueError, "Replacement string contains path separators"
+                ):
                     sanitize_filename("file*name.txt", replacement=replacement)
 
     def test_sanitize_filename_input_too_long(self):
@@ -163,6 +166,7 @@ class TestSecurity(unittest.TestCase):
                 self.assertNotIn("/etc/passwd", msg)
             else:
                 self.fail("ValueError not raised")
+
 
 if __name__ == "__main__":
     unittest.main()
