@@ -1,6 +1,6 @@
 import unittest
-import sys
 from gunz_utils.validation import type_checked
+
 
 class TestTypeChecked(unittest.TestCase):
     def test_basic_validation(self):

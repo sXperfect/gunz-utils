@@ -26,7 +26,7 @@ import typing as t
 from git import Repo, InvalidGitRepositoryError
 from loguru import logger
 
-#? Cache the root to avoid repeated disk I/O
+# ? Cache the root to avoid repeated disk I/O
 _PROJECT_ROOT: t.Optional[pathlib.Path] = None
 
 
@@ -64,11 +64,11 @@ def resolve_project_root(
         return _PROJECT_ROOT
 
     try:
-        #? Search upwards for the .git directory
+        # ? Search upwards for the .git directory
         repo = Repo(anchor, search_parent_directories=True)
         root_path = pathlib.Path(repo.working_tree_dir).resolve()
 
-        #? Validate it's actually a directory
+        # ? Validate it's actually a directory
         if not root_path.is_dir():
             raise RuntimeError(f"Resolved root is not a directory: {root_path}")
 
@@ -77,7 +77,7 @@ def resolve_project_root(
         if inject_to_sys_path:
             root_str = str(root_path)
             if root_str not in sys.path:
-                #? Insert at position 0 to prioritize local source over installed packages
+                # ? Insert at position 0 to prioritize local source over installed packages
                 sys.path.insert(0, root_str)
                 logger.debug(f"Added project root to sys.path: {root_str}")
 

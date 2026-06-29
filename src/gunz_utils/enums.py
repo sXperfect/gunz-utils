@@ -28,7 +28,15 @@ T = TypeVar("T", bound="BaseStrEnum")
 # =============================================================================
 # CONSTANTS
 # =============================================================================
-_MAX_INPUT_LENGTH = 1024  # Security: Prevent DoS via long strings
+# ? Default security limit on input string length. Subclasses may override
+# ? this class attribute (e.g. for long-context models that need larger
+# ? lookup keys) via `__init_subclass__` or direct attribute override.
+DEFAULT_MAX_INPUT_LENGTH = 1024  # Security: Prevent DoS via long strings
+
+# ? Backward-compat alias for the module-level constant. New code should
+# ? reference `cls.DEFAULT_MAX_INPUT_LENGTH` (the class attribute).
+_MAX_INPUT_LENGTH = DEFAULT_MAX_INPUT_LENGTH
+
 
 # =============================================================================
 # BASE ENUM IMPLEMENTATION
@@ -59,9 +67,9 @@ class BaseStrEnum(enum.StrEnum):
     >>> Color.from_fuzzy_string("dark") is Color.DARK_BLUE
     True
     """
-    
-    #? Dictionary mapping lowercase aliases to actual enum values
-    #? Using dunder name to avoid it being treated as an Enum member
+
+    # ? Dictionary mapping lowercase aliases to actual enum values
+    # ? Using dunder name to avoid it being treated as an Enum member
     __ALIASES__: ClassVar[dict[str, str]] = {}
 
     # Lazily initialized map for fuzzy lookups
@@ -106,9 +114,11 @@ class BaseStrEnum(enum.StrEnum):
         Attempts to find a member by alias, normalized value, or case-insensitive name.
         Raises ValueError if no match is found.
         """
-        # Security check to prevent DoS via excessive string processing
-        if len(value_str) > _MAX_INPUT_LENGTH:
-            raise ValueError(f"Input string too long (max {_MAX_INPUT_LENGTH} chars)")
+        # Security check to prevent DoS via excessive string processing.
+        # Uses the class attribute so subclasses can override the limit.
+        max_len = cls.DEFAULT_MAX_INPUT_LENGTH
+        if len(value_str) > max_len:
+            raise ValueError(f"Input string too long (max {max_len} chars)")
 
         value_lower = value_str.lower()
         _aliases = cls.__ALIASES__
@@ -116,7 +126,7 @@ class BaseStrEnum(enum.StrEnum):
         # 1. Check for defined aliases (string -> target_string_value)
         if value_lower in _aliases:
             alias_target_value = _aliases[value_lower]
-            
+
             # Check internal map first
             if alias_target_value in cls._value2member_map_:
                 return cls._value2member_map_[alias_target_value]
@@ -125,7 +135,9 @@ class BaseStrEnum(enum.StrEnum):
             try:
                 return cls(alias_target_value)
             except ValueError:
-                raise ValueError(f"Alias target '{alias_target_value}' is not a valid member value for {cls.__name__}")
+                raise ValueError(
+                    f"Alias target '{alias_target_value}' is not a valid member value for {cls.__name__}"
+                )
 
         # 2. Check for matches in the fuzzy map
         # Optimization: Use cached lookup map instead of iterating
@@ -170,17 +182,17 @@ class BaseStrEnum(enum.StrEnum):
         """
         if isinstance(value, cls):
             return value
-        
+
         try:
             return cls(value)
         except (ValueError, TypeError):
-            pass 
-        
+            pass
+
         if isinstance(value, str):
             try:
                 return cls.from_fuzzy_string(value)
             except ValueError:
-                pass 
+                pass
 
         return None
 
@@ -189,12 +201,26 @@ class BaseStrEnum(enum.StrEnum):
         return cls.values()
 
 
+# ? Default security limit on input string length. Subclasses may override
+# ? this class attribute (e.g. for long-context models that need larger
+# ? lookup keys) via `MyEnum.DEFAULT_MAX_INPUT_LENGTH = 4096`.
+# ?
+# ? Set via setattr after class body (StrEnum rejects non-string class
+# ? attributes like int = 1024 inside the class body, even when annotated
+# ? as ClassVar[int]). The class-body `__ALIASES__` field works because
+# ? `{}` is a falsy/empty value that StrEnum's machinery silently skips.
+# ?
+# ? Security rationale: 1k chars is safe; 100k chars can take seconds
+# ? on slow hardware (regex backtracking is O(n) on `val_norm.replace`).
+setattr(BaseStrEnum, "DEFAULT_MAX_INPUT_LENGTH", 1024)
+
+
 @enum.verify(enum.UNIQUE)
 class OptionalBaseStrEnum(BaseStrEnum):
     """
     A base class for StrEnum that treats None as the NONE enum member.
     """
-    
+
     __ALIASES__: ClassVar[dict[str, str]] = {}
 
     def __init_subclass__(cls, **kwargs) -> None:
@@ -209,14 +235,14 @@ class OptionalBaseStrEnum(BaseStrEnum):
     def _missing_(cls, value: object) -> Self:
         if value is None:
             return cls.NONE
-        
+
         # Try fuzzy match via helper, but do NOT retry cls(value) to avoid recursion
         if isinstance(value, str):
             try:
                 return cls.from_fuzzy_string(value)
             except ValueError:
-                pass # let super raise
-        
+                pass  # let super raise
+
         return super()._missing_(value)
 
 
@@ -236,6 +262,13 @@ class BaseIntEnum(enum.IntEnum):
     """
 
     __ALIASES__: ClassVar[dict[str, int]] = {}
+
+    # ? Default security limit on input string length. IntEnum accepts int
+    # ? class attributes directly (unlike StrEnum), so we don't need the
+    # ? setattr-after-body workaround. Subclasses override the same way:
+    # ?   class MyEnum(BaseIntEnum):
+    # ?       DEFAULT_MAX_INPUT_LENGTH = 4096
+    DEFAULT_MAX_INPUT_LENGTH: int = 1024  # type: ignore[assignment]
 
     # Lazily initialized map for name lookups
     _name_lookup_map: ClassVar[dict[str, Any]]
@@ -262,9 +295,11 @@ class BaseIntEnum(enum.IntEnum):
         Attempts to find a member by alias (string->int), case-insensitive name, or
         string-to-int conversion.
         """
-        # Security check to prevent DoS via excessive string processing
-        if len(value_str) > _MAX_INPUT_LENGTH:
-            raise ValueError(f"Input string too long (max {_MAX_INPUT_LENGTH} chars)")
+        # Security check to prevent DoS via excessive string processing.
+        # Uses the class attribute so subclasses can override the limit.
+        max_len = cls.DEFAULT_MAX_INPUT_LENGTH
+        if len(value_str) > max_len:
+            raise ValueError(f"Input string too long (max {max_len} chars)")
 
         value_lower = value_str.lower()
         _aliases = cls.__ALIASES__
@@ -272,14 +307,16 @@ class BaseIntEnum(enum.IntEnum):
         # 1. Check for aliases (string -> int_value)
         if value_lower in _aliases:
             int_target_value = _aliases[value_lower]
-            
+
             if int_target_value in cls._value2member_map_:
                 return cls._value2member_map_[int_target_value]
 
             try:
                 return cls(int_target_value)
             except ValueError:
-                raise ValueError(f"Alias target '{int_target_value}' is not a valid member value for {cls.__name__}")
+                raise ValueError(
+                    f"Alias target '{int_target_value}' is not a valid member value for {cls.__name__}"
+                )
 
         # 2. Check for member name matches (case-insensitive)
         # Optimization: Use cached lookup map instead of iterating
@@ -294,7 +331,7 @@ class BaseIntEnum(enum.IntEnum):
                 return cls._value2member_map_[int_value]
             return cls(int_value)
         except (ValueError, TypeError):
-            pass 
+            pass
 
         valid_options = ", ".join(f"'{m.value}'" for m in cls)
         raise ValueError(
@@ -325,13 +362,13 @@ class BaseIntEnum(enum.IntEnum):
         try:
             return cls(value)
         except (ValueError, TypeError):
-            pass 
-        
+            pass
+
         if isinstance(value, str):
             try:
                 return cls.from_fuzzy_int_string(value)
             except ValueError:
-                pass 
+                pass
 
         return None
 
