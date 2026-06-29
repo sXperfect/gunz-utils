@@ -2,7 +2,7 @@ import unittest
 import pathlib
 import sys
 import tempfile
-from gunz_utils.project import resolve_project_root, _PROJECT_ROOT
+from gunz_utils.project import resolve_project_root
 from gunz_utils import project as project_module
 
 
@@ -32,7 +32,7 @@ class TestProject(unittest.TestCase):
     def test_resolve_project_root_no_inject(self):
         project_module._PROJECT_ROOT = None
         original_path = sys.path.copy()
-        root = resolve_project_root(inject_to_sys_path=False)
+        resolve_project_root(inject_to_sys_path=False)
         self.assertEqual(sys.path, original_path)
 
     def test_resolve_project_root_invalid_anchor(self):
@@ -49,4 +49,5 @@ class TestProject(unittest.TestCase):
 
 if __name__ == "__main__":
     import sys
+
     unittest.main()
