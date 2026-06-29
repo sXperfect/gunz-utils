@@ -2,9 +2,11 @@
 import unittest
 from gunz_utils.enums import BaseStrEnum, BaseIntEnum
 
+
 class TestEnumSecurity(unittest.TestCase):
     def test_str_enum_length_limit(self):
         """Test that BaseStrEnum rejects overly long inputs."""
+
         class TestStr(BaseStrEnum):
             A = "a"
 
@@ -30,6 +32,7 @@ class TestEnumSecurity(unittest.TestCase):
 
     def test_int_enum_length_limit(self):
         """Test that BaseIntEnum rejects overly long inputs."""
+
         class TestInt(BaseIntEnum):
             ONE = 1
 
@@ -40,8 +43,8 @@ class TestEnumSecurity(unittest.TestCase):
         try:
             TestInt.from_fuzzy_int_string(long_str_ok)
         except ValueError as e:
-             # It might fail conversion to int if it's huge, or fail lookup
-             # But it should NOT fail with our specific length error
+            # It might fail conversion to int if it's huge, or fail lookup
+            # But it should NOT fail with our specific length error
             self.assertNotIn("Input string too long", str(e))
 
         # Invalid length
@@ -49,6 +52,7 @@ class TestEnumSecurity(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             TestInt.from_fuzzy_int_string(long_str_bad)
         self.assertIn("Input string too long", str(cm.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

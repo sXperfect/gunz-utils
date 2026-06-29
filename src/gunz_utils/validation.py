@@ -54,8 +54,9 @@ def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
     TypeError: Validation error in 'my_func':
     Argument 'a': Input should be a valid integer, unable to parse string as an integer (got type 'str')
     """
+
     def decorator(f: t.Callable) -> t.Callable:
-        #? Create the validated version of the function using pydantic
+        # ? Create the validated version of the function using pydantic
         validated_func = validate_call(f, **kwargs)
 
         @functools.wraps(f)
@@ -65,14 +66,14 @@ def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
             except ValidationError as e:
                 errors = []
                 for error in e.errors():
-                    #? Extract location: usually ('args', 0) or ('kwargs', 'arg_name')
-                    #? We want to present a clean name to the user.
+                    # ? Extract location: usually ('args', 0) or ('kwargs', 'arg_name')
+                    # ? We want to present a clean name to the user.
                     loc = error.get("loc", ())
                     msg = error.get("msg", "Invalid input")
                     input_val = error.get("input", "unknown")
 
-                    #? Simplify location string
-                    #? Remove 'args' or 'kwargs' if they are the first element
+                    # ? Simplify location string
+                    # ? Remove 'args' or 'kwargs' if they are the first element
                     clean_loc = []
                     for item in loc:
                         if item not in ("args", "kwargs"):
@@ -80,16 +81,18 @@ def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
 
                     loc_str = " -> ".join(clean_loc) if clean_loc else "input"
 
-                    #? SECURITY: Do not leak the actual input value in the error message
-                    #? as it might be sensitive (e.g., a password).
-                    #? Instead, show the type of the input.
+                    # ? SECURITY: Do not leak the actual input value in the error message
+                    # ? as it might be sensitive (e.g., a password).
+                    # ? Instead, show the type of the input.
                     input_type = type(input_val).__name__
-                    errors.append(f"Argument '{loc_str}': {msg} (got type '{input_type}')")
+                    errors.append(
+                        f"Argument '{loc_str}': {msg} (got type '{input_type}')"
+                    )
 
                 error_msg = f"Validation error in '{f.__name__}':\n" + "\n".join(errors)
 
-                #? Re-raise as TypeError to be more Pythonic for type issues,
-                #? effectively hiding the Pydantic trace from the end user unless they look closer.
+                # ? Re-raise as TypeError to be more Pythonic for type issues,
+                # ? effectively hiding the Pydantic trace from the end user unless they look closer.
                 raise TypeError(error_msg) from None
 
         return wrapper
