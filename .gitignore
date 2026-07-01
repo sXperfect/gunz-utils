@@ -4,3 +4,18 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
+
+# IDE / agent / deploy caches
+.gemini/
+.jules/
+.wrangler/
+.sisyphus/
+
+# Top-level author-facing guides (now superseded by docs/source/)
+guides/
+
+# Built Sphinx output — never tracked
+docs/_build/
+
+# Pre-move backup of docs/TASKS.md
+TASKS.md.bak
