@@ -1,12 +1,11 @@
 import os
 import sys
-import typing as t
 sys.path.insert(0, os.path.abspath('../../src'))
 
 project = 'gunz-utils'
 copyright = '2025, Yeremia Gunawan Adhisantoso'
 author = 'Yeremia Gunawan Adhisantoso'
-release = '1.0.0'
+release = '1.1.0'
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -29,7 +28,7 @@ html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
 # Mock imports for external dependencies
-autodoc_mock_imports = ["pydantic", "pydantic_core", "rich", "git", "typing_extensions", "loguru"]
+autodoc_mock_imports = ["pydantic", "pydantic_core", "cryptography", "git", "gitpython", "loguru"]
 
 # Napoleon settings
 napoleon_google_docstring = False

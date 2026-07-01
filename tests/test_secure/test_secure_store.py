@@ -9,7 +9,7 @@ this test file followed.
 import tempfile
 import unittest
 
-from gunz_utils.secure_store import SecureStore
+from gunz_utils import SecureStore
 
 
 class TestSecureStore(unittest.TestCase):

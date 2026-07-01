@@ -2,8 +2,8 @@ import unittest
 import pathlib
 import sys
 import tempfile
-from gunz_utils.project import resolve_project_root
-from gunz_utils import project as project_module
+from gunz_utils import resolve_project_root
+from gunz_utils.ext import project_gitpython as project_module
 
 
 class TestProject(unittest.TestCase):
