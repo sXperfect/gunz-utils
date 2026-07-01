@@ -9,7 +9,7 @@ from .validation import type_checked
 # ? (enums.py, validation.py, etc.) each have their own __version__
 # ? dunder that should match this — kept in sync by a release script
 # ? or by reading this value (future work).
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "BaseIntEnum",

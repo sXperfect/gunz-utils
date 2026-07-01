@@ -263,13 +263,6 @@ class BaseIntEnum(enum.IntEnum):
 
     __ALIASES__: ClassVar[dict[str, int]] = {}
 
-    # ? Default security limit on input string length. IntEnum accepts int
-    # ? class attributes directly (unlike StrEnum), so we don't need the
-    # ? setattr-after-body workaround. Subclasses override the same way:
-    # ?   class MyEnum(BaseIntEnum):
-    # ?       DEFAULT_MAX_INPUT_LENGTH = 4096
-    DEFAULT_MAX_INPUT_LENGTH: int = 1024  # type: ignore[assignment]
-
     # Lazily initialized map for name lookups
     _name_lookup_map: ClassVar[dict[str, Any]]
 
@@ -375,3 +368,6 @@ class BaseIntEnum(enum.IntEnum):
     @classmethod
     def choices(cls) -> list[Any]:
         return cls.values()
+
+
+setattr(BaseIntEnum, "DEFAULT_MAX_INPUT_LENGTH", 1024)
