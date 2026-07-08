@@ -11,7 +11,6 @@ ensuring scripts run correctly regardless of their execution directory.
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
-__version__ = "1.0.0"
 
 # =============================================================================
 # STANDARD LIBRARY IMPORTS

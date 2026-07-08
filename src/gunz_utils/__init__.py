@@ -13,7 +13,7 @@ from .upstream_protocol import (
 )
 from .models import HealthStatus
 
-__version__ = "1.1.0"
+__version__ = "1.3.0"
 
 _LAZY: dict[str, str] = {
     "type_checked": ".ext.validation_pydantic",
