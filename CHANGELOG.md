@@ -5,6 +5,19 @@ All notable changes to **gunz-utils** are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] — 2026-07-08
+
+### Fixed
+
+- `gunz_utils.__version__` reported `"1.1.0"` from a v1.3.0 install.
+  Synced to `"1.3.0"` to match `pyproject.toml` and the v1.3.0 tag.
+
+### Removed
+
+- Four stale `__version__ = "1.0.0"` duplicates from `enums.py`,
+  `security.py`, `ext.validation_pydantic`, and `ext.project_gitpython`.
+  `__init__.py` is the canonical source now.
+
 ## [1.3.0] — 2026-06-29
 
 ### Added
