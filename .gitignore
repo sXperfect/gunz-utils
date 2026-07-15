@@ -4,3 +4,9 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
+
+# External knowledge base
+.hyperhedron
+
+# Transient data
+tmp/

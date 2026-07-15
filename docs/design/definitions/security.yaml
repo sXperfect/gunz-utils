@@ -1,0 +1,36 @@
+component: "Security"
+type: "Module"
+module_path: "src/gunz_utils/security.py"
+purpose: |
+  File-system hardening primitives: filename sanitization and path-traversal
+  prevention. All inputs are treated as untrusted.
+public_functions:
+  - name: "sanitize_filename"
+    signature: "sanitize_filename(name: str, replacement: str = '_') -> str"
+    purpose: |
+      Normalize a filename so it cannot collide with Windows reserved device
+      names (CON, PRN, NUL, AUX, COM1-9, LPT1-9) and cannot contain illegal
+      characters.
+    security_properties:
+      - "Reserved-name guard runs even when `replacement` is empty (fallback prefix enforced)."
+      - "Case-insensitive comparison for reserved set."
+      - "Strips dangerous control characters (e.g. NUL)."
+  - name: "safe_path_join"
+    signature: "safe_path_join(base: Path, *parts: str) -> Path"
+    purpose: |
+      Join paths while preventing traversal outside `base`. Resolves `..` and
+      absolute path components; raises if the result escapes `base`.
+    security_properties:
+      - "Resolves symlinks via os.path.realpath."
+      - "Rejects null bytes in inputs."
+      - "Used by SecureStore to confine writes to a per-user directory."
+constraints:
+  - "All input is treated as untrusted."
+  - "Must work cross-platform (Linux/macOS/Windows)."
+depends_on: ["pathlib"]
+consumed_by:
+  - "secure_store.py (per-user directory confinement)"
+  - "External callers writing user-provided filenames to disk"
+tests:
+  - "tests/test_security.py"
+  - "tests/test_security_reserved.py"

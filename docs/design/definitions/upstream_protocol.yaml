@@ -1,0 +1,26 @@
+component: "UpstreamClient"
+type: "Module"
+module_path: "src/gunz_utils/upstream_protocol.py"
+purpose: |
+  Protocol + base classes for talking to upstream services (LLM providers,
+  HTTP APIs, etc.) with a unified exception hierarchy.
+public_classes:
+  - name: "UpstreamClient"
+    kind: "Protocol"
+    methods: ["complete", "embed", "stream"]
+  - name: "BaseUpstream"
+    kind: "Class"
+    purpose: "Reusable base implementing common retry / timeout logic."
+exception_hierarchy:
+  - name: "UpstreamError"
+    base: "Exception"
+  - name: "UpstreamTimeoutError"
+    base: "UpstreamError"
+  - name: "UpstreamAuthError"
+    base: "UpstreamError"
+  - name: "UpstreamNotFoundError"
+    base: "UpstreamError"
+  - name: "UpstreamUnavailableError"
+    base: "UpstreamError"
+depends_on: ["typing"]
+tests: []

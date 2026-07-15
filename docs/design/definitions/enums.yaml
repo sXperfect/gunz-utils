@@ -1,0 +1,34 @@
+component: "Enums"
+type: "Module"
+module_path: "src/gunz_utils/enums.py"
+purpose: |
+  Enhanced Enum base classes (BaseStrEnum, BaseIntEnum, OptionalBaseStrEnum)
+  providing fuzzy matching, aliases, safe lookup, and CLI integration on top
+  of the Python standard library enum module.
+public_classes:
+  - name: "BaseStrEnum"
+    base: "str, Enum"
+    features:
+      - "fuzzy_match: case/separator insensitive lookup"
+      - "alias_resolution: __ALIASES__ map"
+      - "safe_lookup: get_or_none(value)"
+      - "introspection: names(), values(), items()"
+      - "cli_integration: choices() for Click/Typer/argparse"
+  - name: "BaseIntEnum"
+    base: "int, Enum"
+    features:
+      - "fuzzy_int_string: string-to-int conversion with aliases"
+      - "inherits BaseStrEnum's safe lookup semantics"
+  - name: "OptionalBaseStrEnum"
+    base: "str, Enum"
+    purpose: "Variant where members may not have a canonical value (None sentinel)."
+constraints:
+  - "DoS guard: max input length 1024 chars on fuzzy lookups (added 2025-02-18)."
+  - "Lazy map caching for hot-path lookups (added 2025-10)."
+depends_on: []
+consumed_by:
+  - "External CLI tools via .choices()"
+  - "Internal validation layer"
+tests:
+  - "tests/test_enums.py"
+  - "tests/test_enums_security.py"

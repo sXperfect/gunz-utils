@@ -1,0 +1,30 @@
+component: "SecureStore"
+type: "Module"
+module_path: "src/gunz_utils/secure_store.py"
+purpose: |
+  Fernet-encrypted secret store. Persists secrets to disk under a per-user
+  base directory, encrypted with a key unlocked interactively at startup.
+public_classes:
+  - name: "SecureStore"
+    methods:
+      - "load(base_dir, password) -> SecureStore"
+      - "get(name: str) -> SecretMetadata"
+      - "set(name: str, value: str) -> None"
+      - "delete(name: str) -> None"
+      - "list() -> list[str]"
+  - name: "SecretMetadata"
+    purpose: "Metadata envelope for a stored secret (name, value, created_at, updated_at)."
+public_functions:
+  - name: "default_base_dir()"
+    purpose: "Returns the OS-appropriate default storage location."
+  - name: "main_unlock_interactive()"
+    purpose: "CLI entry-point for unlocking the store from a terminal."
+security_properties:
+  - "Symlink-safe path confinement via security.safe_path_join."
+  - "Fernet (AES-128-CBC + HMAC-SHA256) encryption at rest."
+  - "Password-derived key (PBKDF2 via cryptography.hazmat)."
+depends_on:
+  - "cryptography (Fernet)"
+  - "security.safe_path_join"
+tests:
+  - "tests/test_secure_store.py"

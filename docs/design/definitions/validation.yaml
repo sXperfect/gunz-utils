@@ -1,0 +1,22 @@
+component: "Validation"
+type: "Module"
+module_path: "src/gunz_utils/validation.py"
+purpose: |
+  Decorator-based runtime type checking using pydantic. Wraps functions so
+  argument/return types are enforced at call time, with safe (non-leaking)
+  error messages.
+public_functions:
+  - name: "type_checked"
+    signature: "type_checked(func: Callable) -> Callable"
+    purpose: |
+      Decorator: validates arguments and return value against PEP-604 type
+      hints via pydantic. Re-raises TypeError without leaking the raw input.
+    security_properties:
+      - "Error messages report only type(input).__name__, never the raw value."
+      - "Defense in depth — even if validation passes, error paths stay safe."
+constraints:
+  - "Never include raw input values in exception messages."
+depends_on: ["pydantic"]
+tests:
+  - "tests/test_validation.py"
+  - "tests/test_validation_leak.py"
