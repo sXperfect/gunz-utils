@@ -5,8 +5,20 @@ dist/
 build/
 .pytest_cache/
 
-# External knowledge base
+# IDE / agent / deploy caches
+.gemini/
+.jules/
+.wrangler/
+.sisyphus/
+
+# External knowledge base (Hyperhedron symlink farm)
 .hyperhedron
+
+# Top-level author-facing guides (now superseded by docs/source/)
+guides/
+
+# Built Sphinx output — never tracked
+docs/_build/
 
 # Transient data
 tmp/

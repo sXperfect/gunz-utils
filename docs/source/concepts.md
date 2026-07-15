@@ -15,3 +15,25 @@ One of the primary goals of Gunz-Utils is to provide safe wrappers around standa
 ## 3. Infrastructure Discovery
 
 The `project` module handles the complexities of discovering repository roots and managing data paths across different environments (Local Workstations vs. Slurm Cluster). By using these utilities, we ensure that code written locally "just works" when submitted to the cluster.
+
+## 4. Optional Dependencies
+
+Gunz-Utils' core install ships with four runtime dependencies (`pydantic`,
+`cryptography`, `gitpython`, `loguru`) so that `import gunz_utils` works
+out-of-the-box. Projects that want a smaller footprint can install narrower
+extras (see `installation.md` for the matrix).
+
+Beyond install-time extras, every dep-bundled module also has a
+**stdlib-only fallback** available under `gunz_utils.ext.*`. For
+example:
+
+```python
+# Default: pydantic-backed type_checked
+from gunz_utils import type_checked
+
+# Stdlib-only fallback: no pydantic needed at runtime
+from gunz_utils.ext.validation_stdlib import type_checked as type_checked_strict
+```
+
+This lets downstream projects pick between power (pydantic) and minimal
+install size (stdlib) on a per-module basis.

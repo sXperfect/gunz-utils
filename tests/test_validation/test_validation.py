@@ -1,5 +1,5 @@
 import unittest
-from gunz_utils.validation import type_checked
+from gunz_utils import type_checked
 
 
 class TestTypeChecked(unittest.TestCase):
