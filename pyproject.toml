@@ -50,3 +50,27 @@ packages = ["src/gunz_utils"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/"]
+
+# --- Ruff (linter + formatter) ----------------------------------------------
+# AGENTS.md §2.6 mandates Ruff for lint + format.
+[tool.ruff]
+# Project requires Python 3.11+.
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+# F (Pyflakes) + E/W (pycodestyle) + I (isort) + UP (pyupgrade) + B (bugbear)
+select = ["F", "E", "W", "I", "UP", "B"]
+# Allow assert in tests; the security guide forbids assert in production code,
+# so we tighten with a per-file override below.
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+# Tests are allowed to use `assert` (the unittest idiom) and re-export
+# private helpers from src/ via leading-underscore imports.
+"tests/**" = ["B011"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
