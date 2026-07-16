@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import unittest
 from gunz_utils.enums import BaseStrEnum, BaseIntEnum
 
