@@ -8,4 +8,4 @@ under `docs/tasks/{pending,active,done}/`.
 |:---:|:---:|:---|:---:|
 | _no active tasks_ | — | _awaiting first task assignment_ | Pending |
 
-> Last archived: [`2026-07-15-protocol-tier1_cleanup_housekeeping`](tasks/done/2026-07-15-protocol-tier1_cleanup_housekeeping.md) (2026-07-15) — 5-commit housekeeping sweep landed and pushed as `970f9aa`.
+> Last archived: [`2026-04-28-gunz_utils-test_improvements`](tasks/done/2026-04-28-gunz_utils-test_improvements.md) (2026-07-16) — completed with two defect-fix commits (`67f108b` legacy flat test removal + `12f4240` encoding-header strip). 81 tests + 4 subtests green.
