@@ -3,7 +3,7 @@
 **Date:** 2026-07-16
 **Role:** Programmer
 **Component:** `docs` / `ci`
-**Status:** Pending
+**Status:** Code fixes DONE (pushed at `6c88aa4`). Cloudflare verification pending user action — see §8.
 **Supersedes:** `docs/tasks/active/2026-04-28-gunz_utils-docs_improvement.md` (the original checklist is stale: api.rst already has all 4 modules; the workflow is broken in ways the original task didn't enumerate)
 
 ## 1. Goal
@@ -167,17 +167,47 @@ After both commits land:
 
 ## 7. Definition of Done
 
-- [ ] Commit 1 lands: workflow installs `.[docs]`
-- [ ] Commit 2 lands: theme + release version aligned
-- [ ] Both commits pushed to `origin/main`
-- [ ] GitHub Actions `deploy_docs` job runs successfully on the resulting push (verify in Actions UI)
+- [x] Commit 1 lands: workflow installs `.[docs]` — **`0494cfc`** ✅
+- [x] Commit 2 lands: theme + release version aligned — **`6c88aa4`** ✅
+- [x] Both commits pushed to `origin/main` — HEAD == origin/main == `6c88aa4` ✅
+- [ ] GitHub Actions `deploy_docs` job runs successfully on the resulting push — **will auto-trigger on next push; verify in Actions UI**
 - [ ] Cloudflare Pages site reflects the latest docs (verify at https://gunz-utils.pages.dev — user-side, requires `CLOUDFLARE_*` secrets to exist)
 
 ## 8. Pending User Actions (block DoD)
 
-- [ ] **Verify `CLOUDFLARE_API_TOKEN` exists** — `https://github.com/sXperfect/gunz-utils/settings/secrets/actions`
-- [ ] **Verify `CLOUDFLARE_ACCOUNT_ID` exists** — same URL
-- [ ] **Verify Cloudflare Pages project `gunz-utils` exists** — Cloudflare dashboard
-- [ ] **Verify wrangler token has Pages deploy permission**
+### 8.1 Verify `CLOUDFLARE_API_TOKEN` exists
+**Web UI (canonical path):** `https://github.com/sXperfect/gunz-utils/settings/secrets/actions`
 
-These are owner-side prerequisites that the agent cannot perform. Without them, even a perfect CI workflow will fail at the Cloudflare deploy step.
+The repository secrets list will show names only. `CLOUDFLARE_API_TOKEN` must appear in the list.
+
+**Via `gh` CLI (if installed):**
+```bash
+gh secret list --repo sXperfect/gunz-utils
+```
+
+### 8.2 Verify `CLOUDFLARE_ACCOUNT_ID` exists
+Same URL as 8.1. Same `gh secret list` command.
+
+### 8.3 Verify Cloudflare Pages project `gunz-utils` exists
+**Cloudflare dashboard:** `https://dash.cloudflare.com/?to=/:account/pages`
+
+The project name must match the `--project-name=gunz-utils` flag in `deploy_docs.yml` line 36.
+
+### 8.4 Verify wrangler token has Pages deploy permission
+The `CLOUDFLARE_API_TOKEN` must include the **Cloudflare Pages: Edit** permission scope. To check or update:
+1. Cloudflare dashboard → My Profile → API Tokens
+2. Find the token used for gunz-utils
+3. Verify "Cloudflare Pages" appears under Permissions with "Edit" access
+
+### 8.5 Caveats discovered during research
+
+- **Secret VALUES are never visible** after creation — GitHub masks them. Only their names and existence are checkable.
+- **Triggering a test deploy** currently requires pushing to `main` (workflow runs on push). To make test runs easier without polluting git history, the workflow could add `workflow_dispatch` as a trigger — deferred as a follow-up.
+- **Even with secrets in place**, the first deploy after the workflow fix may produce warnings (intersphinx `gunz_ml`/`gunz_cm` URLs don't resolve; `_static/` static path doesn't exist). These are warnings, not errors.
+
+### 8.6 Quick verification sequence (after next push)
+
+1. `git push` (already done at `6c88aa4`)
+2. Open `https://github.com/sXperfect/gunz-utils/actions/workflows/deploy_docs.yml`
+3. Verify the latest run shows green (or red — but with `ModuleNotFoundError: No module named 'sphinx_rtd_theme'` etc. addressed)
+4. If green, verify `https://gunz-utils.pages.dev` renders the new docs (footer should say `1.3.0` after Commit 2's release bump)
