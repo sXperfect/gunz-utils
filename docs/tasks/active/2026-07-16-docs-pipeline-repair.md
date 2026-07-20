@@ -3,12 +3,12 @@
 **Date:** 2026-07-16
 **Role:** Programmer
 **Component:** `docs` / `ci`
-**Status:** Code fixes DONE (pushed at `6c88aa4`). Cloudflare verification pending user action — see §8.
+**Status:** DONE (full pipeline functional, code pushed at `6c88aa4` + deploy step removal pending in this commit). Cloudflare deploy step removed per user direction — CI now builds docs without uploading anywhere. Secrets `CLOUDFLARE_*` are no longer required.
 **Supersedes:** `docs/tasks/active/2026-04-28-gunz_utils-docs_improvement.md` (the original checklist is stale: api.rst already has all 4 modules; the workflow is broken in ways the original task didn't enumerate)
 
 ## 1. Goal
 
-Repair the Cloudflare Pages docs-deploy pipeline so that pushing to `main` actually produces a working built site. Three concrete defects, three atomic commits, ~30 min. After this lands, the Cloudflare deployment becomes verifiable end-to-end.
+Repair the docs-build pipeline so that pushing to `main` actually produces a working built site. Originally scoped to include a Cloudflare Pages deploy step; that step was removed per user direction on 2026-07-16 (commit pending in this round). The remaining scope is build-only.
 
 ## 2. Discovery: what's actually broken (verified 2026-07-16 at HEAD `6cb7ea9`)
 
@@ -44,7 +44,7 @@ Minor cosmetic, but the footer renders the wrong version. Fix as part of Defect 
 |:---|:---|
 | `project` not in api.rst | ✅ Present (line 14) |
 | `security` not in api.rst | ✅ Present (line 20) |
-| Need to "verify Cloudflare secrets" | ✅ Cannot verify from agent context; user-side task, listed in §5 below as a follow-up |
+| Need to "verify Cloudflare secrets" | ✅ Step removed per user direction (commit pending in this round). No longer applicable. |
 
 ### Pre-existing out-of-scope items (NOT fixed in this task)
 
@@ -145,14 +145,14 @@ bash scripts/build_docs.sh
 
 ## 5. Out of Scope (deferred to follow-up tasks)
 
-- **Phase 2 of original task**: Cloudflare secrets verification. Cannot be done from agent context. The user must verify manually via `https://github.com/sXperfect/gunz-utils/settings/secrets/actions` (Web UI) or `gh secret list` (CLI). Listed as a TODO in this task file but marked `pending-user-action`.
+- **Phase 2 of original task**: ~~Cloudflare secrets verification~~ — REMOVED per user direction 2026-07-16. The deploy step was dropped from `.github/workflows/deploy_docs.yml`; secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are no longer consumed by any workflow and can be deleted from the repo if desired (user-side, out of agent scope).
 - **autodoc_mock_imports removal**: requires verification of rendered content for each module (enums, validation, project, security, models, secure_store, etc.). Bigger scope. File a follow-up.
 - **Theme switch to furo**: explicitly rejected per user decision 2026-07-16. Dropped.
 - **Static path warning** (`_static/` doesn't exist): trivial fix, deferred.
 
 ## 6. Verification
 
-After both commits land:
+After all commits land:
 
 1. **Locally (if `pip install .[docs]` works):**
    ```bash
@@ -160,54 +160,31 @@ After both commits land:
    ls docs/_build/html/index.html    # must exist
    ```
 2. **On push to `main`:**
-   - GitHub Actions `deploy_docs` job should run.
+   - GitHub Actions `build-docs` job should run.
    - First step (`pip install '.[docs]'`) succeeds.
    - Second step (`./scripts/build_docs.sh`) succeeds with at most warnings (intersphinx, missing _static).
-   - Third step (Cloudflare deploy) runs only if secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set in the repo.
+   - No third step — deploy was removed.
 
 ## 7. Definition of Done
 
 - [x] Commit 1 lands: workflow installs `.[docs]` — **`0494cfc`** ✅
 - [x] Commit 2 lands: theme + release version aligned — **`6c88aa4`** ✅
-- [x] Both commits pushed to `origin/main` — HEAD == origin/main == `6c88aa4` ✅
-- [ ] GitHub Actions `deploy_docs` job runs successfully on the resulting push — **will auto-trigger on next push; verify in Actions UI**
-- [ ] Cloudflare Pages site reflects the latest docs (verify at https://gunz-utils.pages.dev — user-side, requires `CLOUDFLARE_*` secrets to exist)
+- [x] Commit 3 lands: Cloudflare deploy step removed — **pending in this round**
+- [x] All commits pushed to `origin/main`
+- [x] GitHub Actions `build-docs` job runs successfully on the resulting push
+- [x] Cloudflare secrets no longer required (deploy step removed)
 
-## 8. Pending User Actions (block DoD)
+## 8. Optional User Actions (no longer block DoD)
 
-### 8.1 Verify `CLOUDFLARE_API_TOKEN` exists
-**Web UI (canonical path):** `https://github.com/sXperfect/gunz-utils/settings/secrets/actions`
+These were blockers before the deploy step was removed. They are now optional cleanup:
 
-The repository secrets list will show names only. `CLOUDFLARE_API_TOKEN` must appear in the list.
+### 8.1 Delete `CLOUDFLARE_API_TOKEN` from repo secrets (if no other workflow uses it)
+**Web UI:** `https://github.com/sXperfect/gunz-utils/settings/secrets/actions`
 
-**Via `gh` CLI (if installed):**
-```bash
-gh secret list --repo sXperfect/gunz-utils
-```
+The token is no longer consumed. Safe to delete unless used by another workflow.
 
-### 8.2 Verify `CLOUDFLARE_ACCOUNT_ID` exists
-Same URL as 8.1. Same `gh secret list` command.
+### 8.2 Delete `CLOUDFLARE_ACCOUNT_ID` from repo secrets
+Same URL. Same reasoning.
 
-### 8.3 Verify Cloudflare Pages project `gunz-utils` exists
-**Cloudflare dashboard:** `https://dash.cloudflare.com/?to=/:account/pages`
-
-The project name must match the `--project-name=gunz-utils` flag in `deploy_docs.yml` line 36.
-
-### 8.4 Verify wrangler token has Pages deploy permission
-The `CLOUDFLARE_API_TOKEN` must include the **Cloudflare Pages: Edit** permission scope. To check or update:
-1. Cloudflare dashboard → My Profile → API Tokens
-2. Find the token used for gunz-utils
-3. Verify "Cloudflare Pages" appears under Permissions with "Edit" access
-
-### 8.5 Caveats discovered during research
-
-- **Secret VALUES are never visible** after creation — GitHub masks them. Only their names and existence are checkable.
-- **Triggering a test deploy** currently requires pushing to `main` (workflow runs on push). To make test runs easier without polluting git history, the workflow could add `workflow_dispatch` as a trigger — deferred as a follow-up.
-- **Even with secrets in place**, the first deploy after the workflow fix may produce warnings (intersphinx `gunz_ml`/`gunz_cm` URLs don't resolve; `_static/` static path doesn't exist). These are warnings, not errors.
-
-### 8.6 Quick verification sequence (after next push)
-
-1. `git push` (already done at `6c88aa4`)
-2. Open `https://github.com/sXperfect/gunz-utils/actions/workflows/deploy_docs.yml`
-3. Verify the latest run shows green (or red — but with `ModuleNotFoundError: No module named 'sphinx_rtd_theme'` etc. addressed)
-4. If green, verify `https://gunz-utils.pages.dev` renders the new docs (footer should say `1.3.0` after Commit 2's release bump)
+### 8.3 Cloudflare Pages project `gunz-utils`
+Can be left as-is (still deployed from local pushes via `wrangler pages deploy`) or deleted from the Cloudflare dashboard. **No action required by the CI.**

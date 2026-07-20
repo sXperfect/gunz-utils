@@ -1,4 +1,4 @@
-name: Deploy Documentation to Cloudflare Pages
+name: Build Documentation
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build-and-deploy-docs:
+  build-docs:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,10 +27,3 @@ jobs:
         run: |
           chmod +x scripts/build_docs.sh
           ./scripts/build_docs.sh
-
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy docs/_build/html --project-name=gunz-utils --commit-dirty=true
