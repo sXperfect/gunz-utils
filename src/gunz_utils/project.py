@@ -11,14 +11,13 @@ ensuring scripts run correctly regardless of their execution directory.
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
-__version__ = "1.0.0"
+__version__ = "1.3.2"
 
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import pathlib
 import sys
-import typing as t
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -27,7 +26,7 @@ from git import Repo, InvalidGitRepositoryError
 from loguru import logger
 
 # ? Cache the root to avoid repeated disk I/O
-_PROJECT_ROOT: t.Optional[pathlib.Path] = None
+_PROJECT_ROOT: pathlib.Path | None = None
 
 
 def resolve_project_root(

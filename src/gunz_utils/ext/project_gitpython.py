@@ -17,7 +17,6 @@ __license__ = "Clear BSD"
 # =============================================================================
 import pathlib
 import sys
-import typing as t
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -26,7 +25,7 @@ from git import Repo, InvalidGitRepositoryError
 from loguru import logger
 
 # ? Cache the root to avoid repeated disk I/O
-_PROJECT_ROOT: t.Optional[pathlib.Path] = None
+_PROJECT_ROOT: pathlib.Path | None = None
 
 
 def resolve_project_root(

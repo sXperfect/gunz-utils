@@ -18,11 +18,10 @@ import functools
 import pathlib
 import subprocess
 import sys
-import typing as t
 
 __all__ = ["resolve_project_root"]
 
-_PROJECT_ROOT: t.Optional[pathlib.Path] = None
+_PROJECT_ROOT: pathlib.Path | None = None
 
 
 @functools.lru_cache(maxsize=1)
