@@ -6,6 +6,6 @@ under `docs/tasks/{pending,active,done}/`.
 
 | Task ID | Date | Description | Status |
 |:---:|:---:|:---|:---:|
-| [2026-07-16-docs-pipeline-repair](tasks/active/2026-07-16-docs-pipeline-repair.md) | 2026-07-16 | Fix `deploy_docs.yml` install extra, align sphinx theme with pyproject, bump conf.py release | Active |
+| _no active tasks_ | — | _awaiting first task assignment_ | Pending |
 
-> Last archived: [`2026-04-28-gunz_utils-docs_improvement`](tasks/done/2026-04-28-gunz_utils-docs_improvement.md) (2026-07-16) — replaced by active repair task after forensic review found the workflow was broken in ways the original checklist missed.
+> Last archived: [`2026-04-28-gunz_utils-python-v6_0-compliance`](tasks/done/2026-04-28-gunz_utils-python-v6_0-compliance.md) (2026-07-16) — completed with 3 atomic commits (`fc906d1` dunders + coding headers, `e5fe545` project.py `| None` syntax, `883a232` models.py `| None` syntax). 81 tests + 4 subtests green.
