@@ -10,6 +10,14 @@ package surface (``from gunz_utils import type_checked``).
 """
 from __future__ import annotations
 
+# =============================================================================
+# METADATA
+# =============================================================================
+__author__ = "Yeremia Gunawan Adhisantoso"
+__email__ = "adhisant@tnt.uni-hannover.de"
+__license__ = "Clear BSD"
+__version__ = "1.3.2"
+
 from gunz_utils.ext.validation_pydantic import (
     type_checked,
     validate_call,

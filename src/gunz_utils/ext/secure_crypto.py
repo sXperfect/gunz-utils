@@ -1,8 +1,14 @@
-# -*- coding: utf-8 -*-
 """
 Cryptographic utilities for AES-256-GCM.
 Compatible with HyperHedron CLI's TypeScript implementation.
 """
+# =============================================================================
+# METADATA
+# =============================================================================
+__author__ = "Yeremia Gunawan Adhisantoso"
+__email__ = "adhisant@tnt.uni-hannover.de"
+__license__ = "Clear BSD"
+__version__ = "1.3.2"
 
 import os
 import hashlib
