@@ -1,6 +1,7 @@
 """
 Shared data models for HyperHedron components.
 """
+
 # =============================================================================
 # METADATA
 # =============================================================================
@@ -9,15 +10,30 @@ __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
 __version__ = "1.3.2"
 
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 from datetime import datetime
+from typing import Any
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+from pydantic import BaseModel, Field
+
 
 class HealthStatus(BaseModel):
     """Standardized health check response for MCP servers."""
+
     status: str = Field(..., description="HEALTHY or UNHEALTHY")
-    message: Optional[str] = Field(None, description="Detailed status or error message")
+    message: str | None = Field(
+        None,
+        description="Detailed status or error message",
+    )
     timestamp: datetime = Field(default_factory=datetime.now)
-    version: Optional[str] = None
-    hostname: str = Field(default_factory=lambda: __import__('os').uname().nodename)
-    checks: Dict[str, Any] = Field(default_factory=dict, description="Component-specific health signals")
+    version: str | None = None
+    hostname: str = Field(default_factory=lambda: __import__("os").uname().nodename)
+    checks: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Component-specific health signals",
+    )
