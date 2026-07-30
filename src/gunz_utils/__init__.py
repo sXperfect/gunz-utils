@@ -11,7 +11,7 @@ from .upstream_protocol import (
     UpstreamNotFoundError,
     UpstreamUnavailableError,
 )
-from .models import HealthStatus
+from .models import GunzBaseModel, HealthStatus
 
 __version__ = "1.3.2"
 
@@ -59,6 +59,7 @@ __all__ = [
     "UpstreamNotFoundError",
     "UpstreamUnavailableError",
     "HealthStatus",
+    "GunzBaseModel",
     "type_checked",
     "resolve_project_root",
     "setup_logging",
