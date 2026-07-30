@@ -34,7 +34,7 @@ print(f"Project is located at: {root}")
 Leverage Pydantic-powered validation for your research functions:
 
 ```python
-from gunz_utils.validation import validate_call
+from gunz_utils.ext.validation_pydantic import validate_call
 
 @validate_call
 def process_data(samples: int, resolution: int):

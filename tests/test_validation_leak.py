@@ -1,6 +1,6 @@
 import unittest
 
-from gunz_utils.validation import type_checked
+from gunz_utils.ext.validation_pydantic import type_checked
 
 
 class TestValidationLeak(unittest.TestCase):
