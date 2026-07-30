@@ -5,6 +5,55 @@ All notable changes to **gunz-utils** are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-07-16
+
+### Added
+
+- `GunzBaseModel` — shared Pydantic v2 base class in
+  `src/gunz_utils/models.py`. Encapsulates the strictness defaults
+  that every HyperHedron domain model should inherit:
+  `extra="forbid"`, `str_strip_whitespace=True`,
+  `validate_assignment=True`. Re-exported as
+  `from gunz_utils import GunzBaseModel` and added to `__all__`.
+- `tests/test_core/test_models.py` — 16 unit tests covering
+  `GunzBaseModel` configuration, behavior, subclass override, and
+  the public API re-export. Test count: 81 → 97.
+
+### Fixed
+
+- `HealthStatus()` no-arg construction now succeeds; the `status`
+  field defaults to `"UNKNOWN"` (a sentinel for "not yet checked")
+  instead of raising `ValidationError`. Two regression tests added
+  to pin the new behavior. Test count: 97 → 99.
+- Six `except` clauses now chain their raised exceptions with
+  `from exc` (B904). Catches were previously unnamed or lacked the
+  explicit `from` clause, which suppressed the original cause.
+- Ruff auto-fix pass on 39 issues: unsorted imports (19), blank
+  lines with trailing whitespace (11), missing newlines at end of
+  file (5), `setattr` with constant (4).
+
+### Changed
+
+- Python v6.0 compliance sweep: 13 modules now have the full
+  dunder block (`__author__`, `__email__`, `__license__`,
+  `__version__ = "1.4.0"`); 3 files had `# -*- coding: utf-8 -*-`
+  removed; 4 files had `t.Optional` / `typing.Optional` /
+  `typing.Dict` replaced with modern `X | None` / `dict[str, Any]`
+  syntax.
+- Ruff line-length enforcement is now satisfied:
+  `ruff check src/ tests/` reports 0 issues across the codebase.
+  36 line-too-long (E501) violations were fixed via line wrapping
+  and implicit string concatenation.
+
+### Removed
+
+- **CI**: `deploy_docs.yml` no longer uploads to Cloudflare
+  Pages (the step was removed entirely). Both `ci.yml` and
+  `deploy_docs.yml` triggers are pinned to the sentinel branch
+  `never`, so GitHub Actions no longer runs on push or pull
+  request. Local CI via [`act`](https://github.com/nektos/act)
+  remains the supported workflow.
+
 ## [1.3.2] — 2026-07-16
 
 ### Changed
