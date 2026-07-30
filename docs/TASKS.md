@@ -8,4 +8,4 @@ under `docs/tasks/{pending,active,done}/`.
 |:---:|:---:|:---|:---:|
 | _no active tasks_ | — | _awaiting first task assignment_ | Pending |
 
-> Last archived: [`2026-07-16-fix-api-rst`](tasks/done/2026-07-16-fix-api-rst.md) (2026-07-16) — fixed broken `.. automodule:: gunz_utils.validation` directive in `docs/source/api.rst` (shim was deleted in v1.5.0). Added new `Models` and `Upstream Protocol` sections. 1 commit at `3378b5b`.
+> Last archived: [`2026-07-16-v150-migration-docs`](tasks/done/2026-07-16-v150-migration-docs.md) (2026-07-16) — added `Migration` section to README.md explaining the v1.5.0 shim removal, with Option A (ext.*) and Option B (lazy) migration paths. 1 commit at `057cdea`.
