@@ -10,13 +10,14 @@ __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
 __version__ = "1.3.2"
 
-import os
-import hashlib
 import binascii
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import hashlib
+import os
+
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 # Constants matching TypeScript implementation
 IV_LENGTH = 12
@@ -40,9 +41,9 @@ def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
     """
     hostname = os.uname().nodename
     machine_secret = hashlib.sha256(hostname.encode('utf-8')).hexdigest()
-    
+
     final_passphrase = f"{passphrase}:{machine_secret}" if passphrase else machine_secret
-    
+
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=KEY_LENGTH,
@@ -60,15 +61,15 @@ def encrypt(text: str, passphrase: str | None = None) -> str:
     salt = os.urandom(SALT_LENGTH)
     iv = os.urandom(IV_LENGTH)
     key = get_derived_key(salt, passphrase)
-    
+
     aesgcm = AESGCM(key)
     # cryptography's AESGCM.encrypt appends the tag to the ciphertext
     ciphertext_with_tag = aesgcm.encrypt(iv, text.encode('utf-8'), None)
-    
+
     # Split tag (last 16 bytes) and ciphertext
     tag = ciphertext_with_tag[-16:]
     encrypted = ciphertext_with_tag[:-16]
-    
+
     return f"{salt.hex()}:{iv.hex()}:{tag.hex()}:{encrypted.hex()}"
 
 def decrypt(encrypted_text: str, passphrase: str | None = None) -> str:
@@ -84,16 +85,16 @@ def decrypt(encrypted_text: str, passphrase: str | None = None) -> str:
     parts = encrypted_text.split(':')
     if len(parts) != 4:
         raise ValueError("Invalid encrypted format")
-    
+
     salt = binascii.unhexlify(parts[0])
     iv = binascii.unhexlify(parts[1])
     tag = binascii.unhexlify(parts[2])
     encrypted = binascii.unhexlify(parts[3])
-    
+
     key = get_derived_key(salt, passphrase)
     aesgcm = AESGCM(key)
-    
+
     # cryptography expects ciphertext + tag
     decrypted = aesgcm.decrypt(iv, encrypted + tag, None)
-    
+
     return decrypted.decode('utf-8')

@@ -1,7 +1,8 @@
-import unittest
 import pathlib
 import sys
 import tempfile
+import unittest
+
 from gunz_utils import resolve_project_root
 from gunz_utils.ext import project_gitpython as project_module
 

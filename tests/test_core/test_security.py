@@ -1,7 +1,8 @@
-import unittest
 import os
 import tempfile
-from gunz_utils.security import sanitize_filename, safe_path_join
+import unittest
+
+from gunz_utils.security import safe_path_join, sanitize_filename
 
 
 class TestSecurity(unittest.TestCase):

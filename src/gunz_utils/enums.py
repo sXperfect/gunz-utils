@@ -17,7 +17,7 @@ __license__ = "Clear BSD"
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import enum
-from typing import Self, TypeVar, ClassVar, Any
+from typing import Any, ClassVar, Self, TypeVar
 
 # =============================================================================
 # TYPE VARIABLES
@@ -104,7 +104,7 @@ class BaseStrEnum(enum.StrEnum):
                 if name_lower not in lookup_map:
                     lookup_map[name_lower] = member
 
-            setattr(cls, "_fuzzy_lookup_map", lookup_map)
+            cls._fuzzy_lookup_map = lookup_map
             return lookup_map
 
     @classmethod
@@ -211,7 +211,7 @@ class BaseStrEnum(enum.StrEnum):
 # ?
 # ? Security rationale: 1k chars is safe; 100k chars can take seconds
 # ? on slow hardware (regex backtracking is O(n) on `val_norm.replace`).
-setattr(BaseStrEnum, "DEFAULT_MAX_INPUT_LENGTH", 1024)
+BaseStrEnum.DEFAULT_MAX_INPUT_LENGTH = 1024
 
 
 @enum.verify(enum.UNIQUE)
@@ -278,7 +278,7 @@ class BaseIntEnum(enum.IntEnum):
                 name_lower = member.name.lower()
                 if name_lower not in lookup_map:
                     lookup_map[name_lower] = member
-            setattr(cls, "_name_lookup_map", lookup_map)
+            cls._name_lookup_map = lookup_map
             return lookup_map
 
     @classmethod
@@ -369,4 +369,4 @@ class BaseIntEnum(enum.IntEnum):
         return cls.values()
 
 
-setattr(BaseIntEnum, "DEFAULT_MAX_INPUT_LENGTH", 1024)
+BaseIntEnum.DEFAULT_MAX_INPUT_LENGTH = 1024

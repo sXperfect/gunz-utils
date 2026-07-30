@@ -1,5 +1,6 @@
 import unittest
-from gunz_utils.enums import BaseStrEnum, BaseIntEnum
+
+from gunz_utils.enums import BaseIntEnum, BaseStrEnum
 
 
 class TestEnumSecurity(unittest.TestCase):

@@ -12,7 +12,9 @@ __version__ = "1.3.2"
 import os
 import sys
 from pathlib import Path
+
 from loguru import logger
+
 
 def setup_logging(
     log_name: str,
@@ -24,10 +26,10 @@ def setup_logging(
     """
     logger.remove()
     log_level = "DEBUG" if verbose else "INFO"
-    
+
     # Capture Session ID from environment
     session_id = os.environ.get("HH_SESSION_ID", "GLOBAL")
-    
+
     # Standard format with Session ID
     log_format = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "

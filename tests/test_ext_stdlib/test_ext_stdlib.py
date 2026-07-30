@@ -10,10 +10,10 @@ import sys
 import tempfile
 import unittest
 
-from gunz_utils.ext.validation_stdlib import type_checked as stdlib_type_checked
 from gunz_utils.ext.project_stdlib import (
     resolve_project_root as stdlib_resolve_project_root,
 )
+from gunz_utils.ext.validation_stdlib import type_checked as stdlib_type_checked
 
 
 class TestStdlibTypeChecked(unittest.TestCase):

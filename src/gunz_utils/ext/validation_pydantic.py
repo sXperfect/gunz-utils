@@ -21,7 +21,7 @@ import typing as t
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
-from pydantic import validate_call, ValidationError
+from pydantic import ValidationError, validate_call
 
 
 def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:

@@ -10,7 +10,6 @@ Covers the shared strictness defaults exposed by :class:`GunzBaseModel`:
 """
 
 import unittest
-
 from datetime import datetime
 
 from pydantic import ConfigDict, ValidationError
