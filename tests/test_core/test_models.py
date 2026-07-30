@@ -11,6 +11,8 @@ Covers the shared strictness defaults exposed by :class:`GunzBaseModel`:
 
 import unittest
 
+from datetime import datetime
+
 from pydantic import ConfigDict, ValidationError
 
 from gunz_utils import GunzBaseModel
@@ -174,6 +176,28 @@ class TestHealthStatusUnaffected(unittest.TestCase):
         self.assertTrue(issubclass(HealthStatus, PydanticBaseModel))
         # But it does NOT inherit from GunzBaseModel
         self.assertFalse(issubclass(HealthStatus, GunzBaseModel))
+
+    def test_healthstatus_constructible_without_args(self):
+        """``HealthStatus()`` no-arg construction works.
+
+        Regression: previously ``status`` had no default, so
+        ``HealthStatus()`` raised ``ValidationError: status Field
+        required``. The field now defaults to ``"UNKNOWN"``.
+        """
+        h = HealthStatus()
+        self.assertEqual(h.status, "UNKNOWN")
+        # Other optional fields should also have defaults
+        self.assertIsNone(h.message)
+        self.assertIsNone(h.version)
+        # timestamp + hostname + checks get their own defaults
+        self.assertIsInstance(h.timestamp, datetime)
+        self.assertIsInstance(h.hostname, str)
+        self.assertEqual(h.checks, {})
+
+    def test_healthstatus_explicit_status_overrides_default(self):
+        """Passing ``status=\"HEALTHY\"`` overrides the default."""
+        h = HealthStatus(status="HEALTHY")
+        self.assertEqual(h.status, "HEALTHY")
 
 
 if __name__ == "__main__":

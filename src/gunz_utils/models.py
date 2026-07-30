@@ -78,7 +78,10 @@ class GunzBaseModel(BaseModel):
 class HealthStatus(BaseModel):
     """Standardized health check response for MCP servers."""
 
-    status: str = Field(..., description="HEALTHY or UNHEALTHY")
+    status: str = Field(
+        "UNKNOWN",
+        description="HEALTHY or UNHEALTHY (defaults to UNKNOWN until checked)",
+    )
     message: str | None = Field(
         None,
         description="Detailed status or error message",
