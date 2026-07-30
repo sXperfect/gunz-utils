@@ -18,6 +18,33 @@ The `BaseStrEnum` and `BaseIntEnum` classes provide significant improvements ove
 *   **Introspection**: Helper methods like `names()`, `values()`, and `items()` for cleaner code.
 *   **CLI Integration**: `choices()` method to generate valid options for CLI tools (Click, Typer, argparse).
 
+## Migration
+
+### v1.5.0 — `gunz_utils.validation` shim removed
+
+The backwards-compat shim at `gunz_utils.validation` was removed in
+v1.5.0. The shim existed since v1.3.0 to preserve the historical import
+path during the `ext.*` dependency split.
+
+**If you were importing from `gunz_utils.validation` directly**, migrate
+to one of:
+
+```python
+# Option A: import from the canonical ext.* module
+from gunz_utils.ext.validation_pydantic import type_checked, validate_call
+
+# Option B: import from the package surface (lazy-loaded, recommended)
+from gunz_utils import type_checked, validate_call
+```
+
+Both resolve to the same underlying functions. Option B is preferred for
+new code as it doesn't depend on the internal `ext.*` layout.
+
+**No change needed if you imported via `from gunz_utils import …`** —
+the lazy-import paths still work exactly as before.
+
+See `CHANGELOG.md` for the full v1.5.0 entry.
+
 ## Installation
 
 ### From GitHub (Pip)
