@@ -133,10 +133,10 @@ class BaseStrEnum(enum.StrEnum):
             # Fallback to instantiation (should work if valid member)
             try:
                 return cls(alias_target_value)
-            except ValueError:
+            except ValueError as exc:
                 raise ValueError(
                     f"Alias target '{alias_target_value}' is not a valid member value for {cls.__name__}"
-                )
+                ) from exc
 
         # 2. Check for matches in the fuzzy map
         # Optimization: Use cached lookup map instead of iterating
@@ -305,10 +305,10 @@ class BaseIntEnum(enum.IntEnum):
 
             try:
                 return cls(int_target_value)
-            except ValueError:
+            except ValueError as exc:
                 raise ValueError(
                     f"Alias target '{int_target_value}' is not a valid member value for {cls.__name__}"
-                )
+                ) from exc
 
         # 2. Check for member name matches (case-insensitive)
         # Optimization: Use cached lookup map instead of iterating

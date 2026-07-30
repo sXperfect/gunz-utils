@@ -81,9 +81,9 @@ def resolve_project_root(
 
         return _PROJECT_ROOT
 
-    except InvalidGitRepositoryError:
+    except InvalidGitRepositoryError as exc:
         raise RuntimeError(
             "Could not find project root. Ensure you are running inside a git repository."
-        )
+        ) from exc
     except Exception as e:
-        raise RuntimeError(f"Unexpected error resolving project root: {e}")
+        raise RuntimeError(f"Unexpected error resolving project root: {e}") from e
