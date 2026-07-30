@@ -27,6 +27,8 @@ _MAX_FILENAME_INPUT_LENGTH = 4096  # Security: limit input size to prevent DoS
 @functools.lru_cache(maxsize=16)
 def _get_replacement_pattern(replacement: str) -> re.Pattern:
     """Cache compiled patterns for collapsing multiple replacements."""
+    #? Replacement alphabets are tiny in practice, so a bounded cache avoids
+    #? repeated compilation without allowing user input to grow memory forever.
     return re.compile(f"{re.escape(replacement)}+")
 
 

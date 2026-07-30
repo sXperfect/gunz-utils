@@ -101,6 +101,8 @@ class UpstreamError(Exception):
         self.message = message
 
     def to_dict(self) -> dict[str, Any]:
+        #? A stable, JSON-safe envelope lets brokers expose failures without
+        #? leaking exception internals or requiring upstream-specific serializers.
         return {
             "error": self.message,
             "upstream": self.upstream,

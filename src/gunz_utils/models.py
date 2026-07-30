@@ -78,6 +78,8 @@ class GunzBaseModel(BaseModel):
 class HealthStatus(BaseModel):
     """Standardized health check response for MCP servers."""
 
+    #? UNKNOWN distinguishes an unchecked dependency from a failed one, so
+    #? startup status cannot accidentally claim either health or failure.
     status: str = Field(
         "UNKNOWN",
         description="HEALTHY or UNHEALTHY (defaults to UNKNOWN until checked)",

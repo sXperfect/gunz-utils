@@ -84,6 +84,8 @@ def resolve_project_root(
         return _PROJECT_ROOT
 
     except InvalidGitRepositoryError as exc:
+        #? Preserve the GitPython cause so callers can diagnose repository
+        #? discovery failures while receiving this module's stable exception type.
         raise RuntimeError(
             "Could not find project root. "
             "Ensure you are running inside a git repository."

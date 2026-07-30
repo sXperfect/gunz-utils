@@ -42,6 +42,8 @@ def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
     hostname = os.uname().nodename
     machine_secret = hashlib.sha256(hostname.encode('utf-8')).hexdigest()
 
+    #? Binding the optional passphrase to a machine-derived secret prevents the
+    #? same user phrase from yielding portable credentials across hosts.
     final_passphrase = (
         f"{passphrase}:{machine_secret}" if passphrase else machine_secret
     )

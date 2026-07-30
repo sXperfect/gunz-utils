@@ -326,6 +326,8 @@ class BaseIntEnum(enum.IntEnum):
                 return cls._value2member_map_[int_value]
             return cls(int_value)
         except (ValueError, TypeError):
+            #? Conversion failure is expected for symbolic names, which are
+            #? reported uniformly with the valid integer choices below.
             pass
 
         valid_options = ", ".join(f"'{m.value}'" for m in cls)

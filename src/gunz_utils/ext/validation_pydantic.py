@@ -95,6 +95,8 @@ def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
                 # ? Re-raise as TypeError to be more Pythonic for type issues,
                 # ? effectively hiding the Pydantic trace from end users unless
                 # ? they look closer.
+                #? Suppress Pydantic's implementation traceback because callers
+                #? need a concise public type error, not validator internals.
                 raise TypeError(error_msg) from None
 
         return wrapper
