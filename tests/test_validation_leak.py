@@ -17,7 +17,8 @@ class TestValidationLeak(unittest.TestCase):
         sensitive_password = "MySecretPassword123!"
 
         # We pass a string where an int is expected for 'age'
-        # The sensitive data is in the *wrong* argument type, which triggers ValidationError.
+        # The sensitive data is in the *wrong* argument type, which
+        # triggers ValidationError.
         with self.assertRaises(TypeError) as cm:
             login("user", age=sensitive_password)  # type: ignore
 

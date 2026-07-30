@@ -26,7 +26,8 @@ from pydantic import ValidationError, validate_call
 
 def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
     """
-    A wrapper around pydantic.validate_call that provides cleaner, user-friendly error messages.
+    A wrapper around pydantic.validate_call that provides cleaner,
+    user-friendly error messages.
 
     It catches `pydantic.ValidationError` and re-raises it as a `TypeError` with a
     formatted message indicating exactly which argument failed and why.
@@ -51,7 +52,8 @@ def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
     ...
     >>> my_func("string")
     TypeError: Validation error in 'my_func':
-    Argument 'a': Input should be a valid integer, unable to parse string as an integer (got type 'str')
+    Argument 'a': Input should be a valid integer, unable to parse string as an
+    integer (got type 'str')
     """
 
     def decorator(f: t.Callable) -> t.Callable:
@@ -80,8 +82,8 @@ def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
 
                     loc_str = " -> ".join(clean_loc) if clean_loc else "input"
 
-                    # ? SECURITY: Do not leak the actual input value in the error message
-                    # ? as it might be sensitive (e.g., a password).
+                    # ? SECURITY: Do not leak the actual input value in the
+                    # ? error message as it might be sensitive (e.g., a password).
                     # ? Instead, show the type of the input.
                     input_type = type(input_val).__name__
                     errors.append(
@@ -91,7 +93,8 @@ def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
                 error_msg = f"Validation error in '{f.__name__}':\n" + "\n".join(errors)
 
                 # ? Re-raise as TypeError to be more Pythonic for type issues,
-                # ? effectively hiding the Pydantic trace from the end user unless they look closer.
+                # ? effectively hiding the Pydantic trace from end users unless
+                # ? they look closer.
                 raise TypeError(error_msg) from None
 
         return wrapper

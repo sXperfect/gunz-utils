@@ -71,9 +71,11 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
         )
 
     # 1. Check for unsafe replacement characters
-    # ? We must disallow path separators in the replacement string to prevent
-    # ? accidental introduction of path traversal or directory creation.
-    # ? We check for standard separators (/ and \) explicitly to be safe across platforms.
+    # ? We must disallow path separators in the replacement string to
+    # ? prevent accidental introduction of path traversal or directory
+    # ? creation.
+    # ? We check for standard separators (/ and \) explicitly to be safe
+    # ? across platforms.
     if "/" in replacement or "\\" in replacement:
         raise ValueError("Replacement string contains path separators")
 
@@ -88,8 +90,10 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
 
     # 4. Collapse multiple replacements
     if replacement:
-        # ? Optimization: Only run regex if we actually have consecutive replacements
-        # ? This avoids unnecessary regex processing for the common case (e.g. "my_file.txt")
+        # ? Optimization: Only run regex if we actually have consecutive
+        # ? replacements
+        # ? This avoids unnecessary regex processing for the common case
+        # ? (e.g. "my_file.txt")
         if replacement * 2 in filename:
             # ? Use cached pattern for replacement
             pattern = _get_replacement_pattern(replacement)
@@ -112,13 +116,16 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     # ? See: https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
     # ? Windows checks the "base" name up to the first dot.
     # ? e.g. "CON.txt" and "CON.tar.gz" are both invalid.
-    # ? We use partition('.')[0] instead of os.path.splitext because splitext only splits the last extension.
+    # ? We use partition('.')[0] instead of os.path.splitext because
+    # ? splitext only splits the last extension.
     root = filename.partition(".")[0]
 
     # ? Performance Optimization (⚡ Bolt):
     # ? Instead of indiscriminately doing .upper() and looking up in a set,
-    # ? we first check if the length of `root` is 3 or 4, since all reserved names are exactly 3 or 4 chars.
-    # ? Using `==` with `or` is measurably faster than `in {3, 4}` for simple integer checks.
+    # ? we first check if the length of `root` is 3 or 4, since all reserved
+    # ? names are exactly 3 or 4 chars.
+    # ? Using `==` with `or` is measurably faster than `in {3, 4}` for simple
+    # ? integer checks.
     root_len = len(root)
     if (root_len == 3 or root_len == 4) and root.upper() in {
         "CON",
@@ -190,12 +197,16 @@ def safe_path_join(base_dir: str, *paths: str) -> str:
 
         # Determine if the component is absolute
         # If it is, we treat it as relative to the base (stripping root)
-        # OR we just reject it. os.path.join behavior with absolute paths is often a source of bugs.
-        # Here we will reject it if it resets the root, OR we can strip the leading slash.
-        # Safest is to strip leading slashes/drive letters to force relative join.
+        # OR we just reject it. os.path.join behavior with absolute paths is
+        # often a source of bugs.
+        # Here we will reject it if it resets the root, OR we can strip the
+        # leading slash.
+        # Safest is to strip leading slashes/drive letters to force relative
+        # join.
         if os.path.isabs(p):
             # Handle Windows drive letters (e.g. C:\) by splitting drive
-            # splitdrive returns ('', p) on non-Windows usually, or ('C:', '\path') on Windows
+            # splitdrive returns ('', p) on non-Windows usually, or
+            # ('C:', '\path') on Windows
             drive, p = os.path.splitdrive(p)
             # Strip leading separators to ensure it's relative
             p = p.lstrip(os.path.sep)

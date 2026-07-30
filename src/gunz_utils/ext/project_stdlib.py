@@ -36,7 +36,12 @@ def _git_rev_parse_toplevel(anchor: str) -> pathlib.Path | None:
             cwd=anchor,
         )
         return pathlib.Path(r.stdout.strip()).resolve()
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        FileNotFoundError,
+        OSError,
+    ):
         return None
 
 
@@ -70,8 +75,8 @@ def resolve_project_root(
     root = _walk_up_for_marker(start) or _git_rev_parse_toplevel(str(start))
     if root is None:
         raise RuntimeError(
-            "Could not find project root. Ensure you are running inside a git repository "
-            "or near a pyproject.toml."
+            "Could not find project root. Ensure you are running inside a "
+            "git repository or near a pyproject.toml."
         )
 
     if not root.is_dir():

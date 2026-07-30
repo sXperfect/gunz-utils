@@ -102,7 +102,8 @@ class TestSecurity(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_path:
             # Use tmp_path to ensure we have a valid, resolvable base directory
             base = str(tmp_path)
-            # resolve base to handle any symlinks in tmp path itself (e.g. /var vs /private/var)
+            # resolve base to handle any symlinks in tmp path itself
+            # (e.g. /var vs /private/var)
             base = os.path.realpath(base)
 
             expected = os.path.join(base, "uploads", "image.png")
@@ -120,8 +121,8 @@ class TestSecurity(unittest.TestCase):
                 safe_path_join(base, "../etc/passwd")
 
             with self.assertRaisesRegex(ValueError, "Path traversal detected"):
-                # Note: we use os.path.join to construct the traversal string properly for the OS if needed,
-                # but ".." is standard.
+                # Note: we use os.path.join to construct the traversal string
+                # properly for the OS if needed, but ".." is standard.
                 safe_path_join(base, "uploads/../../etc/passwd")
 
     def test_safe_path_join_absolute_input(self):

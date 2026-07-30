@@ -54,7 +54,8 @@ def _check_one(value: t.Any, annotation: t.Any) -> bool:
 
 def _safe_args_repr(exc: Exception) -> str:
     msg = str(exc)
-    return f"{type(exc).__name__}: {msg.splitlines()[0] if msg else 'argument binding failed'}"
+    head_line = msg.splitlines()[0] if msg else "argument binding failed"
+    return f"{type(exc).__name__}: {head_line}"
 
 
 def type_checked(
@@ -91,7 +92,8 @@ def type_checked(
                         if not _check_one(elem, ann):
                             input_type = type(elem).__name__
                             errors.append(
-                                f"Argument '{name}[{idx}]': expected {ann!r} (got type '{input_type}')"
+                                f"Argument '{name}[{idx}]': expected {ann!r} "
+                                f"(got type '{input_type}')"
                             )
                     continue
 
@@ -100,7 +102,8 @@ def type_checked(
                         if not _check_one(v, ann):
                             input_type = type(v).__name__
                             errors.append(
-                                f"Argument '{name}[{k!r}]': expected {ann!r} (got type '{input_type}')"
+                                f"Argument '{name}[{k!r}]': expected {ann!r} "
+                                f"(got type '{input_type}')"
                             )
                     continue
 

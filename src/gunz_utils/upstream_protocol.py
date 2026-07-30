@@ -206,7 +206,11 @@ class BaseUpstream(abc.ABC):
     name: str = "unnamed"
 
     @abc.abstractmethod
-    async def _invoke(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    async def _invoke(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
         """Tool-name-keyed dispatch to the underlying client. Implement me."""
         raise NotImplementedError
 

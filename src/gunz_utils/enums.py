@@ -95,7 +95,8 @@ class BaseStrEnum(enum.StrEnum):
                 if val_norm not in lookup_map:
                     lookup_map[val_norm] = member
 
-                # Add raw lowercase value (optimization for inputs matching value but with separators)
+                # Add raw lowercase value
+                # (optimization for inputs matching value but with separators)
                 if val_lower not in lookup_map:
                     lookup_map[val_lower] = member
 
@@ -135,7 +136,8 @@ class BaseStrEnum(enum.StrEnum):
                 return cls(alias_target_value)
             except ValueError as exc:
                 raise ValueError(
-                    f"Alias target '{alias_target_value}' is not a valid member value for {cls.__name__}"
+                    f"Alias target '{alias_target_value}' is not a valid "
+                    f"member value for {cls.__name__}"
                 ) from exc
 
         # 2. Check for matches in the fuzzy map
@@ -307,7 +309,8 @@ class BaseIntEnum(enum.IntEnum):
                 return cls(int_target_value)
             except ValueError as exc:
                 raise ValueError(
-                    f"Alias target '{int_target_value}' is not a valid member value for {cls.__name__}"
+                    f"Alias target '{int_target_value}' is not a valid "
+                    f"member value for {cls.__name__}"
                 ) from exc
 
         # 2. Check for member name matches (case-insensitive)

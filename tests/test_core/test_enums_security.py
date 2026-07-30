@@ -16,7 +16,8 @@ class TestEnumSecurity(unittest.TestCase):
         # This assumes the implementation uses _MAX_INPUT_LENGTH = 1024
         limit = 1024
 
-        # Valid length (should not raise ValueError for length, though it will raise for not found)
+        # Valid length (should not raise ValueError for length, though it
+        # will raise for not found)
         # We catch the ValueError and check the message to distinguish
         long_str_ok = "a" * limit
         try:

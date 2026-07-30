@@ -42,7 +42,9 @@ def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
     hostname = os.uname().nodename
     machine_secret = hashlib.sha256(hostname.encode('utf-8')).hexdigest()
 
-    final_passphrase = f"{passphrase}:{machine_secret}" if passphrase else machine_secret
+    final_passphrase = (
+        f"{passphrase}:{machine_secret}" if passphrase else machine_secret
+    )
 
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
