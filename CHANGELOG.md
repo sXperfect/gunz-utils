@@ -5,6 +5,31 @@ All notable changes to **gunz-utils** are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-07-16
+
+### Changed
+
+- Two callers migrated from the `gunz_utils.validation` compat shim
+  to the canonical `gunz_utils.ext.validation_pydantic` path:
+  - `tests/test_validation_leak.py` (line 2)
+  - `docs/source/quickstart.md` (line 37)
+- `docs/_build/` Sphinx build artifacts no longer tracked in git.
+  87 files that were committed in `82d78df` are now untracked.
+  The `.gitignore` line `docs/_build/` was already correct; only the
+  pre-existing tracked state needed cleanup. Local builds still
+  produce artifacts in `docs/_build/` (gitignored) as before.
+
+### Removed
+
+- **`src/gunz_utils/validation.py`** — backwards-compat shim originally
+  added in v1.3.0 (commit `59ec712`) to preserve the historical
+  `from gunz_utils.validation import ...` import path during the
+  ext.* split. Now dead code (all callers migrated). **Breaking
+  change** for external consumers still using the legacy path —
+  migrate to `from gunz_utils.ext.validation_pydantic import ...`
+  or `from gunz_utils import type_checked, validate_call` (the
+  latter works via the `_LAZY` dict in `__init__.py`).
+
 ## [1.4.0] — 2026-07-16
 
 ### Added
