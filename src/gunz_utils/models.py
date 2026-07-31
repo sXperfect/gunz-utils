@@ -9,8 +9,6 @@ Public surface
   ``validate_assignment=True``, ``frozen=False``). Subclass this for
   any domain model that wants consistent validation behavior across
   the workspace.
-
-- :class:`HealthStatus` — standardized MCP-server health-check response.
 """
 
 # =============================================================================
@@ -24,13 +22,11 @@ __version__ = "1.3.2"
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
-from datetime import datetime
-from typing import Any
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class GunzBaseModel(BaseModel):
@@ -74,24 +70,3 @@ class GunzBaseModel(BaseModel):
         frozen=False,
     )
 
-
-class HealthStatus(BaseModel):
-    """Standardized health check response for MCP servers."""
-
-    #? UNKNOWN distinguishes an unchecked dependency from a failed one, so
-    #? startup status cannot accidentally claim either health or failure.
-    status: str = Field(
-        "UNKNOWN",
-        description="HEALTHY or UNHEALTHY (defaults to UNKNOWN until checked)",
-    )
-    message: str | None = Field(
-        None,
-        description="Detailed status or error message",
-    )
-    timestamp: datetime = Field(default_factory=datetime.now)
-    version: str | None = None
-    hostname: str = Field(default_factory=lambda: __import__("os").uname().nodename)
-    checks: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Component-specific health signals",
-    )

@@ -1,7 +1,7 @@
 """Shared low-level python utilities for the Gunz ecosystem."""
 
 from .enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
-from .models import GunzBaseModel, HealthStatus
+from .models import GunzBaseModel
 from .security import safe_path_join, sanitize_filename
 from .upstream_protocol import (
     BaseUpstream,
@@ -58,7 +58,6 @@ __all__ = [
     "UpstreamAuthError",
     "UpstreamNotFoundError",
     "UpstreamUnavailableError",
-    "HealthStatus",
     "GunzBaseModel",
     "type_checked",
     "resolve_project_root",
