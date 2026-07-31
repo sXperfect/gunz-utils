@@ -8,4 +8,4 @@ under `docs/tasks/{pending,active,done}/`.
 |:---:|:---:|:---|:---:|
 | _no active tasks_ | — | _awaiting first task assignment_ | Pending |
 
-> Last archived: [`2026-07-16-push-delete-pre-history-scrub-tag`](tasks/done/2026-07-16-push-delete-pre-history-scrub-tag.md) (2026-07-16) — pushed `git push origin :refs/tags/pre-history-scrub` to remove the orphan forensic-backup tag from origin. Local + ikarus + origin all clean. User explicitly authorized. No commit (remote-only operation).
+> Last archived: [`2026-07-16-remove-healthstatus`](tasks/done/2026-07-16-remove-healthstatus.md) (2026-07-16) — dropped `HealthStatus` from public API to keep gunz-utils minimal. 2 commits: `723cfb5` feat(models): remove HealthStatus + `73779ec` chore(release): v1.6.0. Tag `v1.6.0` cut and pushed. Test count: 99 → 96.
