@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath('../../src'))
 project = 'gunz-utils'
 copyright = '2025, Yeremia Gunawan Adhisantoso'
 author = 'Yeremia Gunawan Adhisantoso'
-release = '1.5.0'
+release = '1.6.0'
 
 extensions = [
     'sphinx.ext.autodoc',

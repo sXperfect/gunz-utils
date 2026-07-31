@@ -5,6 +5,28 @@ All notable changes to **gunz-utils** are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-07-16
+
+### Removed
+
+- `gunz_utils.HealthStatus` (MCP server health-check response
+  model). The class was added in v1.3.0 as part of the public
+  API but was never used internally and is too domain-specific
+  for a foundational utilities library. Downstream consumers
+  that need this functionality should define their own
+  response model:
+
+```python
+# Before (v1.5.x and earlier)
+from gunz_utils import HealthStatus
+
+# After (v1.6.0+) — define in your own codebase
+from pydantic import BaseModel
+class HealthStatus(BaseModel):
+    status: str = "UNKNOWN"
+    # ... your fields here
+```
+
 ## [1.5.0] — 2026-07-16
 
 ### Changed
