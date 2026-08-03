@@ -59,7 +59,7 @@ def atomic_write(
     OSError
         If directory creation, writing, replacement, or cleanup fails.
     """
-    if not isinstance(path, (str, pathlib.Path)):
+    if not isinstance(path, str | pathlib.Path):
         raise TypeError("path must be str or pathlib.Path")
 
     target = pathlib.Path(path)
