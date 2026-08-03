@@ -5,6 +5,28 @@ All notable changes to **gunz-utils** are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] — 2026-07-16
+
+Minor release. Five new utility modules added. **All backward-compatible**
+additive changes — no existing API modified or removed.
+
+### Added
+
+- **`gunz_utils.atomic_write(path, content, *, mode="w", encoding=None, mkdir=False)`** in `src/gunz_utils/io.py` — crash-safe file write via temp-file + `os.replace()`. Solves the "partial write on crash / disk full" problem that every "save config / save JSON / dump data" path has. Accepts text or binary content, creates parent dirs on demand, cleans up temp file on failure. No external dependencies.
+- **`gunz_utils.safe_int`, `safe_float`, `safe_bool`** in `src/gunz_utils/parsing.py` — robust string→primitive parsers with `default=` parameter. `safe_int("3.14")` returns the default (not a coercion error); `safe_int("  42  ")` strips whitespace; `safe_int(value, min=0, max=100)` enforces bounds. Designed for CLI args and config files where coercion failures should fall back gracefully.
+- **`gunz_utils.parse_bool(value)`** in `src/gunz_utils/parsing.py` — strict bool parser. Recognizes canonical forms (`true/false`, `1/0`, `yes/no`, `on/off`, etc., case-insensitive) and raises `ValueError` on unrecognized. Pairs with `safe_bool` for use cases where ambiguity must be rejected loudly.
+- **`gunz_utils.format_bytes(n, *, precision=1, binary=False)`** in `src/gunz_utils/formatting.py` — human-readable file sizes. SI units by default (`KB = 1000 B`), IEC units with `binary=True` (`KiB = 1024 B`). Up to `TB`/`TiB`.
+- **`gunz_utils.format_duration(seconds, *, precision=1)`** in `src/gunz_utils/formatting.py` — human-readable elapsed time. Adaptive precision: `ms` for sub-second, `Xs` for under a minute, `Xm Ys` for under an hour, `Xh Ym Zs` for under a day, `Xd Yh Zm Ws` for longer.
+- **`gunz_utils.format_count(n, *, precision=1)`** in `src/gunz_utils/formatting.py` — human-readable large counts with K/M/B/T suffixes. `1000 → 1.0K`, `1_500_000 → 1.5M`, `1_234_567_890 → 1.2B`.
+- **`gunz_utils.Timer(label=None, *, auto_start=True)`** + **`gunz_utils.timer(label=None)`** in `src/gunz_utils/timing.py` — context manager for measuring elapsed wall-clock time. Uses `time.perf_counter()` for high precision. Auto-starts (optional), auto-stops on `__exit__`, supports manual `start()`/`stop()`/`elapsed`. The `timer()` convenience function is a `@contextlib.contextmanager` shortcut.
+- **`gunz_utils.redact(value, *, show_chars=2)`** + **`gunz_utils.redact_dict(d, *, patterns=None, show_chars=2)`** + **`gunz_utils.SECRET_PATTERNS`** in `src/gunz_utils/redaction.py` — secret masking for logs/dumps/error messages. `redact("hunter2")` → `"h****2"`. `redact_dict(config)` walks a dict (recursively into nested dicts and lists) and masks values whose keys match common secret patterns (`password`, `token`, `api_key`, etc., case-insensitive substring match). Prevents accidental token leakage.
+
+### Tests
+
+- Added **110 new tests** across 5 test files (`test_io.py`, `test_parsing.py`, `test_formatting.py`, `test_timing.py`, `test_redaction.py`).
+- Total test count: 96 → **206** (+110).
+- All new tests use `unittest.TestCase` style matching the existing repo convention.
+
 ## [1.6.0] — 2026-07-16
 
 ### Removed

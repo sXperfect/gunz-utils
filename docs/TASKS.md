@@ -8,4 +8,4 @@ under `docs/tasks/{pending,active,done}/`.
 |:---:|:---:|:---|:---:|
 | _no active tasks_ | — | _awaiting first task assignment_ | Pending |
 
-> Last archived: [`2026-07-16-remove-healthstatus`](tasks/done/2026-07-16-remove-healthstatus.md) (2026-07-16) — dropped `HealthStatus` from public API to keep gunz-utils minimal. 2 commits: `723cfb5` feat(models): remove HealthStatus + `73779ec` chore(release): v1.6.0. Tag `v1.6.0` cut and pushed. Test count: 99 → 96.
+> Last archived: [`2026-07-16-add-atomic-write`](tasks/done/2026-07-16-add-atomic-write.md) (and 4 sibling tasks: formatters, redact, safe-parsers, timer) (2026-07-16) — added 5 new utility modules (atomic_write, safe_parsers, formatters, Timer, redact). 6 feature commits landed, v1.7.0 release. Test count: 96 → 206 (+110).

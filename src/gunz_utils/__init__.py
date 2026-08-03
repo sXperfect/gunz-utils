@@ -18,7 +18,7 @@ from .upstream_protocol import (
     UpstreamUnavailableError,
 )
 
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 _LAZY: dict[str, str] = {
     "type_checked": ".ext.validation_pydantic",
