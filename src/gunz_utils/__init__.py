@@ -43,6 +43,7 @@ def __getattr__(name: str):
     if name not in _LAZY:
         raise AttributeError(f"module 'gunz_utils' has no attribute {name!r}")
     import importlib
+
     return getattr(importlib.import_module(_LAZY[name], __name__), name)
 
 
