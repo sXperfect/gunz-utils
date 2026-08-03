@@ -1,6 +1,7 @@
 """Shared low-level python utilities for the Gunz ecosystem."""
 
 from .enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
+from .formatting import format_bytes, format_count, format_duration
 from .io import atomic_write
 from .models import GunzBaseModel
 from .parsing import parse_bool, safe_bool, safe_float, safe_int
@@ -54,6 +55,13 @@ __all__ = [
     "BaseStrEnum",
     "OptionalBaseStrEnum",
     "atomic_write",
+    "format_bytes",
+    "format_count",
+    "format_duration",
+    "parse_bool",
+    "safe_bool",
+    "safe_float",
+    "safe_int",
     "sanitize_filename",
     "safe_path_join",
     "SECRET_PATTERNS",
