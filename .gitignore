@@ -10,6 +10,7 @@ build/
 .jules/
 .wrangler/
 .sisyphus/
+.omo/
 
 # External knowledge base (Hyperhedron symlink farm)
 .hyperhedron
