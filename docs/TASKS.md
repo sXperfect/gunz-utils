@@ -8,4 +8,4 @@ under `docs/tasks/{pending,active,done}/`.
 |:---:|:---:|:---|:---:|
 | _no active tasks_ | — | _awaiting first task assignment_ | Pending |
 
-> Last archived: [`2026-07-16-add-atomic-write`](tasks/done/2026-07-16-add-atomic-write.md) (and 4 sibling tasks: formatters, redact, safe-parsers, timer) (2026-07-16) — added 5 new utility modules (atomic_write, safe_parsers, formatters, Timer, redact). 6 feature commits landed, v1.7.0 release. Test count: 96 → 206 (+110).
+> Last archived: [`2026-08-06-add-hashing`](tasks/done/2026-08-06-add-hashing.md) (and 2 sibling tasks: dict-utils, iteration) (2026-08-06) — added 3 new utility modules (hashing, dict_utils, iteration). 5 commits landed, v1.8.0 release. Test count: 206 → 330 (+124).
