@@ -1,0 +1,174 @@
+"""Hashing helpers for content addressing and file integrity."""
+
+from __future__ import annotations
+
+import hashlib
+import pathlib
+
+__author__ = "Yeremia Gunawan Adhisantoso"
+__email__ = "adhisant@tnt.uni-hannover.de"
+__license__ = "BSD 3-Clause"
+__version__ = "1.8.0"
+
+__all__ = [
+    "content_hash",
+    "file_hash",
+    "short_hash",
+    "DEFAULT_ALGO",
+    "DEFAULT_CHUNK_SIZE",
+    "SUPPORTED_ALGOS",
+]
+
+DEFAULT_ALGO: str = "sha256"
+# ? 64 KiB matches the canonical streaming-IO block size; large enough to amortize
+# ? syscall overhead, small enough to bound memory for huge files.
+DEFAULT_CHUNK_SIZE: int = 65536
+# ? Curated subset keeps behavior predictable across systems; relying on
+# ? hashlib.algorithms_available would expose platform-specific names (e.g.
+# ? shake_128) that change between OpenSSL versions.
+SUPPORTED_ALGOS: frozenset[str] = frozenset(
+    {"sha256", "sha512", "sha1", "blake2b", "blake2s", "sha3_256", "md5"}
+)
+_MIN_SHORT_CHARS: int = 4
+_MAX_SHORT_CHARS: int = 128
+
+
+def content_hash(data: bytes | str, *, algo: str = DEFAULT_ALGO) -> str:
+    """Compute the lowercase hex digest of ``data``.
+
+    String inputs are UTF-8 encoded before hashing. Algorithm is validated
+    against :data:`SUPPORTED_ALGOS` so behavior is identical across Python
+    builds and OpenSSL versions.
+
+    Parameters
+    ----------
+    data : bytes | str
+        Bytes to hash, or a string (UTF-8 encoded before hashing).
+    algo : str, optional
+        Hash algorithm name. Must appear in :data:`SUPPORTED_ALGOS`.
+        Default is ``"sha256"``.
+
+    Returns
+    -------
+    str
+        Lowercase hex digest.
+
+    Raises
+    ------
+    TypeError
+        If ``data`` is not ``bytes`` or ``str``.
+    ValueError
+        If ``algo`` is not in :data:`SUPPORTED_ALGOS`.
+
+    Examples
+    --------
+    >>> content_hash(b"hello")
+    '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
+    >>> content_hash("hello") == content_hash(b"hello")
+    True
+    """
+    if type(data) not in (bytes, str):
+        raise TypeError(f"data must be bytes or str, got {type(data).__name__}")
+    if algo not in SUPPORTED_ALGOS:
+        raise ValueError(
+            f"unsupported algo {algo!r}; expected one of {sorted(SUPPORTED_ALGOS)}"
+        )
+    # ? str -> bytes via UTF-8 encoding (single canonical form for hashing).
+    payload = data.encode("utf-8") if isinstance(data, str) else data
+    return hashlib.new(algo, payload).hexdigest()
+
+
+def file_hash(
+    path: str | pathlib.Path,
+    *,
+    algo: str = DEFAULT_ALGO,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> str:
+    """Compute the hex digest of a file's contents, streamed in chunks.
+
+    Memory usage is bounded by ``chunk_size`` regardless of file size, so
+    multi-GB inputs do not blow up RAM. The file is opened in binary mode.
+
+    Parameters
+    ----------
+    path : str | pathlib.Path
+        File to hash.
+    algo : str, optional
+        Hash algorithm name. Must appear in :data:`SUPPORTED_ALGOS`.
+        Default is ``"sha256"``.
+    chunk_size : int, optional
+        Read block size in bytes. Must be positive. Default is
+        :data:`DEFAULT_CHUNK_SIZE` (64 KiB).
+
+    Returns
+    -------
+    str
+        Lowercase hex digest of the file contents.
+
+    Raises
+    ------
+    ValueError
+        If ``algo`` is unsupported or ``chunk_size`` is not positive.
+    FileNotFoundError
+        If ``path`` does not exist.
+    IsADirectoryError
+        If ``path`` is a directory.
+    """
+    if algo not in SUPPORTED_ALGOS:
+        raise ValueError(
+            f"unsupported algo {algo!r}; expected one of {sorted(SUPPORTED_ALGOS)}"
+        )
+    if chunk_size <= 0:
+        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
+    hasher = hashlib.new(algo)
+    # ? `with` guarantees the file handle closes even if the loop is interrupted.
+    with open(path, "rb") as fh:
+        while True:
+            block = fh.read(chunk_size)
+            if not block:
+                break
+            hasher.update(block)
+    return hasher.hexdigest()
+
+
+def short_hash(data: bytes | str, *, chars: int = 8, algo: str = DEFAULT_ALGO) -> str:
+    """Return the first ``chars`` hex characters of :func:`content_hash`.
+
+    Useful for human-visible content fingerprints (logs, cache keys, git-style
+    short SHAs). 8 chars (32 bits) is a reasonable default for non-cryptographic
+    dedup; longer strings reduce collision probability.
+
+    Parameters
+    ----------
+    data : bytes | str
+        Bytes or string to hash (forwarded to :func:`content_hash`).
+    chars : int, optional
+        Length of the returned prefix. Must be in
+        ``[_MIN_SHORT_CHARS, _MAX_SHORT_CHARS]``. Default is ``8``.
+    algo : str, optional
+        Hash algorithm name (forwarded to :func:`content_hash`).
+
+    Returns
+    -------
+    str
+        Lowercase hex prefix of length ``chars``.
+
+    Raises
+    ------
+    ValueError
+        If ``chars`` is out of range or ``algo`` is unsupported.
+    TypeError
+        If ``data`` is not ``bytes`` or ``str``.
+
+    Examples
+    --------
+    >>> short_hash(b"hello")
+    '2cf24dba'
+    >>> short_hash(b"hello") == content_hash(b"hello")[:8]
+    True
+    """
+    if chars < _MIN_SHORT_CHARS or chars > _MAX_SHORT_CHARS:
+        raise ValueError(
+            f"chars must be in [{_MIN_SHORT_CHARS}, {_MAX_SHORT_CHARS}], got {chars}"
+        )
+    return content_hash(data, algo=algo)[:chars]
