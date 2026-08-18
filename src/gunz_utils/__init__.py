@@ -1,8 +1,18 @@
 """Shared low-level python utilities for the Gunz ecosystem."""
 
+from .dict_utils import deep_get, deep_merge, deep_set
 from .enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
 from .formatting import format_bytes, format_count, format_duration
+from .hashing import (
+    DEFAULT_ALGO,
+    DEFAULT_CHUNK_SIZE,
+    SUPPORTED_ALGOS,
+    content_hash,
+    file_hash,
+    short_hash,
+)
 from .io import atomic_write
+from .iteration import batched, chunked, first, flatten
 from .models import GunzBaseModel
 from .parsing import parse_bool, safe_bool, safe_float, safe_int
 from .redaction import SECRET_PATTERNS, redact, redact_dict
@@ -18,7 +28,7 @@ from .upstream_protocol import (
     UpstreamUnavailableError,
 )
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 
 _LAZY: dict[str, str] = {
     "type_checked": ".ext.validation_pydantic",
@@ -56,6 +66,17 @@ __all__ = [
     "BaseStrEnum",
     "OptionalBaseStrEnum",
     "atomic_write",
+    "batched",
+    "chunked",
+    "content_hash",
+    "DEFAULT_ALGO",
+    "DEFAULT_CHUNK_SIZE",
+    "deep_get",
+    "deep_merge",
+    "deep_set",
+    "file_hash",
+    "first",
+    "flatten",
     "format_bytes",
     "format_count",
     "format_duration",
@@ -68,6 +89,8 @@ __all__ = [
     "SECRET_PATTERNS",
     "redact",
     "redact_dict",
+    "short_hash",
+    "SUPPORTED_ALGOS",
     "Timer",
     "timer",
     "UpstreamClient",

@@ -5,6 +5,25 @@ All notable changes to **gunz-utils** are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] — 2026-08-06
+
+Minor release. Three new utility modules added. **All backward-compatible**
+additive changes — no existing API modified or removed.
+
+### Added
+
+- **`gunz_utils.content_hash(data, *, algo="sha256")`** + **`gunz_utils.file_hash(path, *, algo="sha256", chunk_size=65536)`** + **`gunz_utils.short_hash(data, *, chars=8, algo="sha256")`** in `src/gunz_utils/hashing.py` — content-addressing and file-integrity helpers. `content_hash` accepts bytes or UTF-8 strings and returns the lowercase hex digest. `file_hash` streams the file in 64 KiB chunks so memory stays bounded for multi-GB inputs. `short_hash` returns the first `chars` hex characters (git-style fingerprint). Algorithm selection is restricted to a curated `SUPPORTED_ALGOS` frozenset (`sha256`, `sha512`, `sha1`, `blake2b`, `blake2s`, `sha3_256`, `md5`) for predictable cross-platform behavior. `DEFAULT_ALGO`, `DEFAULT_CHUNK_SIZE`, and `SUPPORTED_ALGOS` are also exported for callers that want to introspect or branch on them. No external dependencies — stdlib `hashlib` + `pathlib`.
+
+- **`gunz_utils.deep_get(d, path, *, default=_MISSING, separator=".")`** + **`gunz_utils.deep_set(d, path, value, *, separator=".")`** + **`gunz_utils.deep_merge(base, override, *, list_strategy="replace")`** in `src/gunz_utils/dict_utils.py` — nested-mapping helpers that fill the stdlib gap between raw dict access and a full Pydantic model. `deep_get` traverses via dotted-path string (`"a.b.c"`) or sequence (`["a", "b", "c"]`) and returns `default` for missing keys or scalar traversal failures (silently `None` rather than `KeyError`; pass `default` explicitly to control). `deep_set` creates intermediate dicts and replaces non-dict intermediates with a fresh dict (documented footgun). `deep_merge` returns a new dict (no mutation of either input), recurses into nested dicts, and supports three `list_strategy` modes for list-on-list collisions: `"replace"` (override wins, default), `"concat"` (base + override), and `"dedup"` (concatenated, deduplicated, order preserved). No external dependencies.
+
+- **`gunz_utils.chunked(iterable, n)`** + **`gunz_utils.batched(iterable, n)`** + **`gunz_utils.flatten(nested, *, max_depth=None, types=(list, tuple))`** + **`gunz_utils.first(iterable, *, default=None)`** in `src/gunz_utils/iteration.py` — lazy iteration helpers. `chunked` yields `n`-sized tuples (immutable, hashable, can be `dict` keys / `set` elements); `batched` yields `n`-sized lists (mutable). Both reject non-positive `n`. `flatten` walks a nested iterable and yields each leaf, descending into containers matching `types`. `max_depth` follows Lodash semantics: `None` flattens all levels, `N` flattens `N` levels (nested containers at deeper levels are yielded as leaves). Scalars passed as `nested` are yielded as a single leaf (defensive, despite the `Iterable` type signature). `first` returns the first item or `default` (matching `more_itertools.first`); empty input without an explicit `default` returns `None`. All four are pure generators — no external dependencies.
+
+### Tests
+
+- Added **124 new tests** across 3 test files (`test_hashing.py`, `test_dict_utils.py`, `test_iteration.py`).
+- Total test count: 206 → **330** (+124).
+- All new tests use `unittest.TestCase` style matching the existing repo convention.
+
 ## [1.7.0] — 2026-07-16
 
 Minor release. Five new utility modules added. **All backward-compatible**
