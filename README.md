@@ -1,119 +1,154 @@
 # Gunz Utils
 
 [![CI](https://github.com/sXperfect/gunz-utils/actions/workflows/ci.yml/badge.svg)](https://github.com/sXperfect/gunz-utils/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE.md)
+[![License](https://img.shields.io/badge/License-Clear_BSD-blue.svg)](LICENSE.md)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 
-**Gunz Utils** is a robust collection of general-purpose Python utilities designed for production environments. Currently, it features a powerful set of enhanced Enum classes that solve common pain points in Python's standard `enum` library.
+**Gunz Utils** is a general-purpose Python utility library for production environments. It bundles enhanced Enums, dict/iteration helpers, hashing, I/O, redaction, timing, validation, and an MCP-friendly `UpstreamClient` Protocol — all under one zero-dep core with opt-in extras for `pydantic`, `gitpython`, `cryptography`, and `loguru`.
 
 ## Features
 
-### Enhanced Enums (`gunz_utils.enums`)
+| Module | What it gives you | Deps |
+|:-------|:------------------|:-----|
+| [`enums`](src/gunz_utils/enums.py) | `BaseStrEnum`, `BaseIntEnum`, `OptionalBaseStrEnum` — fuzzy lookup, aliases, safe `get_or_none`, DoS-bounded input length | stdlib |
+| [`dict_utils`](src/gunz_utils/dict_utils.py) | `deep_get`, `deep_set`, `deep_merge` for nested dicts | stdlib |
+| [`formatting`](src/gunz_utils/formatting.py) | `format_bytes`, `format_duration`, `format_count` — human-readable sizes | stdlib |
+| [`hashing`](src/gunz_utils/hashing.py) | `content_hash`, `file_hash`, `short_hash` — blake2b/sha256, constant-time compare | stdlib |
+| [`io`](src/gunz_utils/io.py) | `atomic_write` — crash-safe file writes with `os.replace` | stdlib |
+| [`iteration`](src/gunz_utils/iteration.py) | `chunked`, `batched`, `flatten`, `first` — lazy generators | stdlib |
+| [`models`](src/gunz_utils/models.py) | `GunzBaseModel` — `pydantic.BaseModel` configured to forbid extra fields | pydantic (core dep) |
+| [`parsing`](src/gunz_utils/parsing.py) | `safe_int`, `safe_float`, `safe_bool`, `parse_bool` — strict coercion with diagnostics | stdlib |
+| [`redaction`](src/gunz_utils/redaction.py) | `redact`, `redact_dict` — pattern-based secret scrubbing | stdlib |
+| [`security`](src/gunz_utils/security.py) | `sanitize_filename`, `safe_path_join` — path traversal & reserved-name guards | stdlib |
+| [`timing`](src/gunz_utils/timing.py) | `Timer` + `timer` context manager — `time.perf_counter` based | stdlib |
+| [`upstream_protocol`](src/gunz_utils/upstream_protocol.py) | `UpstreamClient` Protocol + `UpstreamError` hierarchy + `BaseUpstream` | stdlib |
+| `type_checked` *(lazy)* | `@type_checked` decorator (Pydantic v2 backend) | `pydantic` extra |
+| `resolve_project_root` *(lazy)* | Git-aware repo-root discovery + `sys.path` injection | `gitpython` extra |
+| `setup_logging` *(lazy)* | Structured `loguru` logging with rotation | `loguru` extra |
+| `SecureStore` / `encrypt` / `decrypt` *(lazy)* | Fernet-backed secret-at-rest store + helpers | `cryptography` extra |
 
-The `BaseStrEnum` and `BaseIntEnum` classes provide significant improvements over standard Python Enums:
+## Quick Start
 
-*   **Fuzzy Matching**: Lookup members by case-insensitive name, value, or normalized string (ignoring separators like `-` and `_`).
-*   **Alias Support**: Define robust aliases for your enum members using `__ALIASES__`.
-*   **Safe Lookup**: Use `get_or_none()` to safely retrieve members without raising exceptions.
-*   **Introspection**: Helper methods like `names()`, `values()`, and `items()` for cleaner code.
-*   **CLI Integration**: `choices()` method to generate valid options for CLI tools (Click, Typer, argparse).
+```python
+from gunz_utils import (
+    BaseStrEnum, chunked, format_bytes, atomic_write, redact,
+    Timer, resolve_project_root,
+)
+```
+
+### Enums with fuzzy matching
+
+```python
+class Color(BaseStrEnum):
+    __ALIASES__ = {"crimson": "red"}
+    RED = "red"
+    DARK_BLUE = "dark_blue"
+
+Color.from_fuzzy_string("dark-blue")  # Color.DARK_BLUE
+Color.from_fuzzy_string("crimson")    # Color.RED
+Color.get_or_none("purple")           # None
+```
+
+### Iteration helpers
+
+```python
+list(chunked([1, 2, 3, 4, 5], n=2))   # [(1, 2), (3, 4), (5,)]
+list(flatten([[1, [2]], 3, [[4]]]))       # [1, 2, 3, 4]
+first([1, 2, 3])                          # 1
+```
+
+### Human-readable formatting
+
+```python
+format_bytes(1_500_000)     # "1.43 MB"
+format_duration(3661)       # "1h 1m 1s"
+format_count(1_234_567)     # "1.23M"
+```
+
+### Atomic writes + content hashing
+
+```python
+from gunz_utils import atomic_write, content_hash
+
+atomic_write("/tmp/report.json", b'{"ok": true}')
+digest = content_hash(b"hello")  # blake2b hex digest
+```
+
+### Redaction
+
+```python
+from gunz_utils import redact, redact_dict
+
+redact("api_key=sk-live-abc123")                    # "ap****23"
+redact_dict({"user": "alice", "password": "p@ss"})  # {"user": "alice", "password": "****"}
+```
+
+### Timing
+
+```python
+with Timer("phase-1") as t:
+    do_work()
+print(t.elapsed)  # seconds
+```
+
+### MCP-friendly upstream Protocol
+
+```python
+from gunz_utils import UpstreamClient, UpstreamError
+
+class MyUpstream:
+    name = "demo"
+    async def call(self, tool_name, arguments): ...
+    async def health_check(self) -> bool: return True
+    async def close(self) -> None: ...
+
+isinstance(MyUpstream(), UpstreamClient)  # True (runtime-checkable Protocol)
+```
+
+### Project root discovery
+
+```python
+from gunz_utils import resolve_project_root
+root = resolve_project_root()
+print(f"Project at: {root}")
+```
+
+## Installation
+
+```bash
+pip install git+https://github.com/sXperfect/gunz-utils.git         # core only
+pip install gunz-utils[validation]   # add pydantic + @type_checked
+pip install gunz-utils[secure]       # add cryptography + SecureStore
+pip install gunz-utils[project]      # add gitpython + resolve_project_root
+pip install gunz-utils[observability] # add loguru + setup_logging
+pip install gunz-utils[all]          # everything
+pip install gunz-utils[docs]         # + sphinx toolchain
+```
 
 ## Migration
 
 ### v1.5.0 — `gunz_utils.validation` shim removed
 
-The backwards-compat shim at `gunz_utils.validation` was removed in
-v1.5.0. The shim existed since v1.3.0 to preserve the historical import
-path during the `ext.*` dependency split.
-
-**If you were importing from `gunz_utils.validation` directly**, migrate
-to one of:
+The backwards-compat shim at `gunz_utils.validation` was removed in v1.5.0.
+If you were importing from it directly, migrate to:
 
 ```python
-# Option A: import from the canonical ext.* module
+# Canonical ext.* module
 from gunz_utils.ext.validation_pydantic import type_checked, validate_call
 
-# Option B: import from the package surface (lazy-loaded, recommended)
+# Or — preferred — the lazy package surface
 from gunz_utils import type_checked, validate_call
 ```
 
-Both resolve to the same underlying functions. Option B is preferred for
-new code as it doesn't depend on the internal `ext.*` layout.
+`from gunz_utils import …` keeps working unchanged.
 
-**No change needed if you imported via `from gunz_utils import …`** —
-the lazy-import paths still work exactly as before.
+### v1.6.0 — `gunz_utils.logging`, `gunz_utils.crypto` removed
 
-See `CHANGELOG.md` for the full v1.5.0 entry.
-
-## Installation
-
-### From GitHub (Pip)
-
-You can install the latest version directly from the repository:
-
-```bash
-pip install git+https://github.com/sXperfect/gunz-utils.git
-```
-
-### From Source (Editable)
-
-For development or local integration:
-
-```bash
-git clone https://github.com/sXperfect/gunz-utils.git
-cd gunz-utils
-pip install -e .
-```
-
-## Usage
-
-### Enhanced String Enum
-
-```python
-from gunz_utils.enums import BaseStrEnum
-
-class Color(BaseStrEnum):
-    # Define aliases (optional)
-    __ALIASES__ = {"crimson": "red", "dark": "dark_blue"}
-    
-    RED = "red"
-    BLUE = "blue"
-    DARK_BLUE = "dark_blue"
-
-# 1. Fuzzy Lookup (Case/Separator Insensitive)
-print(Color.from_fuzzy_string("dark-blue"))  # Color.DARK_BLUE
-print(Color.from_fuzzy_string("RED"))        # Color.RED
-
-# 2. Alias Lookup
-print(Color.from_fuzzy_string("crimson"))    # Color.RED
-
-# 3. Safe Lookup
-print(Color.get_or_none("purple"))           # None
-
-# 4. Introspection
-print(Color.names())   # ['RED', 'BLUE', 'DARK_BLUE']
-print(Color.values())  # ['red', 'blue', 'dark_blue']
-```
-
-### Enhanced Integer Enum
-
-```python
-from gunz_utils.enums import BaseIntEnum
-
-class HttpStatus(BaseIntEnum):
-    __ALIASES__ = {"missing": 404, "ok": 200}
-    
-    OK = 200
-    NOT_FOUND = 404
-
-# String-to-Int conversion with alias support
-print(HttpStatus.from_fuzzy_int_string("missing"))  # HttpStatus.NOT_FOUND
-print(HttpStatus.from_fuzzy_int_string("404"))      # HttpStatus.NOT_FOUND
-```
+Same story: moved to `ext.observability_loguru` and `ext.secure_crypto`,
+both reachable from the package surface (`setup_logging`, `encrypt`,
+`decrypt`, etc.).
 
 ## Documentation
-
-To build the documentation locally:
 
 ```bash
 pip install .[docs]
@@ -122,14 +157,15 @@ pip install .[docs]
 
 ## Development
 
-To run the test suite:
-
 ```bash
-python -m unittest discover tests
+pip install -e ".[all]"   # editable install with everything
+pytest                    # run all tests (340+)
+ruff check src tests      # lint
+mypy src/gunz_utils       # type-check
 ```
 
 ## License
 
-This project is licensed under the Clear BSD License - see the [LICENSE.md](LICENSE.md) file for details.
+Clear BSD — see [LICENSE.md](LICENSE.md).
 
 Copyright (c) 2025-present, Yeremia Gunawan Adhisantoso (sXperfect).
