@@ -7,10 +7,12 @@ from __future__ import annotations
 # =============================================================================
 import contextlib
 import time
+from collections.abc import Iterator
+from typing import Literal
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "adhisant@tnt.uni-hannover.de"
-__license__ = "BSD 3-Clause"
+__license__ = "Clear BSD"
 __version__ = "1.6.0"
 
 __all__ = ["Timer", "timer"]
@@ -72,14 +74,14 @@ class Timer:
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: object | None,
-    ) -> bool:
+    ) -> Literal[False]:
         """Stop timing on context exit without suppressing exceptions."""
         self.stop()
         return False
 
 
 @contextlib.contextmanager
-def timer(label: str | None = None):
+def timer(label: str | None = None) -> Iterator[Timer]:
     """Yield a started :class:`Timer` and stop it when the context exits.
 
     Parameters

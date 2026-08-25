@@ -1,5 +1,9 @@
 """Shared low-level python utilities for the Gunz ecosystem."""
 
+from __future__ import annotations
+
+from typing import Any
+
 from .dict_utils import deep_get, deep_merge, deep_set
 from .enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
 from .formatting import format_bytes, format_count, format_duration
@@ -43,7 +47,7 @@ _LAZY: dict[str, str] = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """PEP 562 lazy module attribute resolution.
 
     Names listed in `_LAZY` are loaded on first access via the named

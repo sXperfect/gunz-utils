@@ -64,7 +64,14 @@ def resolve_project_root(
     try:
         # ? Search upwards for the .git directory
         repo = Repo(anchor, search_parent_directories=True)
-        root_path = pathlib.Path(repo.working_tree_dir).resolve()
+        #? working_tree_dir is typed as str | os.PathLike[str] | None by GitPython;
+        #? bare repos expose None here, so guard explicitly.
+        working_dir = repo.working_tree_dir
+        if working_dir is None:
+            raise RuntimeError(
+                "Resolved repo has no working tree (bare repository)."
+            )
+        root_path = pathlib.Path(working_dir).resolve()
 
         # ? Validate it's actually a directory
         if not root_path.is_dir():

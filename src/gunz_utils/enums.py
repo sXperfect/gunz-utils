@@ -17,7 +17,7 @@ __license__ = "Clear BSD"
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import enum
-from typing import Any, ClassVar, Self, TypeVar
+from typing import Any, ClassVar, Self, TypeVar, cast
 
 # =============================================================================
 # TYPE VARIABLES
@@ -74,6 +74,11 @@ class BaseStrEnum(enum.StrEnum):
     # Lazily initialized map for fuzzy lookups
     _fuzzy_lookup_map: ClassVar[dict[str, Any]]
 
+    #? Declared as ClassVar so mypy sees it on `type[Self]`. The actual
+    #? assignment happens after the class body because StrEnum rejects
+    #? non-string attributes inside the body (see note at line 216).
+    DEFAULT_MAX_INPUT_LENGTH: ClassVar[int]
+
     @classmethod
     def _get_fuzzy_map(cls) -> dict[str, Self]:
         """
@@ -129,7 +134,9 @@ class BaseStrEnum(enum.StrEnum):
 
             # Check internal map first
             if alias_target_value in cls._value2member_map_:
-                return cls._value2member_map_[alias_target_value]
+                #? mypy's enum stubs type _value2member_map_ as dict[Any, Any];
+                #? the runtime value is Self, so cast at the boundary.
+                return cast(Self, cls._value2member_map_[alias_target_value])
 
             # Fallback to instantiation (should work if valid member)
             try:
@@ -185,7 +192,9 @@ class BaseStrEnum(enum.StrEnum):
             return value
 
         try:
-            return cls(value)
+            #? `value: object` requires a runtime narrowing before cls()
+            #? will accept it; we already guard ValueError/TypeError.
+            return cls(cast("str", value))
         except (ValueError, TypeError):
             pass
 
@@ -224,7 +233,11 @@ class OptionalBaseStrEnum(BaseStrEnum):
 
     __ALIASES__: ClassVar[dict[str, str]] = {}
 
-    def __init_subclass__(cls, **kwargs) -> None:
+    #? Subclasses must define a NONE member (enforced in __init_subclass__).
+    #? Declared so mypy recognises `cls.NONE` in `_missing_`.
+    NONE: ClassVar[Self]
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         if "NONE" not in cls.__members__:
             raise TypeError(
@@ -244,7 +257,10 @@ class OptionalBaseStrEnum(BaseStrEnum):
             except ValueError:
                 pass  # let super raise
 
-        return super()._missing_(value)
+        #? Enum._missing_ returns Self | None in stubs but the protocol
+        #? guarantees a member on success or raises. Cast to Self since
+        #? this branch only runs after the string-fuzzy path has failed.
+        return cast(Self, super()._missing_(value))
 
 
 @enum.verify(enum.UNIQUE)
@@ -266,6 +282,11 @@ class BaseIntEnum(enum.IntEnum):
 
     # Lazily initialized map for name lookups
     _name_lookup_map: ClassVar[dict[str, Any]]
+
+    #? Declared as ClassVar so mypy sees it on `type[Self]`. The actual
+    #? assignment happens after the class body because IntEnum rejects
+    #? non-int attributes inside the body.
+    DEFAULT_MAX_INPUT_LENGTH: ClassVar[int]
 
     @classmethod
     def _get_name_lookup_map(cls) -> dict[str, Self]:
@@ -303,7 +324,9 @@ class BaseIntEnum(enum.IntEnum):
             int_target_value = _aliases[value_lower]
 
             if int_target_value in cls._value2member_map_:
-                return cls._value2member_map_[int_target_value]
+                #? mypy's enum stubs type _value2member_map_ as dict[Any, Any];
+                #? the runtime value is Self, so cast at the boundary.
+                return cast(Self, cls._value2member_map_[int_target_value])
 
             try:
                 return cls(int_target_value)
@@ -323,7 +346,9 @@ class BaseIntEnum(enum.IntEnum):
         try:
             int_value = int(value_str)
             if int_value in cls._value2member_map_:
-                return cls._value2member_map_[int_value]
+                #? mypy's enum stubs type _value2member_map_ as dict[Any, Any];
+                #? the runtime value is Self, so cast at the boundary.
+                return cast(Self, cls._value2member_map_[int_value])
             return cls(int_value)
         except (ValueError, TypeError):
             #? Conversion failure is expected for symbolic names, which are
@@ -357,7 +382,8 @@ class BaseIntEnum(enum.IntEnum):
             return None
 
         try:
-            return cls(value)
+            #? `value: object` requires narrowing before cls() will accept it.
+            return cls(cast("int", value))
         except (ValueError, TypeError):
             pass
 

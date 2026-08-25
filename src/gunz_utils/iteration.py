@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "adhisant@tnt.uni-hannover.de"
-__license__ = "BSD 3-Clause"
+__license__ = "Clear BSD"
 __version__ = "1.8.0"
 
 __all__ = ["chunked", "batched", "flatten", "first"]
@@ -166,7 +166,9 @@ def flatten(
             yield item
             return
         if isinstance(item, types):
-            for sub in item:
+            #? isinstance narrows the runtime type but mypy can't infer it
+            #? across a tuple of arbitrary container types; explicit cast.
+            for sub in cast(Iterable[Any], item):
                 yield from _walk(sub, depth + 1)
         else:
             yield item
