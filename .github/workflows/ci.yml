@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["never"]
+    branches: ["main"]
   pull_request:
-    branches: ["never"]
+    branches: ["main"]
 
 jobs:
   core:
