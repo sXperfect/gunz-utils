@@ -23,9 +23,9 @@ print(mode)  # Mode.TRAIN
 Easily locate the project root and manage paths securely:
 
 ```python
-from gunz_utils.project import get_project_root
+from gunz_utils import resolve_project_root
 
-root = get_project_root()
+root = resolve_project_root()
 print(f"Project is located at: {root}")
 ```
 

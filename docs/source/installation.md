@@ -29,10 +29,10 @@ Gunz-Utils' core install pulls the following runtime dependencies:
 
 | Package | Version | Why |
 |---|---|---|
-| `pydantic` | `>=2.0.0` | `BaseModel` support in `models.py`; `validate_call` in `validation.py` |
-| `cryptography` | `>=42.0.0` | `Fernet` + `AESGCM` + `PBKDF2` in `crypto.py` and `secure_store.py` |
-| `gitpython` | `>=3.1.0` | `Repo` for project-root detection in `project.py` |
-| `loguru` | `>=0.7.0` | Structured logging in `logging.py`; debug logging in `project.py` |
+| `pydantic` | `>=2.0.0` | `BaseModel` support in `models.py`; `validate_call` in `ext.validation_pydantic` |
+| `cryptography` | `>=42.0.0` | `Fernet` + `AESGCM` + `PBKDF2` in `ext.secure_crypto` and `ext.secure_store` |
+| `gitpython` | `>=3.1.0` | `Repo` for project-root detection in `ext.project_gitpython` |
+| `loguru` | `>=0.7.0` | Structured logging in `ext.observability_loguru`; debug logging in `ext.project_gitpython` |
 
 ## Optional Dependencies
 
@@ -46,7 +46,7 @@ install narrower subsets of gunz-utils via extras:
 | `observability` | `loguru>=0.7.0` | `setup_logging` (default backend) |
 | `secure` | `cryptography>=42.0.0` | `SecureStore`, `encrypt`, `decrypt` |
 | `all` | everything in `dependencies=` | every default backend |
-| `docs` | sphinx, furo, myst-parser, sphinx-autodoc-typehints | building the documentation locally |
+| `docs` | sphinx, myst-parser, sphinx-autodoc-typehints, sphinx_rtd_theme | building the documentation locally |
 
 Examples:
 
