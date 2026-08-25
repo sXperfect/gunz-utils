@@ -74,3 +74,41 @@ ignore = []
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
+
+# --- Pytest ------------------------------------------------------------------
+# src-layout: ``src/`` is on sys.path so ``pytest`` works without ``pip install -e .``
+# AGENTS.md §2.5 declares pytest as the canonical test runner.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+
+# --- mypy --------------------------------------------------------------------
+# Static type checking. Targets Python 3.11 (see requires-python above).
+# We use ``disallow_untyped_defs`` over full ``--strict`` because the codebase
+# still has untyped third-party imports (gitpython) and intentionally Any-heavy
+# call sites in protocol/boundary code (ext.* backends).
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+files = ["src"]
+warn_unused_ignores = true
+warn_redundant_casts = false
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_return_any = true
+# Enforce per-module overrides below; CI runs ``mypy src/gunz_utils`` and gates
+# on Success.
+[[tool.mypy.overrides]]
+# Ext backends depend on heavy third-party libs; allow implicit Any from them.
+module = [
+    "git",
+    "gitpython",
+    "loguru",
+    "pydantic",
+    "pydantic_core",
+    "cryptography",
+]
+ignore_missing_imports = true
