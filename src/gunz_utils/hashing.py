@@ -7,7 +7,7 @@ import pathlib
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "adhisant@tnt.uni-hannover.de"
-__license__ = "BSD 3-Clause"
+__license__ = "Clear BSD"
 __version__ = "1.8.0"
 
 __all__ = [

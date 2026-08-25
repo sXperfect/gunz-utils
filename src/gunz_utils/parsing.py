@@ -11,7 +11,7 @@ from typing import Any
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "adhisant@tnt.uni-hannover.de"
-__license__ = "BSD 3-Clause"
+__license__ = "Clear BSD"
 __version__ = "1.6.0"
 
 __all__ = ["safe_int", "safe_float", "safe_bool", "parse_bool"]
