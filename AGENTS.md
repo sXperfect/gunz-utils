@@ -51,7 +51,13 @@
 ### 2.6 Linting / Formatting
 - **Ruff** is active (presence of `.ruff_cache/` confirms use).
 - Configuration: `pyproject.toml` `[tool.ruff]` section (to be added if missing — see `TASKS.md`).
-- Run `ruff check .` and `ruff format --check .` before commits.
+- Run `ruff check .` before commits (lint + import sort + bugbear).
+- Note: `ruff format` is intentionally NOT in the canonical workflow
+  because ruff rewrites our mandated `#?` explanatory comments to
+  `# ?`. The `#?` convention is required by the python-packaging
+  skill for IDE syntax highlighting. See
+  `docs/tasks/done/2026.08.26-protocol-ruff_format_hash_question_conflict.md`
+  for the rationale.
 
 ### 2.7 Documentation
 - **Sphinx + Furo** theme, MyST parser.
