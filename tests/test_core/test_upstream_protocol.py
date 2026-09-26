@@ -8,10 +8,12 @@ Covers:
 These tests live in ``test_core/`` because the protocol + exception
 hierarchy are zero-dependency (stdlib only).
 """
+import asyncio
 import unittest
 
 from gunz_utils.upstream_protocol import (
     BaseUpstream,
+    PolicyUpstream,
     UpstreamAuthError,
     UpstreamClient,
     UpstreamError,
@@ -194,6 +196,52 @@ class TestBaseUpstream(unittest.TestCase):
         import asyncio
 
         self.assertFalse(asyncio.run(_Flaky().health_check()))
+
+
+class TestPolicyUpstream(unittest.IsolatedAsyncioTestCase):
+    async def test_timeout_is_translated(self) -> None:
+        class Slow:
+            name = "slow"
+
+            async def call(self, tool_name, arguments):
+                await asyncio.sleep(0.05)
+                return {}
+
+            async def health_check(self):
+                return True
+
+            async def close(self):
+                return None
+
+        wrapped = PolicyUpstream(Slow(), timeout_seconds=0.001)
+        with self.assertRaises(UpstreamTimeoutError):
+            await wrapped.call("read", {})
+
+    async def test_retry_requires_explicit_idempotent_tool(self) -> None:
+        class Flaky:
+            name = "flaky"
+
+            def __init__(self):
+                self.calls = 0
+
+            async def call(self, tool_name, arguments):
+                self.calls += 1
+                if self.calls == 1:
+                    raise UpstreamUnavailableError("retry", upstream=self.name)
+                return {"ok": True}
+
+            async def health_check(self):
+                return True
+
+            async def close(self):
+                return None
+
+        client = Flaky()
+        wrapped = PolicyUpstream(
+            client, max_attempts=2, idempotent_tools=frozenset({"read"})
+        )
+        self.assertEqual(await wrapped.call("read", {}), {"ok": True})
+        self.assertEqual(wrapped.stats["retries"], 1)
 
 
 if __name__ == "__main__":
