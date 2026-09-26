@@ -37,3 +37,11 @@ framework-independent testing helpers.
 
 HTTP clients, database abstractions, CLI frameworks, and application
 orchestration remain consumer-library concerns.
+
+## Performance engineering
+
+The benchmark/profiling subsystem intentionally combines native Gunz process-tree
+measurement with adapters to mature specialist tools rather than reimplementing
+their deepest instrumentation. See
+[`benchmark-profiling-tool-landscape.md`](benchmark-profiling-tool-landscape.md)
+for reuse, reimplementation, integration, and performance decisions.
