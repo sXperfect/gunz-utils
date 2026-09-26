@@ -44,6 +44,28 @@ class BenchmarkSuite:
         )
         return self
 
+    def add_parameters(
+        self,
+        name: str,
+        func: Callable[..., Any],
+        parameter: str,
+        values: list[Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> BenchmarkSuite:
+        """Add one case per value in a parameter sweep."""
+        for value in values:
+            case_kwargs = dict(kwargs)
+            case_kwargs[parameter] = value
+            self.add(
+                f"{name}[{parameter}={value}]",
+                func,
+                *args,
+                parameters={parameter: value},
+                **case_kwargs,
+            )
+        return self
+
     def run(self, *, warmup: int = 3, iterations: int = 20) -> list[BenchmarkResult]:
         """Run every case in insertion order."""
         return [
