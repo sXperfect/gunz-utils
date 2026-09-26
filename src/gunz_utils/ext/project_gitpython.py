@@ -23,6 +23,7 @@ import sys
 # THIRD-PARTY IMPORTS
 # =============================================================================
 from git import InvalidGitRepositoryError, Repo
+
 logger = logging.getLogger(__name__)
 
 # ? Cache the root to avoid repeated disk I/O
