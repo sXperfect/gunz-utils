@@ -376,6 +376,19 @@ Close integration gaps left by M1–M5:
 Exit criterion: corrupted artifacts, unsupported schemas, broken exports, and
 environment-invalid regressions fail explicitly rather than producing plausible
 but misleading results.
+\n
+### M7 — Profiler efficiency and experiment orchestration
+
+Integrate the measurement stack into reproducible experiments:
+
+- Cartesian parameter matrices with explicit repetitions;
+- automatic PerformanceRun construction from timing/resource measurements;
+- automatic provenance, derived metrics, stability and load warnings;
+- portable run directories containing run.json and checksummed artifacts;
+- benchmark-package public API contract enforcement.
+
+Exit criterion: consumer repositories can execute parameter experiments and
+produce portable, self-describing run directories without custom orchestration.
 \n## Definition of done
 
 The subsystem is mature when:
