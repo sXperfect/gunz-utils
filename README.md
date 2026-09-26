@@ -179,6 +179,13 @@ pip install .[docs]
 ./scripts/build_docs.sh
 ```
 
+## CI policy
+
+GitHub Actions does not run automatically for pull requests or feature-branch
+pushes. CI runs on pushes to `main` and `develop`, and can be started manually
+with `workflow_dispatch`. Development branches should run the test, Ruff, and
+mypy commands locally before merge.
+
 ## Development
 
 ```bash
