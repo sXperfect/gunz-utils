@@ -19,7 +19,7 @@ from .io import atomic_write
 from .iteration import batched, chunked, first, flatten
 from .parsing import parse_bool, safe_bool, safe_float, safe_int
 from .redaction import SECRET_PATTERNS, redact, redact_dict
-from .security import safe_path_join, sanitize_filename
+from .security import open_path_under_base, safe_path_join, sanitize_filename
 from .timing import Timer, timer
 from .upstream_protocol import (
     BaseUpstream,
@@ -89,6 +89,7 @@ __all__ = [
     "safe_float",
     "safe_int",
     "sanitize_filename",
+    "open_path_under_base",
     "safe_path_join",
     "SECRET_PATTERNS",
     "redact",
