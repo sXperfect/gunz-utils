@@ -29,7 +29,7 @@ def env_overrides(
         upper = name.upper()
         if not upper.startswith(prefix_value):
             continue
-        suffix = name[len(prefix):].lstrip("_")
+        suffix = name[len(prefix_value):]
         if not suffix:
             continue
         cursor = out
