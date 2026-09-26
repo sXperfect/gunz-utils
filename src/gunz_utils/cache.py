@@ -7,7 +7,7 @@ import functools
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Awaitable, Callable, Hashable
+from collections.abc import Callable, Coroutine, Hashable
 from typing import Any, ParamSpec, TypeVar
 
 P = ParamSpec("P")
@@ -65,7 +65,7 @@ class SingleFlight:
         self._lock = asyncio.Lock()
         self._tasks: dict[Hashable, asyncio.Task[Any]] = {}
 
-    async def run(self, key: Hashable, factory: Callable[[], Awaitable[T]]) -> T:
+    async def run(self, key: Hashable, factory: Callable[[], Coroutine[Any, Any, T]]) -> T:
         """Run one factory per key and share its result with concurrent callers."""
         async with self._lock:
             task = self._tasks.get(key)
