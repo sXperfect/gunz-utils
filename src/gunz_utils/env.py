@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import TypeVar, cast as type_cast
+from typing import TypeVar
+from typing import cast as type_cast
 
 T = TypeVar("T")
 _MISSING = object()
