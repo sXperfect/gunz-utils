@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from collections.abc import Callable\nfrom typing import Generic, TypeVar, cast
+from collections.abc import Callable
+from typing import Generic, TypeVar, cast
 
 T = TypeVar("T")
-E = TypeVar("E")\nU = TypeVar("U")
+E = TypeVar("E")
+U = TypeVar("U")
 
 
 @dataclass(frozen=True)
