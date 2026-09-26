@@ -1,6 +1,11 @@
 """Cross-project benchmarking and profiling primitives."""
 
 from .compare import BenchmarkComparison, compare_results
+from .diagnostics import (
+    StabilityReport,
+    analyze_stability,
+    comparability_warnings,
+)
 from .export import save_process_csv, save_process_html
 from .history import BenchmarkHistory, HistoryPoint, Trend
 from .io import GitInfo, capture_git_info, load_result, save_result
