@@ -38,7 +38,13 @@ from .result import Result
 from .retry import async_retry, retry
 from .security import open_path_under_base, safe_path_join, sanitize_filename
 from .serialization import canonical_json, json_dumps, json_loads, to_jsonable
-from .subprocess import CommandError, CommandResult, run_command, run_command_async
+from .subprocess import (
+    CommandError,
+    CommandOutputLimitError,
+    CommandResult,
+    run_command,
+    run_command_async,
+)
 from .testing import eventually, temporary_env
 from .time_utils import expired, monotonic_deadline, remaining, utc_now
 from .timing import Timer, timer
@@ -127,7 +133,7 @@ __all__ = [
     "json_dumps",
     "json_loads",
     "to_jsonable",
-    "CommandError",
+    "CommandError",\n    "CommandOutputLimitError",
     "CommandResult",
     "run_command",
     "run_command_async",
