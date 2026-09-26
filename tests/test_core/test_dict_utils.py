@@ -169,7 +169,13 @@ class TestDeepMerge(unittest.TestCase):
             {"xs": [{"x": 1}, {"y": 2}]},
             list_strategy="dedup",
         )
-        self.assertEqual(len(result["xs"]), 3)
+        self.assertEqual(result["xs"], [{"x": 1}, {"y": 2}])
+
+    def test_dedup_does_not_confuse_hash_collisions(self) -> None:
+        self.assertEqual(
+            deep_merge({"xs": [-1]}, {"xs": [-2]}, list_strategy="dedup"),
+            {"xs": [-1, -2]},
+        )
 
     def test_non_dict_override_on_dict_base_replaces(self) -> None:
         #? Mixed-type pair: override wins without recursing into the dict.
