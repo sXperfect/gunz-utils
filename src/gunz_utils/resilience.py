@@ -86,12 +86,12 @@ class AsyncBulkhead:
         if limit < 1:
             raise ValueError("limit must be at least 1")
         self.limit = limit
-        self._semaphore = asyncio.Semaphore(limit)
+        self._semaphore = asyncio.Semaphore(limit)\n        self._active = 0
 
     @property
     def available(self) -> int:
         """Return the currently available permit estimate."""
-        return self._semaphore._value
+        return self.limit - self._active
 
     async def run(self, operation: Callable[[], Awaitable[T]]) -> T:
         """Execute one operation while holding a bulkhead permit."""
