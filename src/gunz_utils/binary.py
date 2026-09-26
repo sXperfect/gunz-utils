@@ -1,0 +1,51 @@
+"""Strict binary reading/writing primitives."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass
+class ByteReader:
+    data: memoryview
+    offset: int = 0
+
+    def __init__(self, data: bytes | bytearray | memoryview) -> None:
+        self.data = memoryview(data).cast("B")
+        self.offset = 0
+
+    @property
+    def remaining(self) -> int:
+        return len(self.data) - self.offset
+
+    def read(self, size: int) -> memoryview:
+        if size < 0 or size > self.remaining:
+            raise EOFError("binary read exceeds available data")
+        start = self.offset
+        self.offset += size
+        return self.data[start:self.offset]
+
+    def read_uvarint(self) -> int:
+        value = shift = 0
+        for _ in range(10):
+            byte = int(self.read(1)[0])
+            value |= (byte & 0x7F) << shift
+            if not byte & 0x80:
+                return value
+            shift += 7
+        raise ValueError("varint is too long")
+
+
+def encode_uvarint(value: int) -> bytes:
+    if value < 0:
+        raise ValueError("unsigned varint cannot encode negative values")
+    output = bytearray()
+    while True:
+        byte = value & 0x7F
+        value >>= 7
+        output.append(byte | (0x80 if value else 0))
+        if not value:
+            return bytes(output)
+
+
+__all__ = ["ByteReader", "encode_uvarint"]
