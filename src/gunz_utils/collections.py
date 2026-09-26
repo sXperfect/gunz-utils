@@ -12,12 +12,19 @@ K = TypeVar("K")
 def unique(items: Iterable[T], *, key: Callable[[T], K] | None = None) -> list[T]:
     """Return first occurrences while preserving input order."""
     seen: set[object] = set()
+    seen_unhashable: list[object] = []
     out: list[T] = []
     for item in items:
         marker: object = item if key is None else key(item)
-        if marker not in seen:
+        try:
+            if marker in seen:
+                continue
             seen.add(marker)
-            out.append(item)
+        except TypeError:
+            if any(marker == previous for previous in seen_unhashable):
+                continue
+            seen_unhashable.append(marker)
+        out.append(item)
     return out
 
 
