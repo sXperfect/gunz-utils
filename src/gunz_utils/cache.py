@@ -52,7 +52,7 @@ def ttl_cache(
             with lock:
                 cache.clear()
 
-        wrapped.cache_clear = cache_clear  # type: ignore[attr-defined]
+        setattr(wrapped, "cache_clear", cache_clear)
         return wrapped
 
     return decorate
