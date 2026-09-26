@@ -27,7 +27,7 @@ def ttl_cache(
 
     def decorate(func: Callable[P, T]) -> Callable[P, T]:
         cache: OrderedDict[Hashable, tuple[float, T]] = OrderedDict()
-        lock = threading.Lock()
+        lock = threading.Lock()\n        hits = 0\n        misses = 0
 
         @functools.wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
@@ -44,7 +44,7 @@ def ttl_cache(
                     return entry[1]
                 if entry is not None:
                     cache.pop(key, None)
-            value = func(*args, **kwargs)
+            misses += 1\n            value = func(*args, **kwargs)
             with lock:
                 cache[key] = (time.monotonic(), value)
                 cache.move_to_end(key)
@@ -56,7 +56,7 @@ def ttl_cache(
             with lock:
                 cache.clear()
 
-        setattr(wrapped, "cache_clear", cache_clear)
+        setattr(wrapped, "cache_clear", cache_clear)\n        setattr(wrapped, "cache_info", cache_info)
         return wrapped
 
     return decorate
