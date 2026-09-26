@@ -116,3 +116,26 @@ __all__ = [
     "CircuitOpenError",
     "CircuitState",
 ]
+    async def run(
+        self,
+        operation: Callable[[], Awaitable[T]],
+        *,
+        timeout: float | None = None,
+    ) -> T:
+        """Execute one operation after bounded permit acquisition."""
+        if timeout is not None and timeout < 0:
+            raise ValueError("timeout must be non-negative")
+        try:
+            if timeout is None:
+                await self._semaphore.acquire()
+            else:
+                await asyncio.wait_for(self._semaphore.acquire(), timeout)
+        except TimeoutError:
+            raise TimeoutError("bulkhead acquisition timed out") from None
+        self._active += 1
+        try:
+            return await operation()
+        finally:
+            self._active -= 1
+            self._semaphore.release()
+
