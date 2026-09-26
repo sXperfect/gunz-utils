@@ -16,9 +16,11 @@ from .diagnostics import (
 )
 from .environment import NoiseInfo, capture_noise_info
 from .export import save_process_csv, save_process_html
+from .gate import RegressionGate, evaluate_regression_gate
 from .history import BenchmarkHistory, HistoryPoint, Trend
 from .io import GitInfo, capture_git_info, load_result, save_result
 from .metrics import perf_metrics, process_metrics, scaling_efficiency
+from .overhead import OverheadProbe, measure_runner_overhead
 from .performance import PerformanceArtifact, PerformanceRun
 from .perf import (
     PerfCounter,
@@ -35,6 +37,7 @@ from .protocol import WORKER_PROTOCOL_VERSION, WorkerRequest, WorkerResponse
 from .report import format_comparison, format_process_profile
 from .result import BenchmarkResult, BenchmarkStats, SystemInfo
 from .runner import benchmark, benchmark_environment, calibrate_loops
+from .schema import migrate_performance_run, validate_performance_run
 from .suite import BenchmarkCase, BenchmarkSuite
 from .trends import HistorySummary, summarize_history
 from .worker import WorkerResult, run_python_worker, worker_json
