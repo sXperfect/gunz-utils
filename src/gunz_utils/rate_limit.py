@@ -22,22 +22,15 @@ class AsyncRateLimiter:
 
     @property
     def available_tokens(self) -> float:
-        """Return the last observed token balance without waiting."""
+        """Return the estimated token balance without waiting."""
         elapsed = time.monotonic() - self._updated
         return min(self.capacity, self._tokens + elapsed * self.rate)
 
     async def try_acquire(self, tokens: float = 1.0) -> bool:
         """Consume tokens immediately when available without waiting."""
-        if tokens <= 0 or tokens > self.capacity:
-            raise ValueError("tokens must be positive and <= capacity")
+        self._validate_tokens(tokens)
         async with self._lock:
-            now = time.monotonic()
-            elapsed = now - self._updated
-            self._tokens = min(
-                self.capacity,
-                self._tokens + elapsed * self.rate,
-            )
-            self._updated = now
+            self._refill()
             if self._tokens < tokens:
                 return False
             self._tokens -= tokens
@@ -49,23 +42,33 @@ class AsyncRateLimiter:
         *,
         timeout: float | None = None,
     ) -> None:
-        """Wait until the requested token amount is available."""
-        if tokens <= 0 or tokens > self.capacity:
-            raise ValueError("tokens must be positive and <= capacity")
+        """Wait until tokens are available or the optional timeout expires."""
+        self._validate_tokens(tokens)
+        if timeout is not None and timeout < 0:
+            raise ValueError("timeout must be non-negative")
+        deadline = None if timeout is None else time.monotonic() + timeout
         while True:
             async with self._lock:
-                now = time.monotonic()
-                elapsed = now - self._updated
-                self._tokens = min(
-                    self.capacity,
-                    self._tokens + elapsed * self.rate,
-                )
-                self._updated = now
+                self._refill()
                 if self._tokens >= tokens:
                     self._tokens -= tokens
                     return
                 wait = (tokens - self._tokens) / self.rate
-            if deadline is not None:\n                remaining = deadline - time.monotonic()\n                if remaining <= 0 or wait > remaining:\n                    raise TimeoutError("rate-limit acquisition timed out")\n            await asyncio.sleep(wait)
+            if deadline is not None:
+                budget = deadline - time.monotonic()
+                if budget <= 0 or wait > budget:
+                    raise TimeoutError("rate-limit acquisition timed out")
+            await asyncio.sleep(wait)
+
+    def _validate_tokens(self, tokens: float) -> None:
+        if tokens <= 0 or tokens > self.capacity:
+            raise ValueError("tokens must be positive and <= capacity")
+
+    def _refill(self) -> None:
+        now = time.monotonic()
+        elapsed = now - self._updated
+        self._tokens = min(self.capacity, self._tokens + elapsed * self.rate)
+        self._updated = now
 
     async def __aenter__(self) -> AsyncRateLimiter:
         await self.acquire()
