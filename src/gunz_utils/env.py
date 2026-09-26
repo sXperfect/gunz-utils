@@ -14,7 +14,7 @@ _MISSING = object()
 def env(
     name: str,
     *,
-    cast: Callable[[str], T] = str,
+    cast: Callable[[str], T] | None = None,
     default: T | object = _MISSING,
 ) -> T:
     """Read and convert an environment variable with explicit missing handling."""
