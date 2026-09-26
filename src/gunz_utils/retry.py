@@ -11,6 +11,8 @@ from typing import Any, ParamSpec, TypeVar
 
 P = ParamSpec("P")
 T = TypeVar("T")
+RetryHook = Callable[[BaseException, int, float], None]
+RetryPredicate = Callable[[BaseException], bool]
 
 
 def _delay(attempt: int, base_delay: float, max_delay: float, jitter: bool) -> float:
@@ -25,6 +27,8 @@ def retry(
     base_delay: float = 0.1,
     max_delay: float = 10.0,
     jitter: bool = True,
+    retry_if: RetryPredicate | None = None,
+    on_retry: RetryHook | None = None,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]:
     """Retry a synchronous callable with bounded exponential backoff."""
     if attempts < 1:
@@ -38,10 +42,15 @@ def retry(
             for attempt in range(1, attempts + 1):
                 try:
                     return func(*args, **kwargs)
-                except exceptions:
-                    if attempt == attempts:
+                except exceptions as exc:
+                    if attempt == attempts or (
+                        retry_if is not None and not retry_if(exc)
+                    ):
                         raise
-                    time.sleep(_delay(attempt, base_delay, max_delay, jitter))
+                    delay = _delay(attempt, base_delay, max_delay, jitter)
+                    if on_retry is not None:
+                        on_retry(exc, attempt, delay)
+                    time.sleep(delay)
             raise RuntimeError("unreachable")
 
         return wrapped
@@ -56,6 +65,8 @@ def async_retry(
     base_delay: float = 0.1,
     max_delay: float = 10.0,
     jitter: bool = True,
+    retry_if: RetryPredicate | None = None,
+    on_retry: RetryHook | None = None,
 ) -> Callable[[Callable[P, Any]], Callable[P, Any]]:
     """Retry an async callable while preserving cancellation."""
     if attempts < 1:
@@ -71,12 +82,15 @@ def async_retry(
                     return await func(*args, **kwargs)
                 except asyncio.CancelledError:
                     raise
-                except exceptions:
-                    if attempt == attempts:
+                except exceptions as exc:
+                    if attempt == attempts or (
+                        retry_if is not None and not retry_if(exc)
+                    ):
                         raise
-                    await asyncio.sleep(
-                        _delay(attempt, base_delay, max_delay, jitter)
-                    )
+                    delay = _delay(attempt, base_delay, max_delay, jitter)
+                    if on_retry is not None:
+                        on_retry(exc, attempt, delay)
+                    await asyncio.sleep(delay)
             raise RuntimeError("unreachable")
 
         return wrapped
