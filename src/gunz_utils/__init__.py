@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from .async_utils import cancel_and_wait, with_timeout
+from .cache import SingleFlight, ttl_cache
+from .collections import group_by, index_by, partition, unique
+from .concurrency import gather_limited, map_concurrent
+from .config import env_overrides, merge_configs
+from .diagnostics import exception_dict
 from .dict_utils import deep_get, deep_merge, deep_set
 from .enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
+from .env import env, env_bool
 from .formatting import format_bytes, format_count, format_duration
 from .hashing import (
     DEFAULT_ALGO,
@@ -15,11 +22,19 @@ from .hashing import (
     file_hash,
     short_hash,
 )
+from .identifiers import deterministic_id, new_id, short_id
 from .io import atomic_write
 from .iteration import batched, chunked, first, flatten
 from .parsing import parse_bool, safe_bool, safe_float, safe_int
+from .rate_limit import AsyncRateLimiter
 from .redaction import SECRET_PATTERNS, redact, redact_dict
+from .result import Result
+from .retry import async_retry, retry
 from .security import open_path_under_base, safe_path_join, sanitize_filename
+from .serialization import canonical_json, json_dumps, json_loads, to_jsonable
+from .subprocess import CommandError, CommandResult, run_command, run_command_async
+from .testing import eventually, temporary_env
+from .time_utils import expired, monotonic_deadline, remaining, utc_now
 from .timing import Timer, timer
 from .upstream_protocol import (
     BaseUpstream,
@@ -32,7 +47,7 @@ from .upstream_protocol import (
     UpstreamUnavailableError,
 )
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
 
 _LAZY: dict[str, str] = {
     "GunzBaseModel": ".models",
@@ -67,6 +82,42 @@ def __dir__() -> list[str]:
 
 
 __all__ = [
+    "cancel_and_wait",
+    "with_timeout",
+    "group_by",
+    "index_by",
+    "partition",
+    "unique",
+    "env_overrides",
+    "merge_configs",
+    "exception_dict",
+    "env",
+    "env_bool",
+    "deterministic_id",
+    "new_id",
+    "short_id",
+    "AsyncRateLimiter",
+    "Result",
+    "eventually",
+    "temporary_env",
+    "expired",
+    "monotonic_deadline",
+    "remaining",
+    "utc_now",
+    "SingleFlight",
+    "ttl_cache",
+    "gather_limited",
+    "map_concurrent",
+    "retry",
+    "async_retry",
+    "canonical_json",
+    "json_dumps",
+    "json_loads",
+    "to_jsonable",
+    "CommandError",
+    "CommandResult",
+    "run_command",
+    "run_command_async",
     "BaseIntEnum",
     "BaseStrEnum",
     "OptionalBaseStrEnum",

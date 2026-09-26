@@ -16,6 +16,11 @@
 | [`hashing`](src/gunz_utils/hashing.py) | `content_hash`, `file_hash`, `short_hash` — blake2b/sha256, constant-time compare | stdlib |
 | [`io`](src/gunz_utils/io.py) | `atomic_write` — crash-safe file writes with `os.replace` | stdlib |
 | [`iteration`](src/gunz_utils/iteration.py) | `chunked`, `batched`, `flatten`, `first` — lazy generators | stdlib |
+| [`cache`](src/gunz_utils/cache.py) | TTL memoization + async `SingleFlight` request coalescing | stdlib |
+| [`concurrency`](src/gunz_utils/concurrency.py) | bounded async gather/map helpers | stdlib |
+| [`retry`](src/gunz_utils/retry.py) | sync/async exponential retry with optional jitter | stdlib |
+| [`serialization`](src/gunz_utils/serialization.py) | deterministic JSON + common-object normalization | stdlib |
+| [`subprocess`](src/gunz_utils/subprocess.py) | structured sync/async shell-free command execution | stdlib |
 | [`models`](src/gunz_utils/models.py) | `GunzBaseModel` — `pydantic.BaseModel` configured to forbid extra fields | `validation` extra |
 | [`parsing`](src/gunz_utils/parsing.py) | `safe_int`, `safe_float`, `safe_bool`, `parse_bool` — strict coercion with diagnostics | stdlib |
 | [`redaction`](src/gunz_utils/redaction.py) | `redact`, `redact_dict` — pattern-based secret scrubbing | stdlib |
@@ -112,6 +117,10 @@ from gunz_utils import resolve_project_root
 root = resolve_project_root()
 print(f"Project at: {root}")
 ```
+
+### Production foundation helpers
+
+`gunz_utils` also provides bounded async concurrency, generic retry/backoff, TTL caching with async single-flight, deterministic JSON serialization, and structured shell-free subprocess execution. Service-specific idempotency and retry policy remain consumer responsibilities.
 
 ## Installation
 
