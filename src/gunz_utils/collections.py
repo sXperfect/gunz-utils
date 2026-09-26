@@ -34,7 +34,7 @@ def index_by(items: Iterable[T], key: Callable[[T], K]) -> dict[K, T]:
     return {key(item): item for item in items}
 
 
-def partition(items: Iterable[T], predicate: Callable[[T], bool]) -> tuple[list[T], list[T]]:
+def partition(\n    items: Iterable[T],\n    predicate: Callable[[T], bool],\n) -> tuple[list[T], list[T]]:
     """Split items into matching and non-matching lists."""
     yes: list[T] = []
     no: list[T] = []
