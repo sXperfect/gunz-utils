@@ -28,14 +28,14 @@ class AsyncCircuitBreaker:
         self,
         *,
         failure_threshold: int = 5,
-        recovery_timeout: float = 30.0,
+        recovery_timeout: float = 30.0,\n        failure_predicate: Callable[[BaseException], bool] | None = None,
     ) -> None:
         if failure_threshold < 1:
             raise ValueError("failure_threshold must be at least 1")
         if recovery_timeout < 0:
             raise ValueError("recovery_timeout must be non-negative")
         self.failure_threshold = failure_threshold
-        self.recovery_timeout = recovery_timeout
+        self.recovery_timeout = recovery_timeout\n        self.failure_predicate = failure_predicate
         self._failures = 0
         self._opened_at: float | None = None
         self._half_open_in_flight = False
