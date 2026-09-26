@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import TypeVar, cast
+from typing import TypeVar, cast as type_cast
 
 T = TypeVar("T")
 _MISSING = object()
@@ -21,7 +21,7 @@ def env(
     if value is None:
         if default is _MISSING:
             raise KeyError(f"required environment variable {name!r} is not set")
-        return cast(T, default)
+        return type_cast(T, default)
     try:
         return cast(value)
     except (TypeError, ValueError) as exc:
