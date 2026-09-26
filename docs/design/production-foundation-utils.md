@@ -30,7 +30,10 @@ policy.
 
 ## Future extension boundary
 
-Rate limiting, typed environment parsing, identifiers, time/deadline helpers,
-result/error aggregation, and test utilities are appropriate follow-up core
-modules. HTTP clients, database abstractions, CLI frameworks, and application
-orchestration should remain in consumer libraries.
+The foundation now also includes rate limiting, typed environment parsing,
+collection transforms, identifiers, UTC/deadline helpers, layered configuration,
+explicit result values, safe diagnostics, async lifecycle helpers, and
+framework-independent testing helpers.
+
+HTTP clients, database abstractions, CLI frameworks, and application
+orchestration remain consumer-library concerns.
