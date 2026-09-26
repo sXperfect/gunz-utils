@@ -46,6 +46,7 @@ __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
 __version__ = "1.3.2"
 
+import base64
 import os
 import sqlite3
 import threading
@@ -54,6 +55,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 _PBKDF2_ITERATIONS = 600_000  # OWASP 2023 recommendation for SHA-256
 _KEY_FILE_MODE = 0o600  # owner read/write only
@@ -222,7 +225,9 @@ class SecureStore:
         with self._lock:
             if passphrase is None:
                 if self._salt_path.exists() and not self._master_key_path.exists():
-                    raise RuntimeError("Store is passphrase-protected; passphrase required")
+                    raise RuntimeError(
+                        "Store is passphrase-protected; passphrase required"
+                    )
                 if self._master_key_path.exists():
                     key = self._master_key_path.read_bytes().strip()
                 else:
@@ -230,7 +235,9 @@ class SecureStore:
                     self._write_private(self._master_key_path, key)
             else:
                 if self._master_key_path.exists() and not self._salt_path.exists():
-                    raise RuntimeError("Store uses file-key mode; do not supply passphrase")
+                    raise RuntimeError(
+                        "Store uses file-key mode; do not supply passphrase"
+                    )
                 if self._salt_path.exists():
                     salt = self._salt_path.read_bytes()
                 else:
@@ -243,9 +250,6 @@ class SecureStore:
 
     @staticmethod
     def _derive_key(passphrase: str, salt: bytes) -> bytes:
-        import base64
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(), length=32, salt=salt,
             iterations=_PBKDF2_ITERATIONS,
@@ -286,7 +290,9 @@ class SecureStore:
                 current_acl = [s for s in (existing["acl"] or "").split(",") if s]
                 if current_acl and caller not in current_acl:
                     self._audit(caller, "set", name, False)
-                    raise PermissionError(f"Caller {caller!r} not permitted to modify {name!r}")
+                    raise PermissionError(
+                        f"Caller {caller!r} not permitted to modify {name!r}"
+                    )
                 acl_str = existing["acl"] if acl is None else ",".join(acl)
             else:
                 acl_str = ",".join(acl) if acl else ""
@@ -319,7 +325,9 @@ class SecureStore:
             acl = [s for s in (row["acl"] or "").split(",") if s]
             if acl and caller not in acl:
                 self._audit(caller, "get", name, False)
-                raise PermissionError(f"Caller {caller!r} not in ACL {acl} for secret {name!r}")
+                raise PermissionError(
+                    f"Caller {caller!r} not in ACL {acl} for secret {name!r}"
+                )
             try:
                 plaintext = self._fernet.decrypt(row["ciphertext"])
             except InvalidToken:
@@ -346,7 +354,9 @@ class SecureStore:
             acl = [s for s in (row["acl"] or "").split(",") if s]
             if acl and caller not in acl:
                 self._audit(caller, "delete", name, False)
-                raise PermissionError(f"Caller {caller!r} not permitted to delete {name!r}")
+                raise PermissionError(
+                    f"Caller {caller!r} not permitted to delete {name!r}"
+                )
             self._conn.execute("DELETE FROM secrets WHERE name = ?", (name,))
             self._audit(caller, "delete", name, True)
             return True
@@ -423,7 +433,8 @@ class SecureStore:
                     "UPDATE secrets SET ciphertext = ? WHERE name = ?", rewritten
                 )
                 self._conn.execute(
-                    "INSERT OR REPLACE INTO store_meta(key, value) VALUES ('key_check', ?)",
+                    "INSERT OR REPLACE INTO store_meta(key, value) "
+                    "VALUES ('key_check', ?)",
                     (check,),
                 )
                 if new_salt is None:
@@ -455,7 +466,7 @@ class SecureStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def __enter__(self) -> "SecureStore":
+    def __enter__(self) -> SecureStore:
         return self
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
