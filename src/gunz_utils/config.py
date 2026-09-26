@@ -24,7 +24,7 @@ def env_overrides(
 ) -> dict[str, Any]:
     """Convert prefixed environment names into a nested config mapping."""
     out: dict[str, Any] = {}
-    prefix_value = prefix.upper()
+    prefix_value = prefix.upper().rstrip("_") + "_"
     for name, value in environ.items():
         upper = name.upper()
         if not upper.startswith(prefix_value):
