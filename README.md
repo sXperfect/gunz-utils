@@ -190,9 +190,7 @@ mypy commands locally before merge.
 
 ```bash
 pip install -e ".[all]"   # editable install with everything
-pytest                    # run the full test suite
-ruff check src tests      # lint
-mypy src/gunz_utils       # type-check
+./scripts/verify.sh       # compile + lint + type-check + full tests
 ```
 
 ## License

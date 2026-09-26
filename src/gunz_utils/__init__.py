@@ -28,6 +28,12 @@ from .iteration import batched, chunked, first, flatten
 from .parsing import parse_bool, safe_bool, safe_float, safe_int
 from .rate_limit import AsyncRateLimiter
 from .redaction import SECRET_PATTERNS, redact, redact_dict
+from .resilience import (
+    AsyncBulkhead,
+    AsyncCircuitBreaker,
+    CircuitOpenError,
+    CircuitState,
+)
 from .result import Result
 from .retry import async_retry, retry
 from .security import open_path_under_base, safe_path_join, sanitize_filename
@@ -97,6 +103,10 @@ __all__ = [
     "new_id",
     "short_id",
     "AsyncRateLimiter",
+    "AsyncBulkhead",
+    "AsyncCircuitBreaker",
+    "CircuitOpenError",
+    "CircuitState",
     "Result",
     "eventually",
     "temporary_env",
