@@ -16,7 +16,8 @@ __all__ = [
     "BenchmarkStats",
     "BenchmarkSuite",
     "GitInfo",
-    "ProcessDetail",\n    "ProcessProfile",
+    "ProcessDetail",
+    "ProcessProfile",
     "ProcessSample",
     "SystemInfo",
     "benchmark",
@@ -28,5 +29,7 @@ __all__ = [
     "plot_benchmark",
     "plot_process_samples",
     "profile_command",
-    "save_process_csv",\n    "save_process_html",\n    "save_result",
+    "save_process_csv",
+    "save_process_html",
+    "save_result",
 ]
