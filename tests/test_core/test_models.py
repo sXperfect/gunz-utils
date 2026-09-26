@@ -11,8 +11,9 @@ Covers the shared strictness defaults exposed by :class:`GunzBaseModel`:
 
 import unittest
 
-from gunz_utils import GunzBaseModel
 from pydantic import ConfigDict, ValidationError
+
+from gunz_utils import GunzBaseModel
 
 
 class TestGunzBaseModelConfig(unittest.TestCase):
