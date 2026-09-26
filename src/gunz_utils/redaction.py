@@ -169,10 +169,14 @@ def redact_dict(
                 return _MASK
             return value
         if isinstance(value, dict):
-            return {
-                key: _walk(item, _is_secret_key(key, patterns))
-                for key, item in value.items()
-            }
+            out: dict[object, object] = {}
+            for key, item in value.items():
+                secret = _is_secret_key(key, patterns)
+                if secret and isinstance(item, str):
+                    out[key] = redact(item, show_chars=show_chars)
+                else:
+                    out[key] = _walk(item, secret)
+            return out
         if isinstance(value, list):
             return [_walk(item) for item in value]
         if isinstance(value, tuple):
