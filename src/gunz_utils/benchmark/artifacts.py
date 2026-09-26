@@ -31,4 +31,18 @@ def register_artifact(
     return replace(run, artifacts=(*run.artifacts, artifact))
 
 
-__all__ = ["register_artifact"]
+def verify_artifact(artifact: PerformanceArtifact) -> bool:
+    """Verify artifact existence, recorded size and SHA-256 checksum."""
+    if artifact.checksum_sha256 is None or artifact.size_bytes is None:
+        return False
+    item = Path(artifact.path)
+    try:
+        if item.stat().st_size != artifact.size_bytes:
+            return False
+        digest = hashlib.sha256(item.read_bytes()).hexdigest()
+    except OSError:
+        return False
+    return digest == artifact.checksum_sha256
+
+
+__all__ = ["register_artifact", "verify_artifact"]
