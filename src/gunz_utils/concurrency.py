@@ -16,21 +16,48 @@ async def gather_limited(
     limit: int,
     return_exceptions: bool = False,
 ) -> list[T | BaseException]:
-    """Gather awaitables while limiting the number executing concurrently."""
+    """Gather awaitables while bounding active task creation."""
     if limit < 1:
         raise ValueError("limit must be at least 1")
-    semaphore = asyncio.Semaphore(limit)
+    iterator = iter(awaitables)
+    pending: dict[asyncio.Task[T], int] = {}
+    ordered: dict[int, T | BaseException] = {}
+    next_index = 0
 
-    async def run(item: Awaitable[T]) -> T:
-        async with semaphore:
-            return await item
+    def schedule_one() -> bool:
+        nonlocal next_index
+        try:
+            item = next(iterator)
+        except StopIteration:
+            return False
+        pending[asyncio.create_task(item)] = next_index
+        next_index += 1
+        return True
 
-    return list(
-        await asyncio.gather(
-            *(run(item) for item in awaitables),
-            return_exceptions=return_exceptions,
-        )
-    )
+    for _ in range(limit):
+        if not schedule_one():
+            break
+    try:
+        while pending:
+            done, _ = await asyncio.wait(
+                pending,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                index = pending.pop(task)
+                try:
+                    ordered[index] = task.result()
+                except BaseException as exc:
+                    if not return_exceptions:
+                        raise
+                    ordered[index] = exc
+                schedule_one()
+    finally:
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+    return [ordered[index] for index in range(next_index)]
 
 
 async def map_concurrent(
@@ -40,7 +67,7 @@ async def map_concurrent(
     limit: int,
     return_exceptions: bool = False,
 ) -> list[R | BaseException]:
-    """Apply an async function concurrently with bounded parallelism."""
+    """Apply an async function with bounded task creation and ordered results."""
     return await gather_limited(
         (func(item) for item in items),
         limit=limit,
