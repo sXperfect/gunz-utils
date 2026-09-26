@@ -77,7 +77,10 @@ def _linux_snapshot(root_pid: int, started: float) -> ProcessSample:
         live += 1
         user += int(stat[13]) / ticks
         system += int(stat[14]) / ticks
-        rss += max(0, int(stat[23])) * page_size\n        minor_faults += int(stat[9])\n        major_faults += int(stat[11])\n        threads += int(stat[19])
+        rss += max(0, int(stat[23])) * page_size
+        minor_faults += int(stat[9])
+        major_faults += int(stat[11])
+        threads += int(stat[19])
         try:
             io_values = {}
             for line in (proc / str(pid) / "io").read_text().splitlines():
