@@ -75,9 +75,10 @@ class TestAtomicWrite(unittest.TestCase):
             self.assertEqual(list(path.parent.glob(f".{path.name}.*.tmp")), [])
 
     def test_durable_write_round_trip(self) -> None:
-        path = self.root / "durable.txt"
-        atomic_write(path, "durable", durable=True)
-        self.assertEqual(path.read_text(), "durable")
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "durable.txt"
+            atomic_write(path, "durable", durable=True)
+            self.assertEqual(path.read_text(), "durable")
 
 
 if __name__ == "__main__":
