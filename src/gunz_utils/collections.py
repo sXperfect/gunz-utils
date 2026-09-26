@@ -15,9 +15,14 @@ def unique(items: Iterable[T], *, key: Callable[[T], K] | None = None) -> list[T
     out: list[T] = []
     for item in items:
         marker: object = item if key is None else key(item)
-        if marker not in seen:
+        try:
+            if marker in seen:
+                continue
             seen.add(marker)
-            out.append(item)
+        except TypeError:
+            if any(marker == previous for previous in out):
+                continue
+        out.append(item)
     return out
 
 
