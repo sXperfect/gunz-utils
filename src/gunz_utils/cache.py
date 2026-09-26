@@ -32,6 +32,10 @@ def ttl_cache(
         @functools.wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
             key: Hashable = (args, tuple(sorted(kwargs.items())))
+            try:
+                hash(key)
+            except TypeError:
+                return func(*args, **kwargs)
             now = time.monotonic()
             with lock:
                 entry = cache.get(key)
