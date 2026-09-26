@@ -21,6 +21,20 @@ class TestTTLCache(unittest.TestCase):
         self.assertEqual(calls, 1)
 
 
+    def test_unhashable_arguments_bypass_cache(self) -> None:
+        calls = 0
+
+        @ttl_cache(ttl=60)
+        def work(value: list[int]) -> int:
+            nonlocal calls
+            calls += 1
+            return len(value)
+
+        self.assertEqual(work([1]), 1)
+        self.assertEqual(work([1]), 1)
+        self.assertEqual(calls, 2)
+
+
 class TestSingleFlight(unittest.IsolatedAsyncioTestCase):
     async def test_coalesces_same_key(self) -> None:
         flight = SingleFlight()
