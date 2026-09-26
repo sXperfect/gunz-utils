@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import subprocess
 import time
 from collections.abc import Mapping, Sequence
@@ -80,7 +81,7 @@ async def run_command_async(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=cwd,
-        env=None if env is None else dict(env),
+        env=None if env is None else {**os.environ, **env},
     )
     try:
         stdout_b, stderr_b = await asyncio.wait_for(
