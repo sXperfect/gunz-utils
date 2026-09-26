@@ -29,24 +29,48 @@ def plot_benchmark(result: BenchmarkResult) -> Any:
     return figure
 
 
+def _cpu_cores(profile: ProcessProfile) -> tuple[list[float], list[float]]:
+    times: list[float] = []
+    values: list[float] = []
+    previous = None
+    for sample in profile.samples:
+        if previous is not None:
+            elapsed = sample.elapsed - previous.elapsed
+            cpu_now = sample.cpu_user_seconds + sample.cpu_system_seconds
+            cpu_before = previous.cpu_user_seconds + previous.cpu_system_seconds
+            if elapsed > 0:
+                times.append(sample.elapsed)
+                values.append(max(0.0, (cpu_now - cpu_before) / elapsed))
+        previous = sample
+    return times, values
+
+
 def plot_process_samples(profile: ProcessProfile, metric: str = "rss_bytes") -> Any:
     """Plot a process-tree resource metric over elapsed time."""
     allowed = {
         "rss_bytes",
+        "pss_bytes",
+        "private_bytes",
         "cpu_user_seconds",
         "cpu_system_seconds",
+        "cpu_cores",
         "read_bytes",
         "write_bytes",
         "process_count",
+        "threads",
+        "minor_faults",
+        "major_faults",
     }
     if metric not in allowed:
         raise ValueError(f"unsupported process metric: {metric}")
     plt = _pyplot()
     figure, axis = plt.subplots()
-    axis.plot(
-        [sample.elapsed for sample in profile.samples],
-        [getattr(sample, metric) for sample in profile.samples],
-    )
+    if metric == "cpu_cores":
+        times, values = _cpu_cores(profile)
+    else:
+        times = [sample.elapsed for sample in profile.samples]
+        values = [getattr(sample, metric) for sample in profile.samples]
+    axis.plot(times, values)
     axis.set_title(f"Process tree: {metric}")
     axis.set_xlabel("Elapsed seconds")
     axis.set_ylabel(metric)

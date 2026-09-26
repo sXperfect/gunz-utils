@@ -11,14 +11,29 @@ from typing import Any, Sequence
 
 
 @dataclass(frozen=True)
-class ProcessSample:
-    """One aggregate sample across a root process and live descendants."""
+class ProcessDetail:
+    """Per-PID resource snapshot retained for lineage analysis."""
 
+    pid: int
+    ppid: int
+    command: str
+    cpu_user_seconds: float
+    cpu_system_seconds: float
+    rss_bytes: int
+    pss_bytes: int | None
+    private_bytes: int | None
+    threads: int
+
+
+@dataclass(frozen=True)
+class ProcessSample:
     elapsed: float
     process_count: int
     cpu_user_seconds: float
     cpu_system_seconds: float
     rss_bytes: int
+    pss_bytes: int | None
+    private_bytes: int | None
     read_bytes: int
     write_bytes: int
     threads: int
@@ -26,16 +41,17 @@ class ProcessSample:
     major_faults: int
     voluntary_context_switches: int
     involuntary_context_switches: int
+    processes: tuple[ProcessDetail, ...]
 
 
 @dataclass(frozen=True)
 class ProcessProfile:
-    """Completed command profile including process-tree resource samples."""
-
     args: tuple[str, ...]
     returncode: int
     wall_seconds: float
     peak_rss_bytes: int
+    peak_pss_bytes: int | None
+    peak_private_bytes: int | None
     cpu_user_seconds: float
     cpu_system_seconds: float
     read_bytes: int
@@ -50,12 +66,24 @@ class ProcessProfile:
 
     @property
     def average_cpu_cores(self) -> float:
-        """Average aggregate CPU utilization expressed as occupied cores."""
         cpu = self.cpu_user_seconds + self.cpu_system_seconds
         return 0.0 if self.wall_seconds == 0 else cpu / self.wall_seconds
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _memory_rollup(path: Path) -> tuple[int | None, int | None]:
+    try:
+        values: dict[str, int] = {}
+        for line in path.read_text().splitlines():
+            key, value, *_ = line.split()
+            values[key.rstrip(":")] = int(value) * 1024
+        pss = values.get("Pss")
+        private = values.get("Private_Clean", 0) + values.get("Private_Dirty", 0)
+        return pss, private
+    except (FileNotFoundError, PermissionError, ValueError):
+        return None, None
 
 
 def _linux_snapshot(root_pid: int, started: float) -> ProcessSample:
@@ -83,23 +111,52 @@ def _linux_snapshot(root_pid: int, started: float) -> ProcessSample:
 
     ticks = os.sysconf("SC_CLK_TCK")
     page_size = os.sysconf("SC_PAGE_SIZE")
+    details: list[ProcessDetail] = []
     user = system = 0.0
     rss = read_bytes = write_bytes = 0
+    pss_total = private_total = 0
+    pss_complete = private_complete = True
     threads = minor_faults = major_faults = 0
     voluntary = involuntary = 0
-    live = 0
-    for pid in tree:
+
+    for pid in sorted(tree):
         row = rows.get(pid)
         if row is None:
             continue
-        _, stat = row
-        live += 1
-        user += int(stat[13]) / ticks
-        system += int(stat[14]) / ticks
+        ppid, stat = row
+        pid_user = int(stat[13]) / ticks
+        pid_system = int(stat[14]) / ticks
+        pid_rss = max(0, int(stat[23])) * page_size
+        pid_threads = int(stat[19])
+        pss, private = _memory_rollup(proc / str(pid) / "smaps_rollup")
+        command = stat[1].strip("()")
+        user += pid_user
+        system += pid_system
+        rss += pid_rss
+        threads += pid_threads
         minor_faults += int(stat[9])
         major_faults += int(stat[11])
-        threads += int(stat[19])
-        rss += max(0, int(stat[23])) * page_size
+        if pss is None:
+            pss_complete = False
+        else:
+            pss_total += pss
+        if private is None:
+            private_complete = False
+        else:
+            private_total += private
+        details.append(
+            ProcessDetail(
+                pid=pid,
+                ppid=ppid,
+                command=command,
+                cpu_user_seconds=pid_user,
+                cpu_system_seconds=pid_system,
+                rss_bytes=pid_rss,
+                pss_bytes=pss,
+                private_bytes=private,
+                threads=pid_threads,
+            )
+        )
         try:
             io_values = {}
             for line in (proc / str(pid) / "io").read_text().splitlines():
@@ -117,12 +174,15 @@ def _linux_snapshot(root_pid: int, started: float) -> ProcessSample:
                     involuntary += int(line.split()[1])
         except (FileNotFoundError, PermissionError, ValueError, IndexError):
             pass
+
     return ProcessSample(
         elapsed=time.perf_counter() - started,
-        process_count=live,
+        process_count=len(details),
         cpu_user_seconds=user,
         cpu_system_seconds=system,
         rss_bytes=rss,
+        pss_bytes=pss_total if pss_complete else None,
+        private_bytes=private_total if private_complete else None,
         read_bytes=read_bytes,
         write_bytes=write_bytes,
         threads=threads,
@@ -130,6 +190,7 @@ def _linux_snapshot(root_pid: int, started: float) -> ProcessSample:
         major_faults=major_faults,
         voluntary_context_switches=voluntary,
         involuntary_context_switches=involuntary,
+        processes=tuple(details),
     )
 
 
@@ -141,7 +202,6 @@ def profile_command(
     env: dict[str, str] | None = None,
     check: bool = False,
 ) -> ProcessProfile:
-    """Profile a native command and its live descendant process tree on Linux."""
     if not args:
         raise ValueError("args must not be empty")
     if interval <= 0:
@@ -161,26 +221,38 @@ def profile_command(
     if check and process.returncode:
         raise subprocess.CalledProcessError(process.returncode, list(args))
 
-    def peak(name: str, default: int | float = 0) -> int | float:
-        return max((getattr(sample, name) for sample in samples), default=default)
+    def peak(name: str) -> int:
+        return max((int(getattr(sample, name)) for sample in samples), default=0)
+
+    def optional_peak(name: str) -> int | None:
+        values = [getattr(sample, name) for sample in samples]
+        known = [int(value) for value in values if value is not None]
+        return max(known) if known else None
 
     return ProcessProfile(
         args=tuple(args),
         returncode=process.returncode or 0,
         wall_seconds=wall,
-        peak_rss_bytes=int(peak("rss_bytes")),
-        cpu_user_seconds=float(peak("cpu_user_seconds", 0.0)),
-        cpu_system_seconds=float(peak("cpu_system_seconds", 0.0)),
-        read_bytes=int(peak("read_bytes")),
-        write_bytes=int(peak("write_bytes")),
-        peak_process_count=int(peak("process_count")),
-        peak_threads=int(peak("threads")),
-        minor_faults=int(peak("minor_faults")),
-        major_faults=int(peak("major_faults")),
-        voluntary_context_switches=int(peak("voluntary_context_switches")),
-        involuntary_context_switches=int(peak("involuntary_context_switches")),
+        peak_rss_bytes=peak("rss_bytes"),
+        peak_pss_bytes=optional_peak("pss_bytes"),
+        peak_private_bytes=optional_peak("private_bytes"),
+        cpu_user_seconds=max((s.cpu_user_seconds for s in samples), default=0.0),
+        cpu_system_seconds=max((s.cpu_system_seconds for s in samples), default=0.0),
+        read_bytes=peak("read_bytes"),
+        write_bytes=peak("write_bytes"),
+        peak_process_count=peak("process_count"),
+        peak_threads=peak("threads"),
+        minor_faults=peak("minor_faults"),
+        major_faults=peak("major_faults"),
+        voluntary_context_switches=peak("voluntary_context_switches"),
+        involuntary_context_switches=peak("involuntary_context_switches"),
         samples=tuple(samples),
     )
 
 
-__all__ = ["ProcessProfile", "ProcessSample", "profile_command"]
+__all__ = [
+    "ProcessDetail",
+    "ProcessProfile",
+    "ProcessSample",
+    "profile_command",
+]
