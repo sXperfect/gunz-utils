@@ -105,6 +105,8 @@ __all__ = [
     "ensure_correlation_id",
     "operation_context",
     "merge_configs",
+    "GunzDeprecationWarning",
+    "deprecated",
     "exception_dict",
     "env",
     "env_bool",
