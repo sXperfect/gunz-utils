@@ -22,7 +22,8 @@ dependencies = []
 validation = ["pydantic>=2.0.0"]
 project = ["gitpython>=3.1.0"]
 observability = ["loguru>=0.7.0"]
-secure = ["cryptography>=42.0.0"]\nplot = ["matplotlib>=3.8.0"]
+secure = ["cryptography>=42.0.0"]
+plot = ["matplotlib>=3.8.0"]
 all = [
     "pydantic>=2.0.0",
     "cryptography>=42.0.0",
