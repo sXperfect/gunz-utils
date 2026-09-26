@@ -11,7 +11,7 @@
 | Field | Value |
 |:------|:------|
 | **Name** | `gunz-utils` |
-| **Version** | `1.8.0` (see `pyproject.toml`) |
+| **Version** | `1.9.0` (see `pyproject.toml`) |
 | **Description** | General-purpose Python utilities for the Gunz ecosystem. Enhanced Enums, security primitives, UpstreamClient protocol, Fernet secret store. |
 | **License** | BSD 3-Clause (`LICENSE.md`) |
 | **Repository** | https://github.com/sXperfect/gunz-utils |
@@ -377,7 +377,7 @@ The project's agent memory lives under `.hyperhedron/memory/` (which symlinks to
 
 - **CI Provider:** GitHub Actions (see `.github/workflows/`).
 - **Python matrix:** `3.11`.
-- **Triggers:** push to `main`, pull requests.
+- **Triggers:** pushes to `main`/`develop` plus manual `workflow_dispatch`.\n- **PR policy:** pull requests do not trigger Actions automatically; validate locally during development and run CI manually only when explicitly needed.\n- **Credit policy:** never add automatic feature-branch or `pull_request` triggers without explicit approval.
 - **Status badge:** see `README.md`.
 
 ---
