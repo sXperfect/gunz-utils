@@ -31,6 +31,26 @@ class CommandError(RuntimeError):
         self.result = result
 
 
+class CommandOutputLimitError(RuntimeError):
+    """Raised when captured command output exceeds the configured limit."""
+
+
+def _check_output_limit(
+    stdout: bytes | str,
+    stderr: bytes | str,
+    max_output_bytes: int | None,
+) -> None:
+    if max_output_bytes is None:
+        return
+    if max_output_bytes < 0:
+        raise ValueError("max_output_bytes must be non-negative")
+    size = len(stdout) + len(stderr)
+    if size > max_output_bytes:
+        raise CommandOutputLimitError(
+            f"captured command output exceeded {max_output_bytes} bytes"
+        )
+
+
 def run_command(
     args: Sequence[str],
     *,
@@ -40,32 +60,47 @@ def run_command(
     env: Mapping[str, str] | None = None,
     encoding: str = "utf-8",
     errors: str = "strict",
+    max_output_bytes: int | None = None,
 ) -> CommandResult:
-    """Run a command without invoking a shell and capture text output."""
+    """Run a command without a shell and capture bounded text output."""
     if not args:
         raise ValueError("args must not be empty")
     started = time.perf_counter()
     completed = subprocess.run(
         list(args),
         capture_output=True,
-        text=True,
-        encoding=encoding,
-        errors=errors,
+        text=False,
         timeout=timeout,
         check=False,
         cwd=cwd,
         env=None if env is None else {**os.environ, **env},
     )
+    _check_output_limit(completed.stdout, completed.stderr, max_output_bytes)
     result = CommandResult(
         args=tuple(args),
         returncode=completed.returncode,
-        stdout=completed.stdout,
-        stderr=completed.stderr,
+        stdout=completed.stdout.decode(encoding, errors),
+        stderr=completed.stderr.decode(encoding, errors),
         duration=time.perf_counter() - started,
     )
     if check and result.returncode:
         raise CommandError(result)
     return result
+
+
+async def _stop_process(
+    process: asyncio.subprocess.Process,
+    *,
+    terminate_grace: float,
+) -> None:
+    if process.returncode is not None:
+        return
+    process.terminate()
+    try:
+        await asyncio.wait_for(process.wait(), timeout=terminate_grace)
+    except TimeoutError:
+        process.kill()
+        await process.wait()
 
 
 async def run_command_async(
@@ -77,10 +112,16 @@ async def run_command_async(
     env: Mapping[str, str] | None = None,
     encoding: str = "utf-8",
     errors: str = "strict",
+    max_output_bytes: int | None = None,
+    terminate_grace: float = 1.0,
 ) -> CommandResult:
-    """Run a subprocess asynchronously without invoking a shell."""
+    """Run a subprocess with graceful timeout and cancellation cleanup."""
     if not args:
         raise ValueError("args must not be empty")
+    if terminate_grace < 0:
+        raise ValueError("terminate_grace must be non-negative")
+    if max_output_bytes is not None and max_output_bytes < 0:
+        raise ValueError("max_output_bytes must be non-negative")
     started = time.perf_counter()
     process = await asyncio.create_subprocess_exec(
         *args,
@@ -94,10 +135,12 @@ async def run_command_async(
             process.communicate(),
             timeout=timeout,
         )
-    except TimeoutError:
-        process.kill()
-        await process.wait()
+    except (TimeoutError, asyncio.CancelledError):
+        await asyncio.shield(
+            _stop_process(process, terminate_grace=terminate_grace)
+        )
         raise
+    _check_output_limit(stdout_b, stderr_b, max_output_bytes)
     result = CommandResult(
         args=tuple(args),
         returncode=process.returncode or 0,
@@ -110,4 +153,10 @@ async def run_command_async(
     return result
 
 
-__all__ = ["CommandError", "CommandResult", "run_command", "run_command_async"]
+__all__ = [
+    "CommandError",
+    "CommandOutputLimitError",
+    "CommandResult",
+    "run_command",
+    "run_command_async",
+]
