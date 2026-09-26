@@ -86,7 +86,8 @@ class AsyncBulkhead:
         if limit < 1:
             raise ValueError("limit must be at least 1")
         self.limit = limit
-        self._semaphore = asyncio.Semaphore(limit)\n        self._active = 0
+        self._semaphore = asyncio.Semaphore(limit)
+        self._active = 0
 
     @property
     def available(self) -> int:
