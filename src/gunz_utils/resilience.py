@@ -28,14 +28,16 @@ class AsyncCircuitBreaker:
         self,
         *,
         failure_threshold: int = 5,
-        recovery_timeout: float = 30.0,\n        failure_predicate: Callable[[BaseException], bool] | None = None,
+        recovery_timeout: float = 30.0,
+        failure_predicate: Callable[[BaseException], bool] | None = None,
     ) -> None:
         if failure_threshold < 1:
             raise ValueError("failure_threshold must be at least 1")
         if recovery_timeout < 0:
             raise ValueError("recovery_timeout must be non-negative")
         self.failure_threshold = failure_threshold
-        self.recovery_timeout = recovery_timeout\n        self.failure_predicate = failure_predicate
+        self.recovery_timeout = recovery_timeout
+        self.failure_predicate = failure_predicate
         self._failures = 0
         self._opened_at: float | None = None
         self._half_open_in_flight = False
@@ -64,7 +66,11 @@ class AsyncCircuitBreaker:
             result = await operation()
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
+            if self.failure_predicate is not None and not self.failure_predicate(exc):
+                async with self._lock:
+                    self._half_open_in_flight = False
+                raise
             async with self._lock:
                 self._failures += 1
                 if self._failures >= self.failure_threshold:
@@ -97,7 +103,11 @@ class AsyncBulkhead:
     async def run(self, operation: Callable[[], Awaitable[T]]) -> T:
         """Execute one operation while holding a bulkhead permit."""
         async with self._semaphore:
-            return await operation()
+            self._active += 1
+            try:
+                return await operation()
+            finally:
+                self._active -= 1
 
 
 __all__ = [
