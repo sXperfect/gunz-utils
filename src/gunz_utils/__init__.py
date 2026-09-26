@@ -7,7 +7,7 @@ from typing import Any
 from .async_utils import cancel_and_wait, with_timeout
 from .cache import SingleFlight, ttl_cache
 from .collections import group_by, index_by, partition, unique
-from .concurrency import gather_limited, map_concurrent
+from .concurrency import gather_limited, map_concurrent, map_unordered
 from .config import env_overrides, merge_configs
 from .diagnostics import exception_dict
 from .dict_utils import deep_get, deep_merge, deep_set
@@ -108,6 +108,7 @@ __all__ = [
     "ttl_cache",
     "gather_limited",
     "map_concurrent",
+    "map_unordered",
     "retry",
     "async_retry",
     "canonical_json",

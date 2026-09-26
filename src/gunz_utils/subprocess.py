@@ -38,6 +38,8 @@ def run_command(
     check: bool = False,
     cwd: str | None = None,
     env: Mapping[str, str] | None = None,
+    encoding: str = "utf-8",
+    errors: str = "strict",
 ) -> CommandResult:
     """Run a command without invoking a shell and capture text output."""
     if not args:
@@ -47,6 +49,8 @@ def run_command(
         list(args),
         capture_output=True,
         text=True,
+        encoding=encoding,
+        errors=errors,
         timeout=timeout,
         check=False,
         cwd=cwd,
@@ -71,6 +75,8 @@ async def run_command_async(
     check: bool = False,
     cwd: str | None = None,
     env: Mapping[str, str] | None = None,
+    encoding: str = "utf-8",
+    errors: str = "strict",
 ) -> CommandResult:
     """Run a subprocess asynchronously without invoking a shell."""
     if not args:
@@ -95,8 +101,8 @@ async def run_command_async(
     result = CommandResult(
         args=tuple(args),
         returncode=process.returncode or 0,
-        stdout=stdout_b.decode(),
-        stderr=stderr_b.decode(),
+        stdout=stdout_b.decode(encoding, errors),
+        stderr=stderr_b.decode(encoding, errors),
         duration=time.perf_counter() - started,
     )
     if check and result.returncode:

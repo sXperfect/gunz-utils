@@ -19,8 +19,8 @@ policy.
 ## Design constraints
 
 - The core remains standard-library only.
-- Retry never guesses whether an operation is idempotent.
-- Async cancellation propagates rather than being converted into retries.
+- Retry never guesses whether an operation is idempotent; predicates and hooks let consumers classify and observe retries.
+- Async cancellation propagates rather than being converted into retries.\n- `map_unordered` bounds in-flight tasks and streams completion-order results for large workloads.\n- TTL caches expose lightweight hit/miss/size statistics and can be cleared explicitly.\n- Rate limiters expose an estimated available-token balance for diagnostics.
 - Single-flight shields shared work from cancellation by one waiter.
 - Canonical JSON sorts mapping keys, rejects non-finite floats, and does not
   silently encode bytes.
