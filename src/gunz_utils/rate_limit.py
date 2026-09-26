@@ -20,6 +20,12 @@ class AsyncRateLimiter:
         self._updated = time.monotonic()
         self._lock = asyncio.Lock()
 
+    @property
+    def available_tokens(self) -> float:
+        """Return the last observed token balance without waiting."""
+        elapsed = time.monotonic() - self._updated
+        return min(self.capacity, self._tokens + elapsed * self.rate)
+
     async def acquire(self, tokens: float = 1.0) -> None:
         """Wait until the requested token amount is available."""
         if tokens <= 0 or tokens > self.capacity:
