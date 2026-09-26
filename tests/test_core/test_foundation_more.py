@@ -41,7 +41,10 @@ class TestEnvConfig(unittest.TestCase):
             {"a": {"x": 1, "y": 2}},
         )
         self.assertEqual(
-            env_overrides({"APP_DB__HOST": "localhost", "APPLE_X": "bad"}, prefix="APP"),
+            env_overrides(
+                {"APP_DB__HOST": "localhost", "APPLE_X": "bad"},
+                prefix="APP",
+            ),
             {"db": {"host": "localhost"}},
         )
 
