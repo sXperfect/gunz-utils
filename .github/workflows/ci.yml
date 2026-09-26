@@ -25,7 +25,20 @@ jobs:
           pip install .
       - name: Run tests
         run: |
-          python -m unittest discover tests/test_core -v
+          python -m unittest \
+            tests.test_core.test_dict_utils \
+            tests.test_core.test_enums \
+            tests.test_core.test_enums_security \
+            tests.test_core.test_formatting \
+            tests.test_core.test_hashing \
+            tests.test_core.test_io \
+            tests.test_core.test_iteration \
+            tests.test_core.test_parsing \
+            tests.test_core.test_redaction \
+            tests.test_core.test_security \
+            tests.test_core.test_security_reserved \
+            tests.test_core.test_timing \
+            tests.test_core.test_upstream_protocol -v
 
   pytest:
     name: pytest full suite (all extras)
@@ -163,7 +176,28 @@ jobs:
           pip install ruff
       - name: Run ruff
         run: |
-          ruff check src tests
+          ruff check src tests benchmarks
+
+  core_import:
+    name: zero-dependency core import
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install core without dependencies
+        run: pip install . --no-deps
+      - name: Verify core import does not load optional packages
+        run: |
+          python - <<'PY'
+          import sys
+          import gunz_utils
+          forbidden = {"pydantic", "cryptography", "git", "loguru"}
+          loaded = forbidden.intersection(sys.modules)
+          if loaded:
+              raise SystemExit(f"optional dependencies imported by core: {sorted(loaded)}")
+          PY
 
   mypy:
     name: mypy static type check
