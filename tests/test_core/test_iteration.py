@@ -184,6 +184,17 @@ class TestFlatten(unittest.TestCase):
         result = list(flatten(nested))
         self.assertEqual(result, [1, 2, 3, {"k": "v"}, "hello"])
 
+    def test_cycle_is_rejected(self) -> None:
+        cyclic: list = []
+        cyclic.append(cyclic)
+        with self.assertRaisesRegex(ValueError, "cycle detected"):
+            list(flatten([cyclic]))
+
+    def test_max_nesting_bounds_recursive_inputs(self) -> None:
+        nested = [[[[1]]]]
+        with self.assertRaisesRegex(ValueError, "maximum nesting depth"):
+            list(flatten(nested, max_nesting=2))
+
     def test_generator_input(self) -> None:
         def gen():
             yield [1, 2]
