@@ -18,6 +18,8 @@ class PerformanceArtifact:
     path: str
     media_type: str | None = None
     description: str | None = None
+    checksum_sha256: str | None = None
+    size_bytes: int | None = None
 
 
 @dataclass(frozen=True)
