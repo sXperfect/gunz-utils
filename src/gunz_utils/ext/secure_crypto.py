@@ -11,7 +11,6 @@ __license__ = "Clear BSD"
 __version__ = "1.3.2"
 
 import binascii
-import hashlib
 import os
 
 from cryptography.hazmat.backends import default_backend
@@ -23,7 +22,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 IV_LENGTH = 12
 SALT_LENGTH = 16
 KEY_LENGTH = 32
-ITERATIONS = 10000
+ITERATIONS = 600_000
+_FORMAT_PREFIX = "aes256:v2:"
 
 def get_system_passphrase() -> str:
     """
@@ -35,27 +35,17 @@ def get_system_passphrase() -> str:
     return f"{hostname}:{username}:hyperhedron-mcp"
 
 def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
-    """
-    Derives a machine-unique encryption key.
-    Replicates TypeScript's getDerivedKey logic.
-    """
-    hostname = os.uname().nodename
-    machine_secret = hashlib.sha256(hostname.encode('utf-8')).hexdigest()
-
-    #? Binding the optional passphrase to a machine-derived secret prevents the
-    #? same user phrase from yielding portable credentials across hosts.
-    final_passphrase = (
-        f"{passphrase}:{machine_secret}" if passphrase else machine_secret
-    )
-
+    """Derive an AES key from explicit secret material."""
+    if not passphrase:
+        raise ValueError("passphrase is required for encryption")
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=KEY_LENGTH,
         salt=salt,
         iterations=ITERATIONS,
-        backend=default_backend()
+        backend=default_backend(),
     )
-    return kdf.derive(final_passphrase.encode('utf-8'))
+    return kdf.derive(passphrase.encode("utf-8"))
 
 def encrypt(text: str, passphrase: str | None = None) -> str:
     """
@@ -74,7 +64,7 @@ def encrypt(text: str, passphrase: str | None = None) -> str:
     tag = ciphertext_with_tag[-16:]
     encrypted = ciphertext_with_tag[:-16]
 
-    return f"{salt.hex()}:{iv.hex()}:{tag.hex()}:{encrypted.hex()}"
+    return f"{_FORMAT_PREFIX}{salt.hex()}:{iv.hex()}:{tag.hex()}:{encrypted.hex()}"
 
 def decrypt(encrypted_text: str, passphrase: str | None = None) -> str:
     """
@@ -84,8 +74,13 @@ def decrypt(encrypted_text: str, passphrase: str | None = None) -> str:
     """
     if not encrypted_text.startswith("aes256:"):
         return encrypted_text
-
-    encrypted_text = encrypted_text.replace("aes256:", "")
+    if encrypted_text.startswith(_FORMAT_PREFIX):
+        encrypted_text = encrypted_text[len(_FORMAT_PREFIX):]
+    else:
+        raise ValueError(
+            "Legacy aes256 ciphertext uses insecure hostname-derived key material; "
+            "migrate it with an older trusted client before decrypting here"
+        )
     parts = encrypted_text.split(':')
     if len(parts) != 4:
         raise ValueError("Invalid encrypted format")

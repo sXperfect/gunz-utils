@@ -39,7 +39,7 @@ def setup_logging(
     )
 
     # 1. Console Logger
-    logger.add(sys.stderr, level=log_level, format=log_format)
+    logger.add(sys.stderr, level=log_level, format=log_format, diagnose=False)
 
     # 2. File Logger
     if project_root:
@@ -51,5 +51,6 @@ def setup_logging(
             format=log_format,
             rotation="10 MB",
             retention="30 days",
-            enqueue=True
+            enqueue=True,
+            diagnose=False,
         )

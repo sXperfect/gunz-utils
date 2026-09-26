@@ -17,13 +17,13 @@ from .hashing import (
 )
 from .io import atomic_write
 from .iteration import batched, chunked, first, flatten
-from .models import GunzBaseModel
 from .parsing import parse_bool, safe_bool, safe_float, safe_int
 from .redaction import SECRET_PATTERNS, redact, redact_dict
-from .security import safe_path_join, sanitize_filename
+from .security import open_path_under_base, safe_path_join, sanitize_filename
 from .timing import Timer, timer
 from .upstream_protocol import (
     BaseUpstream,
+    PolicyUpstream,
     UpstreamAuthError,
     UpstreamClient,
     UpstreamError,
@@ -35,6 +35,7 @@ from .upstream_protocol import (
 __version__ = "1.8.0"
 
 _LAZY: dict[str, str] = {
+    "GunzBaseModel": ".models",
     "type_checked": ".ext.validation_pydantic",
     "resolve_project_root": ".ext.project_gitpython",
     "setup_logging": ".ext.observability_loguru",
@@ -89,6 +90,7 @@ __all__ = [
     "safe_float",
     "safe_int",
     "sanitize_filename",
+    "open_path_under_base",
     "safe_path_join",
     "SECRET_PATTERNS",
     "redact",
@@ -99,6 +101,7 @@ __all__ = [
     "timer",
     "UpstreamClient",
     "BaseUpstream",
+    "PolicyUpstream",
     "UpstreamError",
     "UpstreamTimeoutError",
     "UpstreamAuthError",

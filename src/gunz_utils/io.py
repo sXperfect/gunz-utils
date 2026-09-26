@@ -24,6 +24,7 @@ def atomic_write(
     mode: str = "w",
     encoding: str | None = None,
     mkdir: bool = False,
+    durable: bool = False,
 ) -> None:
     """Atomically write content to path.
 
@@ -44,6 +45,9 @@ def atomic_write(
         Text encoding, defaulting to UTF-8. Ignored in binary mode.
     mkdir : bool, default=False
         Create missing parent directories with mode ``0o755`` when true.
+    durable : bool, default=False
+        If true, fsync file contents before replacement and the parent directory
+        after replacement on platforms supporting directory descriptors.
 
     Returns
     -------
@@ -87,7 +91,16 @@ def atomic_write(
         else:
             with os.fdopen(fd, mode, encoding=encoding or "utf-8") as file:
                 file.write(content)
+                if durable:
+                    file.flush()
+                    os.fsync(file.fileno())
         os.replace(tmp_path, target)
+        if durable and hasattr(os, "O_DIRECTORY"):
+            dir_fd = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
     except BaseException:
         #? Cleanup catches BaseException so interrupts cannot leave temp files.
         try:

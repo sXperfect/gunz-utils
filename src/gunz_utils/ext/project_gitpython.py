@@ -15,6 +15,7 @@ __license__ = "Clear BSD"
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import logging
 import pathlib
 import sys
 
@@ -22,7 +23,8 @@ import sys
 # THIRD-PARTY IMPORTS
 # =============================================================================
 from git import InvalidGitRepositoryError, Repo
-from loguru import logger
+
+logger = logging.getLogger(__name__)
 
 # ? Cache the root to avoid repeated disk I/O
 _PROJECT_ROOT: pathlib.Path | None = None

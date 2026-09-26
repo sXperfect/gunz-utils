@@ -46,6 +46,7 @@ __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
 __version__ = "1.3.2"
 
+import base64
 import os
 import sqlite3
 import threading
@@ -54,6 +55,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 _PBKDF2_ITERATIONS = 600_000  # OWASP 2023 recommendation for SHA-256
 _KEY_FILE_MODE = 0o600  # owner read/write only
@@ -119,12 +122,16 @@ class SecureStore:
         self._base_dir = (
             Path(base_dir) if base_dir else default_base_dir(library_name)
         )
-        self._base_dir.mkdir(parents=True, exist_ok=True)
+        self._base_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            os.chmod(self._base_dir, 0o700)
+        except OSError:
+            pass
         self._master_key_path = self._base_dir / "master.key"
         self._salt_path = self._base_dir / "master.salt"
         self._db_path = self._base_dir / "config.db"
-        self._lock = threading.Lock()
-        self._fernet_lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._fernet_lock = self._lock
         self._fernet: Fernet | None = None
         self._conn = sqlite3.connect(
             str(self._db_path),
@@ -134,6 +141,10 @@ class SecureStore:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._init_schema()
+        try:
+            os.chmod(self._db_path, _KEY_FILE_MODE)
+        except OSError:
+            pass
 
     def _init_schema(self) -> None:
         with self._lock:
@@ -155,6 +166,11 @@ class SecureStore:
                     secret_name TEXT,
                     allowed INTEGER NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS store_meta (
+                    key TEXT PRIMARY KEY,
+                    value BLOB NOT NULL
+                );
                 """
             )
 
@@ -168,39 +184,77 @@ class SecureStore:
         with self._fernet_lock:
             return self._fernet
 
+    @staticmethod
+    def _write_private(path: Path, data: bytes) -> None:
+        """Create or replace a private file without a world-readable window."""
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, _KEY_FILE_MODE)
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+
+    def _verify_or_initialize_key(self, fernet: Fernet) -> None:
+        row = self._conn.execute(
+            "SELECT value FROM store_meta WHERE key = 'key_check'"
+        ).fetchone()
+        if row is not None:
+            if fernet.decrypt(row["value"]) != b"gunz-utils-secure-store-v1":
+                raise InvalidToken
+            return
+        secret = self._conn.execute(
+            "SELECT ciphertext FROM secrets LIMIT 1"
+        ).fetchone()
+        if secret is not None:
+            fernet.decrypt(secret["ciphertext"])
+        token = fernet.encrypt(b"gunz-utils-secure-store-v1")
+        self._conn.execute(
+            "INSERT INTO store_meta(key, value) VALUES ('key_check', ?)", (token,)
+        )
+
     def unlock(self, passphrase: str | None = None) -> None:
-        """Unlock the store. Auto-creates master key on first run."""
-        if passphrase is None:
-            if self._master_key_path.exists():
-                key = self._master_key_path.read_bytes().strip()
+        """Unlock the store and verify the selected key before publishing it."""
+        with self._lock:
+            if passphrase is None:
+                if self._salt_path.exists() and not self._master_key_path.exists():
+                    raise RuntimeError(
+                        "Store is passphrase-protected; passphrase required"
+                    )
+                if self._master_key_path.exists():
+                    key = self._master_key_path.read_bytes().strip()
+                else:
+                    key = Fernet.generate_key()
+                    self._write_private(self._master_key_path, key)
             else:
-                key = Fernet.generate_key()
-                self._master_key_path.write_bytes(key)
-                os.chmod(self._master_key_path, _KEY_FILE_MODE)
-        else:
-            if self._salt_path.exists():
-                salt = self._salt_path.read_bytes()
-            else:
-                salt = os.urandom(16)
-                self._salt_path.write_bytes(salt)
-                os.chmod(self._salt_path, _KEY_FILE_MODE)
-            import base64
+                if self._master_key_path.exists() and not self._salt_path.exists():
+                    raise RuntimeError(
+                        "Store uses file-key mode; do not supply passphrase"
+                    )
+                if self._salt_path.exists():
+                    salt = self._salt_path.read_bytes()
+                else:
+                    salt = os.urandom(16)
+                    self._write_private(self._salt_path, salt)
+                key = self._derive_key(passphrase, salt)
+            candidate = Fernet(key)
+            self._verify_or_initialize_key(candidate)
+            self._fernet = candidate
 
-            from cryptography.hazmat.backends import default_backend
-            from cryptography.hazmat.primitives import hashes
-            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=salt,
-                iterations=_PBKDF2_ITERATIONS,
-                backend=default_backend(),
-            )
-            key = base64.urlsafe_b64encode(kdf.derive(passphrase.encode()))
-        with self._fernet_lock:
-            self._fernet = Fernet(key)
-
+    @staticmethod
+    def _derive_key(passphrase: str, salt: bytes) -> bytes:
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(), length=32, salt=salt,
+            iterations=_PBKDF2_ITERATIONS,
+        )
+        return base64.urlsafe_b64encode(kdf.derive(passphrase.encode()))
     def _audit(
         self,
         caller: str,
@@ -225,21 +279,26 @@ class SecureStore:
         caller: str = "library",
         acl: list[str] | None = None,
     ) -> None:
-        """Encrypt and store a secret."""
-        if not self.is_unlocked():
-            raise RuntimeError("Store is locked. Call unlock() first.")
-        with self._fernet_lock:
-            fernet = self._fernet
-        if fernet is None:
-            raise RuntimeError("Store is locked. Call unlock() first.")
-
-        if isinstance(value, str):
-            value = value.encode()
-        ciphertext = fernet.encrypt(value)
-        acl_str = ",".join(acl) if acl else ""
-        now = time.time()
-
+        """Encrypt and store a secret, preserving an existing ACL by default."""
         with self._lock:
+            if self._fernet is None:
+                raise RuntimeError("Store is locked. Call unlock() first.")
+            existing = self._conn.execute(
+                "SELECT acl FROM secrets WHERE name = ?", (name,)
+            ).fetchone()
+            if existing is not None:
+                current_acl = [s for s in (existing["acl"] or "").split(",") if s]
+                if current_acl and caller not in current_acl:
+                    self._audit(caller, "set", name, False)
+                    raise PermissionError(
+                        f"Caller {caller!r} not permitted to modify {name!r}"
+                    )
+                acl_str = existing["acl"] if acl is None else ",".join(acl)
+            else:
+                acl_str = ",".join(acl) if acl else ""
+            payload = value.encode() if isinstance(value, str) else value
+            ciphertext = self._fernet.encrypt(payload)
+            now = time.time()
             self._conn.execute(
                 """
                 INSERT INTO secrets (name, ciphertext, acl, created_at, updated_at)
@@ -251,53 +310,79 @@ class SecureStore:
                 """,
                 (name, ciphertext, acl_str, now, now),
             )
-        self._audit(caller, "set", name, True)
+            self._audit(caller, "set", name, True)
+    def get_bytes(self, name: str, *, caller: str = "library") -> bytes | None:
+        """Decrypt and return raw secret bytes, or None if not found."""
+        with self._lock:
+            if self._fernet is None:
+                raise RuntimeError("Store is locked. Call unlock() first.")
+            row = self._conn.execute(
+                "SELECT ciphertext, acl FROM secrets WHERE name = ?", (name,)
+            ).fetchone()
+            if row is None:
+                self._audit(caller, "get", name, False)
+                return None
+            acl = [s for s in (row["acl"] or "").split(",") if s]
+            if acl and caller not in acl:
+                self._audit(caller, "get", name, False)
+                raise PermissionError(
+                    f"Caller {caller!r} not in ACL {acl} for secret {name!r}"
+                )
+            try:
+                plaintext = self._fernet.decrypt(row["ciphertext"])
+            except InvalidToken:
+                self._audit(caller, "get", name, False)
+                raise
+            self._audit(caller, "get", name, True)
+            return plaintext
 
     def get(self, name: str, *, caller: str = "library") -> str | None:
-        """Decrypt and return a secret, or None if not found."""
-        with self._fernet_lock:
-            fernet = self._fernet
-        if fernet is None:
-            raise RuntimeError("Store is locked. Call unlock() first.")
-
-        with self._lock:
-            cur = self._conn.execute(
-                "SELECT ciphertext, acl FROM secrets WHERE name = ?",
-                (name,),
-            )
-            row = cur.fetchone()
-
-        if row is None:
-            self._audit(caller, "get", name, False)
-            return None
-
-        acl = [s for s in (row["acl"] or "").split(",") if s]
-        if acl and caller not in acl:
-            self._audit(caller, "get", name, False)
-            raise PermissionError(
-                f"Caller {caller!r} not in ACL {acl} for secret {name!r}"
-            )
-
-        try:
-            plaintext = fernet.decrypt(row["ciphertext"])
-        except InvalidToken:
-            self._audit(caller, "get", name, False)
-            raise
-
-        self._audit(caller, "get", name, True)
-        return plaintext.decode()
-
+        """Decrypt and UTF-8 decode a text secret, or None if not found."""
+        value = self.get_bytes(name, caller=caller)
+        return None if value is None else value.decode("utf-8")
     def delete(self, name: str, *, caller: str = "library") -> bool:
-        """Delete a secret. Returns True if it existed."""
+        """Delete an authorized secret. The store must be unlocked."""
         with self._lock:
-            cur = self._conn.execute(
-                "DELETE FROM secrets WHERE name = ?",
-                (name,),
-            )
-            deleted = cur.rowcount > 0
-        self._audit(caller, "delete", name, deleted)
-        return deleted
+            if self._fernet is None:
+                raise RuntimeError("Store is locked. Call unlock() first.")
+            row = self._conn.execute(
+                "SELECT acl FROM secrets WHERE name = ?", (name,)
+            ).fetchone()
+            if row is None:
+                self._audit(caller, "delete", name, False)
+                return False
+            acl = [s for s in (row["acl"] or "").split(",") if s]
+            if acl and caller not in acl:
+                self._audit(caller, "delete", name, False)
+                raise PermissionError(
+                    f"Caller {caller!r} not permitted to delete {name!r}"
+                )
+            self._conn.execute("DELETE FROM secrets WHERE name = ?", (name,))
+            self._audit(caller, "delete", name, True)
+            return True
+    def set_many(
+        self,
+        values: dict[str, str | bytes],
+        *,
+        caller: str = "library",
+        acl: list[str] | None = None,
+    ) -> None:
+        """Store multiple values in one SQLite transaction."""
+        with self._lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                for name, value in values.items():
+                    self.set(name, value, caller=caller, acl=acl)
+                self._conn.execute("COMMIT")
+            except BaseException:
+                self._conn.execute("ROLLBACK")
+                raise
 
+    def get_many(
+        self, names: list[str], *, caller: str = "library"
+    ) -> dict[str, str | None]:
+        """Retrieve multiple UTF-8 text secrets."""
+        return {name: self.get(name, caller=caller) for name in names}
     def list_keys(
         self, *, caller: str = "library", acl_filter: bool = True
     ) -> list[SecretMetadata]:
@@ -324,65 +409,68 @@ class SecureStore:
         return out
 
     def rotate_master_key(self, new_passphrase: str | None = None) -> None:
-        """Re-encrypt all secrets with a new master key."""
-        with self._fernet_lock:
-            old_fernet = self._fernet
-        if old_fernet is None:
-            raise RuntimeError("Store is locked. Call unlock() first.")
-
-        new_key = (
-            Fernet.generate_key()
-            if new_passphrase is None
-            else self._derive_from_passphrase(new_passphrase)
-        )
-        new_fernet = Fernet(new_key)
-
+        """Re-encrypt all secrets atomically and publish the new key last."""
         with self._lock:
-            cur = self._conn.execute("SELECT name, ciphertext FROM secrets")
-            rows = cur.fetchall()
-            for r in rows:
-                plaintext = old_fernet.decrypt(r["ciphertext"])
-                new_ciphertext = new_fernet.encrypt(plaintext)
-                self._conn.execute(
-                    "UPDATE secrets SET ciphertext = ? WHERE name = ?",
-                    (new_ciphertext, r["name"]),
+            if self._fernet is None:
+                raise RuntimeError("Store is locked. Call unlock() first.")
+            old_fernet = self._fernet
+            if new_passphrase is None:
+                new_key = Fernet.generate_key()
+                new_salt = None
+            else:
+                new_salt = os.urandom(16)
+                new_key = self._derive_key(new_passphrase, new_salt)
+            new_fernet = Fernet(new_key)
+            rows = self._conn.execute("SELECT name, ciphertext FROM secrets").fetchall()
+            rewritten = [
+                (new_fernet.encrypt(old_fernet.decrypt(r["ciphertext"])), r["name"])
+                for r in rows
+            ]
+            check = new_fernet.encrypt(b"gunz-utils-secure-store-v1")
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                self._conn.executemany(
+                    "UPDATE secrets SET ciphertext = ? WHERE name = ?", rewritten
                 )
-
-        if new_passphrase is None:
-            self._master_key_path.write_bytes(new_key)
-            os.chmod(self._master_key_path, _KEY_FILE_MODE)
-        with self._fernet_lock:
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO store_meta(key, value) "
+                    "VALUES ('key_check', ?)",
+                    (check,),
+                )
+                if new_salt is None:
+                    self._write_private(self._master_key_path, new_key)
+                    if self._salt_path.exists():
+                        self._salt_path.unlink()
+                else:
+                    self._write_private(self._salt_path, new_salt)
+                    if self._master_key_path.exists():
+                        self._master_key_path.unlink()
+                self._conn.execute("COMMIT")
+            except BaseException:
+                self._conn.execute("ROLLBACK")
+                raise
             self._fernet = new_fernet
-
     def lock(self) -> None:
         """Atomically clear the Fernet instance. Thread-safe."""
         with self._fernet_lock:
             self._fernet = None
 
-    def _derive_from_passphrase(self, passphrase: str) -> bytes:
-        import base64
+    def audit_events(self, *, limit: int = 100) -> list[dict[str, object]]:
+        """Return the newest audit events without secret values."""
+        if limit <= 0 or limit > 10_000:
+            raise ValueError("limit must be in [1, 10000]")
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT timestamp, caller, action, secret_name, allowed "
+                "FROM audit ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
 
-        from cryptography.hazmat.backends import default_backend
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    def __enter__(self) -> SecureStore:
+        return self
 
-        salt = (
-            self._salt_path.read_bytes()
-            if self._salt_path.exists()
-            else os.urandom(16)
-        )
-        if not self._salt_path.exists():
-            self._salt_path.write_bytes(salt)
-            os.chmod(self._salt_path, _KEY_FILE_MODE)
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=_PBKDF2_ITERATIONS,
-            backend=default_backend(),
-        )
-        return base64.urlsafe_b64encode(kdf.derive(passphrase.encode()))
-
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
     def close(self) -> None:
         with self._lock:
             self._conn.close()
@@ -392,7 +480,7 @@ class SecureStore:
 def main_unlock_interactive() -> SecureStore:
     """Convenience helper for CLI: prompts for passphrase if needed."""
     store = SecureStore()
-    if store._master_key_path.exists() and store._salt_path.exists():
+    if store._salt_path.exists():
         import getpass
 
         pw = getpass.getpass("Master passphrase: ")

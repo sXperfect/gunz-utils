@@ -17,6 +17,7 @@ __license__ = "Clear BSD"
 import functools
 import os
 import re
+from typing import IO, Any
 
 # Pre-compile the regex for invalid characters (anything not alphanumeric, dot, or dash)
 # We use + to collapse multiple invalid characters in one go
@@ -78,8 +79,10 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     # ? creation.
     # ? We check for standard separators (/ and \) explicitly to be safe
     # ? across platforms.
-    if "/" in replacement or "\\" in replacement:
-        raise ValueError("Replacement string contains path separators")
+    if "/" in replacement or "\\" in replacement or "\0" in replacement:
+        raise ValueError("Replacement string contains unsafe path characters")
+    if len(replacement) > 16:
+        raise ValueError("Replacement string is too long (max 16 chars)")
 
     # 2. Get base name to avoid directories/path traversal via slashes
     # ? os.path.basename strips any directory components, neutralizing ".." attacks
@@ -110,8 +113,18 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
         raise ValueError("Filename is empty after sanitization")
 
     # 7. Check length (common filesystem limit)
-    if len(filename) > 255:
-        filename = filename[:255]
+    encoded = filename.encode("utf-8")
+    if len(encoded) > 255:
+        encoded = encoded[:255]
+        while True:
+            try:
+                filename = encoded.decode("utf-8")
+                break
+            except UnicodeDecodeError:
+                encoded = encoded[:-1]
+        filename = filename.rstrip(replacement + ".")
+        if not filename:
+            raise ValueError("Filename is empty after byte-length truncation")
 
     # 8. Check for Windows reserved filenames
     # ? CON, PRN, AUX, NUL, COM1-9, LPT1-9 are reserved on Windows
@@ -205,13 +218,9 @@ def safe_path_join(base_dir: str, *paths: str) -> str:
         # leading slash.
         # Safest is to strip leading slashes/drive letters to force relative
         # join.
-        if os.path.isabs(p):
-            # Handle Windows drive letters (e.g. C:\) by splitting drive
-            # splitdrive returns ('', p) on non-Windows usually, or
-            # ('C:', '\path') on Windows
-            drive, p = os.path.splitdrive(p)
-            # Strip leading separators to ensure it's relative
-            p = p.lstrip(os.path.sep)
+        drive, _ = os.path.splitdrive(p)
+        if os.path.isabs(p) or drive:
+            raise ValueError("Absolute path components are not allowed")
 
         final_path = os.path.join(final_path, p)
 
@@ -225,3 +234,29 @@ def safe_path_join(base_dir: str, *paths: str) -> str:
         raise ValueError("Path traversal detected: path is outside base directory")
 
     return resolved_path
+
+
+def open_path_under_base(
+    base_dir: str,
+    *paths: str,
+    mode: str = "rb",
+) -> IO[Any]:
+    """Open a contained path while rejecting symlinks in the final component.
+
+    This helper reduces the check/open race present when callers separately use
+    :func:`safe_path_join` and :func:`open`. On POSIX it opens relative to a
+    directory descriptor and refuses a symlink final component.
+    """
+    if any(flag in mode for flag in ("w", "a", "+", "x")):
+        raise ValueError("open_path_under_base currently supports read-only modes")
+    resolved = safe_path_join(base_dir, *paths)
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        return open(resolved, mode)
+    relative = os.path.relpath(resolved, os.path.realpath(base_dir))
+    dir_fd = os.open(os.path.realpath(base_dir), os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        flags = os.O_RDONLY | os.O_NOFOLLOW
+        fd = os.open(relative, flags, dir_fd=dir_fd)
+    finally:
+        os.close(dir_fd)
+    return os.fdopen(fd, mode)

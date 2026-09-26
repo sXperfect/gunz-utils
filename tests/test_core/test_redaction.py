@@ -43,9 +43,14 @@ class TestRedact(unittest.TestCase):
     def test_show_chars_zero_yields_full_mask(self):
         """``show_chars=0`` reveals nothing on either side."""
         # Threshold 0 -> any non-empty string is fully masked.
-        self.assertEqual(redact("hunter2", show_chars=0), "****hunter2")
-        # show_chars=0 means slice [:0] + **** + slice [-0:] = '****' + original.
-        self.assertEqual(redact("a", show_chars=0), "****a")
+        self.assertEqual(redact("hunter2", show_chars=0), "****")
+        self.assertEqual(redact("a", show_chars=0), "****")
+
+    def test_negative_show_chars_rejected(self):
+        with self.assertRaises(ValueError):
+            redact("secret", show_chars=-1)
+        with self.assertRaises(ValueError):
+            redact_dict({"password": "secret"}, show_chars=-1)
 
     def test_show_chars_one(self):
         """``show_chars=1`` exposes a single character at each end."""
@@ -98,7 +103,7 @@ class TestRedactDict(unittest.TestCase):
         cfg = {"auth": {"token": "abc123xyz", "expires": 1234567890}}
         out = redact_dict(cfg)
         # 'abc123xyz' length 9 > 4 -> 'ab****yz'.
-        self.assertEqual(out["auth"]["token"], "ab****yz")
+        self.assertEqual(out["auth"]["token"], "****")
         self.assertEqual(out["auth"]["expires"], 1234567890)
 
     def test_list_of_dicts_secrets_are_masked(self):
@@ -152,6 +157,18 @@ class TestRedactDict(unittest.TestCase):
         # '555-1234' length 8 > 4 -> '55****34'.
         self.assertEqual(out["phone"], "55****34")
 
+    def test_secret_container_masks_descendants(self):
+        out = redact_dict(
+            {
+                "passwords": ["alpha", "beta"],
+                "credentials": {"primary": "gamma"},
+                "token": b"binary-secret",
+            }
+        )
+        self.assertEqual(out["passwords"], ["****", "****"])
+        self.assertEqual(out["credentials"], {"primary": "****"})
+        self.assertEqual(out["token"], "****")
+
     def test_non_dict_input_passes_through(self):
         """Scalars and other non-collection inputs are returned unchanged."""
         self.assertEqual(redact_dict("just a string"), "just a string")
@@ -180,7 +197,7 @@ class TestRedactDict(unittest.TestCase):
         # 'hunter2' length 7 <= 2 * 4 -> fully masked.
         self.assertEqual(out["password"], "****")
         # 'abc123xyz' length 9 > 2 * 4 -> partial mask: 'abc1****3xyz'.
-        self.assertEqual(out["auth"]["token"], "abc1****3xyz")
+        self.assertEqual(out["auth"]["token"], "****")
 
 
 class TestSecretPatterns(unittest.TestCase):

@@ -6,6 +6,7 @@ The SecureStore implementation was promoted from
 ``hyperhedron_google.secure_store`` to ``gunz_utils.secure_store``;
 this test file followed.
 """
+import sqlite3
 import tempfile
 import unittest
 
@@ -100,15 +101,72 @@ class TestSecureStore(unittest.TestCase):
             store.close()
 
             store2 = SecureStore(base_dir=tmp)
-            store2.unlock(passphrase="wrong-passphrase")
             from cryptography.fernet import InvalidToken
 
             with self.assertRaises(InvalidToken):
-                store2.get("k")
+                store2.unlock(passphrase="wrong-passphrase")
             store2.close()
         finally:
             import shutil
 
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_acl_blocks_overwrite_and_delete(self):
+        self.store.set("protected", "value", caller="mcp", acl=["mcp"])
+        with self.assertRaises(PermissionError):
+            self.store.set("protected", "changed", caller="library")
+        with self.assertRaises(PermissionError):
+            self.store.delete("protected", caller="library")
+        self.assertEqual(self.store.get("protected", caller="mcp"), "value")
+
+    def test_existing_acl_is_preserved_when_omitted(self):
+        self.store.set("protected", "one", caller="mcp", acl=["mcp"])
+        self.store.set("protected", "two", caller="mcp")
+        with self.assertRaises(PermissionError):
+            self.store.get("protected", caller="library")
+
+    def test_delete_requires_unlock(self):
+        self.store.set("protected", "value")
+        self.store.lock()
+        with self.assertRaises(RuntimeError):
+            self.store.delete("protected")
+
+    def test_binary_round_trip(self):
+        payload = b"\xff\x00secret"
+        self.store.set("binary", payload)
+        self.assertEqual(self.store.get_bytes("binary"), payload)
+
+    def test_passphrase_store_requires_passphrase(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            store = SecureStore(base_dir=tmp)
+            store.unlock(passphrase="correct-horse-battery-staple")
+            store.set("k", "v")
+            store.close()
+            store2 = SecureStore(base_dir=tmp)
+            with self.assertRaises(RuntimeError):
+                store2.unlock()
+            store2.close()
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_bulk_round_trip_and_audit_query(self):
+        self.store.set_many({"a": "1", "b": "2"})
+        self.assertEqual(self.store.get_many(["a", "b"]), {"a": "1", "b": "2"})
+        events = self.store.audit_events(limit=10)
+        self.assertTrue(any(event["action"] == "set" for event in events))
+
+    def test_context_manager_closes_store(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            with SecureStore(base_dir=tmp) as store:
+                store.unlock()
+                store.set("k", "v")
+            with self.assertRaises(sqlite3.ProgrammingError):
+                store.list_keys()
+        finally:
+            import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
 

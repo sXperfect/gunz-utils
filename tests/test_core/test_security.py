@@ -81,7 +81,7 @@ class TestSecurity(unittest.TestCase):
         for replacement in unsafe_replacements:
             with self.subTest(replacement=replacement):
                 with self.assertRaisesRegex(
-                    ValueError, "Replacement string contains path separators"
+                    ValueError, "Replacement string contains unsafe path characters"
                 ):
                     sanitize_filename("file*name.txt", replacement=replacement)
 
@@ -126,27 +126,12 @@ class TestSecurity(unittest.TestCase):
                 safe_path_join(base, "uploads/../../etc/passwd")
 
     def test_safe_path_join_absolute_input(self):
-        """Test handling of absolute inputs (should be treated as relative)."""
+        """Absolute components are rejected rather than silently rewritten."""
         with tempfile.TemporaryDirectory() as tmp_path:
             base = os.path.realpath(str(tmp_path))
-
-            # Construct an absolute path. On Linux /etc/passwd, on Windows C:\etc\passwd
             abs_input = os.path.abspath(os.path.join(os.sep, "etc", "passwd"))
-
-            # Our implementation treats absolute paths as relative by stripping the root
-            # So /etc/passwd becomes etc/passwd inside base
-            # We must replicate the stripping logic to assert correctly
-
-            # Expected behavior:
-            # 1. splitdrive (handles C:)
-            # 2. lstrip sep
-            # 3. join to base
-
-            _, rel = os.path.splitdrive(abs_input)
-            rel = rel.lstrip(os.path.sep)
-            expected = os.path.join(base, rel)
-
-            self.assertEqual(safe_path_join(base, abs_input), expected)
+            with self.assertRaisesRegex(ValueError, "Absolute path components"):
+                safe_path_join(base, abs_input)
 
     def test_safe_path_join_null_bytes(self):
         """Test null byte injection."""
@@ -168,6 +153,10 @@ class TestSecurity(unittest.TestCase):
                 self.assertNotIn("/etc/passwd", msg)
             else:
                 self.fail("ValueError not raised")
+
+    def test_absolute_component_is_rejected(self):
+        with self.assertRaises(ValueError):
+            safe_path_join("/tmp/base", "/etc/passwd")
 
 
 if __name__ == "__main__":

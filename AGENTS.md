@@ -11,7 +11,7 @@
 | Field | Value |
 |:------|:------|
 | **Name** | `gunz-utils` |
-| **Version** | `1.2.0` (see `pyproject.toml`) |
+| **Version** | `1.8.0` (see `pyproject.toml`) |
 | **Description** | General-purpose Python utilities for the Gunz ecosystem. Enhanced Enums, security primitives, UpstreamClient protocol, Fernet secret store. |
 | **License** | BSD 3-Clause (`LICENSE.md`) |
 | **Repository** | https://github.com/sXperfect/gunz-utils |
@@ -29,11 +29,8 @@
 - `from __future__ import annotations` is used at the top of modules.
 
 ### 2.2 Core Dependencies (production)
-| Package | Min Version | Purpose |
-|:--------|:-----------:|:--------|
-| `pydantic` | `>=2.0.0` | Data models, validation |
-| `cryptography` | `>=42.0.0` | Fernet encryption, secure primitives |
-| `gitpython` | `>=3.1.0` | Repository metadata |
+- The core package is stdlib-only.
+- Optional integrations are lazy-loaded.
 
 ### 2.3 Build System
 - **Backend:** `hatchling` (PEP 517).
@@ -41,7 +38,11 @@
 - **Sdist target:** `src/`.
 
 ### 2.4 Optional Dependencies
-- `docs` extra: `sphinx`, `furo`, `myst-parser`, `sphinx-autodoc-typehints`.
+- `validation`: Pydantic
+- `secure`: cryptography
+- `project`: GitPython
+- `observability`: Loguru
+- `docs`: Sphinx toolchain
 
 ### 2.5 Testing Toolchain
 - **Framework:** `pytest` (configured via `pyproject.toml`/defaults).
@@ -102,7 +103,6 @@ pip install pytest ruff mypy
 mamba activate gunz-utils
 pytest                     # run all tests
 ruff check .               # lint
-ruff format .              # format
 mypy src/gunz_utils        # static type check
 ```
 

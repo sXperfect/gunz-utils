@@ -256,17 +256,18 @@ def deep_merge(
             #? Unhashable items (e.g. dicts) fall through without being
             #? tracked; that mirrors common stdlib semantics and avoids
             #? forcing the caller to pre-normalize their data.
-            seen: set[int] = set()
+            seen_hashable: set[Any] = set()
+            seen_unhashable: list[Any] = []
             result: list[Any] = []
-            for item in list(a) + list(b):
+            for item in (*a, *b):
                 try:
-                    key = hash(item)
+                    if item in seen_hashable:
+                        continue
+                    seen_hashable.add(item)
                 except TypeError:
-                    result.append(item)
-                    continue
-                if key in seen:
-                    continue
-                seen.add(key)
+                    if any(item == previous for previous in seen_unhashable):
+                        continue
+                    seen_unhashable.append(item)
                 result.append(item)
             return result
         #? Non-dict / non-list: override wins. Plain scalars and mixed
