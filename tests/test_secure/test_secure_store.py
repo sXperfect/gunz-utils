@@ -150,6 +150,24 @@ class TestSecureStore(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_bulk_round_trip_and_audit_query(self):
+        self.store.set_many({"a": "1", "b": "2"})
+        self.assertEqual(self.store.get_many(["a", "b"]), {"a": "1", "b": "2"})
+        events = self.store.audit_events(limit=10)
+        self.assertTrue(any(event["action"] == "set" for event in events))
+
+    def test_context_manager_closes_store(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            with SecureStore(base_dir=tmp) as store:
+                store.unlock()
+                store.set("k", "v")
+            with self.assertRaises(Exception):
+                store.list_keys()
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
