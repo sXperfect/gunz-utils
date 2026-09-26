@@ -16,7 +16,7 @@ from .plot import plot_benchmark, plot_history, plot_process_samples
 from .process import ProcessDetail, ProcessProfile, ProcessSample, profile_command
 from .report import format_comparison, format_process_profile
 from .result import BenchmarkResult, BenchmarkStats, SystemInfo
-from .runner import benchmark
+from .runner import benchmark, calibrate_loops
 from .suite import BenchmarkCase, BenchmarkSuite
 
 __all__ = [
@@ -33,9 +33,13 @@ __all__ = [
     "ProcessDetail",
     "ProcessProfile",
     "ProcessSample",
+    "StabilityReport",
     "SystemInfo",
     "Trend",
+    "analyze_stability",
     "benchmark",
+    "calibrate_loops",
+    "comparability_warnings",
     "capture_git_info",
     "compare_results",
     "format_comparison",
