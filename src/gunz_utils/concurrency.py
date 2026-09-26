@@ -48,4 +48,43 @@ async def map_concurrent(
     )
 
 
-__all__ = ["gather_limited", "map_concurrent"]
+async def map_unordered(
+    func: Callable[[T], Awaitable[R]],
+    items: Iterable[T],
+    *,
+    limit: int,
+) -> AsyncIterator[R]:
+    """Yield mapping results as soon as each bounded task completes."""
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+    iterator = iter(items)
+    pending: set[asyncio.Task[R]] = set()
+
+    def schedule_one() -> bool:
+        try:
+            item = next(iterator)
+        except StopIteration:
+            return False
+        pending.add(asyncio.create_task(func(item)))
+        return True
+
+    for _ in range(limit):
+        if not schedule_one():
+            break
+    try:
+        while pending:
+            done, pending = await asyncio.wait(
+                pending,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                yield task.result()
+                schedule_one()
+    finally:
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+
+
+__all__ = ["gather_limited", "map_concurrent", "map_unordered"]
