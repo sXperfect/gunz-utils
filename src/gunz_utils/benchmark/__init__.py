@@ -1,9 +1,15 @@
 """Cross-project benchmarking and profiling primitives."""
 
 from .compare import BenchmarkComparison, compare_results
+from .diagnostics import (
+    StabilityReport,
+    analyze_stability,
+    comparability_warnings,
+)
 from .export import save_process_csv, save_process_html
 from .history import BenchmarkHistory, HistoryPoint, Trend
 from .io import GitInfo, capture_git_info, load_result, save_result
+from .performance import PerformanceArtifact, PerformanceRun
 from .perf import (
     PerfCounter,
     PerfStatResult,
@@ -16,8 +22,9 @@ from .plot import plot_benchmark, plot_history, plot_process_samples
 from .process import ProcessDetail, ProcessProfile, ProcessSample, profile_command
 from .report import format_comparison, format_process_profile
 from .result import BenchmarkResult, BenchmarkStats, SystemInfo
-from .runner import benchmark, calibrate_loops
+from .runner import benchmark, benchmark_environment, calibrate_loops
 from .suite import BenchmarkCase, BenchmarkSuite
+from .worker import WorkerResult, run_python_worker, worker_json
 
 __all__ = [
     "BenchmarkCase",
@@ -28,6 +35,8 @@ __all__ = [
     "BenchmarkSuite",
     "GitInfo",
     "HistoryPoint",
+    "PerformanceArtifact",
+    "PerformanceRun",
     "PerfCounter",
     "PerfStatResult",
     "ProcessDetail",
@@ -36,8 +45,10 @@ __all__ = [
     "StabilityReport",
     "SystemInfo",
     "Trend",
+    "WorkerResult",
     "analyze_stability",
     "benchmark",
+    "benchmark_environment",
     "calibrate_loops",
     "comparability_warnings",
     "capture_git_info",
@@ -55,5 +66,7 @@ __all__ = [
     "profile_command",
     "save_process_csv",
     "save_process_html",
+    "run_python_worker",
     "save_result",
+    "worker_json",
 ]
