@@ -361,7 +361,22 @@ Program F. Histories, policies, reports and scaling analysis.
 
 Programs H + J. Backend interfaces, schema/API migration and release discipline.
 
-## Definition of done
+
+### M6 — Production hardening and self-measurement
+
+Close integration gaps left by M1–M5:
+
+- enforce benchmark public API integrity;
+- validate and migrate serialized PerformanceRun schemas;
+- verify artifact size/checksum integrity;
+- combine metric thresholds with comparability warnings in regression gates;
+- measure the benchmark framework's own overhead;
+- maintain contract tests for all of the above.
+
+Exit criterion: corrupted artifacts, unsupported schemas, broken exports, and
+environment-invalid regressions fail explicitly rather than producing plausible
+but misleading results.
+\n## Definition of done
 
 The subsystem is mature when:
 
