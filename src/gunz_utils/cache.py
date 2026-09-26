@@ -1,4 +1,3 @@
-                    hits += 1
 """Small TTL caches and asynchronous single-flight coordination."""
 
 from __future__ import annotations
@@ -45,10 +44,11 @@ def ttl_cache(
                 entry = cache.get(key)
                 if entry is not None and now - entry[0] <= ttl:
                     cache.move_to_end(key)
+                    hits += 1
                     return entry[1]
                 if entry is not None:
                     cache.pop(key, None)
-            misses += 1
+                misses += 1
             value = func(*args, **kwargs)
             with lock:
                 cache[key] = (time.monotonic(), value)
