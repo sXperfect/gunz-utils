@@ -6,6 +6,7 @@ The SecureStore implementation was promoted from
 ``hyperhedron_google.secure_store`` to ``gunz_utils.secure_store``;
 this test file followed.
 """
+import sqlite3
 import tempfile
 import unittest
 
@@ -162,7 +163,7 @@ class TestSecureStore(unittest.TestCase):
             with SecureStore(base_dir=tmp) as store:
                 store.unlock()
                 store.set("k", "v")
-            with self.assertRaises(Exception):
+            with self.assertRaises(sqlite3.ProgrammingError):
                 store.list_keys()
         finally:
             import shutil
