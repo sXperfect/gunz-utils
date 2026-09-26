@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .async_utils import cancel_and_wait, with_timeout
-from .cache import SingleFlight, ttl_cache
+from .cache import CacheInfo, SingleFlight, async_ttl_cache, ttl_cache
 from .collections import group_by, index_by, partition, unique
 from .concurrency import gather_limited, map_concurrent, map_unordered
 from .config import env_overrides, merge_configs
@@ -114,7 +114,9 @@ __all__ = [
     "monotonic_deadline",
     "remaining",
     "utc_now",
+    "CacheInfo",
     "SingleFlight",
+    "async_ttl_cache",
     "ttl_cache",
     "gather_limited",
     "map_concurrent",
