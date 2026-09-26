@@ -157,6 +157,8 @@ __all__ = [
     "file_hash",
     "first",
     "flatten",
+    "FailAfter",
+    "FaultSequence",
     "format_bytes",
     "format_count",
     "format_duration",
