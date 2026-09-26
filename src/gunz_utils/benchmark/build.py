@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 from .diagnostics import analyze_stability
 from .environment import capture_noise_info
 from .io import capture_git_info
