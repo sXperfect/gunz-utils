@@ -389,6 +389,31 @@ Integrate the measurement stack into reproducible experiments:
 
 Exit criterion: consumer repositories can execute parameter experiments and
 produce portable, self-describing run directories without custom orchestration.
+\n
+### M8–M10 — Data, filesystem and serialization foundation
+
+Completed with bounded structures, atomic/transactional filesystem primitives,
+JSONL streaming, canonical fingerprints and bounded stream hashing.
+
+### M11–M13 — Runtime, observability and configuration
+
+Completed with bounded worker pipelines/backpressure, dependency-free
+instrumentation, and typed configuration values with provenance.
+
+### M14–M15 — Security limits and deterministic testing
+
+Completed with reusable resource limits, manual time and seeded fuzz inputs.
+
+### M16–M18 — Acceleration boundary, binary data and resource lifecycle
+
+Completed with zero-copy buffer views, optional acceleration dispatch, bounded
+binary/varint primitives, and deterministic sync/async resource groups.
+
+### M19 — Package architecture
+
+Subsystem-first imports are the default. New subsystem APIs are not
+automatically added to the package root. See
+[`package-api-policy.md`](package-api-policy.md).
 \n## Definition of done
 
 The subsystem is mature when:
