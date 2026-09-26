@@ -31,6 +31,16 @@ def lexical_contained_path(root: str | Path, path: str | Path) -> Path:
     return Path(root) / supplied
 
 
+def lexical_contained_path(root: str | Path, path: str | Path) -> Path:
+    """Require a relative path to remain lexically below root."""
+    supplied = Path(path)
+    if supplied.is_absolute():
+        raise ValueError("path must be relative")
+    if any(part == ".." for part in supplied.parts):
+        raise ValueError("path escapes configured root")
+    return Path(root) / supplied
+
+
 def atomic_write_bytes(path: str | Path, data: bytes) -> None:
     """Write bytes using fsync + same-directory atomic replacement."""
     target = Path(path)
@@ -67,6 +77,11 @@ def transactional_directory(path: str | Path) -> Iterator[Path]:
 
 
 __all__ = [
+    "atomic_write_bytes",
+    "contained_path",
+    "lexical_contained_path",
+    "transactional_directory",
+]
     "atomic_write_bytes",
     "contained_path",
     "lexical_contained_path",
