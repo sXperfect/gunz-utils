@@ -80,6 +80,7 @@ def flatten(
     *,
     max_depth: int | None = None,
     types: tuple[type, ...] = (list, tuple),
+    max_nesting: int = 256,
 ) -> Iterator:
     """Recursively yield non-container items from a nested iterable.
 
@@ -121,6 +122,9 @@ def flatten(
     """
     if max_depth is not None and max_depth < 0:
         raise ValueError(f"max_depth must be non-negative, got {max_depth}")
+    if max_nesting <= 0:
+        raise ValueError(f"max_nesting must be positive, got {max_nesting}")
+    active: set[int] = set()
 
     def _walk(item: Any, depth: int) -> Iterator:
         #? Strict `>` (rather than `>=`) gives Lodash-compatible semantics:
@@ -131,10 +135,17 @@ def flatten(
             yield item
             return
         if isinstance(item, types):
-            #? isinstance narrows the runtime type but mypy can't infer it
-            #? across a tuple of arbitrary container types; explicit cast.
-            for sub in cast(Iterable[Any], item):
-                yield from _walk(sub, depth + 1)
+            if depth > max_nesting:
+                raise ValueError(f"maximum nesting depth exceeded ({max_nesting})")
+            identity = id(item)
+            if identity in active:
+                raise ValueError("cycle detected while flattening nested iterable")
+            active.add(identity)
+            try:
+                for sub in cast(Iterable[Any], item):
+                    yield from _walk(sub, depth + 1)
+            finally:
+                active.remove(identity)
         else:
             yield item
 
