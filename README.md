@@ -16,7 +16,7 @@
 | [`hashing`](src/gunz_utils/hashing.py) | `content_hash`, `file_hash`, `short_hash` — blake2b/sha256, constant-time compare | stdlib |
 | [`io`](src/gunz_utils/io.py) | `atomic_write` — crash-safe file writes with `os.replace` | stdlib |
 | [`iteration`](src/gunz_utils/iteration.py) | `chunked`, `batched`, `flatten`, `first` — lazy generators | stdlib |
-| [`models`](src/gunz_utils/models.py) | `GunzBaseModel` — `pydantic.BaseModel` configured to forbid extra fields | pydantic (core dep) |
+| [`models`](src/gunz_utils/models.py) | `GunzBaseModel` — `pydantic.BaseModel` configured to forbid extra fields | `validation` extra |
 | [`parsing`](src/gunz_utils/parsing.py) | `safe_int`, `safe_float`, `safe_bool`, `parse_bool` — strict coercion with diagnostics | stdlib |
 | [`redaction`](src/gunz_utils/redaction.py) | `redact`, `redact_dict` — pattern-based secret scrubbing | stdlib |
 | [`security`](src/gunz_utils/security.py) | `sanitize_filename`, `safe_path_join` — path traversal & reserved-name guards | stdlib |
@@ -148,6 +148,21 @@ Same story: moved to `ext.observability_loguru` and `ext.secure_crypto`,
 both reachable from the package surface (`setup_logging`, `encrypt`,
 `decrypt`, etc.).
 
+### Secure storage
+
+```python
+from gunz_utils import SecureStore
+
+with SecureStore(library_name="my-app") as store:
+    store.unlock(passphrase="use-a-secret-from-your-keyring")
+    store.set("service.token", "secret", acl=["cli"])
+    token = store.get("service.token", caller="cli")
+```
+
+The standalone AES helpers require an explicit passphrase. Legacy hostname-derived
+`aes256:` ciphertext is intentionally rejected and must be migrated with a
+trusted older client.
+
 ## Documentation
 
 ```bash
@@ -159,7 +174,7 @@ pip install .[docs]
 
 ```bash
 pip install -e ".[all]"   # editable install with everything
-pytest                    # run all tests (340+)
+pytest                    # run the full test suite
 ruff check src tests      # lint
 mypy src/gunz_utils       # type-check
 ```
