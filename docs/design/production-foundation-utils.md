@@ -45,3 +45,9 @@ measurement with adapters to mature specialist tools rather than reimplementing
 their deepest instrumentation. See
 [`benchmark-profiling-tool-landscape.md`](benchmark-profiling-tool-landscape.md)
 for reuse, reimplementation, integration, and performance decisions.
+
+## Long-horizon program
+
+Future work is organized by engineering properties and milestone exit criteria,
+not individual helper features. See
+[`long-horizon-engineering-roadmap.md`](long-horizon-engineering-roadmap.md).
