@@ -24,6 +24,8 @@ def env(
             raise KeyError(f"required environment variable {name!r} is not set")
         return type_cast(T, default)
     try:
+        if cast is None:
+            return type_cast(T, value)
         return cast(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"invalid value for environment variable {name!r}") from exc
