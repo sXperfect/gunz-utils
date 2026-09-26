@@ -218,13 +218,9 @@ def safe_path_join(base_dir: str, *paths: str) -> str:
         # leading slash.
         # Safest is to strip leading slashes/drive letters to force relative
         # join.
-        if os.path.isabs(p):
-            # Handle Windows drive letters (e.g. C:\) by splitting drive
-            # splitdrive returns ('', p) on non-Windows usually, or
-            # ('C:', '\path') on Windows
-            drive, p = os.path.splitdrive(p)
-            # Strip leading separators to ensure it's relative
-            p = p.lstrip(os.path.sep)
+        drive, _ = os.path.splitdrive(p)
+        if os.path.isabs(p) or drive:
+            raise ValueError("Absolute path components are not allowed")
 
         final_path = os.path.join(final_path, p)
 
