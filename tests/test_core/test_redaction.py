@@ -52,7 +52,7 @@ class TestRedact(unittest.TestCase):
         with self.assertRaises(ValueError):
             redact_dict({"password": "secret"}, show_chars=-1)
 
-    def test_show_chars_one(self):
+    def test_negative_show_chars_rejected(self):\n        with self.assertRaises(ValueError):\n            redact("secret", show_chars=-1)\n        with self.assertRaises(ValueError):\n            redact_dict({"password": "secret"}, show_chars=-1)\n\n    def test_show_chars_one(self):
         """``show_chars=1`` exposes a single character at each end."""
         self.assertEqual(redact("hunter2", show_chars=1), "h****2")
         # 2 chars total <= 2 * 1 -> fully masked.
