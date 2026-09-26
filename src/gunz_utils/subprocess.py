@@ -49,7 +49,7 @@ def run_command(
         timeout=timeout,
         check=False,
         cwd=cwd,
-        env=None if env is None else dict(env),
+        env=None if env is None else {**os.environ, **env},
     )
     result = CommandResult(
         args=tuple(args),
