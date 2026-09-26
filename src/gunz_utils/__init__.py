@@ -17,7 +17,6 @@ from .hashing import (
 )
 from .io import atomic_write
 from .iteration import batched, chunked, first, flatten
-from .models import GunzBaseModel
 from .parsing import parse_bool, safe_bool, safe_float, safe_int
 from .redaction import SECRET_PATTERNS, redact, redact_dict
 from .security import safe_path_join, sanitize_filename
@@ -35,6 +34,7 @@ from .upstream_protocol import (
 __version__ = "1.8.0"
 
 _LAZY: dict[str, str] = {
+    "GunzBaseModel": ".models",
     "type_checked": ".ext.validation_pydantic",
     "resolve_project_root": ".ext.project_gitpython",
     "setup_logging": ".ext.observability_loguru",
