@@ -47,7 +47,7 @@ from .upstream_protocol import (
     UpstreamUnavailableError,
 )
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
 
 _LAZY: dict[str, str] = {
     "GunzBaseModel": ".models",
