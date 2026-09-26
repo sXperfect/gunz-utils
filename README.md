@@ -122,6 +122,46 @@ print(f"Project at: {root}")
 
 `gunz_utils` also provides bounded async concurrency, generic retry/backoff, TTL caching with async single-flight, deterministic JSON serialization, and structured shell-free subprocess execution. Service-specific idempotency and retry policy remain consumer responsibilities.
 
+## Benchmarking and native profiling
+
+The `gunz_utils.benchmark` package provides a reusable benchmark SDK while each
+consumer repository owns its benchmark definitions and baselines.
+
+```python
+from gunz_utils.benchmark import benchmark, profile_command
+
+timing = benchmark(encode, payload, warmup=5, iterations=50)
+
+profile = profile_command(
+    ["./native-encoder", "input.bin"],
+    interval=0.01,
+)
+print(profile.wall_seconds, profile.peak_rss_bytes)
+```
+
+On Linux, `profile_command` samples the root command and all live descendants
+through `/proc`, including non-Python executables. Samples record aggregate RSS,
+user/system CPU time, physical read/write bytes, process count, and elapsed time.
+Because descendants can be short-lived between sampling intervals, use a suitably
+small interval for workloads that spawn very short processes.
+
+Plotting is optional:
+
+```bash
+pip install "gunz-utils[plot]"
+```
+
+```python
+from gunz_utils.benchmark import plot_benchmark, plot_process_samples
+
+plot_benchmark(timing).savefig("timing.png")
+plot_process_samples(profile, "rss_bytes").savefig("memory.png")
+plot_process_samples(profile, "cpu_user_seconds").savefig("cpu.png")
+```
+
+Raw samples and metadata should be retained as JSON artifacts so baseline and
+candidate runs can be compared reproducibly.
+
 ## Installation
 
 ```bash
