@@ -30,6 +30,37 @@ project benchmark/profile definition
        plots / HTML / CI gate
 ```
 
+
+## Native-Python reuse policy
+
+When an upstream tool is implemented primarily in Python and its useful
+mechanism can be reproduced cleanly with the standard library or existing
+Gunz dependencies, prefer implementing the mechanism directly in
+`gunz-utils` instead of introducing that project as a runtime dependency.
+
+This means studying public behavior, algorithms, formats, and documented
+methodology, then implementing a Gunz-native design rather than copying source.
+Preserve attribution and license obligations whenever code, data, or formats
+require them.
+
+Current decisions:
+
+- pyperf: implement calibration, worker isolation, warmup/stability diagnostics,
+  metadata and comparison mechanisms natively where practical.
+- pytest-benchmark: implement benchmark registration/result comparison concepts
+  without depending on pytest at runtime; optional pytest integration may remain
+  a development plugin.
+- ASV: implement lightweight history/trend/comparability mechanisms; do not
+  recreate its environment/build farm unless demanded.
+- pyperformance: do not vendor its benchmark corpus; corpus definitions are
+  separate project data.
+- Scalene: reuse documented concepts selectively, but do not attempt to
+  reproduce its specialized sampling engine merely because its control plane is
+  Python; native/runtime instrumentation remains specialist territory.
+- Memray and py-spy: keep as optional external profilers because their core
+  measurement mechanisms include native components and runtime-specific
+  instrumentation.
+
 ## Tool decisions
 
 | Tool | Reuse directly | Reimplement in gunz-utils | Do not duplicate |
