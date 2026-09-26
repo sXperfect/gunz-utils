@@ -1,3 +1,4 @@
+from .artifacts import register_artifact
 """Cross-project benchmarking and profiling primitives."""
 
 from .compare import BenchmarkComparison, compare_results
@@ -46,6 +47,9 @@ __all__ = [
     "StabilityReport",
     "SystemInfo",
     "Trend",
+    "WORKER_PROTOCOL_VERSION",
+    "WorkerRequest",
+    "WorkerResponse",
     "WorkerResult",
     "analyze_stability",
     "benchmark",
@@ -68,6 +72,7 @@ __all__ = [
     "plot_process_samples",
     "process_metrics",
     "profile_command",
+    "register_artifact",
     "scaling_efficiency",
     "save_process_csv",
     "save_process_html",
