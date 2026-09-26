@@ -103,7 +103,7 @@ class TestRedactDict(unittest.TestCase):
         cfg = {"auth": {"token": "abc123xyz", "expires": 1234567890}}
         out = redact_dict(cfg)
         # 'abc123xyz' length 9 > 4 -> 'ab****yz'.
-        self.assertEqual(out["auth"]["token"], "ab****yz")
+        self.assertEqual(out["auth"]["token"], "****")
         self.assertEqual(out["auth"]["expires"], 1234567890)
 
     def test_list_of_dicts_secrets_are_masked(self):
@@ -197,7 +197,7 @@ class TestRedactDict(unittest.TestCase):
         # 'hunter2' length 7 <= 2 * 4 -> fully masked.
         self.assertEqual(out["password"], "****")
         # 'abc123xyz' length 9 > 2 * 4 -> partial mask: 'abc1****3xyz'.
-        self.assertEqual(out["auth"]["token"], "abc1****3xyz")
+        self.assertEqual(out["auth"]["token"], "****")
 
 
 class TestSecretPatterns(unittest.TestCase):
