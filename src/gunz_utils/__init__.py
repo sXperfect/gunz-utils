@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .cache import SingleFlight, ttl_cache
+from .concurrency import gather_limited, map_concurrent
 from .dict_utils import deep_get, deep_merge, deep_set
 from .enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
 from .formatting import format_bytes, format_count, format_duration
@@ -19,6 +21,9 @@ from .io import atomic_write
 from .iteration import batched, chunked, first, flatten
 from .parsing import parse_bool, safe_bool, safe_float, safe_int
 from .redaction import SECRET_PATTERNS, redact, redact_dict
+from .retry import async_retry, retry
+from .serialization import canonical_json, json_dumps, json_loads, to_jsonable
+from .subprocess import CommandError, CommandResult, run_command, run_command_async
 from .security import open_path_under_base, safe_path_join, sanitize_filename
 from .timing import Timer, timer
 from .upstream_protocol import (
@@ -67,6 +72,20 @@ def __dir__() -> list[str]:
 
 
 __all__ = [
+    "SingleFlight",
+    "ttl_cache",
+    "gather_limited",
+    "map_concurrent",
+    "retry",
+    "async_retry",
+    "canonical_json",
+    "json_dumps",
+    "json_loads",
+    "to_jsonable",
+    "CommandError",
+    "CommandResult",
+    "run_command",
+    "run_command_async",
     "BaseIntEnum",
     "BaseStrEnum",
     "OptionalBaseStrEnum",
