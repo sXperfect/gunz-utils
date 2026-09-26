@@ -17,6 +17,7 @@ __license__ = "Clear BSD"
 import functools
 import os
 import re
+from typing import IO, Any
 
 # Pre-compile the regex for invalid characters (anything not alphanumeric, dot, or dash)
 # We use + to collapse multiple invalid characters in one go
@@ -243,7 +244,7 @@ def open_path_under_base(
     base_dir: str,
     *paths: str,
     mode: str = "rb",
-):
+) -> IO[Any]:
     """Open a contained path while rejecting symlinks in the final component.
 
     This helper reduces the check/open race present when callers separately use
