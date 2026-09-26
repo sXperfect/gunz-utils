@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, cast
 
 T = TypeVar("T")
 E = TypeVar("E")
@@ -39,7 +39,7 @@ class Result(Generic[T, E]):
         """Return the value or raise RuntimeError for an error result."""
         if not self._ok:
             raise RuntimeError(f"cannot unwrap error result: {self.error!r}")
-        return self.value  # type: ignore[return-value]
+        return cast(T, self.value)
 
 
 __all__ = ["Result"]
