@@ -1,3 +1,4 @@
+                    hits += 1
 """Small TTL caches and asynchronous single-flight coordination."""
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ def ttl_cache(
 
         @functools.wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+            nonlocal hits, misses
             key: Hashable = (args, tuple(sorted(kwargs.items())))
             try:
                 hash(key)
@@ -56,8 +58,15 @@ def ttl_cache(
             return value
 
         def cache_clear() -> None:
+            nonlocal hits, misses
             with lock:
                 cache.clear()
+                hits = 0
+                misses = 0
+
+        def cache_info() -> tuple[int, int, int, int]:
+            with lock:
+                return hits, misses, len(cache), maxsize
 
         setattr(wrapped, "cache_clear", cache_clear)
         setattr(wrapped, "cache_info", cache_info)
