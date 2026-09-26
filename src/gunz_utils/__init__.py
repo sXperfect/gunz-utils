@@ -45,7 +45,7 @@ from .subprocess import (
     run_command,
     run_command_async,
 )
-from .testing import eventually, temporary_env
+from .testing import eventually, eventually_async, temporary_env
 from .time_utils import expired, monotonic_deadline, remaining, utc_now
 from .timing import Timer, timer
 from .upstream_protocol import (
@@ -100,7 +100,7 @@ __all__ = [
     "index_by",
     "partition",
     "unique",
-    "env_overrides",
+    "env_overrides",\n    "correlation_id",\n    "ensure_correlation_id",\n    "operation_context",
     "merge_configs",
     "exception_dict",
     "env",
@@ -114,7 +114,7 @@ __all__ = [
     "CircuitOpenError",
     "CircuitState",
     "Result",
-    "eventually",
+    "eventually",\n    "eventually_async",
     "temporary_env",
     "expired",
     "monotonic_deadline",
