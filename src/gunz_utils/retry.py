@@ -20,6 +20,20 @@ def _delay(attempt: int, base_delay: float, max_delay: float, jitter: bool) -> f
     return random.uniform(0.0, delay) if jitter and delay else delay
 
 
+def _validate(
+    attempts: int,
+    base_delay: float,
+    max_delay: float,
+    timeout: float | None,
+) -> None:
+    if attempts < 1:
+        raise ValueError("attempts must be at least 1")
+    if base_delay < 0 or max_delay < 0:
+        raise ValueError("delays must be non-negative")
+    if timeout is not None and timeout < 0:
+        raise ValueError("timeout must be non-negative")
+
+
 def retry(
     *,
     attempts: int = 3,
@@ -29,16 +43,15 @@ def retry(
     jitter: bool = True,
     retry_if: RetryPredicate | None = None,
     on_retry: RetryHook | None = None,
+    timeout: float | None = None,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]:
-    """Retry a synchronous callable with bounded exponential backoff."""
-    if attempts < 1:
-        raise ValueError("attempts must be at least 1")
-    if base_delay < 0 or max_delay < 0:
-        raise ValueError("delays must be non-negative")
+    """Retry a synchronous callable within attempt and time budgets."""
+    _validate(attempts, base_delay, max_delay, timeout)
 
     def decorate(func: Callable[P, T]) -> Callable[P, T]:
         @functools.wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+            deadline = None if timeout is None else time.monotonic() + timeout
             for attempt in range(1, attempts + 1):
                 try:
                     return func(*args, **kwargs)
@@ -48,6 +61,10 @@ def retry(
                     ):
                         raise
                     delay = _delay(attempt, base_delay, max_delay, jitter)
+                    if deadline is not None:
+                        budget = deadline - time.monotonic()
+                        if budget <= 0 or delay > budget:
+                            raise
                     if on_retry is not None:
                         on_retry(exc, attempt, delay)
                     time.sleep(delay)
@@ -67,16 +84,15 @@ def async_retry(
     jitter: bool = True,
     retry_if: RetryPredicate | None = None,
     on_retry: RetryHook | None = None,
+    timeout: float | None = None,
 ) -> Callable[[Callable[P, Any]], Callable[P, Any]]:
-    """Retry an async callable while preserving cancellation."""
-    if attempts < 1:
-        raise ValueError("attempts must be at least 1")
-    if base_delay < 0 or max_delay < 0:
-        raise ValueError("delays must be non-negative")
+    """Retry an async callable within attempt and time budgets."""
+    _validate(attempts, base_delay, max_delay, timeout)
 
     def decorate(func: Callable[P, Any]) -> Callable[P, Any]:
         @functools.wraps(func)
         async def wrapped(*args: P.args, **kwargs: P.kwargs) -> Any:
+            deadline = None if timeout is None else time.monotonic() + timeout
             for attempt in range(1, attempts + 1):
                 try:
                     return await func(*args, **kwargs)
@@ -88,6 +104,10 @@ def async_retry(
                     ):
                         raise
                     delay = _delay(attempt, base_delay, max_delay, jitter)
+                    if deadline is not None:
+                        budget = deadline - time.monotonic()
+                        if budget <= 0 or delay > budget:
+                            raise
                     if on_retry is not None:
                         on_retry(exc, attempt, delay)
                     await asyncio.sleep(delay)
