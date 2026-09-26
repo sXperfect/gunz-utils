@@ -23,6 +23,7 @@ from .security import open_path_under_base, safe_path_join, sanitize_filename
 from .timing import Timer, timer
 from .upstream_protocol import (
     BaseUpstream,
+    PolicyUpstream,
     UpstreamAuthError,
     UpstreamClient,
     UpstreamError,
@@ -100,6 +101,7 @@ __all__ = [
     "timer",
     "UpstreamClient",
     "BaseUpstream",
+    "PolicyUpstream",
     "UpstreamError",
     "UpstreamTimeoutError",
     "UpstreamAuthError",
