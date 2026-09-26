@@ -17,7 +17,8 @@ from gunz_utils.time_utils import expired, monotonic_deadline, remaining, utc_no
 
 class TestCollections(unittest.TestCase):
     def test_transforms(self) -> None:
-        self.assertEqual(unique([1, 1, 2]), [1, 2])\n        self.assertEqual(unique([[1], [1], [2]]), [[1], [2]])
+        self.assertEqual(unique([1, 1, 2]), [1, 2])
+        self.assertEqual(unique([[1], [1], [2]]), [[1], [2]])
         self.assertEqual(group_by(["a", "bb"], len), {1: ["a"], 2: ["bb"]})
         self.assertEqual(index_by(["a", "bb"], len), {1: "a", 2: "bb"})
         self.assertEqual(partition(range(4), lambda x: x % 2 == 0), ([0, 2], [1, 3]))
@@ -40,7 +41,7 @@ class TestEnvConfig(unittest.TestCase):
             {"a": {"x": 1, "y": 2}},
         )
         self.assertEqual(
-            env_overrides({"APP_DB__HOST": "localhost"}, prefix="APP"),
+            env_overrides({"APP_DB__HOST": "localhost", "APPLE_X": "bad"}, prefix="APP"),
             {"db": {"host": "localhost"}},
         )
 
