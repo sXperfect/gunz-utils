@@ -350,6 +350,29 @@ class SecureStore:
             self._conn.execute("DELETE FROM secrets WHERE name = ?", (name,))
             self._audit(caller, "delete", name, True)
             return True
+    def set_many(
+        self,
+        values: dict[str, str | bytes],
+        *,
+        caller: str = "library",
+        acl: list[str] | None = None,
+    ) -> None:
+        """Store multiple values in one SQLite transaction."""
+        with self._lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                for name, value in values.items():
+                    self.set(name, value, caller=caller, acl=acl)
+                self._conn.execute("COMMIT")
+            except BaseException:
+                self._conn.execute("ROLLBACK")
+                raise
+
+    def get_many(
+        self, names: list[str], *, caller: str = "library"
+    ) -> dict[str, str | None]:
+        """Retrieve multiple UTF-8 text secrets."""
+        return {name: self.get(name, caller=caller) for name in names}
     def list_keys(
         self, *, caller: str = "library", acl_filter: bool = True
     ) -> list[SecretMetadata]:
@@ -421,6 +444,22 @@ class SecureStore:
         with self._fernet_lock:
             self._fernet = None
 
+    def audit_events(self, *, limit: int = 100) -> list[dict[str, object]]:
+        """Return the newest audit events without secret values."""
+        if limit <= 0 or limit > 10_000:
+            raise ValueError("limit must be in [1, 10000]")
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT timestamp, caller, action, secret_name, allowed "
+                "FROM audit ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def __enter__(self) -> "SecureStore":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
     def close(self) -> None:
         with self._lock:
             self._conn.close()
