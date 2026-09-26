@@ -3,9 +3,7 @@ name: CI
 on:
   push:
     branches: ["main", "develop"]
-  pull_request:
-    branches: ["main"]
-
+  workflow_dispatch:
 jobs:
   core:
     name: core (enums + security + upstream_protocol)
