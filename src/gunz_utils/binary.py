@@ -26,19 +26,29 @@ class ByteReader:
         return self.data[start:self.offset]
 
     def read_uvarint(self) -> int:
+        """Read a canonical unsigned 64-bit varint transactionally."""
+        start = self.offset
         value = shift = 0
-        for _ in range(10):
-            byte = int(self.read(1)[0])
-            value |= (byte & 0x7F) << shift
-            if not byte & 0x80:
-                return value
-            shift += 7
-        raise ValueError("varint is too long")
+        try:
+            for index in range(10):
+                byte = int(self.read(1)[0])
+                if index == 9 and byte > 1:
+                    raise ValueError("varint exceeds 64 bits")
+                value |= (byte & 0x7F) << shift
+                if not byte & 0x80:
+                    if index > 0 and byte == 0:
+                        raise ValueError("non-canonical varint")
+                    return value
+                shift += 7
+            raise ValueError("varint is too long")
+        except BaseException:
+            self.offset = start
+            raise
 
 
 def encode_uvarint(value: int) -> bytes:
-    if value < 0:
-        raise ValueError("unsigned varint cannot encode negative values")
+    if value < 0 or value > 2**64 - 1:
+        raise ValueError("unsigned varint requires a 64-bit unsigned integer")
     output = bytearray()
     while True:
         byte = value & 0x7F
