@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import unittest
 
 from gunz_utils.async_utils import cancel_and_wait, with_timeout
