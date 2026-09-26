@@ -7,15 +7,15 @@ from .result import BenchmarkResult, BenchmarkStats, SystemInfo
 from .runner import benchmark
 
 __all__ = [
-    "BenchmarkComparison",
+    "BenchmarkCase",\n    "BenchmarkComparison",\n    "BenchmarkSuite",\n    "GitInfo",
     "BenchmarkResult",
     "BenchmarkStats",
     "ProcessProfile",
     "ProcessSample",
     "SystemInfo",
     "benchmark",
-    "compare_results",
+    "capture_git_info",\n    "compare_results",\n    "format_comparison",\n    "format_process_profile",\n    "load_result",
     "plot_benchmark",
     "plot_process_samples",
-    "profile_command",
+    "profile_command",\n    "save_result",
 ]
