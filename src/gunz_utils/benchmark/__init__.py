@@ -40,6 +40,7 @@ from .report import format_comparison, format_process_profile
 from .result import BenchmarkResult, BenchmarkStats, SystemInfo
 from .run_directory import save_run_directory
 from .runner import benchmark, benchmark_environment, calibrate_loops
+from .safe_io import load_result_checked
 from .schema import migrate_performance_run, validate_performance_run
 from .suite import BenchmarkCase, BenchmarkSuite
 from .trends import HistorySummary, summarize_history
@@ -59,7 +60,7 @@ __all__ = [
     "capture_git_info", "capture_noise_info", "comparability_warnings",
     "compare_results", "default_sampler", "evaluate_metric",
     "evaluate_regression_gate", "format_comparison", "format_process_profile",
-    "load_result", "measure_runner_overhead", "migrate_performance_run",
+    "load_result", "load_result_checked", "measure_runner_overhead", "migrate_performance_run",
     "perf_available", "perf_metrics", "perf_record", "perf_script",
     "perf_stat", "plot_benchmark", "plot_history", "plot_process_samples",
     "process_metrics", "profile_command", "register_artifact",
