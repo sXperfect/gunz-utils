@@ -81,7 +81,7 @@ class TestSecurity(unittest.TestCase):
         for replacement in unsafe_replacements:
             with self.subTest(replacement=replacement):
                 with self.assertRaisesRegex(
-                    ValueError, "Replacement string contains path separators"
+                    ValueError, "Replacement string contains unsafe path characters"
                 ):
                     sanitize_filename("file*name.txt", replacement=replacement)
 
@@ -171,7 +171,7 @@ class TestSecurity(unittest.TestCase):
 
     def test_absolute_component_is_rejected(self):
         with self.assertRaises(ValueError):
-            safe_path_join(self.base_dir, "/etc/passwd")
+            safe_path_join("/tmp/base", "/etc/passwd")
 
 
 if __name__ == "__main__":
