@@ -81,8 +81,12 @@ def redact(value: object, *, show_chars: int = 2) -> object:
     >>> redact(12345)
     12345
     """
+    if show_chars < 0:
+        raise ValueError("show_chars must be non-negative")
     if not isinstance(value, str):
         return value
+    if show_chars == 0:
+        return _MASK
     # ? Strings at or below the "reveal both ends" threshold contain
     # ? almost no hidden material, so we collapse them to the full mask
     # ? rather than exposing prefix == suffix.
@@ -150,17 +154,29 @@ def redact_dict(
     """
     if patterns is None:
         patterns = SECRET_PATTERNS
-    if isinstance(d, dict):
-        return {
-            key: (
-                redact(value, show_chars=show_chars)
-                if _is_secret_key(key, patterns) and isinstance(value, str)
-                else redact_dict(value, patterns=patterns, show_chars=show_chars)
-            )
-            for key, value in d.items()
-        }
-    if isinstance(d, list):
-        return [
-            redact_dict(item, patterns=patterns, show_chars=show_chars) for item in d
-        ]
-    return d
+    if show_chars < 0:
+        raise ValueError("show_chars must be non-negative")
+
+    def _walk(value: object, secret_context: bool = False) -> object:
+        if secret_context:
+            if isinstance(value, dict):
+                return {key: _walk(item, True) for key, item in value.items()}
+            if isinstance(value, list):
+                return [_walk(item, True) for item in value]
+            if isinstance(value, tuple):
+                return tuple(_walk(item, True) for item in value)
+            if isinstance(value, (str, bytes, bytearray, memoryview)):
+                return _MASK
+            return value
+        if isinstance(value, dict):
+            return {
+                key: _walk(item, _is_secret_key(key, patterns))
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [_walk(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(_walk(item) for item in value)
+        return value
+
+    return _walk(d)
