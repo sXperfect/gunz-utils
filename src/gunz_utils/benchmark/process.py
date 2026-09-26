@@ -86,7 +86,14 @@ def _memory_rollup(path: Path) -> tuple[int | None, int | None]:
         return None, None
 
 
-def _linux_snapshot(root_pid: int, started: float) -> ProcessSample:
+def _linux_snapshot(
+    root_pid: int,
+    started: float,
+    *,
+    memory_detail: str = "pss",
+) -> ProcessSample:
+    if memory_detail not in {"rss", "pss", "full"}:
+        raise ValueError("memory_detail must be rss, pss, or full")
     proc = Path("/proc")
     if not proc.exists():
         raise NotImplementedError("process-tree profiling currently requires Linux")
@@ -128,7 +135,12 @@ def _linux_snapshot(root_pid: int, started: float) -> ProcessSample:
         pid_system = int(stat[14]) / ticks
         pid_rss = max(0, int(stat[23])) * page_size
         pid_threads = int(stat[19])
-        pss, private = _memory_rollup(proc / str(pid) / "smaps_rollup")
+        if memory_detail == "rss":
+            pss, private = None, None
+        else:
+            pss, private = _memory_rollup(proc / str(pid) / "smaps_rollup")
+            if memory_detail == "pss":
+                private = None
         command = stat[1].strip("()")
         user += pid_user
         system += pid_system
