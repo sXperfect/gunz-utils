@@ -68,6 +68,7 @@ __license__ = "Clear BSD"
 __version__ = "1.3.2"
 
 import abc
+import asyncio
 from typing import Any, Protocol, runtime_checkable
 
 # ---------------------------------------------------------------------------
@@ -233,6 +234,71 @@ class BaseUpstream(abc.ABC):
         return None
 
 
+class PolicyUpstream:
+    """Opt-in timeout, concurrency, and idempotent retry policy wrapper."""
+
+    def __init__(
+        self,
+        client: UpstreamClient,
+        *,
+        timeout_seconds: float = 30.0,
+        max_concurrency: int = 16,
+        max_attempts: int = 1,
+        idempotent_tools: frozenset[str] = frozenset(),
+    ) -> None:
+        if timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
+        if max_concurrency <= 0:
+            raise ValueError("max_concurrency must be positive")
+        if max_attempts <= 0:
+            raise ValueError("max_attempts must be positive")
+        self._client = client
+        self.name = client.name
+        self._timeout_seconds = timeout_seconds
+        self._max_attempts = max_attempts
+        self._idempotent_tools = idempotent_tools
+        self._semaphore = asyncio.Semaphore(max_concurrency)
+        self._stats = {"calls": 0, "retries": 0, "timeouts": 0, "failures": 0}
+
+    @property
+    def stats(self) -> dict[str, int]:
+        """Return a snapshot of policy counters."""
+        return dict(self._stats)
+
+    async def call(
+        self, tool_name: str, arguments: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Call an upstream with bounded concurrency and explicit retry safety."""
+        attempts = self._max_attempts if tool_name in self._idempotent_tools else 1
+        self._stats["calls"] += 1
+        async with self._semaphore:
+            for attempt in range(attempts):
+                try:
+                    async with asyncio.timeout(self._timeout_seconds):
+                        return await self._client.call(tool_name, arguments)
+                except TimeoutError as exc:
+                    self._stats["timeouts"] += 1
+                    raise UpstreamTimeoutError(
+                        f"upstream call timed out after {self._timeout_seconds}s",
+                        upstream=self.name,
+                        tool_name=tool_name,
+                    ) from exc
+                except UpstreamUnavailableError:
+                    if attempt + 1 >= attempts:
+                        self._stats["failures"] += 1
+                        raise
+                    self._stats["retries"] += 1
+        raise RuntimeError("unreachable retry state")
+
+    async def health_check(self) -> bool:
+        """Delegate the liveness probe."""
+        return await self._client.health_check()
+
+    async def close(self) -> None:
+        """Delegate resource cleanup."""
+        await self._client.close()
+
+
 __all__ = [
     "UpstreamError",
     "UpstreamTimeoutError",
@@ -241,4 +307,5 @@ __all__ = [
     "UpstreamUnavailableError",
     "UpstreamClient",
     "BaseUpstream",
+    "PolicyUpstream",
 ]
