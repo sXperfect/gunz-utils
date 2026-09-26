@@ -169,6 +169,10 @@ class TestSecurity(unittest.TestCase):
             else:
                 self.fail("ValueError not raised")
 
+    def test_absolute_component_is_rejected(self):
+        with self.assertRaises(ValueError):
+            safe_path_join(self.base_dir, "/etc/passwd")
+
 
 if __name__ == "__main__":
     unittest.main()
