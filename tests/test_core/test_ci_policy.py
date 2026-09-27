@@ -36,12 +36,13 @@ def test_ci_is_read_only_and_cancels_superseded_runs() -> None:
     assert "cancel-in-progress: true" in text
 
 
-def test_release_check_is_first_verification_command() -> None:
+def test_release_check_precedes_dependency_install_and_expensive_gates() -> None:
     text = _workflow_text()
     release = text.index("python scripts/release.py check")
+    install = text.index("python -m pip install pytest")
     lint = text.index("python -m ruff check")
     tests = text.index("python -m pytest")
-    assert release < lint < tests
+    assert release < install < lint < tests
 
 
 def test_legacy_docs_workflow_is_removed() -> None:
