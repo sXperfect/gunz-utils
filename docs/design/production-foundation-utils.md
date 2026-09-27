@@ -14,13 +14,21 @@ policy.
 | `retry` | Sync/async exponential retry with bounded delay and cancellation safety. |
 | `cache` | Bounded TTL memoization and async single-flight request coalescing. |
 | `serialization` | Stable JSON normalization for hashes, cache keys, and persistence. |
-| `subprocess` | Shell-free structured command execution with captured output and timing. |\n| `limits` | Stateless limits plus cumulative byte/item/depth/deadline budgets. |\n| `plugins` | Deterministic failure-isolated entry-point discovery. |\n| `provenance` | Runtime provenance with explicit environment allowlisting. |\n| `streaming` | Bounded writers, digest writers, and copy-and-hash primitives. |\n| `versioning` | Versioned payload envelopes and forward migration registry. |
+| `subprocess` | Shell-free structured command execution with captured output and timing. |
+| `limits` | Stateless limits plus cumulative byte/item/depth/deadline budgets. |
+| `plugins` | Deterministic failure-isolated entry-point discovery. |
+| `provenance` | Runtime provenance with explicit environment allowlisting. |
+| `streaming` | Bounded writers, digest writers, and copy-and-hash primitives. |
+| `versioning` | Versioned payload envelopes and forward migration registry. |
 
 ## Design constraints
 
 - The core remains standard-library only.
 - Retry never guesses whether an operation is idempotent; predicates and hooks let consumers classify and observe retries.
-- Async cancellation propagates rather than being converted into retries.\n- `map_unordered` bounds in-flight tasks and streams completion-order results for large workloads.\n- TTL caches expose lightweight hit/miss/size statistics and can be cleared explicitly.\n- Rate limiters expose an estimated available-token balance for diagnostics.
+- Async cancellation propagates rather than being converted into retries.
+- `map_unordered` bounds in-flight tasks and streams completion-order results for large workloads.
+- TTL caches expose lightweight hit/miss/size statistics and can be cleared explicitly.
+- Rate limiters expose an estimated available-token balance for diagnostics.
 - Single-flight shields shared work from cancellation by one waiter.
 - Canonical JSON sorts mapping keys, rejects non-finite floats, and does not
   silently encode bytes.
@@ -51,4 +59,8 @@ for reuse, reimplementation, integration, and performance decisions.
 Future work is organized by engineering properties and milestone exit criteria,
 not individual helper features. See
 [`long-horizon-engineering-roadmap.md`](long-horizon-engineering-roadmap.md).
-\n\n## Cross-project foundation boundary\n\nHyperion and Helios-JS may depend on these mechanism-level primitives. Domain-specific crawler state, JavaScript IR, bundler semantics, protocol inference, HTTP policy, and application schemas remain in their owning repositories.\n
+
+
+## Cross-project foundation boundary
+
+Hyperion and Helios-JS may depend on these mechanism-level primitives. Domain-specific crawler state, JavaScript IR, bundler semantics, protocol inference, HTTP policy, and application schemas remain in their owning repositories.
