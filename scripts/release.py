@@ -24,7 +24,10 @@ VERSION_LITERAL_RE = re.compile(
     r'^\s*__version__\s*=\s*["\']\d+\.\d+\.\d+["\']\s*$',
     re.MULTILINE,
 )
-CHANGELOG_HEADING_RE = re.compile(r"^## \[(?P<version>[^]]+)\](?:\s+—\s+.+)?$", re.MULTILINE)
+CHANGELOG_HEADING_RE = re.compile(
+    r"^## \\[(?P<version>[^]]+)\\](?:\\s+—\\s+.+)?$",
+    re.MULTILINE,
+)
 UNRELEASED_SECTION_RE = re.compile(
     r"^## \[Unreleased\]\s*\n(?P<body>.*?)(?=^## \[)",
     re.MULTILINE | re.DOTALL,
@@ -69,7 +72,7 @@ CATEGORY_BUMP = {
 }
 UNRELEASED_NOTE = (
     "Unreleased changes are collected as conflict-free fragments in "
-    "\`changes/\`. Run \`python scripts/release.py status\` to inspect them."
+    "`changes/`. Run `python scripts/release.py status` to inspect them."
 )
 
 
@@ -155,7 +158,10 @@ class ReleaseRepo:
                     "expected <id>.<category>.md"
                 )
             identifier, category = stem.rsplit(".", 1)
-            if not identifier or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", identifier):
+            valid_identifier = re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9._-]*", identifier
+            )
+            if not identifier or valid_identifier is None:
                 raise ReleaseError(f"invalid fragment id in {path.name!r}")
             if category not in CATEGORY_TITLES:
                 allowed = ", ".join(CATEGORY_ORDER)
@@ -248,7 +254,9 @@ class ReleaseRepo:
         else:
             changelog_text = self.changelog.read_text(encoding="utf-8")
             if UNRELEASED_SECTION_RE.search(changelog_text) is None:
-                errors.append("CHANGELOG.md must contain a top-level [Unreleased] section")
+                errors.append(
+                    "CHANGELOG.md must contain a top-level [Unreleased] section"
+                )
 
             seen: set[str] = set()
             for match in CHANGELOG_HEADING_RE.finditer(changelog_text):
@@ -288,7 +296,12 @@ class ReleaseRepo:
 
         if self.sphinx_conf.is_file():
             conf_text = self.sphinx_conf.read_text(encoding="utf-8")
-            if re.search(r"^release\s*=\s*['\"]\d+\.\d+\.\d+['\"]", conf_text, re.MULTILINE):
+            static_release = re.search(
+                r"^release\\s*=\\s*[\'\\"]\\d+\\.\\d+\\.\\d+[\'\\"]",
+                conf_text,
+                re.MULTILINE,
+            )
+            if static_release is not None:
                 errors.append("docs/source/conf.py contains a static release version")
 
         tags = self._git_tags()
@@ -324,7 +337,10 @@ class ReleaseRepo:
         required = self.required_bump(fragments)
 
         print(f"Current version:       {current}")
-        print(f"Latest Git tag:        v{tags[-1]}" if tags else "Latest Git tag:        unavailable")
+        if tags:
+            print(f"Latest Git tag:        v{tags[-1]}")
+        else:
+            print("Latest Git tag:        unavailable")
         print(f"Unreleased fragments:  {len(fragments)}")
         for category in CATEGORY_ORDER:
             if counts[category]:
@@ -471,7 +487,10 @@ class ReleaseRepo:
 
         print(f"Prepared release {target}.")
         print(f"Recommended commit: chore(release): v{target}")
-        print(f"After merge and verification, create tag v{target} and a matching GitHub Release.")
+        print(
+            f"After merge and verification, create tag v{target} and a matching "
+            "GitHub Release."
+        )
         return 0
 
     def verify(self) -> int:
@@ -493,7 +512,12 @@ class ReleaseRepo:
             )
             return 1
         text = self.changelog.read_text(encoding="utf-8")
-        if re.search(rf"^## \[{re.escape(str(current))}\]\b", text, re.MULTILINE) is None:
+        release_heading = re.search(
+            rf"^## \\[{re.escape(str(current))}\\]\\b",
+            text,
+            re.MULTILINE,
+        )
+        if release_heading is None:
             print(
                 f"ERROR: CHANGELOG.md has no [{current}] release entry",
                 file=sys.stderr,
