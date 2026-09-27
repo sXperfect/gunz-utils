@@ -32,6 +32,17 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
         result = await gather_limited([fail()], limit=1, return_exceptions=True)
         self.assertIsInstance(result[0], ValueError)
 
+    async def test_return_exceptions_does_not_swallow_cancellation(self) -> None:
+        async def cancel() -> int:
+            raise asyncio.CancelledError
+
+        with self.assertRaises(asyncio.CancelledError):
+            await gather_limited(
+                [cancel()],
+                limit=1,
+                return_exceptions=True,
+            )
+
     async def test_invalid_limit(self) -> None:
         with self.assertRaises(ValueError):
             await gather_limited([], limit=0)
