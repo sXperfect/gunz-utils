@@ -36,14 +36,16 @@ class VersionedEnvelope:
         }
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "VersionedEnvelope":
+    def from_dict(cls, value: Mapping[str, Any]) -> VersionedEnvelope:
         """Validate and reconstruct an envelope from a mapping."""
         try:
             schema = value["schema"]
             version = value["version"]
             payload = value["payload"]
         except KeyError as exc:
-            raise SchemaMigrationError(f"missing envelope field: {exc.args[0]}") from None
+            raise SchemaMigrationError(
+                f"missing envelope field: {exc.args[0]}"
+            ) from None
         metadata = value.get("metadata", {})
         if not isinstance(schema, str):
             raise SchemaMigrationError("schema must be a string")
@@ -63,7 +65,12 @@ class SchemaMigrator:
     def __init__(self) -> None:
         self._migrations: dict[tuple[str, int], Migration] = {}
 
-    def register(self, schema: str, from_version: int, migration: Migration) -> None:
+    def register(
+        self,
+        schema: str,
+        from_version: int,
+        migration: Migration,
+    ) -> None:
         """Register a migration from version N to N+1."""
         if not schema:
             raise ValueError("schema must not be empty")
@@ -71,7 +78,10 @@ class SchemaMigrator:
             raise ValueError("from_version must be at least 1")
         key = (schema, from_version)
         if key in self._migrations:
-            raise ValueError(f"migration already registered for {schema!r} v{from_version}")
+            raise ValueError(
+                f"migration already registered for {schema!r} "
+                f"v{from_version}"
+            )
         self._migrations[key] = migration
 
     def migrate(
@@ -89,7 +99,8 @@ class SchemaMigrator:
             migration = self._migrations.get((envelope.schema, version))
             if migration is None:
                 raise SchemaMigrationError(
-                    f"missing migration for {envelope.schema!r} v{version} -> v{version + 1}"
+                    f"missing migration for {envelope.schema!r} "
+                    f"v{version} -> v{version + 1}"
                 )
             payload = migration(payload)
             version += 1
