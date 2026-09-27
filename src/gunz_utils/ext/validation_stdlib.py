@@ -16,8 +16,6 @@ aliases, TypeVar resolution.
 """
 from __future__ import annotations
 
-from .._version import __version__
-
 # =============================================================================
 # METADATA
 # =============================================================================
@@ -27,6 +25,8 @@ __license__ = "Clear BSD"
 import functools
 import inspect
 import typing as t
+
+from .._version import __version__
 
 __all__ = ["type_checked"]
 

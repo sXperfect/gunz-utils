@@ -11,8 +11,6 @@ Public surface
   the workspace.
 """
 
-from ._version import __version__
-
 # =============================================================================
 # METADATA
 # =============================================================================
@@ -27,6 +25,8 @@ __license__ = "Clear BSD"
 # THIRD-PARTY IMPORTS
 # =============================================================================
 from pydantic import BaseModel, ConfigDict
+
+from ._version import __version__
 
 
 class GunzBaseModel(BaseModel):

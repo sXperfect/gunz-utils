@@ -6,8 +6,6 @@ No gitpython import, no loguru import.
 """
 from __future__ import annotations
 
-from .._version import __version__
-
 # =============================================================================
 # METADATA
 # =============================================================================
@@ -18,6 +16,8 @@ import functools
 import pathlib
 import subprocess
 import sys
+
+from .._version import __version__
 
 __all__ = ["resolve_project_root"]
 

@@ -1,5 +1,3 @@
-from .._version import __version__
-
 """
 Cryptographic utilities for AES-256-GCM.
 Compatible with HyperHedron CLI's TypeScript implementation.
@@ -17,6 +15,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+from .._version import __version__
 
 # Constants matching TypeScript implementation
 IV_LENGTH = 12

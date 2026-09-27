@@ -1,5 +1,3 @@
-from .._version import __version__
-
 """
 Standardized logging for HyperHedron components.
 """
@@ -14,6 +12,8 @@ import sys
 from pathlib import Path
 
 from loguru import logger
+
+from .._version import __version__
 
 
 def setup_logging(
