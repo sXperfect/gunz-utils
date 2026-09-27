@@ -13,7 +13,7 @@
 | [`enums`](src/gunz_utils/enums.py) | `BaseStrEnum`, `BaseIntEnum`, `OptionalBaseStrEnum` — fuzzy lookup, aliases, safe `get_or_none`, DoS-bounded input length | stdlib |
 | [`dict_utils`](src/gunz_utils/dict_utils.py) | `deep_get`, `deep_set`, `deep_merge` for nested dicts | stdlib |
 | [`formatting`](src/gunz_utils/formatting.py) | `format_bytes`, `format_duration`, `format_count` — human-readable sizes | stdlib |
-| [`hashing`](src/gunz_utils/hashing.py) | `content_hash`, `file_hash`, `short_hash` — blake2b/sha256, constant-time compare | stdlib |
+| [`hashing`](src/gunz_utils/hashing.py) | `content_hash`, `file_hash`, `short_hash` — deterministic content/file digests | stdlib |
 | [`io`](src/gunz_utils/io.py) | `atomic_write`, `atomic_json_write` — crash-safe deterministic output | stdlib |
 | [`iteration`](src/gunz_utils/iteration.py) | `chunked`, `batched`, `flatten`, `first` — lazy generators | stdlib |
 | [`cache`](src/gunz_utils/cache.py) | TTL memoization + async `SingleFlight` request coalescing | stdlib |
@@ -80,8 +80,8 @@ format_count(1_234_567)     # "1.23M"
 ```python
 from gunz_utils import atomic_write, content_hash
 
-atomic_write("/tmp/report.json", b'{"ok": true}')
-digest = content_hash(b"hello")  # blake2b hex digest
+atomic_write("/tmp/report.json", '{"ok": true}')
+digest = content_hash(b"hello")  # sha256 hex digest
 ```
 
 ### Redaction
