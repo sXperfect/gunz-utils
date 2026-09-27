@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import _version
 from .async_utils import cancel_and_wait, with_timeout
 from .cache import CacheInfo, SingleFlight, async_ttl_cache, ttl_cache
 from .collections import group_by, index_by, partition, unique
@@ -64,7 +63,15 @@ from .upstream_protocol import (
 )
 
 
-__version__ = _version.__version__
+
+def _resolve_package_version() -> str:
+    """Return the shared installed-distribution version."""
+    from ._version import __version__
+
+    return __version__
+
+
+__version__ = _resolve_package_version()
 
 
 _LAZY: dict[str, str] = {
