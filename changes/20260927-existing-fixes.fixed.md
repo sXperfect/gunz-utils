@@ -1,0 +1,1 @@
+- Removed duplicated validation branches in secret redaction.
