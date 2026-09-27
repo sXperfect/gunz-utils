@@ -11,6 +11,14 @@ class SchemaMigrationError(ValueError):
     """Raised when a versioned payload cannot be validated or migrated."""
 
 
+def _validate_version(value: object, *, name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"{name} must be an integer")
+    if value < 1:
+        raise ValueError(f"{name} must be at least 1")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class VersionedEnvelope:
     """Wrap a payload with a stable schema name and positive integer version."""
@@ -21,10 +29,14 @@ class VersionedEnvelope:
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if not isinstance(self.schema, str):
+            raise TypeError("schema must be a string")
         if not self.schema:
             raise ValueError("schema must not be empty")
-        if self.version < 1:
-            raise ValueError("version must be at least 1")
+        _validate_version(self.version, name="version")
+        if not isinstance(self.metadata, Mapping):
+            raise TypeError("metadata must be a mapping")
+        object.__setattr__(self, "metadata", dict(self.metadata))
 
     def to_dict(self) -> dict[str, Any]:
         """Return an envelope mapping suitable for JSON normalization."""
@@ -51,6 +63,8 @@ class VersionedEnvelope:
             raise SchemaMigrationError("schema must be a string")
         if not isinstance(version, int) or isinstance(version, bool):
             raise SchemaMigrationError("version must be an integer")
+        if version < 1:
+            raise SchemaMigrationError("version must be at least 1")
         if not isinstance(metadata, Mapping):
             raise SchemaMigrationError("metadata must be a mapping")
         return cls(schema, version, payload, dict(metadata))
@@ -72,10 +86,13 @@ class SchemaMigrator:
         migration: Migration,
     ) -> None:
         """Register a migration from version N to N+1."""
+        if not isinstance(schema, str):
+            raise TypeError("schema must be a string")
         if not schema:
             raise ValueError("schema must not be empty")
-        if from_version < 1:
-            raise ValueError("from_version must be at least 1")
+        _validate_version(from_version, name="from_version")
+        if not callable(migration):
+            raise TypeError("migration must be callable")
         key = (schema, from_version)
         if key in self._migrations:
             raise ValueError(
@@ -91,6 +108,7 @@ class SchemaMigrator:
         target_version: int,
     ) -> VersionedEnvelope:
         """Migrate an envelope forward to target_version."""
+        _validate_version(target_version, name="target_version")
         if target_version < envelope.version:
             raise SchemaMigrationError("schema downgrades are not supported")
         payload = envelope.payload
