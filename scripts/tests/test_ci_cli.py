@@ -1,7 +1,7 @@
 """Narrow subprocess/argument tests for the local CI dispatcher.
 
 These intentionally do NOT run the full 712-test suite. They exercise command
-dispatch, unknown-command handling, exit-status propagation, the import-origin
+dispatch, unknown-command handling, exit-status propagation, release metadata,
 guard, and the packaging isolation-matrix loop (with the heavy venv case
 functions stubbed, so no network and no fresh venvs are created).
 
@@ -41,7 +41,7 @@ def _run_cli(*args: str) -> subprocess.CompletedProcess:
 def test_cli_help_lists_all_gates() -> None:
     result = _run_cli("--help")
     assert result.returncode == 0
-    for gate in ("test", "lint", "docs", "packaging", "all"):
+    for gate in ("release", "lint", "test", "docs", "packaging", "all"):
         assert gate in result.stdout
 
 
@@ -121,15 +121,15 @@ def test_all_stops_on_first_failure(monkeypatch) -> None:
     ci = _load_ci()
     calls: list[str] = []
 
-    def fake_test() -> int:
-        calls.append("test")
+    def fake_release() -> int:
+        calls.append("release")
         return 1
 
     def fake_lint() -> int:
         calls.append("lint")
         return 0
 
-    monkeypatch.setattr(ci, "run_test", fake_test)
+    monkeypatch.setattr(ci, "run_release", fake_release)
     monkeypatch.setattr(ci, "run_lint", fake_lint)
     assert ci.run_all() == 1
-    assert calls == ["test"]
+    assert calls == ["release"]
