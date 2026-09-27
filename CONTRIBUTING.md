@@ -111,6 +111,8 @@ When changing public APIs:
 
 ## Security and repository hygiene
 
+For suspected vulnerabilities, follow [SECURITY.md](SECURITY.md) rather than opening a public issue or pull request with exploit details.
+
 - Never commit credentials, tokens, private keys, or secret-bearing fixtures.
 - Use the redaction helpers for logs and diagnostics that may contain sensitive
   values.

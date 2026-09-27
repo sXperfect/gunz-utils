@@ -32,6 +32,7 @@ Project
 
 * `Source repository <https://github.com/sXperfect/gunz-utils>`_
 * `Changelog <https://github.com/sXperfect/gunz-utils/blob/main/CHANGELOG.md>`_
+* `Security policy <https://github.com/sXperfect/gunz-utils/blob/main/SECURITY.md>`_
 * `Contributing <https://github.com/sXperfect/gunz-utils/blob/main/CONTRIBUTING.md>`_
 
 Indices and tables

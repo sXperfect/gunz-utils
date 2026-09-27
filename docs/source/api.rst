@@ -173,6 +173,153 @@ These modules have no third-party runtime dependencies.
    :show-inheritance:
 
 
+
+Additional stable subsystem namespaces
+--------------------------------------
+
+The package follows a namespace-first public API policy. These top-level
+modules expose stable subsystem contracts without bulk-exporting every symbol
+from :mod:`gunz_utils`.
+
+.. automodule:: gunz_utils.async_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.binary
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.buffers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.cache
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.collections
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.concurrency
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.context
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.deprecation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.diagnostics
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.env
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.faults
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.fs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.identifiers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.pipeline
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.rate_limit
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.resilience
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.resources
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.result
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.serialization
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.subprocess
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.testing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.testkit
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.time_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.typed_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Benchmarking namespace
+----------------------
+
+The benchmark package exposes its supported API through
+:mod:`gunz_utils.benchmark`.
+
+.. automodule:: gunz_utils.benchmark
+   :members:
+   :imported-members:
+   :undoc-members:
+   :show-inheritance:
+
+
 Optional backends (``gunz_utils.ext.*``)
 ----------------------------------------
 

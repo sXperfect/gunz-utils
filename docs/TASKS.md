@@ -1,15 +1,11 @@
 # Task Index
 
-Active and pending tasks for the `gunz-utils` project. Done/archived tasks live in
-[`docs/TASKS_ARCHIVE.md`](TASKS_ARCHIVE.md). Detailed files for each task live
-under `docs/tasks/{pending,active,done}/`.
+Active and pending work for `gunz-utils`. Task-record conventions are described
+in [`docs/tasks/README.md`](tasks/README.md); completed work is indexed in
+[`docs/TASKS_ARCHIVE.md`](TASKS_ARCHIVE.md).
 
 | Task ID | Date | Description | Status |
-|:---:|:---:|:---|:---:|
+|:---|:---:|:---|:---:|
 | [reusable-runtime-primitives](tasks/active/2026.09.27-gunz_utils-reusable_runtime_primitives.md) | 2026-09-27 | Extract dependency-free reusable primitives from gunz-ml | Active |
 
-> All four 2026-08-26 CI/protocol tasks landed. See [`docs/TASKS_ARCHIVE.md`](TASKS_ARCHIVE.md) for the Done records (3 implemented + 1 deliberate no-op).
-
-> Latest archived: [`2026-09-27-shared-foundation`](tasks/done/2026.09.27-core-shared_foundation.md).
->
-> Previously archived: [`2026-08-06-add-hashing`](tasks/done/2026-08-06-add-hashing.md) (and 2 sibling tasks: dict-utils, iteration) (2026-08-06) — added 3 utility modules (hashing, dict_utils, iteration). 5 commits landed, v1.8.0 release. Test count: 206 → 330 (+124).
+There are currently no pending task files.

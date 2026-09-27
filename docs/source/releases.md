@@ -13,6 +13,11 @@ The canonical maintainer workflow is documented in
 - Tags and GitHub Releases are created only after the release commit is merged
   and verified on `main`.
 
-The historical audit is kept in `docs/development/release-history.md`. In
-particular, old source versions without matching tags are not backfilled
-automatically.
+The current tagged version is `v1.11.0`. Its tag points to the matching
+`chore(release): v1.11.0` commit. A GitHub Release has not yet been published
+for that tag, so that publication step remains operational follow-up rather than
+something to reconstruct with a new tag.
+
+The historical audit is kept in
+`docs/development/release-history.md`. Historical source versions without
+matching tags are not backfilled automatically.

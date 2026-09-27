@@ -168,6 +168,10 @@ rather than editing the top of `CHANGELOG.md` directly. See
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor workflow.
 
+## Security
+
+Report suspected vulnerabilities privately using [SECURITY.md](SECURITY.md). Do not open a public issue for an undisclosed security vulnerability.
+
 ## License
 
 Clear BSD. See [LICENSE.md](LICENSE.md).

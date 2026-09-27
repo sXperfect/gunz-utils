@@ -1,0 +1,1 @@
+- Publish a PEP 561 `py.typed` marker and complete public namespace API-reference coverage for downstream users and type checkers.

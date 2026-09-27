@@ -226,6 +226,7 @@ def _case_zero_dep() -> int:
     code = (
         "import sys\n"
         "import gunz_utils\n"
+        "from pathlib import Path\n"
         f"sp = {str(sp)!r}\n"
         f"forbidden = {sorted(FORBIDDEN_OPTIONAL_MODULES)!r}\n"
         "if not str(gunz_utils.__file__).startswith(sp):\n"
@@ -337,6 +338,7 @@ def _case_wheel_sdist() -> int:
     OUTSIDE_CWD.mkdir(parents=True, exist_ok=True)
     code = (
         "import sys\n"
+        "from pathlib import Path\n"
         "import gunz_utils\n"
         f"sp = {str(sp)!r}\n"
         "p = str(gunz_utils.__file__)\n"
@@ -344,7 +346,10 @@ def _case_wheel_sdist() -> int:
         "if not p.startswith(sp):\n"
         "    sys.exit('wheel: source shadowing! gunz_utils '\n"
         "             'resolved outside venv: ' + p)\n"
-        "print('wheel/sdist OK: installed artifact import origin verified')\n"
+        "marker = Path(gunz_utils.__file__).parent / 'py.typed'\n"
+        "if not marker.is_file():\n"
+        "    sys.exit('wheel: missing PEP 561 marker: ' + str(marker))\n"
+        "print('wheel/sdist OK: installed artifact + py.typed verified')\n"
     )
     return _run_venv([str(install_py), "-c", code], cwd=OUTSIDE_CWD)
 

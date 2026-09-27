@@ -1,45 +1,55 @@
 # Task Archive
 
-Historical record of completed tasks for the `gunz-utils` project. Detailed
-files for each task live under `docs/tasks/done/`.
+This index preserves completed engineering task records for `gunz-utils`.
+Detailed files under `docs/tasks/done/` are historical evidence: they may
+reference superseded tools, workflows, paths, policies, or repository states and
+must not be treated as current contributor instructions.
 
-| Task ID | Date | Description | Status |
-|:---:|:---:|:---|:---:|
-| [repair-suite-regressions](tasks/done/2026.09.27-gunz_utils-repair_suite_regressions.md) | 2026-09-27 | Repaired benchmark, profiling, resilience, and stale tests; complete suite passes | Done |
-| [integrate-all-branches](tasks/done/2026.09.27-protocol-integrate_all_branches.md) | 2026-09-27 | Integrated all branches; repaired core imports, validated in hyperion, recorded remaining regression failures | Done |
-| [2024-05-24-windows-reserved](tasks/done/2024-05-24-security-fix_windows_reserved_filenames.md) | 2024-05-24 | Fix Windows Reserved Filenames Vulnerability in `sanitize_filename` | Done |
-| [2025-02-18-safe-path-join](tasks/done/2025-02-18-security-add_safe_path_join.md) | 2025-02-18 | Add `safe_path_join` security utility to prevent path traversal | Done |
-| [2025-02-18-reserved-replacement](tasks/done/2025-02-18-security-fix_reserved_filename_replacement.md) | 2025-02-18 | Fix bypass of reserved filename check via empty `replacement` | Done |
-| [2025-02-18-dos-enum](tasks/done/2025-02-18-enums-fix_dos_input_length.md) | 2025-02-18 | DoS protection in Enum utilities via input length validation | Done |
-| [2025-10-18-fuzzy-lookup](tasks/done/2025-10-18-enums-perf_optimize_fuzzy_lookup.md) | 2025-10-18 | Optimize `BaseStrEnum` fuzzy matching by caching raw values | Done |
-| [2025-10-27-enum-access](tasks/done/2025-10-27-enums-perf_optimize_attribute_access.md) | 2025-10-27 | Optimize Enum attribute access (`__ALIASES__`, lazy maps) | Done |
-| [2025-12-24-leak](tasks/done/2025-12-24-validation-fix_prevent_information_leakage.md) | 2025-12-24 | Prevent information leakage in `type_checked` validation errors | Done |
-| [2026-07-01-deps-split](tasks/done/2026-07-01-build-deps_split_v1.3.0.md) | 2026-07-01 | v1.3.0 dependency split: `gunz_utils.ext.*` modules with stdlib fallbacks, CI job matrix, test reorganization | Done |
-| [2026-07-15-tier1-cleanup](tasks/done/2026-07-15-protocol-tier1_cleanup_housekeeping.md) | 2026-07-15 | Tier 1 cleanup housekeeping: ruff config, delete dead-duplicate src files, validation compat shim, delete legacy flat test, delete orphan tag | Done |
-| [2026-04-28-test-improvements](tasks/done/2026-04-28-gunz_utils-test_improvements.md) | 2026-07-16 | Test improvements: dedicated `project.py` tests, comprehensive `validation.py` coverage, encoding-header cleanup. Archived with two defect-fix commits (`67f108b` legacy flat test removal + `12f4240` encoding-header strip) | Done |
-| [2026-04-28-docs-improvement](tasks/done/2026-04-28-gunz_utils-docs_improvement.md) | 2026-07-16 | Original docs-improvement checklist (Phase 1 api.rst coverage) — replaced by [`2026-07-16-docs-pipeline-repair`](tasks/active/2026-07-16-docs-pipeline-repair.md) after forensic review found `deploy_docs.yml` was installing `.[all]` instead of `.[docs]`, breaking CI on every push | Done (replaced) |
-| [2026-04-28-py-v6](tasks/done/2026-04-28-gunz_utils-python-v6_0-compliance.md) | 2026-07-16 | Python v6.0 compliance: full dunder block on all 13 modules, drop `# -*- coding: utf-8 -*-` from 3 files, replace `t.Optional` / `typing.Optional` / `typing.Dict` with modern `X | None` / `dict[str, Any]` syntax across 4 files | Done |
-| [2026-07-16-validation-migration](tasks/done/2026-07-16-validation-migration.md) | 2026-07-16 | Migrate `tests/test_validation_leak.py` and `docs/source/quickstart.md` from `gunz_utils.validation` compat shim to canonical `gunz_utils.ext.validation_pydantic` path. 1 commit at `494c885`. | Done |
-| [2026-07-16-validation-shim-removal](tasks/done/2026-07-16-validation-shim-removal.md) | 2026-07-16 | Delete `src/gunz_utils/validation.py` compat shim after caller migration. Public API still works via `_LAZY` dict in `__init__.py`. 1 commit at `36945a6`. **Breaking change** for external consumers using `from gunz_utils.validation import ...` — coordinate with release notes. | Done |
-| [2026-07-16-untrack-sphinx-build-artifacts](tasks/done/2026-07-16-untrack-sphinx-build-artifacts.md) | 2026-07-16 | Untrack 87 Sphinx build artifacts under `docs/_build/` via `git rm -r --cached`. `.gitignore` was already correct. 1 commit at `e57e603`. | Done |
-| [2026-07-16-fix-api-rst](tasks/done/2026-07-16-fix-api-rst.md) | 2026-07-16 | Fix broken `.. automodule:: gunz_utils.validation` directive in `docs/source/api.rst` (shim deleted in v1.5.0) → `gunz_utils.ext.validation_pydantic`. Add new `Models` and `Upstream Protocol` sections. 1 commit at `3378b5b`. | Done |
-| [2026-07-16-cleanup-obsolete-files](tasks/done/2026-07-16-cleanup-obsolete-files.md) | 2026-07-16 | Filesystem cleanup: removed 5 obsolete `/tmp/gunz-base-model-wip*` files (now-redundant backup of properly-committed WIP) and 14M `gunz-utils.bak-pre-clone-20260727-225224/` snapshot directory on ikarus. No git operations. No commits. | Done |
-| [2026-07-16-v150-migration-docs](tasks/done/2026-07-16-v150-migration-docs.md) | 2026-07-16 | Add `Migration` section to README.md documenting the v1.5.0 breaking change (compat shim removal) with Option A (`ext.*`) and Option B (lazy) migration paths. 1 commit at `057cdea`. | Done |
-| [2026-07-16-add-hash-question-comments](tasks/done/2026-07-16-add-hash-question-comments.md) | 2026-07-16 | Add `#?` explanatory comments per python-v6 standards across 7 src/ modules (`enums.py`, `models.py`, `project.py`, `security.py`, `upstream_protocol.py`, `ext/secure_crypto.py`, `ext/validation_pydantic.py`). 7 comments total, no logic changes. 1 commit at `b6a5bd8`. | Done |
-| [2026-07-16-push-delete-pre-history-scrub-tag](tasks/done/2026-07-16-push-delete-pre-history-scrub-tag.md) | 2026-07-16 | Push-delete orphan `pre-history-scrub` tag from origin via `git push origin :refs/tags/pre-history-scrub`. Tag was a forensic backup from a filter-branch rewrite pointing at unreachable commit `2096647`; previously deleted locally in `970f9aa` but never pushed-deleted from origin. User explicitly authorized 2026-07-16. No commit (remote-only op). Local + ikarus + origin tag lists all clean. | Done |
-| [2026-07-16-remove-healthstatus](tasks/done/2026-07-16-remove-healthstatus.md) | 2026-07-16 | Removed `HealthStatus` from public API to keep gunz-utils minimal (foundational utilities only; MCP-server-specific response models belong in consumer repos). 2 commits: `723cfb5` (code removal, tests 99→96) + `73779ec` (v1.6.0 release). Tag `v1.6.0` cut + pushed. **Breaking change** for any consumer importing `HealthStatus` from `gunz_utils`. | Done |
-| [2026-07-16-add-atomic-write](tasks/done/2026-07-16-add-atomic-write.md) | 2026-07-16 | Add `atomic_write(path, content)` utility to `src/gunz_utils/io.py`. Crash-safe file writes via temp-file + `os.replace()`. Commit `4e06ad3`. | Done |
-| [2026-07-16-add-safe-parsers](tasks/done/2026-07-16-add-safe-parsers.md) | 2026-07-16 | Add `safe_int`, `safe_float`, `safe_bool`, `parse_bool` to `src/gunz_utils/parsing.py`. Robust string→primitive parsers with default + bounds. Commit `13e942d` (bundled with formatters commit due to parallel-agent interleaving). | Done |
-| [2026-07-16-add-formatters](tasks/done/2026-07-16-add-formatters.md) | 2026-07-16 | Add `format_bytes`, `format_duration`, `format_count` to `src/gunz_utils/formatting.py`. Human-readable size/time/count formatters. Commit `13e942d` (bundled with parsing commit). | Done |
-| [2026-07-16-add-timer](tasks/done/2026-07-16-add-timer.md) | 2026-07-16 | Add `Timer` class + `timer()` context manager to `src/gunz_utils/timing.py`. Elapsed wall-clock time tracking with `time.perf_counter()`. Commit `ca08ddc`. | Done |
-| [2026-07-16-add-redact](tasks/done/2026-07-16-add-redact.md) | 2026-07-16 | Add `redact`, `redact_dict`, `SECRET_PATTERNS` to `src/gunz_utils/redaction.py`. Secret masking for logs/dumps. Commit `1683b0f`. | Done |
-| [2026-08-06-add-hashing](tasks/done/2026-08-06-add-hashing.md) | 2026-08-06 | v1.8.0: Add `content_hash`, `file_hash`, `short_hash` (+ `DEFAULT_ALGO`, `DEFAULT_CHUNK_SIZE`, `SUPPORTED_ALGOS`) to `src/gunz_utils/hashing.py`. Pure-stdlib content addressing and file integrity. 37 tests. | Done |
-| [2026-08-06-add-dict-utils](tasks/done/2026-08-06-add-dict-utils.md) | 2026-08-06 | v1.8.0: Add `deep_get`, `deep_set`, `deep_merge` to `src/gunz_utils/dict_utils.py`. Nested-mapping helpers (`deep_merge` supports `replace`/`concat`/`dedup` list strategies). 42 tests. | Done |
-| [2026-08-06-add-iteration](tasks/done/2026-08-06-add-iteration.md) | 2026-08-06 | v1.8.0: Add `chunked`, `batched`, `flatten`, `first` to `src/gunz_utils/iteration.py`. Lazy iteration helpers; `flatten` uses Lodash-compatible `max_depth` semantics. 45 tests. Two implementation deviations corrected during verification (top-level iterable iteration + `max_depth` off-by-one). | Done |
-| [2026-08-26-ruff-format-hash-question-conflict](tasks/done/2026.08.26-protocol-ruff_format_hash_question_conflict.md) | 2026-08-26 | Decide/resolve the `ruff format` ↔ `#?` convention conflict (update AGENTS.md §2.6). Chose Option A: drop `ruff format` from the canonical workflow, preserve the mandated `#?` comment convention. Commit `723cde5` (+7/-1, AGENTS.md only). | Done |
-| [2026-08-26-ci-mypy-gate](tasks/done/2026.08.26-protocol-ci_mypy_gate.md) | 2026-08-26 | Add `mypy` job to `.github/workflows/ci.yml` so type regressions block merges. Job installs package + heavy third-party deps (`pydantic`, `cryptography`, `gitpython`, `loguru`) and runs `mypy src/gunz_utils`. Commit `e4e9ef8` (+18, ci.yml only). | Done |
-| [2026-08-26-ci-pytest-gate](tasks/done/2026.08.26-protocol-ci_pytest_gate.md) | 2026-08-26 | Add unified `pytest` job running `.[all]` for cross-extra integration coverage. New `pytest` job mirrors `core:` style with matrix `[3.11, 3.12]`. Existing per-extra `unittest discover` jobs preserved as regression net. Commit `b1b067b` (+21, ci.yml only). | Done |
-| [2026-08-26-ci-ruff-format-gate](tasks/done/2026.08.26-protocol-ci_ruff_format_gate.md) | 2026-08-26 | Conditional follow-up to `ruff_format_hash_question_conflict`. **No-op**: upstream task chose Option A (drop `ruff format`), so no `ruff format --check` job is added. CI workflows left free of `ruff format` invocations to prevent the rewriter from rewriting `#?` comments. | Done (no-op) |
+Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
+[`docs/TASKS.md`](TASKS.md), and [`docs/tasks/README.md`](tasks/README.md).
 
-| [2026-09-26-audit-hardening](tasks/done/2026.09.26-audit-hardening.md) | 2026-09-26 | Security, reliability, packaging, performance, CI, and regression-test hardening from repository audit. | Done |
-| [2026-09-27-shared-foundation](tasks/done/2026.09.27-core-shared_foundation.md) | 2026-09-27 | Stabilize gunz-utils and add cross-project mechanism primitives for Hyperion and Helios-JS. | Done |
+## 2026
+
+- [`2026.09.27-protocol-integrate_all_branches`](tasks/done/2026.09.27-protocol-integrate_all_branches.md)
+- [`2026.09.27-gunz_utils-repair_suite_regressions`](tasks/done/2026.09.27-gunz_utils-repair_suite_regressions.md)
+- [`2026.09.27-core-shared_foundation`](tasks/done/2026.09.27-core-shared_foundation.md)
+- [`2026.09.26-audit-hardening`](tasks/done/2026.09.26-audit-hardening.md)
+- [`2026.08.26-protocol-ruff_format_hash_question_conflict`](tasks/done/2026.08.26-protocol-ruff_format_hash_question_conflict.md)
+- [`2026.08.26-protocol-ci_ruff_format_gate`](tasks/done/2026.08.26-protocol-ci_ruff_format_gate.md)
+- [`2026.08.26-protocol-ci_pytest_gate`](tasks/done/2026.08.26-protocol-ci_pytest_gate.md)
+- [`2026.08.26-protocol-ci_mypy_gate`](tasks/done/2026.08.26-protocol-ci_mypy_gate.md)
+- [`2026-08-06-add-iteration`](tasks/done/2026-08-06-add-iteration.md)
+- [`2026-08-06-add-hashing`](tasks/done/2026-08-06-add-hashing.md)
+- [`2026-08-06-add-dict-utils`](tasks/done/2026-08-06-add-dict-utils.md)
+- [`2026-07-16-validation-shim-removal`](tasks/done/2026-07-16-validation-shim-removal.md)
+- [`2026-07-16-validation-migration`](tasks/done/2026-07-16-validation-migration.md)
+- [`2026-07-16-v150-migration-docs`](tasks/done/2026-07-16-v150-migration-docs.md)
+- [`2026-07-16-untrack-sphinx-build-artifacts`](tasks/done/2026-07-16-untrack-sphinx-build-artifacts.md)
+- [`2026-07-16-remove-healthstatus`](tasks/done/2026-07-16-remove-healthstatus.md)
+- [`2026-07-16-push-delete-pre-history-scrub-tag`](tasks/done/2026-07-16-push-delete-pre-history-scrub-tag.md)
+- [`2026-07-16-fix-api-rst`](tasks/done/2026-07-16-fix-api-rst.md)
+- [`2026-07-16-cleanup-obsolete-files`](tasks/done/2026-07-16-cleanup-obsolete-files.md)
+- [`2026-07-16-add-timer`](tasks/done/2026-07-16-add-timer.md)
+- [`2026-07-16-add-safe-parsers`](tasks/done/2026-07-16-add-safe-parsers.md)
+- [`2026-07-16-add-redact`](tasks/done/2026-07-16-add-redact.md)
+- [`2026-07-16-add-hash-question-comments`](tasks/done/2026-07-16-add-hash-question-comments.md)
+- [`2026-07-16-add-formatters`](tasks/done/2026-07-16-add-formatters.md)
+- [`2026-07-16-add-atomic-write`](tasks/done/2026-07-16-add-atomic-write.md)
+- [`2026-07-15-protocol-tier1_cleanup_housekeeping`](tasks/done/2026-07-15-protocol-tier1_cleanup_housekeeping.md)
+- [`2026-07-01-build-deps_split_v1.3.0`](tasks/done/2026-07-01-build-deps_split_v1.3.0.md)
+- [`2026-04-28-gunz_utils-test_improvements`](tasks/done/2026-04-28-gunz_utils-test_improvements.md)
+- [`2026-04-28-gunz_utils-python-v6_0-compliance`](tasks/done/2026-04-28-gunz_utils-python-v6_0-compliance.md)
+- [`2026-04-28-gunz_utils-docs_improvement`](tasks/done/2026-04-28-gunz_utils-docs_improvement.md)
+
+## 2025
+
+- [`2025-12-24-validation-fix_prevent_information_leakage`](tasks/done/2025-12-24-validation-fix_prevent_information_leakage.md)
+- [`2025-10-27-enums-perf_optimize_attribute_access`](tasks/done/2025-10-27-enums-perf_optimize_attribute_access.md)
+- [`2025-10-18-enums-perf_optimize_fuzzy_lookup`](tasks/done/2025-10-18-enums-perf_optimize_fuzzy_lookup.md)
+- [`2025-02-18-security-fix_reserved_filename_replacement`](tasks/done/2025-02-18-security-fix_reserved_filename_replacement.md)
+- [`2025-02-18-security-add_safe_path_join`](tasks/done/2025-02-18-security-add_safe_path_join.md)
+- [`2025-02-18-enums-fix_dos_input_length`](tasks/done/2025-02-18-enums-fix_dos_input_length.md)
+
+## 2024
+
+- [`2024-05-24-security-fix_windows_reserved_filenames`](tasks/done/2024-05-24-security-fix_windows_reserved_filenames.md)
