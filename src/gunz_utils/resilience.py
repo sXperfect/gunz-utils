@@ -45,6 +45,7 @@ class AsyncCircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
+        """Return the current breaker state."""
         if self._opened_at is None:
             return CircuitState.CLOSED
         if time.monotonic() - self._opened_at >= self.recovery_timeout:
@@ -100,22 +101,6 @@ class AsyncBulkhead:
         """Return the currently available permit estimate."""
         return self.limit - self._active
 
-    async def run(self, operation: Callable[[], Awaitable[T]]) -> T:
-        """Execute one operation while holding a bulkhead permit."""
-        async with self._semaphore:
-            self._active += 1
-            try:
-                return await operation()
-            finally:
-                self._active -= 1
-
-
-__all__ = [
-    "AsyncBulkhead",
-    "AsyncCircuitBreaker",
-    "CircuitOpenError",
-    "CircuitState",
-]
     async def run(
         self,
         operation: Callable[[], Awaitable[T]],
@@ -132,6 +117,7 @@ __all__ = [
                 await asyncio.wait_for(self._semaphore.acquire(), timeout)
         except TimeoutError:
             raise TimeoutError("bulkhead acquisition timed out") from None
+
         self._active += 1
         try:
             return await operation()
@@ -139,3 +125,10 @@ __all__ = [
             self._active -= 1
             self._semaphore.release()
 
+
+__all__ = [
+    "AsyncBulkhead",
+    "AsyncCircuitBreaker",
+    "CircuitOpenError",
+    "CircuitState",
+]

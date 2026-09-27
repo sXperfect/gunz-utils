@@ -9,10 +9,13 @@ from .cache import CacheInfo, SingleFlight, async_ttl_cache, ttl_cache
 from .collections import group_by, index_by, partition, unique
 from .concurrency import gather_limited, map_concurrent, map_unordered
 from .config import env_overrides, merge_configs
+from .context import correlation_id, ensure_correlation_id, operation_context
+from .deprecation import GunzDeprecationWarning, deprecated
 from .diagnostics import exception_dict
 from .dict_utils import deep_get, deep_merge, deep_set
 from .enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
 from .env import env, env_bool
+from .faults import FailAfter, FaultSequence
 from .formatting import format_bytes, format_count, format_duration
 from .hashing import (
     DEFAULT_ALGO,
@@ -76,12 +79,7 @@ _LAZY: dict[str, str] = {
 
 
 def __getattr__(name: str) -> Any:
-    """PEP 562 lazy module attribute resolution.
-
-    Names listed in `_LAZY` are loaded on first access via the named
-    submodule under `gunz_utils.ext.*`. Anything else raises
-    `AttributeError` with the conventional message.
-    """
+    """Resolve lazily imported optional package attributes."""
     if name not in _LAZY:
         raise AttributeError(f"module 'gunz_utils' has no attribute {name!r}")
     import importlib

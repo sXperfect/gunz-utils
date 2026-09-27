@@ -59,6 +59,30 @@ class TestBulkhead(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(peak, 2)
         self.assertEqual(bulkhead.available, 2)
 
+    async def test_acquisition_timeout(self) -> None:
+        bulkhead = AsyncBulkhead(1)
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def held() -> None:
+            entered.set()
+            await release.wait()
+
+        holder = asyncio.create_task(bulkhead.run(held))
+        await entered.wait()
+        try:
+            with self.assertRaisesRegex(TimeoutError, "bulkhead acquisition timed out"):
+                await bulkhead.run(lambda: asyncio.sleep(0), timeout=0.001)
+        finally:
+            release.set()
+            await holder
+        self.assertEqual(bulkhead.available, 1)
+
+    async def test_negative_timeout_is_rejected(self) -> None:
+        bulkhead = AsyncBulkhead(1)
+        with self.assertRaises(ValueError):
+            await bulkhead.run(lambda: asyncio.sleep(0), timeout=-1)
+
 
 if __name__ == "__main__":
     unittest.main()

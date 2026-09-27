@@ -5,7 +5,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from gunz_utils.fs import atomic_write_bytes, contained_path, transactional_directory
+from gunz_utils.fs import (
+    atomic_write_bytes,
+    contained_path,
+    lexical_contained_path,
+    transactional_directory,
+)
 from gunz_utils.streaming import fingerprint, hash_stream, iter_jsonl, write_jsonl
 from gunz_utils.structures import RingBuffer, stable_unique, top_k
 
@@ -26,8 +31,13 @@ class TestM8M10(unittest.TestCase):
             atomic_write_bytes(target, b"abc")
             self.assertEqual(target.read_bytes(), b"abc")
             self.assertEqual(contained_path(root, "a/b"), root / "a/b")
+            self.assertEqual(lexical_contained_path(root, "a/b"), root / "a/b")
             with self.assertRaises(ValueError):
                 contained_path(root, "../escape")
+            with self.assertRaises(ValueError):
+                lexical_contained_path(root, "../escape")
+            with self.assertRaises(ValueError):
+                lexical_contained_path(root, root / "absolute")
             final = root / "published"
             with transactional_directory(final) as staging:
                 (staging / "x").write_text("ok")
