@@ -16,7 +16,7 @@
 | **License** | BSD 3-Clause (`LICENSE.md`) |
 | **Repository** | https://github.com/sXperfect/gunz-utils |
 | **Issue Tracker** | https://github.com/sXperfect/gunz-utils/issues |
-| **Primary Author** | Yeremia Gunawan Adhisantoso `<adhisant@tnt.uni-hannover.de>` |
+| **Primary Author** | Yeremia Gunawan Adhisantoso `<yeremiag@gmail.com>` |
 | **Commit Author** | Author identity from `pyproject.toml` unless overridden locally via `git config user.{name,email}`. |
 
 ---
@@ -221,7 +221,7 @@ feat: add input length validation to Enum fuzzy matching
 ```
 
 ### 5.2 Author Identity
-- Primary identity (from `pyproject.toml`): Yeremia Gunawan Adhisantoso `<adhisant@tnt.uni-hannover.de>`.
+- Primary identity (from `pyproject.toml`): Yeremia Gunawan Adhisantoso `<yeremiag@gmail.com>`.
 - Override locally only if the developer has their own git identity (`git config user.{name,email}`).
 - Never commit as a generic identity (e.g., `root`, `opencode`).
 

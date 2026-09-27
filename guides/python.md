@@ -144,7 +144,7 @@ If it's not documented, it's harder to use and maintain.
     **Recommended Dunder Block:**
     ```python
     __author__ = "Yeremia Gunawan Adhisantoso"
-    __email__ = "adhisant@tnt.uni-hannover.de"
+    __email__ = "yeremiag@gmail.com"
     __license__ = "Clear BSD"
     ```
 - **Use `#?` for Explanatory Comments**: Use inline comments prefixed with `#?` to explain the *why*
