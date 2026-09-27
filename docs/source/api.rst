@@ -43,6 +43,36 @@ These modules have no third-party runtime dependencies.
    :undoc-members:
    :show-inheritance:
 
+.. automodule:: gunz_utils.limits
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.plugins
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.provenance
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.retry
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.streaming
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.versioning
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. automodule:: gunz_utils.models
    :members:
    :undoc-members:
