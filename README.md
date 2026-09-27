@@ -14,11 +14,16 @@
 | [`dict_utils`](src/gunz_utils/dict_utils.py) | `deep_get`, `deep_set`, `deep_merge` for nested dicts | stdlib |
 | [`formatting`](src/gunz_utils/formatting.py) | `format_bytes`, `format_duration`, `format_count` — human-readable sizes | stdlib |
 | [`hashing`](src/gunz_utils/hashing.py) | `content_hash`, `file_hash`, `short_hash` — blake2b/sha256, constant-time compare | stdlib |
-| [`io`](src/gunz_utils/io.py) | `atomic_write` — crash-safe file writes with `os.replace` | stdlib |
+| [`io`](src/gunz_utils/io.py) | `atomic_write`, `atomic_json_write` — crash-safe deterministic output | stdlib |
 | [`iteration`](src/gunz_utils/iteration.py) | `chunked`, `batched`, `flatten`, `first` — lazy generators | stdlib |
 | [`cache`](src/gunz_utils/cache.py) | TTL memoization + async `SingleFlight` request coalescing | stdlib |
 | [`concurrency`](src/gunz_utils/concurrency.py) | bounded async gather/map helpers | stdlib |
-| [`retry`](src/gunz_utils/retry.py) | sync/async exponential retry with optional jitter | stdlib |
+| [`retry`](src/gunz_utils/retry.py) | decorator retry plus result-aware `RetryPolicy` execution | stdlib |
+| [`limits`](src/gunz_utils/limits.py) | stateless `Limits` + cumulative `ResourceBudget` accounting | stdlib |
+| [`plugins`](src/gunz_utils/plugins.py) | deterministic failure-isolated entry-point discovery | stdlib |
+| [`provenance`](src/gunz_utils/provenance.py) | allowlisted runtime provenance for reproducible artifacts | stdlib |
+| [`streaming`](src/gunz_utils/streaming.py) | bounded/digesting writers and copy-and-hash | stdlib |
+| [`versioning`](src/gunz_utils/versioning.py) | versioned envelopes and forward schema migrations | stdlib |
 | [`serialization`](src/gunz_utils/serialization.py) | deterministic JSON + common-object normalization | stdlib |
 | [`subprocess`](src/gunz_utils/subprocess.py) | structured sync/async shell-free command execution | stdlib |
 | [`models`](src/gunz_utils/models.py) | `GunzBaseModel` — `pydantic.BaseModel` configured to forbid extra fields | `validation` extra |
@@ -120,7 +125,7 @@ print(f"Project at: {root}")
 
 ### Production foundation helpers
 
-`gunz_utils` also provides bounded async concurrency, generic retry/backoff, TTL caching with async single-flight, deterministic JSON serialization, and structured shell-free subprocess execution. Service-specific idempotency and retry policy remain consumer responsibilities.
+`gunz_utils` also provides bounded async concurrency, generic retry/backoff, TTL caching with async single-flight, deterministic JSON serialization, structured shell-free subprocess execution, failure-isolated plugin discovery, cumulative resource budgets, reproducibility metadata, schema migration envelopes, and bounded digest streaming. Service-specific idempotency and domain policy remain consumer responsibilities.
 
 ## Benchmarking and native profiling
 
