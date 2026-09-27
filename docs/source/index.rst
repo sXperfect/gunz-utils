@@ -24,6 +24,7 @@ validation, and cross-platform project management.
    quickstart
    concepts
    ci
+   releases
 
 .. toctree::
    :maxdepth: 2

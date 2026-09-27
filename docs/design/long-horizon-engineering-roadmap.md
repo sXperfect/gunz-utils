@@ -334,10 +334,12 @@ External adapters and native mechanisms must normalize into the same
 - Introduce a deprecation helper and policy.
 - Maintain API-contract tests.
 - Add schema-contract fixtures.
-- Generate changelog entries for public changes.
-- Use semantic versioning consistently.
+- Record public changes as conflict-free files under `changes/` and assemble
+  the changelog only during release preparation.
+- Use strict semantic versioning enforced by `scripts/release.py`.
+- Keep `pyproject.toml` as the sole static package-version source.
 - Keep feature-branch Actions disabled; `scripts/verify.sh` is the development
-  gate, with CI on main/develop/manual dispatch.
+  gate, with hosted CI only for pushes to `main` and PRs targeting `main`.
 
 ## Milestones
 

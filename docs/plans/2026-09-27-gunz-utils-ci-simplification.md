@@ -95,7 +95,7 @@ Prove root import without optional packages, stdlib fallbacks, declared single e
 
 ### C06 — PR triggers, cancellation, limits, caching and diagnostics
 
-Add ordinary PR validation and appropriate main/develop/manual behavior. Avoid duplicate branch-push/PR work where straightforward. Set explicit read-only permissions, per-workflow/ref concurrency groups, cancel superseded CI, bounded job timeouts, and dependency caches keyed by relevant metadata/interpreter. Keep needed diagnostics in logs/summaries; use small short-lived failure artifacts only when useful. Avoid caching secrets, virtual environments with unsafe restore semantics, or unbounded key churn. Verify always-reporting required gate semantics and fork safety.
+Add PR validation only for pull requests targeting `main` and post-merge validation only for pushes to `main`. Feature-branch pushes, `develop`, and manual dispatch stay disabled to avoid duplicate hosted work. Set explicit read-only permissions, per-workflow/ref concurrency groups, cancel superseded CI, bounded job timeouts, and dependency caches keyed by relevant metadata/interpreter. Keep needed diagnostics in logs/summaries; use small short-lived failure artifacts only when useful. Avoid caching secrets, virtual environments with unsafe restore semantics, or unbounded key churn. Verify always-reporting required gate semantics and fork safety.
 
 ### C07 — Documentation workflow and maintenance consolidation
 
@@ -103,7 +103,7 @@ Choose one clear place for docs validation and truthful local parity, without do
 
 ### C08 — Adversarial acceptance and rollout packet
 
-Independently validate full tests, lint, typing, strict docs, packaged imports and isolation to the extent supported locally. Validate YAML syntax and Actions expressions with existing available tools, keeping missing tooling explicit. Check meaningful scenarios: code PR, docs-only PR, API change, CI metadata change, fork PR without secrets, repeated pushes/cancellation, failing test, failing lint, failed docs, skipped optional work, manual dispatch, cache miss/hit, and package import from outside checkout. Use a compact scenario table and focused tests rather than mirroring YAML in brittle assertions.
+Independently validate full tests, lint, typing, strict docs, packaged imports and isolation to the extent supported locally. Validate YAML syntax and Actions expressions with existing available tools, keeping missing tooling explicit. Check meaningful scenarios: code PR to `main`, docs-only PR to `main`, PR to another base (no CI), feature-branch push (no CI), main push, API change, CI metadata change, fork PR without secrets, repeated pushes/cancellation, failing test, failing lint, failed docs, cache miss/hit, and package import from outside checkout. Use a compact scenario table and focused tests rather than mirroring YAML in brittle assertions.
 
 Provide before/after workflow/job/command counts, measured local timings and available hosted baseline durations, estimated setup savings, storage bounds, unresolved settings, and a reversible rollout procedure preserving required check coverage. Real post-change GitHub results require a separately authorized publish/run step; do not label unrun hosted checks successful. Finish with a precise reviewable patch and honest pending hosted validation, not a false production-complete claim.
 

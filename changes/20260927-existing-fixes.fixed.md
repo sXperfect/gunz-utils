@@ -1,0 +1,14 @@
+- Removed duplicated validation branches in secret redaction.
+- Directory fingerprints exclude symlinked files so rooted manifests do not silently depend on external content.
+- Deterministic named sampling rejects duplicate names rather than depending on input ordering.
+- Rsync cache synchronization now holds its advisory lock through completion-marker publication, preventing false-complete races between concurrent sync processes.
+- Advisory lock files reject symlink redirection and use `O_NOFOLLOW` when available.
+- Network URIs validate IPv6 authorities, normalize IDNA hostnames, and reject authority-injection delimiters.
+- Partition manifests reject scalar strings as identifier collections and defensively freeze assignments.
+- Execution manifests normalize run IDs and reject boolean/non-positive attempt counters.
+- Paired standardized effects use `None` when mathematically undefined so results remain canonical-JSON compatible.
+- Variant experiment failures retain exception type only, avoiding arbitrary secret-bearing exception text in reports.
+- Content-addressed ingest now hashes while copying in one pass and rejects symlinked source/store entries.
+- Paired-effect helpers use `None` for undefined standardized effects, keeping results compatible with canonical JSON.
+- Rsync mirroring rejects hidden destructive extra flags and lock/marker filename collisions.
+- Provenance metadata freezing rejects cyclic container graphs explicitly.

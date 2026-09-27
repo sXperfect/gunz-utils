@@ -1,12 +1,16 @@
 import os
 import sys
+from importlib.metadata import PackageNotFoundError, version as package_version
 
 sys.path.insert(0, os.path.abspath('../../src'))
 
 project = 'gunz-utils'
 copyright = '2025, Yeremia Gunawan Adhisantoso'
 author = 'Yeremia Gunawan Adhisantoso'
-release = '1.10.0'
+try:
+    release = package_version("gunz-utils")
+except PackageNotFoundError:
+    release = "0+unknown"
 
 extensions = [
     'sphinx.ext.autodoc',

@@ -12,8 +12,6 @@ from .serialization import json_dumps
 __author__ = "Yeremia Gunz"
 __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
-__version__ = "1.10.0"
-
 __all__ = ["atomic_json_write", "atomic_write"]
 
 

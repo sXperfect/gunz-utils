@@ -65,8 +65,6 @@ from __future__ import annotations
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
-__version__ = "1.3.2"
-
 import abc
 import asyncio
 from typing import Any, Protocol, runtime_checkable

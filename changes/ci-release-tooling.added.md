@@ -1,0 +1,1 @@
+Add stdlib-only release tooling with changelog fragments, semantic-version bump validation, release preparation, and release-readiness checks.

@@ -236,16 +236,43 @@ pip install .[docs]
 
 ## CI policy
 
-GitHub Actions does not run automatically for pull requests or feature-branch
-pushes. CI runs on pushes to `main` and `develop`, and can be started manually
-with `workflow_dispatch`. Development branches should run the test, Ruff, and
-mypy commands locally before merge.
+Hosted CI is intentionally narrow to reduce runner usage and duplicate work:
+
+- feature-branch pushes do not run GitHub Actions;
+- pushes to `main` run the single sequential `CI / verify` job;
+- pull requests run CI only when their base branch is `main`;
+- superseded runs for the same PR/ref are cancelled.
+
+The hosted job checks release metadata first, then Ruff, mypy, the Python 3.11
+test suite, strict documentation, packaging/isolation, and finally Python 3.12
+compatibility. Development branches should use the same local gate before merge.
+
+## Release management
+
+`pyproject.toml` is the sole static source of the package version.
+`gunz_utils.__version__` and the Sphinx release string are derived from
+installed package metadata. User-visible changes are recorded as conflict-free
+files under `changes/` instead of editing the top of `CHANGELOG.md` on every
+branch.
+
+```bash
+python scripts/release.py check          # validate release metadata
+python scripts/release.py status         # inspect pending SemVer impact
+python scripts/release.py prepare X.Y.Z  # assemble a release locally
+python scripts/release.py verify         # verify prepared release metadata
+```
+
+Release commits use `chore(release): vX.Y.Z`. See
+[`docs/development/releases.md`](docs/development/releases.md) for the complete
+process and
+[`docs/development/release-history.md`](docs/development/release-history.md)
+for the audited historical tag/version gaps.
 
 ## Development
 
 ```bash
-pip install -e ".[all]"   # editable install with everything
-./scripts/verify.sh       # compile + lint + type-check + full tests
+pip install -e ".[all,plot,docs]"  # editable install with CI-capable extras
+./scripts/verify.sh                # release + lint + tests + docs + packaging
 ```
 
 ## License

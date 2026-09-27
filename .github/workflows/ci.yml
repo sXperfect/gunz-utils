@@ -2,150 +2,72 @@ name: CI
 
 on:
   push:
-    branches: ["main", "develop"]
+    branches: ["main"]
   pull_request:
+    branches: ["main"]
     types: ["opened", "synchronize", "reopened", "ready_for_review"]
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: test (full pytest, Python 3.11)
+  verify:
+    name: verify
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: pyproject.toml
-      - name: Install dependencies
+
+      - name: Check release metadata
+        run: python scripts/release.py check
+
+      - name: Install CI dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest==9.0.2
-          pip install ".[all]"
-      - name: Run full pytest
+          python -m pip install pytest==9.0.2 ruff==0.14.10 mypy==1.19.1
+          python -m pip install ".[all,plot,docs]"
+
+      - name: Run Ruff
+        run: python -m ruff check src tests benchmarks scripts
+
+      - name: Run mypy
+        run: python -m mypy src/gunz_utils
+
+      - name: Run full pytest on Python 3.11
         run: python -m pytest
 
-  compat:
-    name: compat (full pytest, Python 3.12)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
+      - name: Build documentation strictly
+        run: python scripts/ci.py docs
+
+      - name: Run packaging and dependency isolation
+        run: python scripts/ci.py packaging
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: pyproject.toml
-      - name: Install dependencies
+
+      - name: Install Python 3.12 compatibility dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest==9.0.2
-          pip install ".[all]"
-      - name: Run full pytest
+          python -m pip install pytest==9.0.2
+          python -m pip install ".[all]"
+
+      - name: Run full pytest on Python 3.12
         run: python -m pytest
-
-  lint:
-    name: lint (ruff + mypy, Python 3.11)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff==0.14.10 mypy==1.19.1
-          pip install ".[all,plot]"
-      - name: Run ruff
-        run: python -m ruff check src tests benchmarks
-      - name: Run mypy
-        run: python -m mypy src/gunz_utils
-
-  packaging:
-    name: packaging (dependency-isolation matrix, Python 3.11)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Run packaging / isolation matrix
-        run: python scripts/ci.py packaging
-
-  docs:
-    name: docs (strict Sphinx -W)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # Canonical docs-validation place: build docs strictly (`python scripts/ci.py
-    # docs` runs `scripts/build_docs.sh` with `-W`). This job ALWAYS runs on every
-    # PR, branch push, and manual run. Docs are intentionally NOT path-filtered:
-    # job-level `paths:`/`paths-ignore:` is not valid Actions syntax (those keys
-    # belong under `on.<push|pull_request>` event filters, which would strand the
-    # required `docs` check on code-only PRs). Building docs on every run is the
-    # chosen, simplest trade-off for this repo. ci-result accepts a skipped docs
-    # result defensively but the docs job normally yields success/failure only.
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install docs deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install ".[docs]"
-      - name: Build docs (strict)
-        run: python scripts/ci.py docs
-
-  ci-result:
-    name: ci-result (aggregate required checks)
-    if: always()
-    needs: [test, compat, lint, packaging, docs]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Aggregate required checks
-        run: |
-          set -euo pipefail
-          failed=0
-          ok_core() {
-            case "$1" in
-              success) ;;
-              *) echo "::error::$2 required job did not succeed: $1"; failed=1 ;;
-            esac
-          }
-          ok_docs() {
-            case "$1" in
-              success) ;;
-              skipped) echo "::notice::docs skipped (no docs-relevant changes)" ;;
-              *) echo "::error::docs required job did not succeed: $1"; failed=1 ;;
-            esac
-          }
-          ok_core "${{ needs.test.result }}" test
-          ok_core "${{ needs.compat.result }}" compat
-          ok_core "${{ needs.lint.result }}" lint
-          ok_core "${{ needs.packaging.result }}" packaging
-          ok_docs "${{ needs.docs.result }}"
-          if [ "$failed" -eq 0 ]; then
-            echo "::notice::CI OK: all required jobs passed"
-          else
-            exit 1
-          fi

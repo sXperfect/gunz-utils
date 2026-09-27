@@ -11,7 +11,7 @@
 | Field | Value |
 |:------|:------|
 | **Name** | `gunz-utils` |
-| **Version** | `1.10.0` (see `pyproject.toml`) |
+| **Version** | See `pyproject.toml` — the sole static package-version source. |
 | **Description** | General-purpose Python utilities for the Gunz ecosystem. Enhanced Enums, security primitives, UpstreamClient protocol, Fernet secret store. |
 | **License** | BSD 3-Clause (`LICENSE.md`) |
 | **Repository** | https://github.com/sXperfect/gunz-utils |
@@ -61,9 +61,9 @@
   for the rationale.
 
 ### 2.7 Documentation
-- **Sphinx + Furo** theme, MyST parser.
+- **Sphinx + Read the Docs** theme, MyST parser.
 - Source: `docs/source/`.
-- Build script: `docs/build_docs.sh`.
+- Build script: `scripts/build_docs.sh`.
 
 ---
 
@@ -232,9 +232,26 @@ feat: add input length validation to Enum fuzzy matching
 - Do not commit unless the user explicitly requests it.
 
 ### 5.4 Branch Hygiene
-- `main` is the protected release branch.
+- `main` is the release branch.
 - Feature branches: `feat/<short-kebab-description>`.
 - Fix branches: `fix/<short-kebab-description>`.
+- Feature-branch pushes do not trigger hosted CI.
+- Changes intended for `main` should be validated locally before opening a PR.
+
+### 5.5 Release and Changelog Discipline
+- `pyproject.toml` is the only static source of the package version.
+- Never add per-module package `__version__` literals.
+- `gunz_utils.__version__` and Sphinx release metadata are derived from
+  installed package metadata.
+- User-visible changes add a fragment under `changes/`; ordinary feature/fix
+  work does not edit the top of `CHANGELOG.md` directly.
+- Run `python scripts/release.py check` before merge and
+  `python scripts/release.py status` when planning a release.
+- Release preparation uses `python scripts/release.py prepare X.Y.Z`.
+- Release commits use exactly `chore(release): vX.Y.Z`.
+- Tags and GitHub Releases are created only after the release commit is on
+  `main` and verified.
+- Full policy: `docs/development/releases.md`.
 
 ---
 
@@ -375,9 +392,15 @@ The project's agent memory lives under `.hyperhedron/memory/` (which symlinks to
 
 ## 10. CI / CD
 
-- **CI Provider:** GitHub Actions (see `.github/workflows/`).
-- **Python matrix:** `3.11`.
-- **Triggers:** pushes to `main`/`develop` plus manual `workflow_dispatch`.\n- **PR policy:** pull requests do not trigger Actions automatically; validate locally during development and run CI manually only when explicitly needed.\n- **Credit policy:** never add automatic feature-branch or `pull_request` triggers without explicit approval.
+- **CI Provider:** GitHub Actions (see `.github/workflows/ci.yml`).
+- **Hosted check:** one sequential `CI / verify` runner.
+- **Python coverage:** 3.11 primary; 3.12 compatibility test at the end.
+- **Triggers:** pushes to `main` and pull requests whose base branch is `main`.
+- **No hosted CI:** feature-branch pushes, `develop`, and manual dispatch.
+- **Credit policy:** keep cheap release/lint checks before expensive tests,
+  documentation, packaging isolation, and compatibility testing.
+- **Concurrency:** superseded runs for the same PR/ref are cancelled.
+- **Local parity:** `python scripts/ci.py all` is the development gate.
 - **Status badge:** see `README.md`.
 
 ---
@@ -393,6 +416,7 @@ The project's agent memory lives under `.hyperhedron/memory/` (which symlinks to
 | Shared SOPs | `.hyperhedron/guides/` |
 | Protocol standards | `.hyperhedron/protocols/` |
 | Sphinx docs | `docs/source/` |
+| Release process | `docs/development/releases.md` |
 
 ---
 
