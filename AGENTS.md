@@ -11,7 +11,7 @@
 | Field | Value |
 |:------|:------|
 | **Name** | `gunz-utils` |
-| **Version** | `1.9.0` (see `pyproject.toml`) |
+| **Version** | `1.10.0` (see `pyproject.toml`) |
 | **Description** | General-purpose Python utilities for the Gunz ecosystem. Enhanced Enums, security primitives, UpstreamClient protocol, Fernet secret store. |
 | **License** | BSD 3-Clause (`LICENSE.md`) |
 | **Repository** | https://github.com/sXperfect/gunz-utils |
