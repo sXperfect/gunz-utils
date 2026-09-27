@@ -60,18 +60,24 @@ class BoundedWriter:
         self.bytes_written = 0
 
     def write(self, data: bytes) -> int:
-        """Write one complete byte block without exceeding the configured limit."""
+        """Write all bytes without exceeding the configured limit."""
         if self.bytes_written + len(data) > self.max_bytes:
             raise ValueError("write exceeds byte limit")
-        written = self.handle.write(data)
-        if written != len(data):
-            raise OSError(f"short write: expected {len(data)} bytes, wrote {written}")
-        self.bytes_written += written
-        return written
+        view = memoryview(data)
+        offset = 0
+        while offset < len(view):
+            written = self.handle.write(view[offset:])
+            if written is None or written <= 0:
+                raise OSError("binary stream made no forward progress")
+            if written > len(view) - offset:
+                raise OSError("binary stream reported an invalid write count")
+            offset += written
+            self.bytes_written += written
+        return offset
 
 
 class DigestWriter:
-    """Binary writer that hashes successfully written bytes and can enforce a limit."""
+    """Binary writer that hashes written bytes and can enforce a byte limit."""
 
     def __init__(
         self,
@@ -89,15 +95,24 @@ class DigestWriter:
         self._digest = hashlib.new(algorithm)
 
     def write(self, data: bytes) -> int:
-        """Write and hash one complete byte block."""
-        if self.max_bytes is not None and self.bytes_written + len(data) > self.max_bytes:
+        """Write and hash all bytes, handling partial underlying writes."""
+        if (
+            self.max_bytes is not None
+            and self.bytes_written + len(data) > self.max_bytes
+        ):
             raise ValueError("write exceeds byte limit")
-        written = self.handle.write(data)
-        if written != len(data):
-            raise OSError(f"short write: expected {len(data)} bytes, wrote {written}")
-        self._digest.update(data)
-        self.bytes_written += written
-        return written
+        view = memoryview(data)
+        offset = 0
+        while offset < len(view):
+            written = self.handle.write(view[offset:])
+            if written is None or written <= 0:
+                raise OSError("binary stream made no forward progress")
+            if written > len(view) - offset:
+                raise OSError("binary stream reported an invalid write count")
+            self._digest.update(view[offset : offset + written])
+            offset += written
+            self.bytes_written += written
+        return offset
 
     @property
     def hexdigest(self) -> str:
