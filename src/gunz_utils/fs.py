@@ -9,12 +9,17 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from .io import atomic_write
+
 
 def contained_path(root: str | Path, path: str | Path) -> Path:
     """Resolve a path and require it to remain inside root."""
     base = Path(root).resolve()
     supplied = Path(path)
-    candidate = (base / supplied).resolve() if not supplied.is_absolute() else supplied.resolve()
+    if supplied.is_absolute():
+        candidate = supplied.resolve()
+    else:
+        candidate = (base / supplied).resolve()
     try:
         candidate.relative_to(base)
     except ValueError:
@@ -33,22 +38,14 @@ def lexical_contained_path(root: str | Path, path: str | Path) -> Path:
 
 
 def atomic_write_bytes(path: str | Path, data: bytes) -> None:
-    """Write bytes using fsync and same-directory atomic replacement."""
-    target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, target)
-    except BaseException:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
-        raise
+    """Write bytes durably through the canonical atomic-write implementation."""
+    atomic_write(
+        path,
+        data,
+        mode="wb",
+        mkdir=True,
+        durable=True,
+    )
 
 
 @contextmanager
