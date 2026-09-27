@@ -4,6 +4,17 @@ This page documents the canonical verification policy for `gunz-utils`.
 Development is local-first: feature-branch pushes do not spend hosted runner
 time. GitHub Actions verifies only changes entering or already on `main`.
 
+## Design guides
+
+The durable design rationale and validation history live under:
+
+- `docs/guides/ci/design.md`
+- `docs/guides/ci/lessons-learned.md`
+
+Those guides explain why the hosted workflow is sequential, main-only,
+history-aware, strict on documentation warnings, and local-first for ordinary
+development.
+
 ## Hosted trigger policy
 
 `.github/workflows/ci.yml` runs only for:
