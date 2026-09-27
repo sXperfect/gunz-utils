@@ -414,7 +414,7 @@ binary/varint primitives, and deterministic sync/async resource groups.
 Subsystem-first imports are the default. New subsystem APIs are not
 automatically added to the package root. See
 [`package-api-policy.md`](package-api-policy.md).
-\n## Definition of done
+\n### M20 — Cross-project foundation\n\nCompleted foundation for Hyperion, Helios-JS, and other Gunz repositories:\n\n- failure-isolated plugin discovery;\n- consumable resource budgets;\n- allowlisted runtime provenance;\n- versioned schema envelopes and migrations;\n- result-aware retry policies;\n- bounded digest streaming;\n- atomic deterministic JSON publication;\n- repaired filesystem, resilience, and package-root API defects.\n\nConsumer repositories should import these mechanisms from subsystem namespaces and keep domain semantics local.\n\n## Definition of done
 
 The subsystem is mature when:
 
