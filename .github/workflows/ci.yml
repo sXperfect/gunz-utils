@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    # TEMPORARY pre-PR validation trigger; remove after this hosted run.
+    branches: ["main", "feat/ci-release-management"]
   pull_request:
     branches: ["main"]
     types: ["opened", "synchronize", "reopened", "ready_for_review"]
