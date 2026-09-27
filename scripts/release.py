@@ -288,7 +288,7 @@ class ReleaseRepo:
             errors.append("missing src/gunz_utils/_version.py")
         else:
             version_text = self.version_module.read_text(encoding="utf-8")
-            if 'package_version("gunz-utils")' not in version_text:
+            if 'metadata.version("gunz-utils")' not in version_text:
                 errors.append(
                     "gunz_utils._version must derive from importlib.metadata"
                 )

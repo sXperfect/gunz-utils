@@ -55,8 +55,8 @@ Pending fragments are stored separately.
         encoding="utf-8",
     )
     (tmp_path / "src" / "gunz_utils" / "_version.py").write_text(
-        "from importlib.metadata import version as package_version\n"
-        '__version__ = package_version("gunz-utils")\n',
+        "from importlib import metadata\n"
+        '__version__ = metadata.version("gunz-utils")\n',
         encoding="utf-8",
     )
     (tmp_path / "src" / "gunz_utils" / "__init__.py").write_text(
