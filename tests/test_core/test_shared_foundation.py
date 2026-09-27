@@ -4,6 +4,14 @@ import os
 import unittest
 from unittest.mock import patch
 
+import gunz_utils.io as io_module
+import gunz_utils.limits as limits_module
+import gunz_utils.plugins as plugins_module
+import gunz_utils.provenance as provenance_module
+import gunz_utils.retry as retry_module
+import gunz_utils.streaming as streaming_module
+import gunz_utils.versioning as versioning_module
+
 from gunz_utils.limits import BudgetExceededError, Limits, ResourceBudget
 from gunz_utils.plugins import discover_plugins
 from gunz_utils.provenance import capture_runtime_provenance
@@ -13,6 +21,23 @@ from gunz_utils.versioning import (
     VersionedEnvelope,
 )
 
+
+class TestSharedModuleAPI(unittest.TestCase):
+    def test_all_exports_resolve_and_are_unique(self) -> None:
+        modules = (
+            io_module,
+            limits_module,
+            plugins_module,
+            provenance_module,
+            retry_module,
+            streaming_module,
+            versioning_module,
+        )
+        for module in modules:
+            exports = module.__all__
+            self.assertEqual(len(exports), len(set(exports)))
+            missing = [name for name in exports if not hasattr(module, name)]
+            self.assertEqual(missing, [], module.__name__)
 
 class FakeEntryPoint:
     def __init__(
