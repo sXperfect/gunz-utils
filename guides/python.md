@@ -137,15 +137,15 @@ If it's not documented, it's harder to use and maintain.
         * `str | None` replaces `Optional[str]`.
     * For arguments that represent file paths, accept both `str` and `pathlib.Path` by using the
       type hint `str | pathlib.Path`.
-- **Module Metadata**: Place module-level "dunder" variables (`__author__`, `__version__`, etc.)
-  immediately after the module docstring.
+- **Module Metadata**: Package release versions belong only in `pyproject.toml`.
+  Individual modules must not carry independent `__version__` constants because they
+  drift from the distribution version. Optional author/license metadata may remain.
 
     **Recommended Dunder Block:**
     ```python
     __author__ = "Yeremia Gunawan Adhisantoso"
     __email__ = "adhisant@tnt.uni-hannover.de"
     __license__ = "Clear BSD"
-    __version__ = "1.0.0"
     ```
 - **Use `#?` for Explanatory Comments**: Use inline comments prefixed with `#?` to explain the *why*
   behind complex or non-obvious code, not the *what*. The `?` prefix **is mandatory** for IDE syntax
@@ -153,10 +153,11 @@ If it's not documented, it's harder to use and maintain.
 
 ### Versioning and Distribution
 
-- **Semantic Versioning (SemVer)**: The project's version number (`__version__`) must follow the
-  **Semantic Versioning** (`MAJOR.MINOR.PATCH`) standard.
-- **Packaging**: Use a `pyproject.toml` file to define project metadata and dependencies for
-  distributable packages.
+- **Semantic Versioning (SemVer)**: The distribution version in `pyproject.toml` follows
+  **Semantic Versioning** (`MAJOR.MINOR.PATCH`). `gunz_utils.__version__` is derived from
+  installed package metadata rather than maintained as a second literal.
+- **Packaging**: Use `pyproject.toml` as the single static source for package metadata and
+  dependencies.
 
 ### Logging
 
