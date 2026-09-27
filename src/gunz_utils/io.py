@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ._version import __version__
+
 import os
 import pathlib
 import tempfile
@@ -10,7 +12,7 @@ from typing import Any
 from .serialization import json_dumps
 
 __author__ = "Yeremia Gunz"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = ["atomic_json_write", "atomic_write"]
 

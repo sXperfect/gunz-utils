@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any
+
+from ._version import __version__
 
 from .async_utils import cancel_and_wait, with_timeout
 from .cache import CacheInfo, SingleFlight, async_ttl_cache, ttl_cache
@@ -63,10 +64,6 @@ from .upstream_protocol import (
     UpstreamUnavailableError,
 )
 
-try:
-    __version__ = version("gunz-utils")
-except PackageNotFoundError:
-    __version__ = "0+unknown"
 
 _LAZY: dict[str, str] = {
     "GunzBaseModel": ".models",

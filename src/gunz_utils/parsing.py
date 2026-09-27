@@ -6,11 +6,13 @@ safe defaults, plus a strict boolean parser for validation boundaries.
 
 from __future__ import annotations
 
+from ._version import __version__
+
 import math
 from typing import Any
 
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = ["safe_int", "safe_float", "safe_bool", "parse_bool"]
 

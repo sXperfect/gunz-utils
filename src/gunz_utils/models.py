@@ -11,11 +11,13 @@ Public surface
   the workspace.
 """
 
+from ._version import __version__
+
 # =============================================================================
 # METADATA
 # =============================================================================
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
