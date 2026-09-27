@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from ._version import __version__
+
 from collections.abc import Mapping, MutableMapping, Sequence
 from typing import Any, Literal, cast
 
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = ["deep_get", "deep_set", "deep_merge"]
 
