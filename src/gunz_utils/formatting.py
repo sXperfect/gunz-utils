@@ -7,7 +7,7 @@ hand-rolling its own convention.
 
 from __future__ import annotations
 
-from ._version import __version__
+from ._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"

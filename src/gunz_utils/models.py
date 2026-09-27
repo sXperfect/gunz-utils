@@ -26,7 +26,7 @@ __license__ = "Clear BSD"
 # =============================================================================
 from pydantic import BaseModel, ConfigDict
 
-from ._version import __version__
+from ._version import __version__ as __version__
 
 
 class GunzBaseModel(BaseModel):

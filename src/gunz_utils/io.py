@@ -7,7 +7,7 @@ import pathlib
 import tempfile
 from typing import Any
 
-from ._version import __version__
+from ._version import __version__ as __version__
 from .serialization import json_dumps
 
 __author__ = "Yeremia Gunz"

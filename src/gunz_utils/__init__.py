@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ._version import __version__
-
+from ._version import __version__ as __version__
 from .async_utils import cancel_and_wait, with_timeout
 from .cache import CacheInfo, SingleFlight, async_ttl_cache, ttl_cache
 from .collections import group_by, index_by, partition, unique
