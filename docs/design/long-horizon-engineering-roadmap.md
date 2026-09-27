@@ -376,7 +376,8 @@ Close integration gaps left by M1–M5:
 Exit criterion: corrupted artifacts, unsupported schemas, broken exports, and
 environment-invalid regressions fail explicitly rather than producing plausible
 but misleading results.
-\n
+
+
 ### M7 — Profiler efficiency and experiment orchestration
 
 Integrate the measurement stack into reproducible experiments:
@@ -389,7 +390,8 @@ Integrate the measurement stack into reproducible experiments:
 
 Exit criterion: consumer repositories can execute parameter experiments and
 produce portable, self-describing run directories without custom orchestration.
-\n
+
+
 ### M8–M10 — Data, filesystem and serialization foundation
 
 Completed with bounded structures, atomic/transactional filesystem primitives,
@@ -414,7 +416,23 @@ binary/varint primitives, and deterministic sync/async resource groups.
 Subsystem-first imports are the default. New subsystem APIs are not
 automatically added to the package root. See
 [`package-api-policy.md`](package-api-policy.md).
-\n### M20 — Cross-project foundation\n\nCompleted foundation for Hyperion, Helios-JS, and other Gunz repositories:\n\n- failure-isolated plugin discovery;\n- consumable resource budgets;\n- allowlisted runtime provenance;\n- versioned schema envelopes and migrations;\n- result-aware retry policies;\n- bounded digest streaming;\n- atomic deterministic JSON publication;\n- repaired filesystem, resilience, and package-root API defects.\n\nConsumer repositories should import these mechanisms from subsystem namespaces and keep domain semantics local.\n\n## Definition of done
+
+### M20 — Cross-project foundation
+
+Completed foundation for Hyperion, Helios-JS, and other Gunz repositories:
+
+- failure-isolated plugin discovery;
+- consumable resource budgets;
+- allowlisted runtime provenance;
+- versioned schema envelopes and migrations;
+- result-aware retry policies;
+- bounded digest streaming;
+- atomic deterministic JSON publication;
+- repaired filesystem, resilience, and package-root API defects.
+
+Consumer repositories should import these mechanisms from subsystem namespaces and keep domain semantics local.
+
+## Definition of done
 
 The subsystem is mature when:
 
