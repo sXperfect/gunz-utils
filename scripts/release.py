@@ -15,9 +15,9 @@ import subprocess
 import sys
 import tomllib
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 VERSION_LITERAL_RE = re.compile(
