@@ -145,9 +145,9 @@ A project should be reproducible and easy for others to set up.
 
 Writing clean, well-documented code is crucial for long-term success.
 
-* **Module Metadata**: Place module-level "dunder" variables (e.g., `__author__`, `__version__`,
-  `__status__`) immediately after the module docstring. This makes important metadata easily
-  accessible to both developers and automated tools.
+* **Module Metadata**: Keep distribution versions in project/package metadata rather than
+  duplicating a package `__version__` literal in every module. Module-specific metadata such as
+  `__author__` or `__status__` may remain when it carries independent meaning.
 * **Type Hinting**: Use Python's type hints for function arguments and return values. This improves
   code clarity and allows for static analysis.
 * **Docstrings and Comments**:
