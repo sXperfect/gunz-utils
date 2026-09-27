@@ -1,7 +1,7 @@
 API Reference
 =============
 
-This page documents every public module in ``gunz_utils`` v1.8.0.
+This page documents every public module in ``gunz_utils`` v1.10.0.
 
 .. contents::
    :local:
