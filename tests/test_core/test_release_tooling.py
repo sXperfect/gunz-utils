@@ -60,7 +60,8 @@ Pending fragments are stored separately.
         encoding="utf-8",
     )
     (tmp_path / "src" / "gunz_utils" / "__init__.py").write_text(
-        "from ._version import __version__\n",
+        "from . import _version\n"
+        "__version__ = _version.__version__\n",
         encoding="utf-8",
     )
     (tmp_path / "docs" / "source" / "conf.py").write_text(
