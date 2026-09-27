@@ -29,7 +29,7 @@ CHANGELOG_HEADING_RE = re.compile(
     re.MULTILINE,
 )
 UNRELEASED_SECTION_RE = re.compile(
-    r"^## \[Unreleased\]\s*\n(?P<body>.*?)(?=^## \[)",
+    r"^## \[Unreleased\]\s*\n(?P<body>.*?)(?=^## \[|\Z)",
     re.MULTILINE | re.DOTALL,
 )
 
@@ -420,7 +420,7 @@ class ReleaseRepo:
         )
         section = text[project_match.end() : end]
         replaced, count = re.subn(
-            r'(?m)^version\s*=\s*"[^"]+"\s*$',
+            r'(?m)^version[ \t]*=[ \t]*"[^"]+"[ \t]*$',
             f'version = "{target}"',
             section,
             count=1,
@@ -436,7 +436,11 @@ class ReleaseRepo:
         release_date: dt.date,
     ) -> str:
         text = self.changelog.read_text(encoding="utf-8")
-        if re.search(rf"^## \[{re.escape(str(target))}\]\b", text, re.MULTILINE):
+        if re.search(
+            rf"^## \[{re.escape(str(target))}\](?:\s|$)",
+            text,
+            re.MULTILINE,
+        ):
             raise ReleaseError(f"CHANGELOG.md already contains [{target}]")
         match = UNRELEASED_SECTION_RE.search(text)
         if match is None:
@@ -513,7 +517,7 @@ class ReleaseRepo:
             return 1
         text = self.changelog.read_text(encoding="utf-8")
         release_heading = re.search(
-            rf"^## \[{re.escape(str(current))}\]\b",
+            rf"^## \[{re.escape(str(current))}\](?:\s|$)",
             text,
             re.MULTILINE,
         )
