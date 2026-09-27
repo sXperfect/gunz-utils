@@ -42,8 +42,8 @@ DOCS_SOURCE = PROJECT_ROOT / "docs" / "source"
 BUILD_DOCS_SCRIPT = PROJECT_ROOT / "scripts" / "build_docs.sh"
 RELEASE_SCRIPT = PROJECT_ROOT / "scripts" / "release.py"
 
-# The hosted zero-dependency core-import gate (ci.yml core_import) forbids these
-# optional packages from being imported by the core package.
+# The packaging isolation gate forbids these optional packages from being
+# imported by the zero-dependency core package.
 FORBIDDEN_OPTIONAL_MODULES = {"pydantic", "cryptography", "git", "loguru"}
 
 # Scratch locations for the packaging isolation matrix. These live inside the
