@@ -25,7 +25,7 @@ VERSION_LITERAL_RE = re.compile(
     re.MULTILINE,
 )
 CHANGELOG_HEADING_RE = re.compile(
-    r"^## \\[(?P<version>[^]]+)\\](?:\\s+—\\s+.+)?$",
+    r"^## \[(?P<version>[^]]+)\](?:\s+—\s+.+)?$",
     re.MULTILINE,
 )
 UNRELEASED_SECTION_RE = re.compile(
@@ -297,7 +297,7 @@ class ReleaseRepo:
         if self.sphinx_conf.is_file():
             conf_text = self.sphinx_conf.read_text(encoding="utf-8")
             static_release = re.search(
-                r"^release\\s*=\\s*[\'\\"]\\d+\\.\\d+\\.\\d+[\'\\"]",
+                r"^release\s*=\s*['\"]\d+\.\d+\.\d+['\"]",
                 conf_text,
                 re.MULTILINE,
             )
@@ -513,7 +513,7 @@ class ReleaseRepo:
             return 1
         text = self.changelog.read_text(encoding="utf-8")
         release_heading = re.search(
-            rf"^## \\[{re.escape(str(current))}\\]\\b",
+            rf"^## \[{re.escape(str(current))}\]\b",
             text,
             re.MULTILINE,
         )
