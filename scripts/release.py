@@ -89,7 +89,7 @@ class SemVer:
     patch: int
 
     @classmethod
-    def parse(cls, value: str) -> "SemVer":
+    def parse(cls, value: str) -> SemVer:
         match = SEMVER_RE.fullmatch(value.strip())
         if match is None:
             raise ReleaseError(
