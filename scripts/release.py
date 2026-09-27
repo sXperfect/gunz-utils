@@ -295,9 +295,12 @@ class ReleaseRepo:
 
         if self.init_py.is_file():
             init_text = self.init_py.read_text(encoding="utf-8")
-            if "from ._version import __version__" not in init_text:
+            if (
+                "from . import _version" not in init_text
+                or "__version__ = _version.__version__" not in init_text
+            ):
                 errors.append(
-                    "gunz_utils.__version__ must import the shared version resolver"
+                    "gunz_utils.__version__ must use the shared version resolver"
                 )
             if VERSION_LITERAL_RE.search(init_text):
                 errors.append(
