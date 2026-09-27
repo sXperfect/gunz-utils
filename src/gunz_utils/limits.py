@@ -76,7 +76,7 @@ class ResourceBudget:
         limits: Limits,
         *,
         clock: Callable[[], float] = time.monotonic,
-    ) -> "ResourceBudget":
+    ) -> ResourceBudget:
         """Create a fresh consumable budget from stateless limits."""
         return cls(
             max_bytes=limits.max_bytes,
@@ -114,8 +114,8 @@ class ResourceBudget:
             raise BudgetExceededError("depth budget exceeded")
 
     def check_deadline(self) -> None:
-        """Reject work after the configured monotonic deadline."""
-        if self._deadline is not None and self._clock() > self._deadline:
+        """Reject work at or after the configured monotonic deadline."""
+        if self._deadline is not None and self._clock() >= self._deadline:
             raise BudgetExceededError("time budget exceeded")
 
     @property
