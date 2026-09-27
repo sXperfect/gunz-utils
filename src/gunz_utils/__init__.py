@@ -63,7 +63,6 @@ from .upstream_protocol import (
 )
 
 
-
 def _resolve_package_version() -> str:
     """Return the shared installed-distribution version."""
     from ._version import __version__
