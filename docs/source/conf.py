@@ -1,6 +1,6 @@
 import os
 import sys
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import PackageNotFoundError, version as package_version
 
 sys.path.insert(0, os.path.abspath('../../src'))
 
@@ -8,7 +8,7 @@ project = 'gunz-utils'
 copyright = '2025, Yeremia Gunawan Adhisantoso'
 author = 'Yeremia Gunawan Adhisantoso'
 try:
-    release = version("gunz-utils")
+    release = package_version("gunz-utils")
 except PackageNotFoundError:
     release = "0+unknown"
 
