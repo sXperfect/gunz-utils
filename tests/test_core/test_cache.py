@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from datetime import UTC, datetime, timedelta
 
-from gunz_utils.cache import SingleFlight, ttl_cache
+from gunz_utils.cache import RecencyTTLPolicy, SingleFlight, ttl_cache
 
 
 class TestTTLCache(unittest.TestCase):
@@ -53,3 +54,79 @@ class TestSingleFlight(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(results, [7, 7, 7])
         self.assertEqual(calls, 1)
+
+
+
+class TestRecencyTTLPolicy(unittest.TestCase):
+    def setUp(self) -> None:
+        self.policy = RecencyTTLPolicy(
+            recent_window=timedelta(days=5),
+            recent_ttl=timedelta(hours=6),
+            historical_ttl=timedelta(days=30),
+            empty_recent_ttl=timedelta(hours=1),
+        )
+        self.now = datetime(
+            2026,
+            9,
+            27,
+            12,
+            0,
+            tzinfo=UTC,
+        )
+
+    def test_selects_recent_and_historical_ttls(self) -> None:
+        self.assertEqual(
+            self.policy.ttl_for(
+                self.now - timedelta(days=2),
+                now=self.now,
+            ),
+            timedelta(hours=6),
+        )
+        self.assertEqual(
+            self.policy.ttl_for(
+                self.now - timedelta(days=10),
+                now=self.now,
+            ),
+            timedelta(days=30),
+        )
+
+    def test_recent_empty_result_uses_empty_ttl(self) -> None:
+        self.assertEqual(
+            self.policy.ttl_for(
+                self.now - timedelta(hours=2),
+                empty=True,
+                now=self.now,
+            ),
+            timedelta(hours=1),
+        )
+
+    def test_future_timestamp_is_treated_as_recent(self) -> None:
+        self.assertEqual(
+            self.policy.ttl_for(
+                self.now + timedelta(hours=1),
+                now=self.now,
+            ),
+            timedelta(hours=6),
+        )
+
+    def test_requires_timezone_aware_datetimes(self) -> None:
+        naive = datetime(2026, 9, 27, 12, 0)
+
+        with self.assertRaises(ValueError):
+            self.policy.ttl_for(
+                naive,
+                now=self.now,
+            )
+        with self.assertRaises(ValueError):
+            self.policy.ttl_for(
+                self.now,
+                now=naive,
+            )
+
+    def test_rejects_negative_durations(self) -> None:
+        with self.assertRaises(ValueError):
+            RecencyTTLPolicy(
+                recent_window=timedelta(days=-1),
+                recent_ttl=timedelta(hours=1),
+                historical_ttl=timedelta(days=1),
+            )

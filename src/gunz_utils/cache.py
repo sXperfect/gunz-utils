@@ -7,6 +7,7 @@ import functools
 import threading
 import time
 from collections import OrderedDict
+from datetime import UTC, datetime, timedelta
 from collections.abc import Awaitable, Callable, Coroutine, Hashable
 from dataclasses import dataclass
 from typing import Any, ParamSpec, TypeVar
@@ -177,4 +178,102 @@ class SingleFlight:
                         self._tasks.pop(key, None)
 
 
-__all__ = ["CacheInfo", "SingleFlight", "async_ttl_cache", "ttl_cache"]
+__all__ = [
+    "CacheInfo",
+    "RecencyTTLPolicy",
+    "SingleFlight",
+    "async_ttl_cache",
+    "ttl_cache",
+]
+
+
+
+@dataclass(frozen=True, slots=True)
+class RecencyTTLPolicy:
+    """Choose cache TTL from the age of source data.
+
+    Parameters
+    ----------
+    recent_window : timedelta
+        Data age considered recent.
+    recent_ttl : timedelta
+        TTL for recent non-empty data.
+    historical_ttl : timedelta
+        TTL for data older than recent_window.
+    empty_recent_ttl : timedelta | None, optional
+        Optional shorter/different TTL for empty recent responses. When None,
+        recent_ttl is used.
+
+    Notes
+    -----
+    This policy knows nothing about markets, crawlers, providers, or datasets.
+    Consumers define what timestamp represents the data's freshness boundary.
+    """
+
+    recent_window: timedelta
+    recent_ttl: timedelta
+    historical_ttl: timedelta
+    empty_recent_ttl: timedelta | None = None
+
+    def __post_init__(self) -> None:
+        """Validate non-negative windows and TTLs."""
+        values = {
+            "recent_window": self.recent_window,
+            "recent_ttl": self.recent_ttl,
+            "historical_ttl": self.historical_ttl,
+        }
+        if self.empty_recent_ttl is not None:
+            values["empty_recent_ttl"] = self.empty_recent_ttl
+
+        for name, value in values.items():
+            if not isinstance(value, timedelta):
+                raise TypeError(f"{name} must be datetime.timedelta")
+            if value < timedelta(0):
+                raise ValueError(f"{name} must be non-negative")
+
+    def ttl_for(
+        self,
+        observed_at: datetime,
+        *,
+        empty: bool = False,
+        now: datetime | None = None,
+    ) -> timedelta:
+        """Return the TTL appropriate for one source timestamp.
+
+        Parameters
+        ----------
+        observed_at : datetime
+            Time represented by the cached source data. Must be timezone-aware.
+        empty : bool, optional
+            Whether the source result is empty.
+        now : datetime | None, optional
+            Reference time for deterministic tests. Defaults to current UTC.
+
+        Returns
+        -------
+        timedelta
+            Selected TTL.
+
+        Raises
+        ------
+        ValueError
+            If observed_at or now is timezone-naive.
+        """
+        if not isinstance(observed_at, datetime):
+            raise TypeError("observed_at must be datetime")
+        if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+            raise ValueError("observed_at must be timezone-aware")
+
+        reference = now or datetime.now(UTC)
+        if not isinstance(reference, datetime):
+            raise TypeError("now must be datetime or None")
+        if reference.tzinfo is None or reference.utcoffset() is None:
+            raise ValueError("now must be timezone-aware")
+
+        age = reference.astimezone(UTC) - observed_at.astimezone(UTC)
+        recent = age <= self.recent_window
+        if recent:
+            if empty and self.empty_recent_ttl is not None:
+                return self.empty_recent_ttl
+            return self.recent_ttl
+        return self.historical_ttl

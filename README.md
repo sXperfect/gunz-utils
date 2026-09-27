@@ -18,12 +18,22 @@
 | [`iteration`](src/gunz_utils/iteration.py) | `chunked`, `batched`, `flatten`, `first` — lazy generators | stdlib |
 | [`cache`](src/gunz_utils/cache.py) | TTL memoization + async `SingleFlight` request coalescing | stdlib |
 | [`concurrency`](src/gunz_utils/concurrency.py) | bounded async gather/map helpers | stdlib |
-| [`retry`](src/gunz_utils/retry.py) | decorator retry plus result-aware `RetryPolicy` execution | stdlib |
+| [`retry`](src/gunz_utils/retry.py) | result/exception-aware retry with context-specific delay overrides | stdlib |
 | [`limits`](src/gunz_utils/limits.py) | stateless `Limits` + cumulative `ResourceBudget` accounting | stdlib |
 | [`plugins`](src/gunz_utils/plugins.py) | deterministic failure-isolated entry-point discovery | stdlib |
 | [`provenance`](src/gunz_utils/provenance.py) | allowlisted runtime provenance for reproducible artifacts | stdlib |
 | [`streaming`](src/gunz_utils/streaming.py) | bounded/digesting writers and copy-and-hash | stdlib |
 | [`versioning`](src/gunz_utils/versioning.py) | versioned envelopes and forward schema migrations | stdlib |
+| [`sampling`](src/gunz_utils/sampling.py) | deterministic named-item sampling across processes | stdlib |
+| [`experiments`](src/gunz_utils/experiments.py) | pristine-state variant matrices and metric comparisons | stdlib |
+| [`content_store`](src/gunz_utils/content_store.py) | content-addressed storage, fanout, integrity checks, and atomic materialization | stdlib |
+| [`dag`](src/gunz_utils/dag.py) | dependency-ordered workflow execution with fingerprint caching | stdlib |
+| [`network`](src/gunz_utils/network.py) | safe network URI construction and TCP reachability checks | stdlib |
+| [`partitions`](src/gunz_utils/partitions.py) | immutable disjoint partition manifests with stable fingerprints | stdlib |
+| [`stats`](src/gunz_utils/stats.py) | bootstrap mean confidence intervals and paired effects | stdlib |
+| [`signals`](src/gunz_utils/signals.py) | reversible process/asyncio termination handlers | stdlib |
+| [`provenance_graph`](src/gunz_utils/provenance_graph.py) | immutable provenance nodes and acyclic lineage traversal | stdlib |
+| [`sync`](src/gunz_utils/sync.py) | shell-free rsync mirroring with optional shared-filesystem locking | stdlib |
 | [`serialization`](src/gunz_utils/serialization.py) | deterministic JSON + common-object normalization | stdlib |
 | [`subprocess`](src/gunz_utils/subprocess.py) | structured sync/async shell-free command execution | stdlib |
 | [`models`](src/gunz_utils/models.py) | `GunzBaseModel` — `pydantic.BaseModel` configured to forbid extra fields | `validation` extra |

@@ -25,10 +25,29 @@ def atomic_write(
     encoding: str | None = None,
     mkdir: bool = False,
     durable: bool = False,
+    permissions: int | None = None,
 ) -> None:
-    """Atomically write text or bytes through a same-directory temporary file."""
+    """Atomically write text or bytes through a same-directory temporary file.
+
+    When permissions is provided, the temporary file receives that mode before
+    any content is written, and the mode is preserved by atomic replacement.
+    """
     if not isinstance(path, str | pathlib.Path):
         raise TypeError("path must be str or pathlib.Path")
+
+    if permissions is not None:
+        if (
+            isinstance(permissions, bool)
+            or not isinstance(permissions, int)
+            or not 0 <= permissions <= 0o7777
+        ):
+            raise ValueError(
+                "permissions must be an integer mode in the range 0..0o7777"
+            )
+        if not hasattr(os, "fchmod"):
+            raise NotImplementedError(
+                "explicit permissions require os.fchmod support"
+            )
 
     target = pathlib.Path(path)
     if mkdir:
@@ -48,6 +67,11 @@ def atomic_write(
         suffix=".tmp",
     )
     try:
+        if permissions is not None:
+            os.fchmod(
+                fd,
+                permissions,
+            )
         if is_binary:
             with os.fdopen(fd, mode) as file:
                 file.write(content)
@@ -82,6 +106,7 @@ def atomic_json_write(
     pretty: bool = True,
     mkdir: bool = False,
     durable: bool = False,
+    permissions: int | None = None,
 ) -> None:
     """Serialize deterministic JSON and publish it atomically.
 
@@ -97,6 +122,8 @@ def atomic_json_write(
         Create missing parent directories.
     durable : bool, default=False
         Flush file and parent-directory metadata before returning.
+    permissions : int | None, default=None
+        Explicit file mode applied before content is written.
     """
     atomic_write(
         path,
@@ -105,4 +132,5 @@ def atomic_json_write(
         encoding="utf-8",
         mkdir=mkdir,
         durable=durable,
+        permissions=permissions,
     )

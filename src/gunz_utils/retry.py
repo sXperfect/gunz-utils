@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import math
 import random
 import time
 from collections.abc import Awaitable, Callable
@@ -52,6 +53,10 @@ class RetryPolicy(Generic[T]):
     timeout: float | None = None
     retry_if_exception: Callable[[BaseException], bool] | None = None
     retry_if_result: Callable[[T], bool] | None = None
+    delay_override: (
+        Callable[[int, T | None, BaseException | None], float | None]
+        | None
+    ) = None
 
     def __post_init__(self) -> None:
         _validate(
@@ -63,10 +68,41 @@ class RetryPolicy(Generic[T]):
         if not self.exceptions:
             raise ValueError("exceptions must not be empty")
 
-    def delay(self, attempt: int) -> float:
-        """Return the configured delay after a one-based attempt."""
+    def delay(
+        self,
+        attempt: int,
+        *,
+        result: T | None = None,
+        error: BaseException | None = None,
+    ) -> float:
+        """Return the delay after a one-based attempt.
+
+        An explicit delay_override can inspect the attempt plus result/error and
+        return an exact non-negative delay. Returning None falls back to the
+        configured exponential backoff and jitter.
+        """
         if attempt < 1:
             raise ValueError("attempt must be at least 1")
+
+        if self.delay_override is not None:
+            override = self.delay_override(
+                attempt,
+                result,
+                error,
+            )
+            if override is not None:
+                if (
+                    isinstance(override, bool)
+                    or not isinstance(override, (int, float))
+                    or not math.isfinite(float(override))
+                    or override < 0
+                ):
+                    raise ValueError(
+                        "delay_override must return a finite "
+                        "non-negative number or None"
+                    )
+                return float(override)
+
         return _delay(
             attempt,
             self.base_delay,
@@ -115,7 +151,10 @@ def run_with_retry(
                 and not policy.retry_if_exception(exc)
             ):
                 raise
-            delay = policy.delay(attempt)
+            delay = policy.delay(
+                attempt,
+                error=exc,
+            )
             if not _has_wait_budget(deadline, delay):
                 raise
             if on_retry is not None:
@@ -135,7 +174,10 @@ def run_with_retry(
         )
         if not should_retry or attempt == policy.attempts:
             return result
-        delay = policy.delay(attempt)
+        delay = policy.delay(
+            attempt,
+            result=result,
+        )
         if not _has_wait_budget(deadline, delay):
             return result
         if on_retry is not None:
@@ -171,7 +213,10 @@ async def async_run_with_retry(
                 and not policy.retry_if_exception(exc)
             ):
                 raise
-            delay = policy.delay(attempt)
+            delay = policy.delay(
+                attempt,
+                error=exc,
+            )
             if not _has_wait_budget(deadline, delay):
                 raise
             if on_retry is not None:
@@ -191,7 +236,10 @@ async def async_run_with_retry(
         )
         if not should_retry or attempt == policy.attempts:
             return result
-        delay = policy.delay(attempt)
+        delay = policy.delay(
+            attempt,
+            result=result,
+        )
         if not _has_wait_budget(deadline, delay):
             return result
         if on_retry is not None:

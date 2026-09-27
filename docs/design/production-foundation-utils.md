@@ -11,7 +11,7 @@ policy.
 | Module | Contract |
 |---|---|
 | `concurrency` | Bound concurrent async work while preserving input order. |
-| `retry` | Sync/async exponential retry with bounded delay and cancellation safety. |
+| `retry` | Sync/async retry with exponential defaults, bounded delay, cancellation safety, and context-aware delay overrides. |
 | `cache` | Bounded TTL memoization and async single-flight request coalescing. |
 | `serialization` | Stable JSON normalization for hashes, cache keys, and persistence. |
 | `subprocess` | Shell-free structured command execution with captured output and timing. |
@@ -20,6 +20,19 @@ policy.
 | `provenance` | Runtime provenance with explicit environment allowlisting. |
 | `streaming` | Bounded writers, digest writers, and copy-and-hash primitives. |
 | `versioning` | Versioned payload envelopes and forward migration registry. |
+| `sampling` | Stable deterministic named-item sampling independent of Python hash randomization. |
+| `experiments` | Pristine-state variant matrices and scalar metric comparison. |
+| `structures` | Bounded retention and typed deep structural differences. |
+| `instrumentation` | Lightweight success/failure execution spans. |
+| `content_store` | Integrity-checked content-addressed storage with fanout and atomic materialization. |
+| `signals` | Reversible process and asyncio termination/preemption handlers. |
+| `network` | Standards-oriented authority URI construction and TCP reachability. |
+| `stats` | Seeded bootstrap mean confidence intervals and paired effects. |
+| `partitions` | Immutable disjoint named partitions with stable fingerprints. |
+| `dag` | Dependency-ordered workflow execution with transitive fingerprint caching. |
+| `provenance_graph` | Acyclic lineage graphs with unresolved/external input tracking. |
+| `sync` | Shell-free rsync mirroring with advisory locking and atomic completion markers. |
+| `leases` | Backend-neutral renewable lease heartbeat coordination for async workers. |
 
 ## Design constraints
 
@@ -43,8 +56,9 @@ collection transforms, identifiers, UTC/deadline helpers, layered configuration,
 explicit result values, safe diagnostics, async lifecycle helpers, and
 framework-independent testing helpers.
 
-HTTP clients, database abstractions, CLI frameworks, and application
-orchestration remain consumer-library concerns.
+HTTP clients, database abstractions, CLI frameworks, and domain-specific
+application orchestration remain consumer-library concerns. The generic DAG
+executes dependency relationships only; it does not own application policy.
 
 ## Performance engineering
 

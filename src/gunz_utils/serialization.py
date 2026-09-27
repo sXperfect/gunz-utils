@@ -12,7 +12,10 @@ from typing import Any
 def to_jsonable(value: Any) -> Any:
     """Convert common Python objects into JSON-compatible values."""
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return to_jsonable(dataclasses.asdict(value))
+        return {
+            field.name: to_jsonable(getattr(value, field.name))
+            for field in dataclasses.fields(value)
+        }
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, Mapping):

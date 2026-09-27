@@ -83,12 +83,8 @@ def redact(value: object, *, show_chars: int = 2) -> object:
     """
     if show_chars < 0:
         raise ValueError("show_chars must be non-negative")
-    if show_chars < 0:
-        raise ValueError("show_chars must be non-negative")
     if not isinstance(value, str):
         return value
-    if show_chars == 0:
-        return _MASK
     if show_chars == 0:
         return _MASK
     # ? Strings at or below the "reveal both ends" threshold contain

@@ -73,6 +73,68 @@ These modules have no third-party runtime dependencies.
    :undoc-members:
    :show-inheritance:
 
+
+.. automodule:: gunz_utils.sampling
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.experiments
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.structures
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.instrumentation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.content_store
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.signals
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.network
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.stats
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.partitions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.dag
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: gunz_utils.provenance_graph
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.sync
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. automodule:: gunz_utils.models
    :members:
    :undoc-members:
@@ -147,6 +209,11 @@ let you run with zero third-party deps where supported.
    :show-inheritance:
 
 .. automodule:: gunz_utils.ext.secure_store
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.leases
    :members:
    :undoc-members:
    :show-inheritance:

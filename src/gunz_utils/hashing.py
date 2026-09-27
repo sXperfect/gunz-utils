@@ -12,8 +12,11 @@ __version__ = "1.8.0"
 
 __all__ = [
     "content_hash",
+    "directory_hash",
+    "directory_manifest",
     "file_hash",
     "short_hash",
+    "structured_hash",
     "DEFAULT_ALGO",
     "DEFAULT_CHUNK_SIZE",
     "SUPPORTED_ALGOS",
@@ -172,3 +175,114 @@ def short_hash(data: bytes | str, *, chars: int = 8, algo: str = DEFAULT_ALGO) -
             f"chars must be in [{_MIN_SHORT_CHARS}, {_MAX_SHORT_CHARS}], got {chars}"
         )
     return content_hash(data, algo=algo)[:chars]
+
+
+
+def structured_hash(
+    value: object,
+    *,
+    algo: str = DEFAULT_ALGO,
+) -> str:
+    """Hash structured Python data through canonical JSON serialization.
+
+    Parameters
+    ----------
+    value : object
+        Value supported by :func:`gunz_utils.serialization.canonical_json`.
+    algo : str, optional
+        Hash algorithm accepted by :func:`content_hash`.
+
+    Returns
+    -------
+    str
+        Stable hexadecimal digest.
+
+    Notes
+    -----
+    Mapping key order and set iteration order do not affect the resulting
+    digest because serialization is canonicalized first.
+    """
+    from .serialization import canonical_json
+
+    return content_hash(
+        canonical_json(value),
+        algo=algo,
+    )
+
+
+def directory_manifest(
+    root: str | pathlib.Path,
+    *,
+    algo: str = DEFAULT_ALGO,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> dict[str, str]:
+    """Return stable relative-path hashes for every regular file below root.
+
+    Parameters
+    ----------
+    root : str | pathlib.Path
+        Directory to traverse recursively.
+    algo : str, optional
+        Hash algorithm used for each file.
+    chunk_size : int, optional
+        Streaming block size used by :func:`file_hash`.
+
+    Returns
+    -------
+    dict[str, str]
+        Relative POSIX paths mapped to file digests, ordered lexically by path.
+        Symbolic links are excluded so the manifest cannot silently depend on
+        content outside the requested root.
+
+    Raises
+    ------
+    NotADirectoryError
+        If root is not a directory.
+    """
+    if algo not in SUPPORTED_ALGOS:
+        raise ValueError(
+            f"unsupported algo {algo!r}; expected one of {sorted(SUPPORTED_ALGOS)}"
+        )
+    if chunk_size <= 0:
+        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
+
+    base = pathlib.Path(root)
+    if not base.is_dir():
+        raise NotADirectoryError(str(base))
+
+    files = sorted(
+        (
+            path
+            for path in base.rglob("*")
+            if path.is_file() and not path.is_symlink()
+        ),
+        key=lambda path: path.relative_to(base).as_posix(),
+    )
+    return {
+        path.relative_to(base).as_posix(): file_hash(
+            path,
+            algo=algo,
+            chunk_size=chunk_size,
+        )
+        for path in files
+    }
+
+
+def directory_hash(
+    root: str | pathlib.Path,
+    *,
+    algo: str = DEFAULT_ALGO,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> str:
+    """Return one digest representing paths and contents below a directory.
+
+    The digest changes when a relative path or any file content changes.
+    """
+    return structured_hash(
+        directory_manifest(
+            root,
+            algo=algo,
+            chunk_size=chunk_size,
+        ),
+        algo=algo,
+    )

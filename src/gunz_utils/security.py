@@ -260,3 +260,117 @@ def open_path_under_base(
     finally:
         os.close(dir_fd)
     return os.fdopen(fd, mode)
+
+
+
+class NameAccessPolicy:
+    """Allow/deny policy for named capabilities.
+
+    Parameters
+    ----------
+    allowed : frozenset[str] | None, optional
+        Optional allowlist. When None, names are allowed unless denied.
+    denied : frozenset[str], optional
+        Explicit denylist. Deny entries always take precedence over the
+        allowlist.
+
+    Notes
+    -----
+    This policy is intentionally domain-neutral. Callers can use it for plugin
+    names, providers, execution backends, agent tools, data sources, or other
+    stable identifiers.
+    """
+
+    def __init__(
+        self,
+        *,
+        allowed: frozenset[str] | None = None,
+        denied: frozenset[str] = frozenset(),
+    ) -> None:
+        normalized_allowed = (
+            None
+            if allowed is None
+            else frozenset(allowed)
+        )
+        normalized_denied = frozenset(denied)
+        for collection in (normalized_allowed, normalized_denied):
+            if collection is None:
+                continue
+            if any(
+                not isinstance(name, str) or not name
+                for name in collection
+            ):
+                raise ValueError(
+                    "policy names must be non-empty strings"
+                )
+        self.allowed = normalized_allowed
+        self.denied = normalized_denied
+
+    def allows(
+        self,
+        name: str,
+    ) -> bool:
+        """Return whether a name is permitted without raising.
+
+        Parameters
+        ----------
+        name : str
+            Capability name.
+
+        Returns
+        -------
+        bool
+            True when permitted.
+
+        Raises
+        ------
+        ValueError
+            If name is empty.
+        """
+        normalized = self._validate_name(name)
+        if normalized in self.denied:
+            return False
+        return self.allowed is None or normalized in self.allowed
+
+    def check(
+        self,
+        name: str,
+    ) -> bool:
+        """Require a name to be permitted.
+
+        Parameters
+        ----------
+        name : str
+            Capability name.
+
+        Returns
+        -------
+        bool
+            True when permitted.
+
+        Raises
+        ------
+        PermissionError
+            If the name is denied or absent from a configured allowlist.
+        ValueError
+            If name is empty.
+        """
+        normalized = self._validate_name(name)
+        if normalized in self.denied:
+            raise PermissionError(
+                f"name {normalized!r} is explicitly denied"
+            )
+        if self.allowed is not None and normalized not in self.allowed:
+            raise PermissionError(
+                f"name {normalized!r} is not allowlisted"
+            )
+        return True
+
+    @staticmethod
+    def _validate_name(
+        name: str,
+    ) -> str:
+        """Validate one policy identifier."""
+        if not isinstance(name, str) or not name:
+            raise ValueError("name must be a non-empty string")
+        return name

@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import unittest
 from pathlib import Path
+from types import MappingProxyType
 
 from gunz_utils.serialization import canonical_json, json_loads, to_jsonable
 
@@ -28,3 +29,33 @@ class TestSerialization(unittest.TestCase):
     def test_bytes_are_explicitly_rejected(self) -> None:
         with self.assertRaises(TypeError):
             canonical_json({"raw": b"x"})
+
+
+
+@dataclasses.dataclass(frozen=True)
+class FrozenMappingExample:
+    values: object
+
+
+class TestImmutableDataclassSerialization(unittest.TestCase):
+    def test_mapping_proxy_inside_dataclass_is_supported(self) -> None:
+        value = FrozenMappingExample(
+            MappingProxyType(
+                {
+                    "nested": MappingProxyType(
+                        {"value": 1}
+                    )
+                }
+            )
+        )
+
+        self.assertEqual(
+            to_jsonable(value),
+            {
+                "values": {
+                    "nested": {
+                        "value": 1,
+                    }
+                }
+            },
+        )

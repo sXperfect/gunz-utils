@@ -5,6 +5,48 @@ All notable changes to **gunz-utils** are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `gunz_utils.sampling`: deterministic process-independent named-item sampling.
+- `gunz_utils.experiments`: pristine-state variant matrices, numeric comparisons, and directional metric-improvement evidence.
+- `gunz_utils.structures.deep_diff` and `retain_priority_and_recent`: typed structural comparison and bounded priority retention.
+- `gunz_utils.instrumentation.Trace`: lightweight success/failure span tracing.
+- Structured and directory hashing extensions plus symlink-safe rooted directory manifests.
+- `gunz_utils.content_store`: content-addressed local file storage with integrity verification, configurable digest fanout, and atomic hardlink/copy materialization.
+- Named lifecycle fault injection plus reversible process and asyncio termination/preemption signal helpers.
+- Rich execution manifests layered on existing runtime provenance.
+- Safe authority URI construction and TCP reachability helpers.
+- Seeded bootstrap mean confidence intervals and paired standardized-effect summaries.
+- Immutable disjoint partition manifests with stable fingerprints plus generic overlap/disjointness checks.
+- Generic name allow/deny access policy.
+- Fingerprint-aware workflow DAG execution with transitive dependency cache invalidation.
+- Context-aware retry delay overrides for provider Retry-After values and fixed schedules in sync/async retry execution.
+- `gunz_utils.cache.RecencyTTLPolicy` for timezone-aware recent/historical/empty-result TTL selection without domain-specific market semantics.
+- Context-aware retry delay overrides for provider Retry-After values and fixed schedules while preserving exponential/jitter defaults.
+- Atomic writes can apply explicit file permissions before content publication.
+- Immutable provenance graph nodes with acyclic lineage traversal and unresolved-input reporting.
+- Shell-free rsync directory mirroring with advisory coordination and atomic completion markers.
+- Backend-neutral renewable lease heartbeat execution that cancels stale work on ownership loss.
+
+### Fixed
+
+- Removed duplicated validation branches in secret redaction.
+- Directory fingerprints exclude symlinked files so rooted manifests do not silently depend on external content.
+- Deterministic named sampling rejects duplicate names rather than depending on input ordering.
+- Rsync cache synchronization now holds its advisory lock through completion-marker publication, preventing false-complete races between concurrent sync processes.
+- Advisory lock files reject symlink redirection and use `O_NOFOLLOW` when available.
+- Network URIs validate IPv6 authorities, normalize IDNA hostnames, and reject authority-injection delimiters.
+- Partition manifests reject scalar strings as identifier collections and defensively freeze assignments.
+- Execution manifests normalize run IDs and reject boolean/non-positive attempt counters.
+- Paired standardized effects use `None` when mathematically undefined so results remain canonical-JSON compatible.
+- Variant experiment failures retain exception type only, avoiding arbitrary secret-bearing exception text in reports.
+- Content-addressed ingest now hashes while copying in one pass and rejects symlinked source/store entries.
+- Paired-effect helpers use `None` for undefined standardized effects, keeping results compatible with canonical JSON.
+- Rsync mirroring rejects hidden destructive extra flags and lock/marker filename collisions.
+- Provenance metadata freezing rejects cyclic container graphs explicitly.
+
 ## [1.10.0] — 2026-09-27
 
 Shared-foundation release for cross-project consumers such as Hyperion and Helios-JS.
@@ -24,7 +66,8 @@ Shared-foundation release for cross-project consumers such as Hyperion and Helio
 - Removed duplicate `lexical_contained_path` and stray duplicated module text from `fs.py`.
 - Repaired the stray duplicate `AsyncBulkhead.run` body and unified timeout-aware permit acquisition.
 - Restored root exports promised by `gunz_utils.__all__` for context, deprecation, and fault helpers.
-- Durable binary `atomic_write` now flushes and fsyncs before atomic replacement.\n- Bounded concurrency now propagates child cancellation even when `return_exceptions=True`; cancellation, process-exit, and keyboard-interrupt signals are never converted into ordinary result values.
+- Durable binary `atomic_write` now flushes and fsyncs before atomic replacement.
+- Bounded concurrency now propagates child cancellation even when `return_exceptions=True`; cancellation, process-exit, and keyboard-interrupt signals are never converted into ordinary result values.
 
 ### Compatibility
 
