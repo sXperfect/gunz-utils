@@ -4,8 +4,9 @@
 Each subcommand corresponds to one intended hosted gate and runs the same
 check the CI workflow would run, **without** mutating the active environment:
 
+    python scripts/ci.py release     # release/version/changelog metadata
+    python scripts/ci.py lint        # ruff (src tests benchmarks scripts) + mypy
     python scripts/ci.py test        # full pytest (unittest cases + pytest functions)
-    python scripts/ci.py lint        # ruff (src tests benchmarks) + mypy
     python scripts/ci.py docs        # Sphinx docs build (scripts/build_docs.sh)
     python scripts/ci.py packaging   # dependency-isolation matrix in fresh venvs
     python scripts/ci.py all         # every gate sequentially, stop on first failure
@@ -39,6 +40,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
 DOCS_SOURCE = PROJECT_ROOT / "docs" / "source"
 BUILD_DOCS_SCRIPT = PROJECT_ROOT / "scripts" / "build_docs.sh"
+RELEASE_SCRIPT = PROJECT_ROOT / "scripts" / "release.py"
 
 # The hosted zero-dependency core-import gate (ci.yml core_import) forbids these
 # optional packages from being imported by the core package.
@@ -129,8 +131,16 @@ def _run(cmd: Sequence[str], *, env: Mapping[str, str] | None = None) -> int:
     return result.returncode
 
 
+def run_release() -> int:
+    """Validate package version, changelog fragments, and release metadata."""
+    if not RELEASE_SCRIPT.is_file():
+        print(f"!! missing release script: {RELEASE_SCRIPT}", file=sys.stderr)
+        return 2
+    return _run([sys.executable, str(RELEASE_SCRIPT), "check"])
+
+
 def run_test() -> int:
-    """Full pytest collection (unittest cases + pytest functions, currently 712)."""
+    """Run the complete pytest collection."""
     _verify_import_origin()
     return _run([sys.executable, "-m", "pytest"])
 
@@ -341,7 +351,18 @@ def _case_wheel_sdist() -> int:
 
 def run_lint() -> int:
     """Ruff (src tests benchmarks) then mypy; propagate the first failure."""
-    status = _run([sys.executable, "-m", "ruff", "check", "src", "tests", "benchmarks"])
+    status = _run(
+        [
+            sys.executable,
+            "-m",
+            "ruff",
+            "check",
+            "src",
+            "tests",
+            "benchmarks",
+            "scripts",
+        ]
+    )
     mypy_status = _run([sys.executable, "-m", "mypy", "src/gunz_utils"])
     if status == 0:
         status = mypy_status
@@ -404,8 +425,9 @@ def run_packaging() -> int:
 
 
 GATES: dict[str, tuple[str, str]] = {
+    "release": ("Validate release/version/changelog metadata", "release metadata"),
+    "lint": ("Run ruff (src tests benchmarks scripts) then mypy", "ruff + mypy"),
     "test": ("Run full pytest (unittest cases + pytest functions)", "full pytest"),
-    "lint": ("Run ruff (src tests benchmarks) then mypy", "ruff + mypy"),
     "docs": ("Build documentation via scripts/build_docs.sh", "sphinx docs"),
     "packaging": (
         "Run the packaging / dependency-isolation gate",
@@ -422,8 +444,9 @@ def run_all() -> int:
         print(f"  gate: {name}  --  {help_text}")
         print("=" * 72)
         runner = {
-            "test": run_test,
+            "release": run_release,
             "lint": run_lint,
+            "test": run_test,
             "docs": run_docs,
             "packaging": run_packaging,
         }[name]
@@ -462,8 +485,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_all()
 
     runner = {
-        "test": run_test,
+        "release": run_release,
         "lint": run_lint,
+        "test": run_test,
         "docs": run_docs,
         "packaging": run_packaging,
     }.get(args.command)
