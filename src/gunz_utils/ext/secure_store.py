@@ -56,7 +56,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-from .._version import __version__
+from .._version import __version__ as __version__
 
 _PBKDF2_ITERATIONS = 600_000  # OWASP 2023 recommendation for SHA-256
 _KEY_FILE_MODE = 0o600  # owner read/write only

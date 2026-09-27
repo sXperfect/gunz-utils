@@ -17,7 +17,7 @@ import pathlib
 import subprocess
 import sys
 
-from .._version import __version__
+from .._version import __version__ as __version__
 
 __all__ = ["resolve_project_root"]
 

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from .._version import __version__
+from .._version import __version__ as __version__
 
 
 def setup_logging(

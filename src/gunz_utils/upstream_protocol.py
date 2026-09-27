@@ -69,7 +69,7 @@ import abc
 import asyncio
 from typing import Any, Protocol, runtime_checkable
 
-from ._version import __version__
+from ._version import __version__ as __version__
 
 # ---------------------------------------------------------------------------
 # Exception hierarchy

@@ -26,7 +26,7 @@ import functools
 import inspect
 import typing as t
 
-from .._version import __version__
+from .._version import __version__ as __version__
 
 __all__ = ["type_checked"]
 
