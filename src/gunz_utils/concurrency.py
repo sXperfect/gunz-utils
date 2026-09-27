@@ -47,7 +47,9 @@ async def gather_limited(
                 index = pending.pop(task)
                 try:
                     ordered[index] = task.result()
-                except BaseException as exc:
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
                     if not return_exceptions:
                         raise
                     ordered[index] = exc
