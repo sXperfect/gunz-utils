@@ -1,1 +1,0 @@
-Remove stale per-module `__version__` attributes; package version metadata is now exposed only through `gunz_utils.__version__`, derived from installed distribution metadata.
