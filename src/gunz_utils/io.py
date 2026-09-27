@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-# =============================================================================
-# STANDARD LIBRARY IMPORTS
-# =============================================================================
 import os
 import pathlib
 import tempfile
+from typing import Any
+
+from .serialization import json_dumps
 
 __author__ = "Yeremia Gunz"
 __email__ = "adhisant@tnt.uni-hannover.de"
 __license__ = "Clear BSD"
-__version__ = "1.6.0"
+__version__ = "1.10.0"
 
-__all__ = ["atomic_write"]
+__all__ = ["atomic_json_write", "atomic_write"]
 
 
 def atomic_write(
@@ -26,43 +26,7 @@ def atomic_write(
     mkdir: bool = False,
     durable: bool = False,
 ) -> None:
-    """Atomically write content to path.
-
-    Writes content to a temp file in the same directory, then uses
-    ``os.replace()`` to atomically rename the temp file over the target.
-    This guarantees readers see either the old content or the new content,
-    never a partial write.
-
-    Parameters
-    ----------
-    path : str or pathlib.Path
-        Target file path. Parent directory must exist unless ``mkdir=True``.
-    content : str or bytes
-        String content in text mode or bytes content in binary mode.
-    mode : str, default="w"
-        File mode. Use ``"w"`` for text or ``"wb"`` for binary content.
-    encoding : str or None, default=None
-        Text encoding, defaulting to UTF-8. Ignored in binary mode.
-    mkdir : bool, default=False
-        Create missing parent directories with mode ``0o755`` when true.
-    durable : bool, default=False
-        If true, fsync file contents before replacement and the parent directory
-        after replacement on platforms supporting directory descriptors.
-
-    Returns
-    -------
-    None
-        The content is written to ``path`` in place.
-
-    Raises
-    ------
-    TypeError
-        If ``path`` is not a string or ``pathlib.Path``.
-    ValueError
-        If content type does not match the selected mode.
-    OSError
-        If directory creation, writing, replacement, or cleanup fails.
-    """
+    """Atomically write text or bytes through a same-directory temporary file."""
     if not isinstance(path, str | pathlib.Path):
         raise TypeError("path must be str or pathlib.Path")
 
@@ -74,11 +38,10 @@ def atomic_write(
 
     is_binary = "b" in mode
     if is_binary and isinstance(content, str):
-        raise ValueError("Binary mode ('wb') requires bytes content")
+        raise ValueError("Binary mode requires bytes content")
     if not is_binary and isinstance(content, bytes):
-        raise ValueError("Text mode ('w') requires str content")
+        raise ValueError("Text mode requires str content")
 
-    #? A same-directory descriptor keeps os.replace atomic across filesystems.
     fd, tmp_path = tempfile.mkstemp(
         dir=str(target.parent),
         prefix=f".{target.name}.",
@@ -88,6 +51,9 @@ def atomic_write(
         if is_binary:
             with os.fdopen(fd, mode) as file:
                 file.write(content)
+                if durable:
+                    file.flush()
+                    os.fsync(file.fileno())
         else:
             with os.fdopen(fd, mode, encoding=encoding or "utf-8") as file:
                 file.write(content)
@@ -102,9 +68,41 @@ def atomic_write(
             finally:
                 os.close(dir_fd)
     except BaseException:
-        #? Cleanup catches BaseException so interrupts cannot leave temp files.
         try:
             os.unlink(tmp_path)
         except OSError:
             pass
         raise
+
+
+def atomic_json_write(
+    path: str | pathlib.Path,
+    value: Any,
+    *,
+    pretty: bool = True,
+    mkdir: bool = False,
+    durable: bool = False,
+) -> None:
+    """Serialize deterministic JSON and publish it atomically.
+
+    Parameters
+    ----------
+    path : str | pathlib.Path
+        Destination JSON path.
+    value : Any
+        Value accepted by gunz_utils.serialization.to_jsonable.
+    pretty : bool, default=True
+        Use indented JSON when true.
+    mkdir : bool, default=False
+        Create missing parent directories.
+    durable : bool, default=False
+        Flush file and parent-directory metadata before returning.
+    """
+    atomic_write(
+        path,
+        json_dumps(value, pretty=pretty),
+        mode="w",
+        encoding="utf-8",
+        mkdir=mkdir,
+        durable=durable,
+    )
