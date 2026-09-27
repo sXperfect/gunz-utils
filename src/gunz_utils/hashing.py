@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from ._version import __version__
-
 import hashlib
 import pathlib
+
+from ._version import __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"

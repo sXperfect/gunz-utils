@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from ._version import __version__
-
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
@@ -11,6 +9,8 @@ import contextlib
 import time
 from collections.abc import Iterator
 from typing import Literal
+
+from ._version import __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"

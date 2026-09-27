@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from ._version import __version__
-
 from collections.abc import Iterable, Iterator
 from itertools import islice
 from typing import Any, TypeVar, cast
+
+from ._version import __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"

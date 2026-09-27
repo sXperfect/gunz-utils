@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from ._version import __version__
-
 from collections.abc import Mapping, MutableMapping, Sequence
 from typing import Any, Literal, cast
+
+from ._version import __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"

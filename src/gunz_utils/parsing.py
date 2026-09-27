@@ -6,10 +6,10 @@ safe defaults, plus a strict boolean parser for validation boundaries.
 
 from __future__ import annotations
 
-from ._version import __version__
-
 import math
 from typing import Any
+
+from ._version import __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"

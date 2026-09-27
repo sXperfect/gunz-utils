@@ -59,8 +59,6 @@ the subclass.
 
 from __future__ import annotations
 
-from ._version import __version__
-
 # =============================================================================
 # METADATA
 # =============================================================================
@@ -70,6 +68,8 @@ __license__ = "Clear BSD"
 import abc
 import asyncio
 from typing import Any, Protocol, runtime_checkable
+
+from ._version import __version__
 
 # ---------------------------------------------------------------------------
 # Exception hierarchy

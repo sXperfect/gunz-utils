@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from ._version import __version__
-
 import os
 import pathlib
 import tempfile
 from typing import Any
 
+from ._version import __version__
 from .serialization import json_dumps
 
 __author__ = "Yeremia Gunz"
