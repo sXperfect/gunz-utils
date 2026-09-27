@@ -81,3 +81,8 @@ def test_api_reference_covers_optional_backends_and_benchmark_namespace() -> Non
     documented = _documented_modules()
     missing = sorted(expected - documented)
     assert missing == []
+
+
+def test_agent_policy_and_documentation_layout() -> None:
+    assert (PROJECT_ROOT / "AGENTS.md").is_file()
+    assert not (PROJECT_ROOT / "guides").exists()

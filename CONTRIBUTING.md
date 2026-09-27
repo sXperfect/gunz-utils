@@ -5,6 +5,10 @@ Prefer a shared primitive here only when its contract is useful across multiple
 consumers; application policy and framework-specific behavior normally belong
 in the consuming repository.
 
+Automated coding agents must also follow [`AGENTS.md`](AGENTS.md), which
+summarizes repository-specific CI, versioning, security-audit, API, and hygiene
+rules while pointing back to canonical configuration and maintained docs.
+
 ## Development setup
 
 Requirements:

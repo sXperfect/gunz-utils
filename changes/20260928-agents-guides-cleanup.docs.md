@@ -1,0 +1,1 @@
+- Remove the obsolete top-level `guides/` tree and establish a tool-neutral `AGENTS.md` covering CI, versioning, security audit, API, testing, and repository-hygiene rules.

@@ -68,8 +68,7 @@ line-length = 88
 [tool.ruff.lint]
 # F (Pyflakes) + E/W (pycodestyle) + I (isort) + UP (pyupgrade) + B (bugbear)
 select = ["F", "E", "W", "I", "UP", "B"]
-# Allow assert in tests; the security guide forbids assert in production code,
-# so we tighten with a per-file override below.
+# Tests may use assert; AGENTS.md forbids assert as production runtime validation.
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]

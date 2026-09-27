@@ -15,9 +15,6 @@ build/
 # External knowledge base (Hyperhedron symlink farm)
 .hyperhedron
 
-# Top-level author-facing guides (superseded by docs/source/)
-guides/
-
 # Built Sphinx output
 docs/_build/
 

@@ -22,9 +22,10 @@ used.
 Do not derive current repository policy from an archived task. Current policy is
 defined by:
 
-1. [`CONTRIBUTING.md`](../../CONTRIBUTING.md);
-2. current configuration such as `pyproject.toml` and `.github/workflows/`;
-3. maintained documentation under `docs/source/` and `docs/development/`.
+1. executable configuration such as `pyproject.toml`, `.github/workflows/`, and repository scripts;
+2. [`CONTRIBUTING.md`](../../CONTRIBUTING.md);
+3. [`AGENTS.md`](../../AGENTS.md) for agent-facing operational rules;
+4. maintained documentation under `docs/source/`, `docs/development/`, `docs/design/`, and `docs/guides/`.
 
 ## Naming
 
