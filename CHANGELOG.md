@@ -24,7 +24,7 @@ Shared-foundation release for cross-project consumers such as Hyperion and Helio
 - Removed duplicate `lexical_contained_path` and stray duplicated module text from `fs.py`.
 - Repaired the stray duplicate `AsyncBulkhead.run` body and unified timeout-aware permit acquisition.
 - Restored root exports promised by `gunz_utils.__all__` for context, deprecation, and fault helpers.
-- Durable binary `atomic_write` now flushes and fsyncs before atomic replacement.
+- Durable binary `atomic_write` now flushes and fsyncs before atomic replacement.\n- Bounded concurrency now propagates child cancellation even when `return_exceptions=True`; cancellation, process-exit, and keyboard-interrupt signals are never converted into ordinary result values.
 
 ### Compatibility
 
