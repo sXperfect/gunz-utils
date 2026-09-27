@@ -66,6 +66,9 @@ class AsyncCircuitBreaker:
         try:
             result = await operation()
         except asyncio.CancelledError:
+            if state is CircuitState.HALF_OPEN:
+                async with self._lock:
+                    self._half_open_in_flight = False
             raise
         except Exception as exc:
             if self.failure_predicate is not None and not self.failure_predicate(exc):

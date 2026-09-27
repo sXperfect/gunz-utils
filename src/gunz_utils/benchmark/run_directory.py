@@ -32,7 +32,12 @@ def save_run_directory(
         for artifact in run.artifacts:
             source = Path(artifact.path)
             target = artifacts_dir / source.name
-            shutil.copy2(source, target)
+            suffix = 1
+            while target.exists() and target.resolve() != source.resolve():
+                target = artifacts_dir / f"{source.stem}-{suffix}{source.suffix}"
+                suffix += 1
+            if target.resolve() != source.resolve():
+                shutil.copy2(source, target)
             updated = register_artifact(
                 updated,
                 target,

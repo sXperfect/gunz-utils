@@ -38,7 +38,11 @@ class PerformanceRun:
     schema_version: int = 1
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        """Return an envelope whose array fields satisfy the persisted schema."""
+        data = asdict(self)
+        data["artifacts"] = list(data["artifacts"])
+        data["warnings"] = list(data["warnings"])
+        return data
 
 
 __all__ = ["PerformanceArtifact", "PerformanceRun"]

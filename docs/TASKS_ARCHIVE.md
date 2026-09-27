@@ -5,6 +5,8 @@ files for each task live under `docs/tasks/done/`.
 
 | Task ID | Date | Description | Status |
 |:---:|:---:|:---|:---:|
+| [repair-suite-regressions](tasks/done/2026.09.27-gunz_utils-repair_suite_regressions.md) | 2026-09-27 | Repaired benchmark, profiling, resilience, and stale tests; complete suite passes | Done |
+| [integrate-all-branches](tasks/done/2026.09.27-protocol-integrate_all_branches.md) | 2026-09-27 | Integrated all branches; repaired core imports, validated in hyperion, recorded remaining regression failures | Done |
 | [2024-05-24-windows-reserved](tasks/done/2024-05-24-security-fix_windows_reserved_filenames.md) | 2024-05-24 | Fix Windows Reserved Filenames Vulnerability in `sanitize_filename` | Done |
 | [2025-02-18-safe-path-join](tasks/done/2025-02-18-security-add_safe_path_join.md) | 2025-02-18 | Add `safe_path_join` security utility to prevent path traversal | Done |
 | [2025-02-18-reserved-replacement](tasks/done/2025-02-18-security-fix_reserved_filename_replacement.md) | 2025-02-18 | Fix bypass of reserved filename check via empty `replacement` | Done |

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import AbstractSet, Callable
+from collections.abc import Callable
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from typing import TypeVar
 

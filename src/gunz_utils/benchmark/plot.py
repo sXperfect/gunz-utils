@@ -30,6 +30,36 @@ def plot_benchmark(result: BenchmarkResult) -> Any:
     return figure
 
 
+def plot_history(history: BenchmarkHistory, metric: str = "median") -> Any:
+    """Plot ordered benchmark results to compare commits or releases.
+
+    Args:
+        history: Nonempty history in the order the results should appear.
+        metric: Numeric BenchmarkStats attribute, matching ``history.trend``.
+
+    Returns:
+        Matplotlib figure containing the selected metric for every result.
+
+    Raises:
+        ValueError: If the history is empty.
+        AttributeError: If the metric is not a BenchmarkStats attribute.
+        RuntimeError: If the optional matplotlib dependency is unavailable.
+    """
+    if not history.points:
+        raise ValueError("benchmark history is empty")
+    values = [float(getattr(point.result.stats, metric)) for point in history.points]
+    labels = [point.label for point in history.points]
+    positions = list(range(len(history.points)))
+    plt = _pyplot()
+    figure, axis = plt.subplots()
+    axis.plot(positions, values)
+    axis.set_xticks(positions, labels)
+    axis.set_title(f"Benchmark history: {metric}")
+    axis.set_xlabel("Run")
+    axis.set_ylabel(metric)
+    return figure
+
+
 def _cpu_cores(profile: ProcessProfile) -> tuple[list[float], list[float]]:
     times: list[float] = []
     values: list[float] = []
@@ -78,4 +108,4 @@ def plot_process_samples(profile: ProcessProfile, metric: str = "rss_bytes") -> 
     return figure
 
 
-__all__ = ["plot_benchmark", "plot_process_samples"]
+__all__ = ["plot_benchmark", "plot_history", "plot_process_samples"]

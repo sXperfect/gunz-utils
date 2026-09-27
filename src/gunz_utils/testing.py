@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from collections.abc import Awaitable, Callable, Iterator, Mapping
@@ -47,4 +48,32 @@ def eventually(
         time.sleep(interval)
 
 
-__all__ = ["eventually", "temporary_env"]
+async def eventually_async(
+    predicate: Callable[[], Awaitable[bool]],
+    *,
+    timeout: float = 1.0,
+    interval: float = 0.01,
+) -> None:
+    """Poll an async predicate without blocking other tasks.
+
+    Args:
+        predicate: Async condition to check until it succeeds.
+        timeout: Maximum polling duration in seconds.
+        interval: Delay between unsuccessful checks in seconds.
+
+    Raises:
+        ValueError: If timeout is negative or interval is not positive.
+        TimeoutError: If the condition remains false until the deadline.
+    """
+    if timeout < 0 or interval <= 0:
+        raise ValueError("timeout must be non-negative and interval positive")
+    deadline = time.monotonic() + timeout
+    while True:
+        if await predicate():
+            return
+        if time.monotonic() >= deadline:
+            raise TimeoutError("condition did not become true before timeout")
+        await asyncio.sleep(interval)
+
+
+__all__ = ["eventually", "eventually_async", "temporary_env"]

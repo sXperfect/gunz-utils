@@ -5,9 +5,10 @@ from __future__ import annotations
 import os
 import subprocess
 import time
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -77,12 +78,15 @@ def _memory_rollup(path: Path) -> tuple[int | None, int | None]:
     try:
         values: dict[str, int] = {}
         for line in path.read_text().splitlines():
-            key, value, *_ = line.split()
-            values[key.rstrip(":")] = int(value) * 1024
+            key, separator, value = line.partition(":")
+            if separator and key in {"Pss", "Private_Clean", "Private_Dirty"}:
+                values[key] = int(value.split()[0]) * 1024
         pss = values.get("Pss")
         private = values.get("Private_Clean", 0) + values.get("Private_Dirty", 0)
         return pss, private
-    except (FileNotFoundError, PermissionError, ValueError):
+    except (
+        FileNotFoundError, ProcessLookupError, PermissionError, ValueError, IndexError
+    ):
         return None, None
 
 
@@ -104,7 +108,13 @@ def _linux_snapshot(
         try:
             stat = (entry / "stat").read_text().split()
             rows[int(entry.name)] = (int(stat[3]), stat)
-        except (FileNotFoundError, PermissionError, IndexError, ValueError):
+        except (
+            FileNotFoundError,
+            ProcessLookupError,
+            PermissionError,
+            IndexError,
+            ValueError,
+        ):
             continue
 
     tree = {root_pid}
@@ -176,7 +186,7 @@ def _linux_snapshot(
                 io_values[key] = int(value.strip())
             read_bytes += io_values.get("read_bytes", 0)
             write_bytes += io_values.get("write_bytes", 0)
-        except (FileNotFoundError, PermissionError, ValueError):
+        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError):
             pass
         try:
             for line in (proc / str(pid) / "status").read_text().splitlines():
@@ -184,7 +194,13 @@ def _linux_snapshot(
                     voluntary += int(line.split()[1])
                 elif line.startswith("nonvoluntary_ctxt_switches:"):
                     involuntary += int(line.split()[1])
-        except (FileNotFoundError, PermissionError, ValueError, IndexError):
+        except (
+            FileNotFoundError,
+            ProcessLookupError,
+            PermissionError,
+            ValueError,
+            IndexError,
+        ):
             pass
 
     return ProcessSample(
@@ -213,11 +229,45 @@ def profile_command(
     cwd: str | None = None,
     env: dict[str, str] | None = None,
     check: bool = False,
+    memory_detail: str = "pss",
+    detailed_memory_every: int = 1,
 ) -> ProcessProfile:
+    """Sample a command's process tree while limiting expensive memory reads.
+
+    Args:
+        args: Executable and arguments to launch without a shell.
+        interval: Positive delay in seconds between process snapshots.
+        cwd: Optional working directory for the command.
+        env: Environment overrides merged with the current environment.
+        check: Raise if the command exits with a nonzero status.
+        memory_detail: ``rss``, ``pss``, or ``full`` (includes private memory).
+        detailed_memory_every: Positive integer snapshot cadence for detailed
+            memory reads, starting with the first snapshot. Other snapshots
+            record RSS and leave PSS and private memory unknown.
+
+    Returns:
+        Profile containing observed samples and peak resource measurements.
+        Commands that exit before observation may have no samples.
+
+    Raises:
+        ValueError: If arguments or sampling options are invalid.
+        NotImplementedError: If Linux process information is unavailable.
+        subprocess.CalledProcessError: If ``check`` is true and the command fails.
+    """
     if not args:
         raise ValueError("args must not be empty")
     if interval <= 0:
         raise ValueError("interval must be positive")
+    if memory_detail not in {"rss", "pss", "full"}:
+        raise ValueError("memory_detail must be rss, pss, or full")
+    if (
+        not isinstance(detailed_memory_every, int)
+        or isinstance(detailed_memory_every, bool)
+        or detailed_memory_every <= 0
+    ):
+        raise ValueError("detailed_memory_every must be a positive integer")
+    if not Path("/proc").exists():
+        raise NotImplementedError("process-tree profiling currently requires Linux")
     started = time.perf_counter()
     process = subprocess.Popen(
         list(args),
@@ -225,10 +275,14 @@ def profile_command(
         env=None if env is None else {**os.environ, **env},
     )
     samples: list[ProcessSample] = []
+    snapshot_index = 0
     while process.poll() is None:
-        samples.append(_linux_snapshot(process.pid, started))
+        detail = memory_detail if snapshot_index % detailed_memory_every == 0 else "rss"
+        sample = _linux_snapshot(process.pid, started, memory_detail=detail)
+        if sample.process_count:
+            samples.append(sample)
+        snapshot_index += 1
         time.sleep(interval)
-    samples.append(_linux_snapshot(process.pid, started))
     wall = time.perf_counter() - started
     if check and process.returncode:
         raise subprocess.CalledProcessError(process.returncode, list(args))

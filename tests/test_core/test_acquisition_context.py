@@ -68,6 +68,26 @@ class TestAsyncTesting(unittest.IsolatedAsyncioTestCase):
         await eventually_async(predicate, timeout=1, interval=0.001)
         self.assertEqual(calls, 2)
 
+    async def test_eventually_async_timeout(self) -> None:
+        """A false predicate must terminate when its deadline expires."""
+        async def predicate() -> bool:
+            return False
+
+        with self.assertRaises(TimeoutError):
+            await eventually_async(predicate, timeout=0)
+
+    async def test_eventually_async_invalid_timing(self) -> None:
+        """Reject invalid timing before invoking the predicate."""
+        async def predicate() -> bool:
+            self.fail("invalid timing must not invoke the predicate")
+
+        for timeout, interval in [(-1, 0.01), (1, 0), (1, -1)]:
+            with self.subTest(timeout=timeout, interval=interval):
+                with self.assertRaises(ValueError):
+                    await eventually_async(
+                        predicate, timeout=timeout, interval=interval
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from gunz_utils.subprocess import CommandError, CommandResult
-from gunz_utils.sync import _normalize_rsync_source, rsync_mirror
+from gunz_utils.sync import _advisory_lock, _normalize_rsync_source, rsync_mirror
 
 
 def _result(args: list[str]) -> CommandResult:

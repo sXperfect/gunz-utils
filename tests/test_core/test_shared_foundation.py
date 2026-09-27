@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import os
 import unittest
+from importlib import import_module
 from unittest.mock import patch
 
 import gunz_utils.io as io_module
 import gunz_utils.limits as limits_module
 import gunz_utils.plugins as plugins_module
 import gunz_utils.provenance as provenance_module
-import gunz_utils.retry as retry_module
 import gunz_utils.streaming as streaming_module
 import gunz_utils.versioning as versioning_module
-
 from gunz_utils.limits import BudgetExceededError, Limits, ResourceBudget
 from gunz_utils.plugins import discover_plugins
 from gunz_utils.provenance import capture_runtime_provenance
@@ -29,7 +28,7 @@ class TestSharedModuleAPI(unittest.TestCase):
             limits_module,
             plugins_module,
             provenance_module,
-            retry_module,
+            import_module("gunz_utils.retry"),
             streaming_module,
             versioning_module,
         )

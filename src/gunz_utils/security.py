@@ -24,6 +24,13 @@ from typing import IO, Any
 _INVALID_CHARS_PATTERN = re.compile(r"[^\w\.\-]+")
 _MAX_FILENAME_INPUT_LENGTH = 4096  # Security: limit input size to prevent DoS
 
+__all__ = [
+    "NameAccessPolicy",
+    "open_path_under_base",
+    "safe_path_join",
+    "sanitize_filename",
+]
+
 
 @functools.lru_cache(maxsize=16)
 def _get_replacement_pattern(replacement: str) -> re.Pattern:

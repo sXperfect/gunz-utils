@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import unittest
 
-from gunz_utils.cache import ttl_cache
+from gunz_utils.cache import CacheInfo, ttl_cache
 from gunz_utils.concurrency import map_unordered
 from gunz_utils.rate_limit import AsyncRateLimiter
 from gunz_utils.result import Result
@@ -30,9 +30,11 @@ class TestCacheInfo(unittest.TestCase):
         work(1)
         work(1)
         info = work.cache_info()
-        self.assertEqual(info, (1, 1, 1, 2))
+        self.assertEqual(info, CacheInfo(hits=1, misses=1, size=1, maxsize=2))
         work.cache_clear()
-        self.assertEqual(work.cache_info(), (0, 0, 0, 2))
+        self.assertEqual(
+            work.cache_info(), CacheInfo(hits=0, misses=0, size=0, maxsize=2)
+        )
 
 
 class TestRetryPolicy(unittest.TestCase):
