@@ -1,106 +1,153 @@
 # CI & Local Gate Reference
 
-This page documents the canonical CI configuration for `gunz-utils` and the
-local runner that mirrors it. A passing hosted run means the same thing as a
-passing local gate.
+This page documents the canonical verification policy for `gunz-utils`.
+Development is local-first: feature-branch pushes do not spend hosted runner
+time. GitHub Actions verifies only changes entering or already on `main`.
 
-## Canonical location
+## Hosted trigger policy
 
-- Hosted: `.github/workflows/ci.yml`
-- Local: `scripts/ci.py` (a thin dispatcher that runs the identical commands)
+`.github/workflows/ci.yml` runs only for:
 
-Docs building is consolidated into the `docs` job of `ci.yml`; the legacy
-`.github/workflows/deploy_docs.yml` is obsolete and disabled (see below).
+- a push to `main`;
+- a pull request whose base branch is `main`.
 
-## CI jobs and what they validate
+It does not run for feature-branch pushes, `develop`, or manual dispatch.
+Superseded runs for the same pull request or ref are cancelled.
 
-| Job | Validates | Local command |
-|-----|-----------|---------------|
-| `test` (Python 3.11) | Full pytest collection (712) | `python scripts/ci.py test` |
-| `compat` (Python 3.12) | Full pytest collection on 3.12 (compatibility guarantee) | `python scripts/ci.py test` (on 3.12) |
-| `lint` (Python 3.11) | `ruff check src tests benchmarks` then `mypy src/gunz_utils` | `python scripts/ci.py lint` |
-| `packaging` (Python 3.11) | Dependency-isolation matrix in fresh venvs (below) | `python scripts/ci.py packaging` |
-| `docs` (Python 3.11) | Strict Sphinx build (`-W`, zero warnings) via `scripts/build_docs.sh` | `python scripts/ci.py docs` |
-| `ci-result` | Aggregate gate: fails unless `test`/`compat`/`lint`/`packaging` all succeed and `docs` succeeds | — |
+## One hosted runner
 
-`ci-result` is the single stable required check for branch protection. It runs
-with `if: always()` so it surfaces real failures and never hides them. The
-`docs` job **always runs** on every PR, branch push, and manual run (it is not
-path-filtered — job-level `paths:` is invalid Actions syntax), so a `docs`
-failure or cancellation always fails the aggregate. The `ci-result` logic keeps
-a defensive `skipped` acceptance branch, but with the `docs` job always running
-it normally observes only `success`/`failure`.
+The workflow exposes one stable required check: `CI / verify`. Its steps run
+sequentially on one runner so setup/download work is reused and short jobs do
+not each pay separate runner-start/rounding overhead.
 
-## Supported Python versions and why
+The order is deliberately fail-fast:
 
-- Python **3.11** is the primary supported version (the strict floor per
-  `pyproject.toml` / `AGENTS.md`).
-- Python **3.12** runs the same full suite as a `compat` guarantee that the
-  library stays forward-compatible.
+1. release/version/changelog metadata;
+2. Ruff;
+3. mypy;
+4. full Python 3.11 pytest suite;
+5. strict Sphinx documentation build;
+6. packaging and optional-dependency isolation matrix;
+7. full Python 3.12 compatibility pytest suite.
 
-Both are exercised with the full 712-test collection — never a subset.
+Cheap static checks therefore stop the run before the expensive isolation and
+compatibility stages when possible.
 
 ## Local commands
 
+The local dispatcher is the canonical implementation of repository gates:
+
 ```bash
-mamba activate gunz-utils        # or: mamba run -n gunz-utils ...
-python scripts/ci.py test        # full pytest (712)
-python scripts/ci.py lint        # ruff + mypy
-python scripts/ci.py docs        # strict sphinx build
-python scripts/ci.py packaging   # dependency-isolation matrix
-python scripts/ci.py all         # every gate in order, stop on first failure
+python scripts/ci.py release
+python scripts/ci.py lint
+python scripts/ci.py test
+python scripts/ci.py docs
+python scripts/ci.py packaging
+python scripts/ci.py all
 ```
 
-Set `PYTHONPATH=/path/to/gunz-utils/src` so imports resolve into this worktree.
+`scripts/verify.sh` is a convenience wrapper around
+`python scripts/ci.py all`.
 
-## Isolation guarantee (packaging)
+### Release gate
 
-Each `packaging` case runs in its own brand-new `python -m venv` under
-`tmp/c05-venvs/` with no `PYTHONPATH`, so a previously installed extra can never
-leak into a later case and the **installed** package is what gets exercised.
-Cases: zero-dependency root import, stdlib fallback (no extras), each optional
-extra in isolation (`validation`, `project`, `observability`, `secure`), real
-headless `Agg` plotting, and wheel/sdist build with an outside-checkout import
-(source-shadowing guard). There is no cumulative "install everything then run"
-shortcut — each boundary is proven independently.
+```bash
+python scripts/release.py check
+```
 
-## Tool-refresh process
+This validates the `pyproject.toml` version, changelog structure, pending
+fragment names/categories, absence of stale module-level package versions, and
+the runtime/Sphinx version-source policy. Tag gaps are reported as warnings
+rather than fabricated automatically.
 
-CI pins its tools to exact versions matching the local gate environment
-(`pytest==9.0.2`, `ruff==0.14.10`, `mypy==1.19.1` in `ci.yml`). To bump a tool:
+See [the release process](../development/releases.md) for changelog fragments
+and release preparation.
 
-1. Update the exact pin in the relevant `ci.yml` install step.
-2. Install the new version locally and run `python scripts/ci.py test` and
-   `python scripts/ci.py lint` to confirm parity.
-3. Commit the pin change only after both gates are green locally.
+### Lint gate
 
-## Artifacts / cache / retention
+```bash
+python -m ruff check src tests benchmarks scripts
+python -m mypy src/gunz_utils
+```
 
-- `actions/setup-python` `cache: pip` caches pip's wheel cache keyed by OS,
-  interpreter, and the `pyproject.toml` hash (bounded, low churn).
-- The `packaging` fresh venvs are **never** cached — isolation must stay fresh.
-- No artifact uploads by default (builds stay lean; diagnostics live in logs and
-  the `ci-result` summary). The workflow never deploys to Pages and holds
-  read-only `contents: read` permissions.
+Ruff includes repository tooling so `scripts/release.py` and the CI dispatcher
+are validated rather than treated as unowned automation.
+
+### Test gate
+
+```bash
+python -m pytest
+```
+
+The hosted workflow executes the full suite on Python 3.11 and repeats it on
+Python 3.12 only after the earlier gates pass.
+
+### Documentation gate
+
+```bash
+python scripts/ci.py docs
+```
+
+This calls `scripts/build_docs.sh`, which performs a strict Sphinx build with
+warnings treated as errors.
+
+### Packaging/isolation gate
+
+```bash
+python scripts/ci.py packaging
+```
+
+Each case runs in its own fresh `python -m venv` under `tmp/c05-venvs/` with
+`PYTHONPATH` removed. The matrix verifies:
+
+- zero-dependency package import;
+- standard-library fallback behavior;
+- `validation` extra in isolation;
+- `project` extra in isolation;
+- `observability` extra in isolation;
+- `secure` extra in isolation;
+- real headless plotting through the `plot` extra;
+- wheel and sdist creation plus an outside-checkout wheel import.
+
+The virtual environments are never cached. Pip's download/wheel cache may be
+reused so isolation stays real without repeatedly downloading unchanged
+artifacts.
+
+## Hosted environment and caching
+
+The workflow starts on Python 3.11 and uses `actions/setup-python` pip caching
+keyed by `pyproject.toml`. CI dependencies are installed once for the primary
+stages; pip itself is not upgraded on every run.
+
+The packaging gate creates fresh virtual environments but can reuse pip's
+download cache. After the primary gates pass, the same job switches to Python
+3.12, installs the compatibility-test requirements, and runs the complete test
+suite.
+
+No build artifacts are uploaded by default. The workflow has read-only
+`contents: read` permission.
+
+## Tool version refresh
+
+Hosted developer-tool pins are explicit. To update one:
+
+1. update the relevant pin in `.github/workflows/ci.yml`;
+2. install/test the same version locally;
+3. run `python scripts/ci.py all`;
+4. commit only after local verification succeeds.
+
+Do not add a second workflow merely to test another gate. Prefer extending the
+local dispatcher and the single `verify` job unless a materially different
+security/permission boundary requires separation.
 
 ## Troubleshooting
 
-- **`test`/`compat` fail**: run `python scripts/ci.py test`; confirm
-  `PYTHONPATH` points at this worktree's `src/`; check the failing test output.
-- **`lint` fails**: `python scripts/ci.py lint` — fix the ruff findings or mypy
-  errors; do not add `# type: ignore` or narrow the scope.
-- **`docs` fails**: `python scripts/ci.py docs` — the strict `-W` build surfaces
-  every Sphinx warning; fix the RST/Markdown/Sphinx issue, do not suppress `-W`.
-- **`packaging` fails**: `python scripts/ci.py packaging` names the failing case;
-  a failure usually means a fresh-venv install or an isolation boundary broke
-  (e.g. an extra leaked, a missing-optional didn't raise, or wheel import
-  shadowed the source tree).
-- **`ci-result` fails**: inspect the job log — it lists each required job's
-  result and emits an `::error::` for any non-success.
+- Release gate: `python scripts/release.py status` and
+  `python scripts/release.py check`.
+- Ruff/mypy: `python scripts/ci.py lint`.
+- Tests: `python scripts/ci.py test`.
+- Docs: `python scripts/ci.py docs`.
+- Packaging: `python scripts/ci.py packaging`.
 
-## Legacy `deploy_docs.yml`
-
-`deploy_docs.yml` previously built docs on push. That build is now consolidated
-into the `docs` job of `ci.yml`; the legacy workflow's job is disabled
-(`if: false`) so docs are never built twice, and the file is retained only as a
-placeholder pending explicit authorization to delete it.
+For feature work, fix failures locally before opening or updating a pull request
+to `main`; ordinary feature-branch pushes intentionally have no hosted CI.
