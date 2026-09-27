@@ -1,45 +1,66 @@
 # Quickstart
 
-**Gunz-Utils** provides several critical primitives used across the 3D-Recon/Pekora projects.
+**Gunz Utils** provides reusable, domain-neutral Python primitives shared across
+Gunz projects. The core package has no runtime dependencies.
 
-## 1. Enhanced Enums
-
-Use `BaseStrEnum` for case-insensitive string enums with fuzzy lookup support:
-
-```python
-from gunz_utils.enums import BaseStrEnum
-
-class Mode(BaseStrEnum):
-    TRAIN = "train"
-    EVAL = "eval"
-
-# Case insensitive lookup
-mode = Mode.from_str("Train") 
-print(mode)  # Mode.TRAIN
-```
-
-## 2. Project Management
-
-Easily locate the project root and manage paths securely:
+## Collections and iteration
 
 ```python
-from gunz_utils import resolve_project_root
+from gunz_utils import chunked, deep_get
 
-root = resolve_project_root()
-print(f"Project is located at: {root}")
+batches = list(chunked(range(5), n=2))
+value = deep_get({"job": {"retries": 3}}, "job.retries")
 ```
 
-## 3. Data Validation
-
-Leverage Pydantic-powered validation for your research functions:
+## Deterministic hashing and serialization
 
 ```python
-from gunz_utils.ext.validation_pydantic import validate_call
+from gunz_utils import canonical_json, content_hash
 
-@validate_call
-def process_data(samples: int, resolution: int):
-    print(f"Processing {samples} at {resolution}bp")
-
-# This will raise a validation error if types are incorrect
-process_data(samples=100, resolution=10000)
+payload = {"name": "example", "enabled": True}
+encoded = canonical_json(payload)
+digest = content_hash(encoded)
 ```
+
+## Safe paths and redaction
+
+```python
+from gunz_utils import redact_dict, safe_path_join
+
+path = safe_path_join("/srv/data", "reports", "latest.json")
+safe_log = redact_dict({"user": "alice", "password": "secret"})
+```
+
+## Concurrency and retries
+
+```python
+from gunz_utils import async_retry, gather_limited
+
+# See the API reference for policies, limits, and error handling.
+```
+
+## Optional integrations
+
+Optional dependencies are loaded lazily:
+
+```python
+from gunz_utils import SecureStore, resolve_project_root, setup_logging, type_checked
+```
+
+Install the corresponding extras before using these symbols. See
+[Installation](installation.md) for the extras matrix.
+
+## Benchmarking
+
+```python
+from gunz_utils.benchmark import benchmark
+
+result = benchmark(sum, range(10_000), warmup=3, iterations=20)
+print(result.stats.mean, result.stats.p95)
+```
+
+The benchmark package also provides process profiling, comparison, regression
+gates, history, reporting, artifact verification, and optional plotting.
+
+For the complete surface, continue with the [API reference](api.rst) and
+[Core concepts](concepts.md).

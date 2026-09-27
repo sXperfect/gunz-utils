@@ -1,62 +1,83 @@
 # Installation
 
-**Gunz-Utils** is the foundational core of the Gunz ecosystem, providing shared enums, validation logic, project management, observability, and security utilities.
+**Gunz Utils** is a Python 3.11+ utility library with a dependency-free core.
+Third-party integrations are available only through optional extras.
 
-## Standard Installation
+## Install directly from GitHub
 
-Install directly from GitHub:
-
-```bash
-pip install git+https://github.com/sXperfect/gunz-utils.git
-```
-
-## Development Environment
+Core only:
 
 ```bash
-# Create the environment
-mamba create -n gunz-utils python=3.11
-
-# Activate it
-mamba activate gunz-utils
-
-# Install in editable mode
-pip install -e .
+python -m pip install "gunz-utils @ git+https://github.com/sXperfect/gunz-utils.git"
 ```
+
+With the common runtime integrations:
+
+```bash
+python -m pip install "gunz-utils[all] @ git+https://github.com/sXperfect/gunz-utils.git"
+```
+
+Add plotting when benchmark visualization is needed:
+
+```bash
+python -m pip install "gunz-utils[all,plot] @ git+https://github.com/sXperfect/gunz-utils.git"
+```
+
+For reproducible deployments, pin the VCS URL to a reviewed tag or commit SHA
+instead of tracking the repository head.
+
+## Install from a local checkout
+
+```bash
+git clone https://github.com/sXperfect/gunz-utils.git
+cd gunz-utils
+python -m pip install -e .
+```
+
+For local development:
+
+```bash
+python -m pip install -e ".[all,plot,docs]"
+python -m pip install pytest==9.0.2 ruff==0.14.10 mypy==1.19.1
+```
+
+The explicit developer-tool versions above mirror the hosted CI workflow.
 
 ## Dependencies
 
-Gunz-Utils' core install pulls the following runtime dependencies:
+The core distribution has no runtime dependencies:
 
-| Package | Version | Why |
-|---|---|---|
-| `pydantic` | `>=2.0.0` | `BaseModel` support in `models.py`; `validate_call` in `ext.validation_pydantic` |
-| `cryptography` | `>=42.0.0` | `Fernet` + `AESGCM` + `PBKDF2` in `ext.secure_crypto` and `ext.secure_store` |
-| `gitpython` | `>=3.1.0` | `Repo` for project-root detection in `ext.project_gitpython` |
-| `loguru` | `>=0.7.0` | Structured logging in `ext.observability_loguru`; debug logging in `ext.project_gitpython` |
-
-## Optional Dependencies
-
-To minimize install footprint for projects that don't need the heavy modules,
-install narrower subsets of gunz-utils via extras:
-
-| Extra | Pulls in | Unlocks |
-|---|---|---|
-| `validation` | `pydantic>=2.0.0` | `type_checked` decorator (default backend) |
-| `project` | `gitpython>=3.1.0`, `loguru>=0.7.0` | `resolve_project_root` (default backend) |
-| `observability` | `loguru>=0.7.0` | `setup_logging` (default backend) |
-| `secure` | `cryptography>=42.0.0` | `SecureStore`, `encrypt`, `decrypt` |
-| `all` | everything in `dependencies=` | every default backend |
-| `docs` | sphinx, myst-parser, sphinx-autodoc-typehints, sphinx_rtd_theme | building the documentation locally |
-
-Examples:
-
-```bash
-pip install gunz-utils[validation]    # add pydantic explicitly
-pip install gunz-utils[secure]       # add cryptography
-pip install gunz-utils[all]           # everything
-pip install gunz-utils[all,docs]      # everything + docs tooling
+```toml
+dependencies = []
 ```
 
-Stdlib-only fallback paths are also available without any of the
-above extras — see the *Optional Dependencies* section in
-`concepts.md` for details on `gunz_utils.ext.*` modules.
+Importing `gunz_utils` therefore does not require Pydantic, Cryptography,
+GitPython, Loguru, or Matplotlib.
+
+Optional extras are defined in `pyproject.toml`:
+
+| Extra | Adds | Representative functionality |
+|---|---|---|
+| `validation` | `pydantic>=2.0.0` | Pydantic-backed runtime validation |
+| `project` | `gitpython>=3.1.0` | Git-aware project-root discovery |
+| `observability` | `loguru>=0.7.0` | Structured logging setup |
+| `secure` | `cryptography>=42.0.0` | Encryption and secure storage |
+| `plot` | `matplotlib>=3.8.0` | Benchmark plotting |
+| `all` | validation + project + observability + secure | Common runtime integrations |
+| `docs` | Sphinx toolchain | Local documentation builds |
+
+`all` intentionally does not include `plot` or `docs`.
+
+## Optional integration behavior
+
+Common optional symbols are exposed lazily from the package root:
+
+```python
+from gunz_utils import SecureStore, resolve_project_root, setup_logging, type_checked
+```
+
+Install the matching extra before using a symbol whose backend depends on a
+third-party package.
+
+Where provided, stdlib alternatives live under `gunz_utils.ext.*`. The API
+reference documents which backend each symbol uses.

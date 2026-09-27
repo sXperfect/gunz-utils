@@ -1,20 +1,15 @@
-Gunz-Utils: Foundational Core
-=============================
+Gunz Utils
+==========
 
 .. image:: https://img.shields.io/badge/License-Clear_BSD-blue.svg
-.. image:: https://img.shields.io/badge/Python-3.11+-green.svg
+   :target: https://github.com/sXperfect/gunz-utils/blob/main/LICENSE.md
+.. image:: https://img.shields.io/badge/Python-3.11%2B-3776AB.svg
+   :target: https://www.python.org/
 
-**Gunz-Utils** is the shared foundational library for the Gunz ecosystem. 
-It provides low-level primitives for enhanced enums, security-focused 
-validation, and cross-platform project management.
-
-.. toctree::
-   :maxdepth: 1
-   :caption: The Gunz Ecosystem
-
-   Gunz-ML (SDK) <https://gunz-ml.pages.dev>
-   Gunz-CM (Matrix) <https://gunz-cm.pages.dev>
-   Gunz-Utils (Core) <https://gunz-utils.pages.dev>
+**Gunz Utils** is the shared Python utility foundation for the Gunz ecosystem.
+It provides dependency-free core primitives for configuration, concurrency,
+resilience, I/O, security, reproducibility, workflow support, experimentation,
+and benchmarking, with opt-in integrations for third-party backends.
 
 .. toctree::
    :maxdepth: 1
@@ -31,6 +26,13 @@ validation, and cross-platform project management.
    :caption: Technical Reference
 
    api.rst
+
+Project
+=======
+
+* `Source repository <https://github.com/sXperfect/gunz-utils>`_
+* `Changelog <https://github.com/sXperfect/gunz-utils/blob/main/CHANGELOG.md>`_
+* `Contributing <https://github.com/sXperfect/gunz-utils/blob/main/CONTRIBUTING.md>`_
 
 Indices and tables
 ==================

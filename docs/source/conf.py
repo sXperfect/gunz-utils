@@ -22,8 +22,6 @@ extensions = [
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
-    'gunz_ml': ('https://gunz-ml.pages.dev/', None),
-    'gunz_cm': ('https://gunz-cm.pages.dev/', None),
 }
 
 templates_path = ['_templates']

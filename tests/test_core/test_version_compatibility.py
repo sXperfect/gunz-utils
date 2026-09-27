@@ -49,7 +49,7 @@ def test_pyproject_uses_preferred_maintainer_email() -> None:
 def test_legacy_maintainer_email_is_absent_from_repository_text() -> None:
     old_email = "adhisant@tnt.uni-hannover.de"
     candidates = [
-        PROJECT_ROOT / "AGENTS.md",
+        PROJECT_ROOT / "CONTRIBUTING.md",
         PROJECT_ROOT / "LICENSE.md",
         PROJECT_ROOT / "README.md",
         PROJECT_ROOT / "CHANGELOG.md",

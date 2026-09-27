@@ -37,8 +37,8 @@ def resolve_project_root(
     """
     Dynamically finds the git repository root and optionally adds it to sys.path.
 
-    This allows scripts to import local modules (e.g., `src.pekora`) without
-    hardcoding relative paths.
+    This allows scripts to import local project modules without hardcoding
+    relative paths.
 
     Parameters
     ----------
