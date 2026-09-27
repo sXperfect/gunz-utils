@@ -7,16 +7,18 @@ without depending on a GitHub Actions workflow.
 ## Invariants
 
 1. `pyproject.toml` is the only static source of the distribution version.
-2. `gunz_utils.__version__` is derived from installed package metadata with
-   `importlib.metadata.version("gunz-utils")`.
-3. Sphinx derives its release string from the same installed metadata.
-4. Individual modules must not define package `__version__` literals.
-5. Every user-visible change is represented by a changelog fragment under
+2. `gunz_utils._version` derives the runtime version from installed package
+   metadata with `importlib.metadata.version("gunz-utils")`.
+3. `gunz_utils.__version__` and historical module-level `__version__`
+   attributes import that shared resolver for backward compatibility.
+4. Sphinx derives its release string from the same installed metadata.
+5. Individual modules must never store independent package-version literals.
+6. Every user-visible change is represented by a changelog fragment under
    `changes/`.
-6. `CHANGELOG.md` is assembled from fragments only when a release is prepared.
-7. Releases use strict Semantic Versioning: `MAJOR.MINOR.PATCH`.
-8. A release commit uses exactly `chore(release): vX.Y.Z`.
-9. A released version should have matching package metadata, changelog heading,
+7. `CHANGELOG.md` is assembled from fragments only when a release is prepared.
+8. Releases use strict Semantic Versioning: `MAJOR.MINOR.PATCH`.
+9. A release commit uses exactly `chore(release): vX.Y.Z`.
+10. A released version should have matching package metadata, changelog heading,
    Git tag `vX.Y.Z`, and GitHub Release `vX.Y.Z`.
 
 ## Normal development
