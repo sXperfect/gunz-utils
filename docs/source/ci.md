@@ -60,8 +60,8 @@ fragment names/categories, absence of stale module-level package versions, and
 the runtime/Sphinx version-source policy. Tag gaps are reported as warnings
 rather than fabricated automatically.
 
-See [the release process](../development/releases.md) for changelog fragments
-and release preparation.
+See [Releases](releases.md) for the hosted-documentation summary. The full
+maintainer process remains in `docs/development/releases.md`.
 
 ### Lint gate
 
