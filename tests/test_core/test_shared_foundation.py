@@ -205,6 +205,31 @@ class TestVersioning(unittest.TestCase):
         with self.assertRaises(SchemaMigrationError):
             migrator.migrate(envelope, target_version=3)
 
+    def test_direct_constructor_rejects_boolean_version(self) -> None:
+        with self.assertRaises(ValueError):
+            VersionedEnvelope("demo", True, {})
+
+    def test_direct_constructor_copies_metadata(self) -> None:
+        metadata = {"source": "test"}
+        envelope = VersionedEnvelope("demo", 1, {}, metadata)
+        metadata["source"] = "changed"
+        self.assertEqual(envelope.metadata["source"], "test")
+
+    def test_register_rejects_boolean_version_and_noncallable(self) -> None:
+        migrator = SchemaMigrator()
+        with self.assertRaises(ValueError):
+            migrator.register("demo", True, lambda value: value)
+        with self.assertRaises(TypeError):
+            migrator.register("demo", 1, None)
+
+    def test_migrate_rejects_boolean_target_version(self) -> None:
+        migrator = SchemaMigrator()
+        with self.assertRaises(ValueError):
+            migrator.migrate(
+                VersionedEnvelope("demo", 1, {}),
+                target_version=True,
+            )
+
     def test_from_dict_validates_types(self) -> None:
         with self.assertRaises(SchemaMigrationError):
             VersionedEnvelope.from_dict(
