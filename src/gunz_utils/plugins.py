@@ -41,6 +41,10 @@ def discover_plugins(
 ) -> tuple[PluginLoadResult, ...]:
     """Discover and safely load plugins from an entry-point group.
 
+    Failures expose only the exception type, not the exception message. This
+    keeps plugin discovery diagnostics useful without copying arbitrary
+    plugin-provided text that may contain credentials or other secrets.
+
     Parameters
     ----------
     group : str
@@ -55,7 +59,10 @@ def discover_plugins(
     """
     if not group:
         raise ValueError("group must not be empty")
-    candidates = sorted(entry_points(group=group), key=lambda item: (item.name, item.value))
+    candidates = sorted(
+        entry_points(group=group),
+        key=lambda item: (item.name, item.value),
+    )
     results: list[PluginLoadResult] = []
     for entry_point in candidates:
         info = _entry_point_info(entry_point, group)
@@ -66,7 +73,12 @@ def discover_plugins(
                     raise TypeError("plugin is not callable")
                 plugin = plugin()
         except Exception as exc:
-            results.append(PluginLoadResult(info=info, error=f"{type(exc).__name__}: {exc}"))
+            results.append(
+                PluginLoadResult(
+                    info=info,
+                    error=type(exc).__name__,
+                )
+            )
         else:
             results.append(PluginLoadResult(info=info, plugin=plugin))
     return tuple(results)
