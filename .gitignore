@@ -4,27 +4,22 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# IDE / agent / deploy caches
+# Local editor / deploy caches
 .gemini/
 .jules/
 .wrangler/
-.sisyphus/
-.omo/
 
 # External knowledge base (Hyperhedron symlink farm)
 .hyperhedron
 
-# Top-level author-facing guides (now superseded by docs/source/)
+# Top-level author-facing guides (superseded by docs/source/)
 guides/
 
-# Built Sphinx output — never tracked
+# Built Sphinx output
 docs/_build/
 
 # Transient data
 tmp/
-
-# BEGIN oh-my-opencode-slim worktrees
-.slim/worktrees/
-.slim/worktrees.json
-# END oh-my-opencode-slim worktrees

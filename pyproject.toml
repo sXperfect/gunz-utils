@@ -48,7 +48,7 @@ packages = ["src/gunz_utils"]
 include = ["src/"]
 
 # --- Ruff (linter + formatter) ----------------------------------------------
-# AGENTS.md §2.6 mandates Ruff linting; ruff format is intentionally excluded.
+# Ruff linting is part of the canonical local/CI gate; formatting is intentionally excluded.
 [tool.ruff]
 # Project requires Python 3.11+.
 target-version = "py311"
@@ -73,7 +73,7 @@ skip-magic-trailing-comma = false
 
 # --- Pytest ------------------------------------------------------------------
 # src-layout: ``src/`` is on sys.path so ``pytest`` works without ``pip install -e .``
-# AGENTS.md §2.5 declares pytest as the canonical test runner.
+# Pytest is the canonical test runner.
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

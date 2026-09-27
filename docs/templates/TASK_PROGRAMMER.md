@@ -18,7 +18,7 @@ One-paragraph summary of what this task is delivering and **why**.
 
 ## 3. Approach
 High-level plan. Reference specific files and patterns from `src/gunz_utils/`.
-Use existing utilities when possible (per `AGENTS.md` §4.2 Reuse Mandate).
+Use existing utilities when possible; see `CONTRIBUTING.md` for repository-wide workflow.
 
 ## 4. Implementation Plan
 1. Step 1 — file + change
@@ -26,11 +26,8 @@ Use existing utilities when possible (per `AGENTS.md` §4.2 Reuse Mandate).
 3. Step 3 — tests added/updated
 
 ## 5. Verification
-- [ ] `ruff check src/ tests/`
-- [ ] `ruff format --check src/ tests/`
-- [ ] `mypy src/gunz_utils`
-- [ ] `pytest tests/`
-- [ ] `lsp_diagnostics` clean on changed files
+- [ ] `./scripts/verify.sh`
+- [ ] Focused tests for the changed behavior pass
 - [ ] All existing tests still pass
 
 ## 6. Notes
