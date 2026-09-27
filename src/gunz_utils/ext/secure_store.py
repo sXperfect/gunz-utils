@@ -12,7 +12,7 @@ Layout (per consumer)::
         master.salt         PBKDF2 salt (mode 0600). Passphrase-mode only.
         config.db           SQLite: encrypted secret rows + audit log.
 
-Two unlock modes:
+Two unlock modes::
 
     file (default):   reads master.key directly (server/headless).
     passphrase:       derives master.key from a user passphrase +

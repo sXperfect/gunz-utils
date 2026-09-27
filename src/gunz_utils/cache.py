@@ -7,10 +7,10 @@ import functools
 import threading
 import time
 from collections import OrderedDict
-from datetime import UTC, datetime, timedelta
-from collections.abc import Awaitable, Callable, Coroutine, Hashable
+from collections.abc import Callable, Coroutine, Hashable
 from dataclasses import dataclass
-from typing import Any, ParamSpec, TypeVar
+from datetime import UTC, datetime, timedelta
+from typing import Any, Generic, ParamSpec, TypeVar
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -35,118 +35,171 @@ def _cache_key(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Hashable | None
     return key
 
 
+class _TTLCache(Generic[P, T]):
+    """Decorated callable with a bounded, time-based cache.
+
+    Attributes
+    ----------
+    cache_clear : Callable[[], None]
+        Drop all cached entries and reset hit/miss counters.
+    cache_info : Callable[[], CacheInfo]
+        Return a snapshot of cache activity and capacity.
+
+    The class carries the cache bookkeeping so the returned object can expose
+    ``cache_clear``/``cache_info`` as first-class, type-checked attributes (a
+    plain function cannot declare them without ``setattr`` or a cast).
+    """
+
+    def __init__(
+        self,
+        func: Callable[P, T],
+        *,
+        ttl: float,
+        maxsize: int,
+    ) -> None:
+        functools.update_wrapper(self, func)
+        self._func = func
+        self._ttl = ttl
+        self._maxsize = maxsize
+        self._cache: OrderedDict[Hashable, tuple[float, T]] = OrderedDict()
+        self._lock = threading.Lock()
+        self._hits = 0
+        self._misses = 0
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
+        key = _cache_key(args, kwargs)
+        if key is None:
+            return self._func(*args, **kwargs)
+        now = time.monotonic()
+        with self._lock:
+            entry = self._cache.get(key)
+            if entry is not None and now - entry[0] <= self._ttl:
+                self._cache.move_to_end(key)
+                self._hits += 1
+                return entry[1]
+            if entry is not None:
+                self._cache.pop(key, None)
+            self._misses += 1
+        value = self._func(*args, **kwargs)
+        with self._lock:
+            self._cache[key] = (time.monotonic(), value)
+            self._cache.move_to_end(key)
+            while len(self._cache) > self._maxsize:
+                self._cache.popitem(last=False)
+        return value
+
+    def cache_clear(self) -> None:
+        """Drop all cached entries and reset the hit/miss counters."""
+        with self._lock:
+            self._cache.clear()
+            self._hits = 0
+            self._misses = 0
+
+    def cache_info(self) -> CacheInfo:
+        """Return a snapshot of cache activity and capacity."""
+        with self._lock:
+            return CacheInfo(
+                self._hits, self._misses, len(self._cache), self._maxsize
+            )
+
+
 def ttl_cache(
     *,
     ttl: float,
     maxsize: int = 128,
-) -> Callable[[Callable[P, T]], Callable[P, T]]:
+) -> Callable[[Callable[P, T]], _TTLCache[P, T]]:
     """Cache synchronous function results for a bounded amount of time."""
     if ttl < 0:
         raise ValueError("ttl must be non-negative")
     if maxsize < 1:
         raise ValueError("maxsize must be at least 1")
 
-    def decorate(func: Callable[P, T]) -> Callable[P, T]:
-        cache: OrderedDict[Hashable, tuple[float, T]] = OrderedDict()
-        lock = threading.Lock()
-        hits = 0
-        misses = 0
-
-        @functools.wraps(func)
-        def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
-            nonlocal hits, misses
-            key = _cache_key(args, kwargs)
-            if key is None:
-                return func(*args, **kwargs)
-            now = time.monotonic()
-            with lock:
-                entry = cache.get(key)
-                if entry is not None and now - entry[0] <= ttl:
-                    cache.move_to_end(key)
-                    hits += 1
-                    return entry[1]
-                if entry is not None:
-                    cache.pop(key, None)
-                misses += 1
-            value = func(*args, **kwargs)
-            with lock:
-                cache[key] = (time.monotonic(), value)
-                cache.move_to_end(key)
-                while len(cache) > maxsize:
-                    cache.popitem(last=False)
-            return value
-
-        def cache_clear() -> None:
-            nonlocal hits, misses
-            with lock:
-                cache.clear()
-                hits = 0
-                misses = 0
-
-        def cache_info() -> CacheInfo:
-            with lock:
-                return CacheInfo(hits, misses, len(cache), maxsize)
-
-        setattr(wrapped, "cache_clear", cache_clear)
-        setattr(wrapped, "cache_info", cache_info)
-        return wrapped
+    def decorate(func: Callable[P, T]) -> _TTLCache[P, T]:
+        return _TTLCache(func, ttl=ttl, maxsize=maxsize)
 
     return decorate
+
+
+class _AsyncTTLCache(Generic[P, T]):
+    """Decorated async callable caching results and coalescing concurrent misses.
+
+    Attributes
+    ----------
+    cache_clear : Callable[[], Awaitable[None]]
+        Drop all cached entries (awaitable, matching the async API).
+
+    Carries the async cache/in-flight bookkeeping so ``cache_clear`` is a
+    type-checked attribute without ``setattr`` or a cast.
+    """
+
+    def __init__(
+        self,
+        func: Callable[P, Coroutine[Any, Any, T]],
+        *,
+        ttl: float,
+        maxsize: int,
+    ) -> None:
+        functools.update_wrapper(self, func)
+        self._func = func
+        self._ttl = ttl
+        self._maxsize = maxsize
+        self._cache: OrderedDict[Hashable, tuple[float, T]] = OrderedDict()
+        self._in_flight: dict[Hashable, asyncio.Task[T]] = {}
+        self._lock = asyncio.Lock()
+
+    async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
+        key = _cache_key(args, kwargs)
+        if key is None:
+            return await self._func(*args, **kwargs)
+        async with self._lock:
+            now = time.monotonic()
+            entry = self._cache.get(key)
+            if entry is not None and now - entry[0] <= self._ttl:
+                self._cache.move_to_end(key)
+                return entry[1]
+            if entry is not None:
+                self._cache.pop(key, None)
+            task = self._in_flight.get(key)
+            if task is None:
+                task = asyncio.create_task(self._func(*args, **kwargs))
+                self._in_flight[key] = task
+        try:
+            value = await asyncio.shield(task)
+        finally:
+            if task.done():
+                async with self._lock:
+                    if self._in_flight.get(key) is task:
+                        self._in_flight.pop(key, None)
+        async with self._lock:
+            self._cache[key] = (time.monotonic(), value)
+            self._cache.move_to_end(key)
+            while len(self._cache) > self._maxsize:
+                self._cache.popitem(last=False)
+        return value
+
+    async def cache_clear(self) -> None:
+        """Drop all cached entries (awaitable, matching the async API)."""
+        async with self._lock:
+            self._cache.clear()
 
 
 def async_ttl_cache(
     *,
     ttl: float,
     maxsize: int = 128,
-) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
+) -> Callable[
+    [Callable[P, Coroutine[Any, Any, T]]], _AsyncTTLCache[P, T]
+]:
     """Cache async results and coalesce concurrent misses for each key."""
     if ttl < 0:
         raise ValueError("ttl must be non-negative")
     if maxsize < 1:
         raise ValueError("maxsize must be at least 1")
 
-    def decorate(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
-        cache: OrderedDict[Hashable, tuple[float, T]] = OrderedDict()
-        in_flight: dict[Hashable, asyncio.Task[T]] = {}
-        lock = asyncio.Lock()
-
-        @functools.wraps(func)
-        async def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
-            key = _cache_key(args, kwargs)
-            if key is None:
-                return await func(*args, **kwargs)
-            async with lock:
-                now = time.monotonic()
-                entry = cache.get(key)
-                if entry is not None and now - entry[0] <= ttl:
-                    cache.move_to_end(key)
-                    return entry[1]
-                if entry is not None:
-                    cache.pop(key, None)
-                task = in_flight.get(key)
-                if task is None:
-                    task = asyncio.create_task(func(*args, **kwargs))
-                    in_flight[key] = task
-            try:
-                value = await asyncio.shield(task)
-            finally:
-                if task.done():
-                    async with lock:
-                        if in_flight.get(key) is task:
-                            in_flight.pop(key, None)
-            async with lock:
-                cache[key] = (time.monotonic(), value)
-                cache.move_to_end(key)
-                while len(cache) > maxsize:
-                    cache.popitem(last=False)
-            return value
-
-        async def cache_clear() -> None:
-            async with lock:
-                cache.clear()
-
-        setattr(wrapped, "cache_clear", cache_clear)
-        return wrapped
+    def decorate(
+        func: Callable[P, Coroutine[Any, Any, T]],
+    ) -> _AsyncTTLCache[P, T]:
+        return _AsyncTTLCache(func, ttl=ttl, maxsize=maxsize)
 
     return decorate
 

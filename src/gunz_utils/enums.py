@@ -36,6 +36,28 @@ DEFAULT_MAX_INPUT_LENGTH = 1024  # Security: Prevent DoS via long strings
 # ? reference `cls.DEFAULT_MAX_INPUT_LENGTH` (the class attribute).
 _MAX_INPUT_LENGTH = DEFAULT_MAX_INPUT_LENGTH
 
+# ? mypy cannot see StrEnum ``ClassVar`` attributes as their declared type
+# ? (it resolves ``cls.<attr>`` to the enum member type instead), and ruff's
+# ? B009 rejects ``getattr`` with a constant name. These private, per-class
+# ? lookup maps are therefore stored at module level, keyed by the enum class.
+_FUZZY_LOOKUP_MAPS: dict[type, dict[str, Any]] = {}
+_NAME_LOOKUP_MAPS: dict[type, dict[str, Any]] = {}
+
+
+def _max_input_length(cls: type) -> int:
+    """Return the effective input-length limit for ``cls``, honoring overrides.
+
+    Reads the resolved ``DEFAULT_MAX_INPUT_LENGTH`` from the class ``__dict__``
+    across the MRO because direct ``cls.<attr>`` access on StrEnum resolves to
+    the enum member type in mypy (see note above). Falls back to the module
+    default when no class in the MRO declares an integer limit.
+    """
+    for klass in cls.__mro__:
+        value = klass.__dict__.get("DEFAULT_MAX_INPUT_LENGTH")
+        if isinstance(value, int):
+            return value
+    return DEFAULT_MAX_INPUT_LENGTH
+
 
 # =============================================================================
 # BASE ENUM IMPLEMENTATION
@@ -71,9 +93,6 @@ class BaseStrEnum(enum.StrEnum):
     # ? Using dunder name to avoid it being treated as an Enum member
     __ALIASES__: ClassVar[dict[str, str]] = {}
 
-    # Lazily initialized map for fuzzy lookups
-    _fuzzy_lookup_map: ClassVar[dict[str, Any]]
-
     #? Declared as ClassVar so mypy sees it on `type[Self]`. The actual
     #? assignment happens after the class body because StrEnum rejects
     #? non-string attributes inside the body (see note at line 216).
@@ -86,32 +105,29 @@ class BaseStrEnum(enum.StrEnum):
         Key is the normalized string or lowercase name.
         Value is the enum member.
         """
-        # Use a private attribute on the class itself to store the map
-        # We use getattr/setattr to avoid static type checker issues with
-        # dynamically added attributes on Enum classes.
-        try:
-            return cls._fuzzy_lookup_map
-        except AttributeError:
-            lookup_map = {}
-            for member in cls:
-                # Add normalized value
-                val_lower = member.value.lower()
-                val_norm = val_lower.replace("-", "_").replace(" ", "_")
-                if val_norm not in lookup_map:
-                    lookup_map[val_norm] = member
+        existing = _FUZZY_LOOKUP_MAPS.get(cls)
+        if existing is not None:
+            return existing
+        lookup_map: dict[str, Self] = {}
+        for member in cls:
+            # Add normalized value
+            val_lower = member.value.lower()
+            val_norm = val_lower.replace("-", "_").replace(" ", "_")
+            if val_norm not in lookup_map:
+                lookup_map[val_norm] = member
 
-                # Add raw lowercase value
-                # (optimization for inputs matching value but with separators)
-                if val_lower not in lookup_map:
-                    lookup_map[val_lower] = member
+            # Add raw lowercase value
+            # (optimization for inputs matching value but with separators)
+            if val_lower not in lookup_map:
+                lookup_map[val_lower] = member
 
-                # Add lowercase name
-                name_lower = member.name.lower()
-                if name_lower not in lookup_map:
-                    lookup_map[name_lower] = member
+            # Add lowercase name
+            name_lower = member.name.lower()
+            if name_lower not in lookup_map:
+                lookup_map[name_lower] = member
 
-            cls._fuzzy_lookup_map = lookup_map
-            return lookup_map
+        _FUZZY_LOOKUP_MAPS[cls] = lookup_map
+        return lookup_map
 
     @classmethod
     def from_fuzzy_string(cls, value_str: str) -> Self:
@@ -121,7 +137,7 @@ class BaseStrEnum(enum.StrEnum):
         """
         # Security check to prevent DoS via excessive string processing.
         # Uses the class attribute so subclasses can override the limit.
-        max_len = cls.DEFAULT_MAX_INPUT_LENGTH
+        max_len = _max_input_length(cls)
         if len(value_str) > max_len:
             raise ValueError(f"Input string too long (max {max_len} chars)")
 
@@ -248,7 +264,7 @@ class OptionalBaseStrEnum(BaseStrEnum):
     @classmethod
     def _missing_(cls, value: object) -> Self:
         if value is None:
-            return cls.NONE
+            return cls.__members__["NONE"]
 
         # Try fuzzy match via helper, but do NOT retry cls(value) to avoid recursion
         if isinstance(value, str):
@@ -280,9 +296,6 @@ class BaseIntEnum(enum.IntEnum):
 
     __ALIASES__: ClassVar[dict[str, int]] = {}
 
-    # Lazily initialized map for name lookups
-    _name_lookup_map: ClassVar[dict[str, Any]]
-
     #? Declared as ClassVar so mypy sees it on `type[Self]`. The actual
     #? assignment happens after the class body because IntEnum rejects
     #? non-int attributes inside the body.
@@ -293,16 +306,16 @@ class BaseIntEnum(enum.IntEnum):
         """
         Lazily builds and returns a mapping from lowercase name to enum member.
         """
-        try:
-            return cls._name_lookup_map
-        except AttributeError:
-            lookup_map = {}
-            for member in cls:
-                name_lower = member.name.lower()
-                if name_lower not in lookup_map:
-                    lookup_map[name_lower] = member
-            cls._name_lookup_map = lookup_map
-            return lookup_map
+        existing = _NAME_LOOKUP_MAPS.get(cls)
+        if existing is not None:
+            return existing
+        lookup_map: dict[str, Self] = {}
+        for member in cls:
+            name_lower = member.name.lower()
+            if name_lower not in lookup_map:
+                lookup_map[name_lower] = member
+        _NAME_LOOKUP_MAPS[cls] = lookup_map
+        return lookup_map
 
     @classmethod
     def from_fuzzy_int_string(cls, value_str: str) -> Self:
@@ -312,7 +325,7 @@ class BaseIntEnum(enum.IntEnum):
         """
         # Security check to prevent DoS via excessive string processing.
         # Uses the class attribute so subclasses can override the limit.
-        max_len = cls.DEFAULT_MAX_INPUT_LENGTH
+        max_len = _max_input_length(cls)
         if len(value_str) > max_len:
             raise ValueError(f"Input string too long (max {max_len} chars)")
 

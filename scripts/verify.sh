@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
+# Local verification entry point mirroring the intended hosted gates.
+# Delegates to scripts/ci.py so the local surface always matches CI.
 set -euo pipefail
 
-python -m compileall -q src tests
-ruff check src tests benchmarks
-mypy src/gunz_utils
-pytest -q
+python scripts/ci.py all

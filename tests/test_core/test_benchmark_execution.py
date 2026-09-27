@@ -66,7 +66,9 @@ class TestWorker(unittest.TestCase):
 
     def test_worker_json(self) -> None:
         self.assertEqual(
-            worker_json(type("R", (), {"returncode": 0, "stdout": "{}", "stderr": ""})()),
+            worker_json(
+                type("R", (), {"returncode": 0, "stdout": "{}", "stderr": ""})()
+            ),
             {},
         )
 

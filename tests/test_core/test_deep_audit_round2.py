@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import sys
-import tempfile
 import unittest
-from pathlib import Path
 
-from gunz_utils.benchmark import load_result_checked, profile_command
+from gunz_utils.benchmark import profile_command
 from gunz_utils.concurrency import gather_limited
 from gunz_utils.resilience import AsyncCircuitBreaker, CircuitState
 

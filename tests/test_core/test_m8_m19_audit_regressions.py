@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import asyncio
 import tempfile
 import unittest
 from pathlib import Path
 
-from gunz_utils.benchmark import PerformanceRun, SystemInfo, register_artifact, save_run_directory
+from gunz_utils.benchmark import (
+    PerformanceRun,
+    SystemInfo,
+    register_artifact,
+    save_run_directory,
+)
 from gunz_utils.binary import ByteReader, encode_uvarint
 from gunz_utils.fs import lexical_contained_path
 from gunz_utils.pipeline import worker_map

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from .result import BenchmarkResult
 from .runner import benchmark
@@ -35,7 +36,7 @@ def run_experiment(
         raise ValueError("parameter value lists must not be empty")
     output: list[ExperimentResult] = []
     for combination in itertools.product(*values):
-        kwargs = dict(zip(keys, combination))
+        kwargs = dict(zip(keys, combination, strict=True))
         for repetition in range(repetitions):
             result = benchmark(
                 func,

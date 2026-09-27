@@ -23,7 +23,15 @@ def load_result_checked(
     data: Any = json.loads(item.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("benchmark result must be a JSON object")
-    required = {"name", "samples", "stats", "warmup", "iterations", "system", "schema_version"}
+    required = {
+        "name",
+        "samples",
+        "stats",
+        "warmup",
+        "iterations",
+        "system",
+        "schema_version",
+    }
     missing = required - data.keys()
     if missing:
         raise ValueError(f"benchmark result missing fields: {sorted(missing)}")

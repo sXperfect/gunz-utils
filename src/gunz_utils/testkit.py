@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 
 @dataclass
@@ -20,7 +20,9 @@ class ManualClock:
         self.now += seconds
 
 
-def fuzz_integers(*, seed: int, count: int, minimum: int = 0, maximum: int = 2**31 - 1) -> Iterator[int]:
+def fuzz_integers(
+    *, seed: int, count: int, minimum: int = 0, maximum: int = 2**31 - 1
+) -> Iterator[int]:
     """Yield deterministic pseudo-random integers for lightweight fuzz tests."""
     if count < 0:
         raise ValueError("count must be non-negative")

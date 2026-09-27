@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -80,8 +80,8 @@ async def _heartbeat_loop(
 
 
 async def run_with_lease_heartbeat(
-    operation: Callable[[], Awaitable[T]],
-    renew: Callable[[], Awaitable[bool]],
+    operation: Callable[[], Coroutine[Any, Any, T]],
+    renew: Callable[[], Coroutine[Any, Any, bool]],
     *,
     heartbeat_interval: float,
     renew_immediately: bool = False,

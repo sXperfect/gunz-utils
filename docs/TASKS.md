@@ -6,6 +6,7 @@ under `docs/tasks/{pending,active,done}/`.
 
 | Task ID | Date | Description | Status |
 |:---:|:---:|:---|:---:|
+| [2026.09.27-protocol-ci_simplification](tasks/active/2026.09.27-protocol-ci_simplification.md) | 2026-09-27 | Simplify GitHub CI with coverage-preserving DS4F worker/auditor milestones | Active |
 | [reusable-runtime-primitives](tasks/active/2026.09.27-gunz_utils-reusable_runtime_primitives.md) | 2026-09-27 | Extract dependency-free reusable primitives from gunz-ml | Active |
 
 > All four 2026-08-26 CI/protocol tasks landed. See [`docs/TASKS_ARCHIVE.md`](TASKS_ARCHIVE.md) for the active Done records (3 implemented + 1 deliberate no-op).

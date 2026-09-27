@@ -14,7 +14,10 @@ def as_readonly_view(data: bytes | bytearray | memoryview) -> memoryview:
     return view.toreadonly()
 
 
-def dispatch(reference: Callable[..., T], accelerated: Callable[..., T] | None = None) -> Callable[..., T]:
+def dispatch(
+    reference: Callable[..., T],
+    accelerated: Callable[..., T] | None = None,
+) -> Callable[..., T]:
     """Select an optional accelerated implementation without making it required."""
     return accelerated or reference
 

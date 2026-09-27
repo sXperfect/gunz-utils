@@ -54,6 +54,7 @@ These modules have no third-party runtime dependencies.
    :show-inheritance:
 
 .. automodule:: gunz_utils.provenance
+   :no-index:
    :members:
    :undoc-members:
    :show-inheritance:
@@ -85,6 +86,7 @@ These modules have no third-party runtime dependencies.
    :show-inheritance:
 
 .. automodule:: gunz_utils.structures
+   :no-index:
    :members:
    :undoc-members:
    :show-inheritance:
@@ -172,7 +174,7 @@ These modules have no third-party runtime dependencies.
 
 
 Optional backends (``gunz_utils.ext.*``)
----------------------------------------
+----------------------------------------
 
 Each extra (``validation``, ``project``, ``observability``, ``secure``)
 pulls in its default backend here. Stdlib fallbacks ship alongside and

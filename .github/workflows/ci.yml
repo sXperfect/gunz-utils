@@ -3,214 +3,149 @@ name: CI
 on:
   push:
     branches: ["main", "develop"]
+  pull_request:
+    types: ["opened", "synchronize", "reopened", "ready_for_review"]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  core:
-    name: core (enums + security + upstream_protocol)
+  test:
+    name: test (full pytest, Python 3.11)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .
-      - name: Run tests
-        run: |
-          python -m unittest \
-            tests.test_core.test_dict_utils \
-            tests.test_core.test_enums \
-            tests.test_core.test_enums_security \
-            tests.test_core.test_formatting \
-            tests.test_core.test_hashing \
-            tests.test_core.test_io \
-            tests.test_core.test_iteration \
-            tests.test_core.test_parsing \
-            tests.test_core.test_redaction \
-            tests.test_core.test_security \
-            tests.test_core.test_security_reserved \
-            tests.test_core.test_timing \
-            tests.test_core.test_upstream_protocol -v
-
-  pytest:
-    name: pytest full suite (all extras)
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-          pip install .[all]
-      - name: Run pytest
-        run: |
-          pytest -v
-
-  validation_extras:
-    name: validation (type_checked + leak)
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .[validation]
-      - name: Run tests
-        run: |
-          python -m unittest discover tests/test_validation -v
-
-  project_extras:
-    name: project (resolve_project_root)
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .[project]
-      - name: Run tests
-        run: |
-          python -m unittest discover tests/test_project -v
-
-  observability_extras:
-    name: observability (setup_logging)
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .[observability]
-      - name: Run tests
-        run: |
-          python -m unittest discover tests/test_observability -v
-
-  stdlib_fallback:
-    name: stdlib fallback (validation_stdlib + project_stdlib)
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .
-      - name: Run tests
-        run: |
-          python -m unittest discover tests/test_ext_stdlib -v
-
-  secure_extras:
-    name: secure (SecureStore + cryptography)
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .[secure]
-      - name: Run tests
-        run: |
-          python -m unittest discover tests/test_secure -v
-
-  ruff:
-    name: ruff lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install ruff
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          pip install pytest==9.0.2
+          pip install ".[all]"
+      - name: Run full pytest
+        run: python -m pytest
+
+  compat:
+    name: compat (full pytest, Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest==9.0.2
+          pip install ".[all]"
+      - name: Run full pytest
+        run: python -m pytest
+
+  lint:
+    name: lint (ruff + mypy, Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff==0.14.10 mypy==1.19.1
+          pip install ".[all]"
       - name: Run ruff
-        run: |
-          ruff check src tests benchmarks
+        run: python -m ruff check src tests benchmarks
+      - name: Run mypy
+        run: python -m mypy src/gunz_utils
 
-  core_import:
-    name: zero-dependency core import
+  packaging:
+    name: packaging (dependency-isolation matrix, Python 3.11)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install core without dependencies
-        run: pip install . --no-deps
-      - name: Verify core import does not load optional packages
-        run: |
-          python - <<'PY'
-          import sys
-          import gunz_utils
-          forbidden = {"pydantic", "cryptography", "git", "loguru"}
-          loaded = forbidden.intersection(sys.modules)
-          if loaded:
-              raise SystemExit(f"optional dependencies imported by core: {sorted(loaded)}")
-          PY
-
-  mypy:
-    name: mypy static type check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install dependencies
+      - name: Run packaging / isolation matrix
+        run: python scripts/ci.py packaging
+
+  docs:
+    name: docs (strict Sphinx -W)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Canonical docs-validation place: build docs strictly (`python scripts/ci.py
+    # docs` runs `scripts/build_docs.sh` with `-W`). This job ALWAYS runs on every
+    # PR, branch push, and manual run. Docs are intentionally NOT path-filtered:
+    # job-level `paths:`/`paths-ignore:` is not valid Actions syntax (those keys
+    # belong under `on.<push|pull_request>` event filters, which would strand the
+    # required `docs` check on code-only PRs). Building docs on every run is the
+    # chosen, simplest trade-off for this repo. ci-result accepts a skipped docs
+    # result defensively but the docs job normally yields success/failure only.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install docs deps
         run: |
           python -m pip install --upgrade pip
-          pip install .
-          pip install mypy pydantic cryptography gitpython loguru
-      - name: Run mypy
+          pip install ".[docs]"
+      - name: Build docs (strict)
+        run: python scripts/ci.py docs
+
+  ci-result:
+    name: ci-result (aggregate required checks)
+    if: always()
+    needs: [test, compat, lint, packaging, docs]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Aggregate required checks
         run: |
-          mypy src/gunz_utils
+          set -euo pipefail
+          failed=0
+          ok_core() {
+            case "$1" in
+              success) ;;
+              *) echo "::error::$2 required job did not succeed: $1"; failed=1 ;;
+            esac
+          }
+          ok_docs() {
+            case "$1" in
+              success) ;;
+              skipped) echo "::notice::docs skipped (no docs-relevant changes)" ;;
+              *) echo "::error::docs required job did not succeed: $1"; failed=1 ;;
+            esac
+          }
+          ok_core "${{ needs.test.result }}" test
+          ok_core "${{ needs.compat.result }}" compat
+          ok_core "${{ needs.lint.result }}" lint
+          ok_core "${{ needs.packaging.result }}" packaging
+          ok_docs "${{ needs.docs.result }}"
+          if [ "$failed" -eq 0 ]; then
+            echo "::notice::CI OK: all required jobs passed"
+          else
+            exit 1
+          fi

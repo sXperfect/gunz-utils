@@ -20,7 +20,7 @@ class NoiseInfo:
 def capture_noise_info() -> NoiseInfo:
     """Capture inexpensive environment state relevant to benchmark noise."""
     try:
-        load = os.getloadavg()
+        load: tuple[float | None, float | None, float | None] = os.getloadavg()
     except (AttributeError, OSError):
         load = (None, None, None)
     affinity = (

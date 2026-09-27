@@ -21,7 +21,7 @@ rm -rf "$DOCS_DIR/_build"
 # 2. Build HTML
 echo "-> Building HTML..."
 cd "$SOURCE_DIR"
-sphinx-build -b html . "$DOCS_DIR/_build/html"
+sphinx-build -b html -W . "$DOCS_DIR/_build/html"
 
 echo "========================================"
 echo "Build Complete!"

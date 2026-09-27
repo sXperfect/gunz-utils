@@ -17,7 +17,8 @@ class TestDeepProcessProfile(unittest.TestCase):
                 sys.executable,
                 "-c",
                 "import subprocess,sys,time;"
-                "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(.03)']);"
+                "p=subprocess.Popen([sys.executable,'-c',"
+                "'import time;time.sleep(.03)']);"
                 "time.sleep(.02);p.wait()",
             ],
             interval=0.002,

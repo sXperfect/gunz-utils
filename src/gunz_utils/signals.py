@@ -7,8 +7,7 @@ import signal
 from collections.abc import Callable
 from dataclasses import dataclass
 from types import FrameType
-from typing import Any
-
+from typing import Any, Literal
 
 SignalCallback = Callable[[int], None]
 
@@ -41,7 +40,7 @@ class SignalRegistration:
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: object | None,
-    ) -> bool:
+    ) -> Literal[False]:
         """Restore the previous handler without suppressing exceptions."""
         self.restore()
         return False
@@ -80,7 +79,7 @@ class AsyncSignalRegistration:
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: object | None,
-    ) -> bool:
+    ) -> Literal[False]:
         """Restore all previous handlers without suppressing exceptions."""
         self.restore()
         return False

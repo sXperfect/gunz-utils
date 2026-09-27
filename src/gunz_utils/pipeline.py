@@ -25,7 +25,9 @@ async def worker_map(
     if size < 1:
         raise ValueError("queue_size must be positive")
     incoming: asyncio.Queue[T | object] = asyncio.Queue(size)
-    outgoing: asyncio.Queue[tuple[bool, R | BaseException | object]] = asyncio.Queue(size)
+    outgoing: asyncio.Queue[tuple[bool, R | BaseException | object]] = asyncio.Queue(
+        size
+    )
 
     async def producer() -> None:
         try:

@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
-from typing import TypeVar
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterable
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 R = TypeVar("R")
 
 
 async def gather_limited(
-    awaitables: Iterable[Awaitable[T]],
+    awaitables: Iterable[Coroutine[Any, Any, T]],
     *,
     limit: int,
     return_exceptions: bool = False,
@@ -63,7 +63,7 @@ async def gather_limited(
 
 
 async def map_concurrent(
-    func: Callable[[T], Awaitable[R]],
+    func: Callable[[T], Coroutine[Any, Any, R]],
     items: Iterable[T],
     *,
     limit: int,
@@ -78,7 +78,7 @@ async def map_concurrent(
 
 
 async def map_unordered(
-    func: Callable[[T], Awaitable[R]],
+    func: Callable[[T], Coroutine[Any, Any, R]],
     items: Iterable[T],
     *,
     limit: int,

@@ -1,11 +1,12 @@
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('../../src'))
 
 project = 'gunz-utils'
 copyright = '2025, Yeremia Gunawan Adhisantoso'
 author = 'Yeremia Gunawan Adhisantoso'
-release = '1.8.0'
+release = '1.10.0'
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -28,7 +29,9 @@ html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
 # Mock imports for external dependencies
-autodoc_mock_imports = ["pydantic", "pydantic_core", "cryptography", "git", "gitpython", "loguru"]
+autodoc_mock_imports = [
+    "pydantic", "pydantic_core", "cryptography", "git", "gitpython", "loguru",
+]
 
 # Napoleon settings
 napoleon_google_docstring = False

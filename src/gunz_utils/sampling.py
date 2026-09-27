@@ -43,7 +43,7 @@ def stable_priority(
     if not isinstance(seed, int):
         raise TypeError(f"seed must be int, got {type(seed).__name__}")
 
-    payload = f"{seed}:{name}".encode("utf-8")
+    payload = f"{seed}:{name}".encode()
     digest = hashlib.blake2b(payload, digest_size=8).digest()
     return int.from_bytes(digest, byteorder="big", signed=False)
 

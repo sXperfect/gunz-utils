@@ -39,7 +39,9 @@ class PortableSampler(ProcessSampler):
 
     @property
     def capabilities(self) -> SamplerCapabilities:
-        return SamplerCapabilities(False, False, False, False, False, False, False, False)
+        return SamplerCapabilities(
+            False, False, False, False, False, False, False, False
+        )
 
 
 def default_sampler() -> ProcessSampler:

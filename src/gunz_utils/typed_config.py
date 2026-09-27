@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -23,7 +24,9 @@ def parse_bool(value: str) -> bool:
     raise ValueError(f"invalid boolean: {value!r}")
 
 
-def convert(value: str, parser: Callable[[str], T], *, source: str = "environment") -> ConfigValue[T]:
+def convert(
+    value: str, parser: Callable[[str], T], *, source: str = "environment"
+) -> ConfigValue[T]:
     return ConfigValue(parser(value), source)
 
 

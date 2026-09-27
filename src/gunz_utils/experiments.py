@@ -5,9 +5,9 @@ from __future__ import annotations
 import copy
 import itertools
 import math
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from collections.abc import Mapping, Sequence
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -154,7 +154,7 @@ def compare_numeric_metrics(
 
         left_value = float(left)
         right_value = float(right)
-        delta = right_value - left_value
+        delta_f = right_value - left_value
         result[key] = {
             "numeric": True,
             "baseline": left_value,
@@ -163,10 +163,10 @@ def compare_numeric_metrics(
                 math.isfinite(left_value)
                 and math.isfinite(right_value)
             ),
-            "delta": delta,
+            "delta": delta_f,
             "relative_delta": (
-                delta / abs(left_value)
-                if left_value != 0 and math.isfinite(delta)
+                delta_f / abs(left_value)
+                if left_value != 0 and math.isfinite(delta_f)
                 else None
             ),
         }

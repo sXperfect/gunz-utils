@@ -14,7 +14,7 @@ def perf_metrics(result: PerfStatResult) -> dict[str, float | None]:
 
     def ratio(numerator: str, denominator: str) -> float | None:
         top, bottom = values.get(numerator), values.get(denominator)
-        if top is None or bottom in {None, 0}:
+        if top is None or bottom is None or bottom == 0:
             return None
         return top / bottom
 
@@ -30,7 +30,7 @@ def process_metrics(profile: ProcessProfile) -> dict[str, float | None]:
     wall = profile.wall_seconds
     samples = profile.samples
     memory_time = 0.0
-    for previous, current in zip(samples, samples[1:]):
+    for previous, current in zip(samples, samples[1:], strict=False):
         duration = current.elapsed - previous.elapsed
         memory_time += previous.rss_bytes * max(0.0, duration)
     return {
@@ -55,7 +55,7 @@ def scaling_efficiency(
         raise ValueError("workers and durations must be non-empty and equally sized")
     base_workers, base_duration = workers[0], durations[0]
     result: list[float | None] = []
-    for count, duration in zip(workers, durations):
+    for count, duration in zip(workers, durations, strict=True):
         if count <= 0 or duration <= 0 or base_workers <= 0:
             result.append(None)
             continue

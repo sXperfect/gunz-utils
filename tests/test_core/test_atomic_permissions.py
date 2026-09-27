@@ -11,7 +11,6 @@ import pytest
 
 from gunz_utils.io import atomic_json_write, atomic_write
 
-
 pytestmark = pytest.mark.skipif(
     not hasattr(os, "fchmod"),
     reason="explicit descriptor permissions require os.fchmod",

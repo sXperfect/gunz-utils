@@ -1,5 +1,5 @@
 Gunz-Utils: Foundational Core
-============================
+=============================
 
 .. image:: https://img.shields.io/badge/License-Clear_BSD-blue.svg
 .. image:: https://img.shields.io/badge/Python-3.11+-green.svg
@@ -23,6 +23,7 @@ validation, and cross-platform project management.
    installation
    quickstart
    concepts
+   ci
 
 .. toctree::
    :maxdepth: 2

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import AsyncExitStack, ExitStack
+from types import TracebackType
 from typing import Any
 
 
@@ -17,8 +18,13 @@ class ResourceGroup:
     def enter(self, resource: Any) -> Any:
         return self._stack.enter_context(resource)
 
-    def __exit__(self, *exc: object) -> bool | None:
-        return self._stack.__exit__(*exc)
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None:
+        return self._stack.__exit__(exc_type, exc_value, traceback)
 
 
 class AsyncResourceGroup:
@@ -32,8 +38,13 @@ class AsyncResourceGroup:
     async def enter(self, resource: Any) -> Any:
         return await self._stack.enter_async_context(resource)
 
-    async def __aexit__(self, *exc: object) -> bool | None:
-        return await self._stack.__aexit__(*exc)
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None:
+        return await self._stack.__aexit__(exc_type, exc_value, traceback)
 
 
 __all__ = ["AsyncResourceGroup", "ResourceGroup"]

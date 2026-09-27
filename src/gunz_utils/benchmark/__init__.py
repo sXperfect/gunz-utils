@@ -23,7 +23,6 @@ from .history import BenchmarkHistory, HistoryPoint, Trend
 from .io import GitInfo, capture_git_info, load_result, save_result
 from .metrics import perf_metrics, process_metrics, scaling_efficiency
 from .overhead import OverheadProbe, measure_runner_overhead
-from .performance import PerformanceArtifact, PerformanceRun
 from .perf import (
     PerfCounter,
     PerfStatResult,
@@ -32,6 +31,7 @@ from .perf import (
     perf_script,
     perf_stat,
 )
+from .performance import PerformanceArtifact, PerformanceRun
 from .plot import plot_benchmark, plot_history, plot_process_samples
 from .policy import MetricDecision, MetricPolicy, evaluate_metric
 from .process import ProcessDetail, ProcessProfile, ProcessSample, profile_command
@@ -50,7 +50,8 @@ __all__ = [
     "BenchmarkCase", "BenchmarkComparison", "BenchmarkHistory", "ExperimentResult",
     "BenchmarkResult", "BenchmarkStats", "BenchmarkSuite", "GitInfo",
     "HistoryPoint", "HistorySummary", "LinuxProcSampler", "MetricDecision",
-    "MetricPolicy", "NoiseInfo", "OverheadProbe", "PerformanceArtifact", "PerformanceRun",
+    "MetricPolicy", "NoiseInfo", "OverheadProbe", "PerformanceArtifact",
+    "PerformanceRun",
     "PerfCounter", "PerfStatResult", "PortableSampler", "ProcessDetail",
     "ProcessProfile", "ProcessSample", "ProcessSampler", "RegressionGate",
     "SamplerCapabilities",
@@ -60,7 +61,8 @@ __all__ = [
     "capture_git_info", "capture_noise_info", "comparability_warnings",
     "compare_results", "default_sampler", "evaluate_metric",
     "evaluate_regression_gate", "format_comparison", "format_process_profile",
-    "load_result", "load_result_checked", "measure_runner_overhead", "migrate_performance_run",
+    "load_result", "load_result_checked", "measure_runner_overhead",
+    "migrate_performance_run",
     "perf_available", "perf_metrics", "perf_record", "perf_script",
     "perf_stat", "plot_benchmark", "plot_history", "plot_process_samples",
     "process_metrics", "profile_command", "register_artifact",

@@ -39,12 +39,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.program:
         parser.error("profile requires a command after options")
-    result = profile_command(args.program, interval=args.interval)
+    profile_result = profile_command(args.program, interval=args.interval)
     Path(args.output).write_text(
-        json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n",
+        json.dumps(profile_result.to_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    return result.returncode
+    return profile_result.returncode
 
 
 if __name__ == "__main__":

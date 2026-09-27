@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
-from collections.abc import Iterator
 
 _correlation_id: ContextVar[str | None] = ContextVar(
     "gunz_utils_correlation_id",

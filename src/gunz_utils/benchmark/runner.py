@@ -6,9 +6,9 @@ import gc
 import os
 import statistics
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator, TypeVar
+from typing import Any, TypeVar
 
 from .result import BenchmarkResult, BenchmarkStats, SystemInfo
 
@@ -40,7 +40,9 @@ def benchmark_environment(
             gc.disable()
         if cpu_affinity is not None:
             if not hasattr(os, "sched_getaffinity"):
-                raise NotImplementedError("CPU affinity is unavailable on this platform")
+                raise NotImplementedError(
+                    "CPU affinity is unavailable on this platform"
+                )
             previous_affinity = os.sched_getaffinity(0)
             os.sched_setaffinity(0, cpu_affinity)
         yield
@@ -151,7 +153,7 @@ def benchmark(
         }
     )
     return BenchmarkResult(
-        name=name or getattr(func, "__qualname__", repr(func)),
+        name=name or str(getattr(func, "__qualname__", repr(func))),
         samples=tuple(samples),
         stats=stats,
         warmup=warmup,

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
-from types import MappingProxyType
 from pathlib import Path
+from types import MappingProxyType
 
 from .hashing import structured_hash
 from .io import atomic_write
@@ -50,11 +50,12 @@ class PartitionManifest:
         for name, identifiers in self.partitions.items():
             if not isinstance(name, str) or not name.strip():
                 raise ValueError("partition names must be non-empty strings")
-            if len(set(identifiers)) != len(identifiers):
+            identifiers_tuple = tuple(identifiers)
+            if len(set(identifiers_tuple)) != len(identifiers_tuple):
                 raise ValueError(
                     f"duplicate item identifiers in partition {name!r}"
                 )
-            for identifier in identifiers:
+            for identifier in identifiers_tuple:
                 if not isinstance(identifier, str) or not identifier:
                     raise ValueError(
                         f"partition {name!r} contains an invalid item identifier"

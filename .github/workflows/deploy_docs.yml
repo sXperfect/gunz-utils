@@ -1,15 +1,30 @@
-name: Build Documentation
+name: Build Documentation (OBSOLETE - consolidated into ci.yml)
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    branches: [main, develop]
 
+# -----------------------------------------------------------------------------
+# OBSOLETE / REDUNDANT
+#
+# Docs validation now lives in the `docs` job of `.github/workflows/ci.yml`,
+# which runs `python scripts/ci.py docs` (i.e. `scripts/build_docs.sh` with the
+# strict `-W` flag). That is the single canonical docs-validation place, and it
+# is path-filtered and gated by the `ci-result` aggregate job.
+#
+# This workflow's build-docs job is DISABLED (`if: false`) so the same docs
+# build is not executed in two places. The file is retained as a placeholder
+# only: per the destructive-action checkpoint policy, it is not deleted without
+# explicit authorization. Recommended next step: delete this file once the
+# maintainer authorizes it (docs building is fully covered by ci.yml).
+#
+# This workflow is and remains build-only; it never deploys to Pages and holds
+# no write permissions.
+# -----------------------------------------------------------------------------
 jobs:
   build-docs:
     runs-on: ubuntu-latest
-
+    if: false
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

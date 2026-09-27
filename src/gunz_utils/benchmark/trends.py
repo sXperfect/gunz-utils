@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import statistics
+from dataclasses import dataclass
 
 from .history import BenchmarkHistory
 
@@ -35,7 +35,10 @@ def summarize_history(
         xs = list(range(len(values)))
         x_mean = statistics.fmean(xs)
         y_mean = statistics.fmean(values)
-        numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, values))
+        numerator = sum(
+            (x - x_mean) * (y - y_mean)
+            for x, y in zip(xs, values, strict=True)
+        )
         denominator = sum((x - x_mean) ** 2 for x in xs)
         slope = 0.0 if denominator == 0 else numerator / denominator
     previous = values[max(0, len(values) - baseline_window - 1):-1]
