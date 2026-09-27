@@ -128,7 +128,10 @@ def test_check_rejects_module_version_literals(tmp_path: Path) -> None:
 
     result = repo.check()
     assert not result.ok
-    assert any(\n        "example.py contains a package __version__ literal" in item\n        for item in result.errors\n    )
+    assert any(
+        "example.py contains a package __version__ literal" in item
+        for item in result.errors
+    )
 
 
 def test_repository_release_metadata_is_self_consistent() -> None:
