@@ -7,10 +7,24 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from gunz_utils.io import atomic_json_write, atomic_write
-from gunz_utils.retry import RetryPolicy, async_run_with_retry, run_with_retry
-from gunz_utils.streaming import BoundedWriter, DigestWriter, copy_and_hash
+from gunz_utils.retry import (
+    RetryPolicy,
+    async_run_with_retry,
+    run_with_retry,
+)
+from gunz_utils.streaming import (
+    BoundedWriter,
+    DigestWriter,
+    copy_and_hash,
+)
+
+
+class PartialWriter(io.BytesIO):
+    def write(self, data: Any) -> int:
+        return super().write(bytes(data[:1]))
 
 
 class TestRetryPolicy(unittest.TestCase):
@@ -90,12 +104,22 @@ class TestStreamingWriters(unittest.TestCase):
             writer.write(b"cd")
         self.assertEqual(output.getvalue(), b"ab")
 
-    def test_digest_writer_tracks_successful_bytes(self) -> None:
-        output = io.BytesIO()
+    def test_bounded_writer_handles_partial_writes(self) -> None:
+        output = PartialWriter()
+        writer = BoundedWriter(output, max_bytes=3)
+        self.assertEqual(writer.write(b"abc"), 3)
+        self.assertEqual(writer.bytes_written, 3)
+        self.assertEqual(output.getvalue(), b"abc")
+
+    def test_digest_writer_tracks_partial_writes(self) -> None:
+        output = PartialWriter()
         writer = DigestWriter(output)
         writer.write(b"abc")
         self.assertEqual(writer.bytes_written, 3)
-        self.assertEqual(writer.hexdigest, hashlib.sha256(b"abc").hexdigest())
+        self.assertEqual(
+            writer.hexdigest,
+            hashlib.sha256(b"abc").hexdigest(),
+        )
 
     def test_copy_and_hash(self) -> None:
         output = io.BytesIO()
@@ -107,21 +131,40 @@ class TestStreamingWriters(unittest.TestCase):
         )
         self.assertEqual(output.getvalue(), b"abcdef")
         self.assertEqual(result.bytes_written, 6)
-        self.assertEqual(result.hexdigest, hashlib.sha256(b"abcdef").hexdigest())
+        self.assertEqual(
+            result.hexdigest,
+            hashlib.sha256(b"abcdef").hexdigest(),
+        )
 
 
 class TestAtomicJSON(unittest.TestCase):
     def test_atomic_json_write_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "nested" / "value.json"
-            atomic_json_write(path, {"b": 2, "a": 1}, mkdir=True)
-            self.assertEqual(json.loads(path.read_text()), {"a": 1, "b": 2})
-            self.assertLess(path.read_text().find('"a"'), path.read_text().find('"b"'))
+            atomic_json_write(
+                path,
+                {"b": 2, "a": 1},
+                mkdir=True,
+            )
+            text = path.read_text()
+            self.assertEqual(
+                json.loads(text),
+                {"a": 1, "b": 2},
+            )
+            self.assertLess(
+                text.find('"a"'),
+                text.find('"b"'),
+            )
 
     def test_durable_binary_write(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "value.bin"
-            atomic_write(path, b"abc", mode="wb", durable=True)
+            atomic_write(
+                path,
+                b"abc",
+                mode="wb",
+                durable=True,
+            )
             self.assertEqual(path.read_bytes(), b"abc")
 
 
