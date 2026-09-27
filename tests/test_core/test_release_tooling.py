@@ -54,14 +54,21 @@ Pending fragments are stored separately.
 """,
         encoding="utf-8",
     )
+    (tmp_path / "src" / "gunz_utils" / "_version.py").write_text(
+        "from importlib import metadata\n"
+        '__version__ = metadata.version("gunz-utils")\n',
+        encoding="utf-8",
+    )
     (tmp_path / "src" / "gunz_utils" / "__init__.py").write_text(
-        'from importlib.metadata import version\n'
-        '__version__ = version("gunz-utils")\n',
+        "def _resolve_package_version():\n"
+        "    from ._version import __version__\n"
+        "    return __version__\n"
+        "__version__ = _resolve_package_version()\n",
         encoding="utf-8",
     )
     (tmp_path / "docs" / "source" / "conf.py").write_text(
-        'from importlib.metadata import version\n'
-        'release = version("gunz-utils")\n',
+        "from importlib.metadata import version as package_version\n"
+        'release = package_version("gunz-utils")\n',
         encoding="utf-8",
     )
     return release.ReleaseRepo(tmp_path)

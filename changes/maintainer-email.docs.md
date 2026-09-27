@@ -1,0 +1,1 @@
+Update repository maintainer metadata to use `yeremiag@gmail.com` consistently.

@@ -10,12 +10,14 @@ from __future__ import annotations
 # METADATA
 # =============================================================================
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import functools
 import pathlib
 import subprocess
 import sys
+
+from .._version import __version__ as __version__
 
 __all__ = ["resolve_project_root"]
 

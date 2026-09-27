@@ -10,7 +10,7 @@ for creating enum members. It leverages modern Python 3.11+ features.
 # METADATA
 # =============================================================================
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 
 # =============================================================================

@@ -15,7 +15,7 @@ Public surface
 # METADATA
 # =============================================================================
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
@@ -25,6 +25,8 @@ __license__ = "Clear BSD"
 # THIRD-PARTY IMPORTS
 # =============================================================================
 from pydantic import BaseModel, ConfigDict
+
+from ._version import __version__ as __version__
 
 
 class GunzBaseModel(BaseModel):

@@ -140,11 +140,13 @@ If it's not documented, it's harder to use and maintain.
 - **Module Metadata**: Package release versions belong only in `pyproject.toml`.
   Individual modules must not carry independent `__version__` constants because they
   drift from the distribution version. Optional author/license metadata may remain.
+  When backward compatibility requires `module.__version__`, import it from
+  `gunz_utils._version` rather than copying a literal.
 
     **Recommended Dunder Block:**
     ```python
     __author__ = "Yeremia Gunawan Adhisantoso"
-    __email__ = "adhisant@tnt.uni-hannover.de"
+    __email__ = "yeremiag@gmail.com"
     __license__ = "Clear BSD"
     ```
 - **Use `#?` for Explanatory Comments**: Use inline comments prefixed with `#?` to explain the *why*

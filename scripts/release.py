@@ -133,6 +133,7 @@ class ReleaseRepo:
         self.fragments_dir = self.root / "changes"
         self.source_dir = self.root / "src" / "gunz_utils"
         self.init_py = self.source_dir / "__init__.py"
+        self.version_module = self.source_dir / "_version.py"
         self.sphinx_conf = self.root / "docs" / "source" / "conf.py"
 
     def current_version(self) -> SemVer:
@@ -283,11 +284,23 @@ class ReleaseRepo:
                         "__version__ literal"
                     )
 
+        if not self.version_module.is_file():
+            errors.append("missing src/gunz_utils/_version.py")
+        else:
+            version_text = self.version_module.read_text(encoding="utf-8")
+            if 'metadata.version("gunz-utils")' not in version_text:
+                errors.append(
+                    "gunz_utils._version must derive from importlib.metadata"
+                )
+
         if self.init_py.is_file():
             init_text = self.init_py.read_text(encoding="utf-8")
-            if 'version("gunz-utils")' not in init_text:
+            if (
+                "from ._version import __version__" not in init_text
+                or "__version__ = _resolve_package_version()" not in init_text
+            ):
                 errors.append(
-                    "gunz_utils.__version__ must derive from importlib.metadata"
+                    "gunz_utils.__version__ must use the shared version resolver"
                 )
             if VERSION_LITERAL_RE.search(init_text):
                 errors.append(
@@ -303,6 +316,10 @@ class ReleaseRepo:
             )
             if static_release is not None:
                 errors.append("docs/source/conf.py contains a static release version")
+            if 'package_version("gunz-utils")' not in conf_text:
+                errors.append(
+                    "Sphinx release must derive from installed package metadata"
+                )
 
         tags = self._git_tags()
         if tags:

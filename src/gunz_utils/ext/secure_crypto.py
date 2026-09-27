@@ -6,7 +6,7 @@ Compatible with HyperHedron CLI's TypeScript implementation.
 # METADATA
 # =============================================================================
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import binascii
 import os
@@ -15,6 +15,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+from .._version import __version__ as __version__
 
 # Constants matching TypeScript implementation
 IV_LENGTH = 12

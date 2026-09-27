@@ -10,8 +10,10 @@ import time
 from collections.abc import Iterator
 from typing import Literal
 
+from ._version import __version__ as __version__
+
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = ["Timer", "timer"]
 

@@ -357,7 +357,7 @@ name = "gunz-utils"
 version = "1.3.0"
 description = "General purpose utilities for the Gunz ecosystem"
 authors = [
-    { name = "Yeremia Gunawan Adhisantoso", email = "adhisant@tnt.uni-hannover.de" },
+    { name = "Yeremia Gunawan Adhisantoso", email = "yeremiag@gmail.com" },
 ]
 readme = "README.md"
 requires-python = ">=3.11"

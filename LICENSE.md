@@ -6,7 +6,7 @@ Copyright (c) 2025-present
   Leibniz University Hannover (LUH)
 
 Contacts
-  Yeremia Gunawan Adhisantoso <adhisant@tnt.uni-hannover.de>
+  Yeremia Gunawan Adhisantoso <yeremiag@gmail.com>
 
 All rights reserved.
 

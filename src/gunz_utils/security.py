@@ -8,7 +8,7 @@ This module provides helpers for security-related tasks, such as sanitizing inpu
 # METADATA
 # =============================================================================
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 
 # =============================================================================

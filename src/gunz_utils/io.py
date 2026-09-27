@@ -7,10 +7,11 @@ import pathlib
 import tempfile
 from typing import Any
 
+from ._version import __version__ as __version__
 from .serialization import json_dumps
 
 __author__ = "Yeremia Gunz"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = ["atomic_json_write", "atomic_write"]
 

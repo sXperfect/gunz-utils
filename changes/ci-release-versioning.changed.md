@@ -1,0 +1,1 @@
+Centralize runtime package-version resolution while preserving historical module-level `__version__` attributes as aliases of the installed distribution version.

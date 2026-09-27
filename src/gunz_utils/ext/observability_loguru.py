@@ -5,13 +5,15 @@ Standardized logging for HyperHedron components.
 # METADATA
 # =============================================================================
 __author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "adhisant@tnt.uni-hannover.de"
+__email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import os
 import sys
 from pathlib import Path
 
 from loguru import logger
+
+from .._version import __version__ as __version__
 
 
 def setup_logging(
