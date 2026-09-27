@@ -1,1 +1,0 @@
-Consolidate hosted verification into one fail-fast runner, with Actions triggered only by pushes to `main` and pull requests targeting `main`; feature-branch pushes no longer consume hosted CI.
