@@ -3,8 +3,8 @@ from __future__ import annotations
 import math
 import os
 import unittest
-from typing import Any, cast
 from importlib import import_module
+from typing import Any, cast
 from unittest.mock import patch
 
 import gunz_utils.io as io_module
