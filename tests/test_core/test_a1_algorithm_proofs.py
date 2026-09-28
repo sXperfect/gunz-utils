@@ -554,3 +554,88 @@ def test_termination_registration_rejects_invalid_domain_before_install() -> Non
             signum=signal.SIGTERM,
             exit_after=1,  # type: ignore[arg-type]
         )
+
+
+def test_gather_limited_iterator_failure_cleans_initial_tasks() -> None:
+    async def scenario() -> None:
+        baseline = set(asyncio.all_tasks())
+
+        async def idle() -> None:
+            await asyncio.Event().wait()
+
+        def broken():
+            yield idle()
+            raise RuntimeError("iterator failed")
+
+        with pytest.raises(RuntimeError, match="iterator failed"):
+            await gather_limited(broken(), limit=2)
+
+        await asyncio.sleep(0)
+        remaining = set(asyncio.all_tasks()) - baseline
+        assert remaining == set()
+
+    asyncio.run(scenario())
+
+
+def test_map_unordered_iterator_failure_cleans_initial_tasks() -> None:
+    async def scenario() -> None:
+        baseline = set(asyncio.all_tasks())
+
+        async def idle(_value: int) -> int:
+            await asyncio.Event().wait()
+            return 0
+
+        def broken():
+            yield 1
+            raise RuntimeError("iterator failed")
+
+        stream = map_unordered(idle, broken(), limit=2)
+        with pytest.raises(RuntimeError, match="iterator failed"):
+            await anext(stream)
+
+        await asyncio.sleep(0)
+        remaining = set(asyncio.all_tasks()) - baseline
+        assert remaining == set()
+
+    asyncio.run(scenario())
+
+
+def test_worker_pipeline_producer_failure_propagates_without_deadlock() -> None:
+    async def scenario() -> None:
+        async def work(value: int) -> int:
+            return value
+
+        def broken():
+            yield 1
+            raise RuntimeError("source failed")
+
+        stream = worker_map(
+            work,
+            broken(),
+            workers=1,
+            queue_size=1,
+        )
+        with pytest.raises(RuntimeError, match="source failed"):
+            async for _value in stream:
+                pass
+
+    asyncio.run(scenario())
+
+
+def test_content_store_rejects_non_boolean_publication_flags(
+    tmp_path: Path,
+) -> None:
+    store = ContentAddressedStore(tmp_path / "store")
+    artifact = store.put_bytes(b"payload")
+
+    with pytest.raises(ValueError, match="verify"):
+        store.get(artifact.digest, verify=1)  # type: ignore[arg-type]
+
+    for flag in ("replace", "verify", "fallback_copy"):
+        kwargs = {flag: 1}
+        with pytest.raises(ValueError, match=flag):
+            store.materialize(
+                artifact.digest,
+                tmp_path / f"{flag}.bin",
+                **kwargs,  # type: ignore[arg-type]
+            )
