@@ -1,0 +1,1 @@
+- Raise the optional Matplotlib floor to 3.10.0 so the plotting extra resolves only to upstream-supported security lines.
