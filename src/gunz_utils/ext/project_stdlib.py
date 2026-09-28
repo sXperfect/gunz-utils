@@ -17,9 +17,8 @@ import pathlib
 import subprocess
 import sys
 
-from ..subprocess import CommandError, CommandOutputLimitError, run_command
-
 from .._version import __version__ as __version__
+from ..subprocess import CommandError, CommandOutputLimitError, run_command
 
 __all__ = ["resolve_project_root"]
 

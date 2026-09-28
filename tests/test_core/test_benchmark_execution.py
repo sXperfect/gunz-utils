@@ -4,8 +4,6 @@ import gc
 import json
 import unittest
 
-from gunz_utils.subprocess import CommandOutputLimitError
-
 from gunz_utils.benchmark import (
     BenchmarkSuite,
     PerformanceArtifact,
@@ -16,6 +14,7 @@ from gunz_utils.benchmark import (
     run_python_worker,
     worker_json,
 )
+from gunz_utils.subprocess import CommandOutputLimitError
 
 
 class TestExecutionControls(unittest.TestCase):

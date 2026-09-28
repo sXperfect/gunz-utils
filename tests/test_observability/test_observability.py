@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
 from gunz_utils import setup_logging
 
