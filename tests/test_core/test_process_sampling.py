@@ -95,6 +95,9 @@ class TestProcessSampling(unittest.TestCase):
             {"detailed_memory_every": 0},
             {"detailed_memory_every": -1},
             {"detailed_memory_every": 1.5},
+            {"interval": float("nan")},
+            {"interval": float("inf")},
+            {"interval": True},
         ):
             with self.subTest(options=options):
                 with patch("gunz_utils.benchmark.process.subprocess.Popen") as launch:
