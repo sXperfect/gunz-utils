@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,7 +53,17 @@ class BenchmarkHistory:
     def trend(self, metric: str = "median") -> Trend:
         if not self.points:
             raise ValueError("benchmark history is empty")
-        values = [float(getattr(point.result.stats, metric)) for point in self.points]
+        if not isinstance(metric, str) or not metric:
+            raise ValueError("metric must be a non-empty string")
+        try:
+            values = [
+                float(getattr(point.result.stats, metric))
+                for point in self.points
+            ]
+        except AttributeError:
+            raise ValueError(f"unknown benchmark metric: {metric!r}") from None
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("benchmark history metric values must be finite")
         first, last = values[0], values[-1]
         absolute = last - first
         relative = 0.0 if first == 0 and last == 0 else (
