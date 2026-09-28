@@ -404,8 +404,9 @@ def run_packaging() -> int:
                       from a CWD outside the checkout and assert it resolves to the
                       venv ``site-packages`` (source-shadowing guard).
 
-    Returns 0 only when every locally-runnable case passes; otherwise returns
-    nonzero after printing the name of the first failing case.
+    Runs every locally-runnable case even when an earlier independent case
+    fails. Returns 0 only when all cases pass; otherwise prints the complete
+    failed-case list and returns nonzero.
     """
     cases: list[tuple[str, Callable[[], int]]] = [
         ("zero-dep", _case_zero_dep),
