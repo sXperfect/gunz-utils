@@ -121,8 +121,14 @@ def file_hash(
         raise ValueError(
             f"unsupported algo {algo!r}; expected one of {sorted(SUPPORTED_ALGOS)}"
         )
-    if chunk_size <= 0:
-        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
+    if (
+        isinstance(chunk_size, bool)
+        or not isinstance(chunk_size, int)
+        or chunk_size <= 0
+    ):
+        raise ValueError(
+            f"chunk_size must be a positive integer, got {chunk_size!r}"
+        )
     hasher = hashlib.new(algo)
     # ? `with` guarantees the file handle closes even if the loop is interrupted.
     with open(path, "rb") as fh:
@@ -170,9 +176,15 @@ def short_hash(data: bytes | str, *, chars: int = 8, algo: str = DEFAULT_ALGO) -
     >>> short_hash(b"hello") == content_hash(b"hello")[:8]
     True
     """
-    if chars < _MIN_SHORT_CHARS or chars > _MAX_SHORT_CHARS:
+    if (
+        isinstance(chars, bool)
+        or not isinstance(chars, int)
+        or chars < _MIN_SHORT_CHARS
+        or chars > _MAX_SHORT_CHARS
+    ):
         raise ValueError(
-            f"chars must be in [{_MIN_SHORT_CHARS}, {_MAX_SHORT_CHARS}], got {chars}"
+            f"chars must be an integer in "
+            f"[{_MIN_SHORT_CHARS}, {_MAX_SHORT_CHARS}], got {chars!r}"
         )
     return content_hash(data, algo=algo)[:chars]
 
@@ -243,8 +255,14 @@ def directory_manifest(
         raise ValueError(
             f"unsupported algo {algo!r}; expected one of {sorted(SUPPORTED_ALGOS)}"
         )
-    if chunk_size <= 0:
-        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
+    if (
+        isinstance(chunk_size, bool)
+        or not isinstance(chunk_size, int)
+        or chunk_size <= 0
+    ):
+        raise ValueError(
+            f"chunk_size must be a positive integer, got {chunk_size!r}"
+        )
 
     base = pathlib.Path(root)
     if not base.is_dir():
