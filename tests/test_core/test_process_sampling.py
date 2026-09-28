@@ -4,7 +4,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from gunz_utils.benchmark.process import ProcessSample, _memory_rollup, profile_command
+from gunz_utils.benchmark.process import (
+    ProcessSample,
+    _memory_rollup,
+    _parse_proc_stat,
+    profile_command,
+)
 
 
 def _sample(process_count: int = 1) -> ProcessSample:
@@ -29,6 +34,21 @@ def _sample(process_count: int = 1) -> ProcessSample:
 
 class TestProcessSampling(unittest.TestCase):
     """Exercise process races without relying on operating system timing."""
+
+
+    def test_proc_stat_parser_preserves_spaces_and_parentheses(self) -> None:
+        text = (
+            "123 (worker pool (x)) "
+            "S 1 0 0 0 0 0 7 0 9 0 11 13 0 0 0 0 4 0 0 0 5"
+        )
+        pid, command, fields = _parse_proc_stat(text)
+        self.assertEqual(pid, 123)
+        self.assertEqual(command, "worker pool (x)")
+        self.assertEqual(fields[3], "1")
+        self.assertEqual(fields[13], "11")
+        self.assertEqual(fields[14], "13")
+        self.assertEqual(fields[19], "4")
+        self.assertEqual(fields[23], "5")
 
     def test_rollup_ignores_mapping_header(self) -> None:
         """Real Linux rollups include a nonnumeric mapping header."""
