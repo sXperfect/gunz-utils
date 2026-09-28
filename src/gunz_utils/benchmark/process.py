@@ -301,13 +301,31 @@ def profile_command(
     )
     samples: list[ProcessSample] = []
     snapshot_index = 0
-    while process.poll() is None:
-        detail = memory_detail if snapshot_index % detailed_memory_every == 0 else "rss"
-        sample = _linux_snapshot(process.pid, started, memory_detail=detail)
-        if sample.process_count:
-            samples.append(sample)
-        snapshot_index += 1
-        time.sleep(interval)
+    try:
+        while process.poll() is None:
+            detail = (
+                memory_detail
+                if snapshot_index % detailed_memory_every == 0
+                else "rss"
+            )
+            sample = _linux_snapshot(
+                process.pid,
+                started,
+                memory_detail=detail,
+            )
+            if sample.process_count:
+                samples.append(sample)
+            snapshot_index += 1
+            time.sleep(float(interval))
+    except BaseException:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+        raise
     wall = time.perf_counter() - started
     if check and process.returncode:
         raise subprocess.CalledProcessError(process.returncode, list(args))
