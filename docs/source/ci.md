@@ -40,9 +40,14 @@ The verification itself is one aggregate command:
 
 ```bash
 python scripts/audit_ci.py \
+  --skip-release \
   --compat-python python3.12 \
   --summary-json tmp/ci-summary.json
 ```
+
+`--skip-release` is used only in hosted CI because the workflow has already
+run the release check as a cheap pre-install preflight. Local `./scripts/verify.sh`
+still includes release validation in the aggregate run.
 
 The orchestrator runs independent checks in this order:
 
