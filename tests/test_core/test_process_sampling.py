@@ -1,10 +1,16 @@
 """Deterministic process sampling checks for exit races and memory cadence."""
 
+import math
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from gunz_utils.benchmark.process import ProcessSample, _memory_rollup, profile_command
+from gunz_utils.benchmark.process import (
+    ProcessSample,
+    _memory_rollup,
+    _parse_proc_stat,
+    profile_command,
+)
 
 
 def _sample(process_count: int = 1) -> ProcessSample:
@@ -29,6 +35,21 @@ def _sample(process_count: int = 1) -> ProcessSample:
 
 class TestProcessSampling(unittest.TestCase):
     """Exercise process races without relying on operating system timing."""
+
+    def test_proc_stat_parser_preserves_spaces_and_parentheses(self) -> None:
+        text = (
+            "123 (worker pool (x)) "
+            "S 1 0 0 0 0 0 7 0 9 0 11 13 0 0 0 0 4 0 0 0 5"
+        )
+        pid, command, fields = _parse_proc_stat(text)
+        self.assertEqual(pid, 123)
+        self.assertEqual(command, "worker pool (x)")
+        self.assertEqual(fields[3], "1")
+        self.assertEqual(fields[13], "11")
+        self.assertEqual(fields[14], "13")
+        self.assertEqual(fields[19], "4")
+        self.assertEqual(fields[23], "5")
+
 
     def test_rollup_ignores_mapping_header(self) -> None:
         """Real Linux rollups include a nonnumeric mapping header."""
@@ -95,9 +116,36 @@ class TestProcessSampling(unittest.TestCase):
             {"detailed_memory_every": 0},
             {"detailed_memory_every": -1},
             {"detailed_memory_every": 1.5},
+            {"interval": math.nan},
+            {"interval": math.inf},
+            {"interval": True},
         ):
             with self.subTest(options=options):
                 with patch("gunz_utils.benchmark.process.subprocess.Popen") as launch:
                     with self.assertRaises(ValueError):
                         profile_command(["command"], **options)
                     launch.assert_not_called()
+
+
+    def test_sampler_failure_terminates_launched_process(self) -> None:
+        process = Mock(pid=123, returncode=None)
+        process.poll.return_value = None
+        process.wait.return_value = 0
+        with (
+            patch(
+                "gunz_utils.benchmark.process.subprocess.Popen",
+                return_value=process,
+            ),
+            patch(
+                "gunz_utils.benchmark.process.Path.exists",
+                return_value=True,
+            ),
+            patch(
+                "gunz_utils.benchmark.process._linux_snapshot",
+                side_effect=RuntimeError("sample failed"),
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "sample failed"):
+                profile_command(["command"])
+        process.terminate.assert_called_once()
+        process.wait.assert_called()
