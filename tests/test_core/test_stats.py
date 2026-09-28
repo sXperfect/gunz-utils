@@ -167,3 +167,14 @@ def test_normal_mean_summary_rejects_unrepresentable_interval() -> None:
             [1e308, -1e308],
             confidence_z=1.96,
         )
+
+
+def test_statistics_reject_boolean_and_non_numeric_domains() -> None:
+    with pytest.raises(ValueError, match="real numeric"):
+        paired_effect([True], [0.0])
+    with pytest.raises(ValueError, match="samples"):
+        bootstrap_mean_ci([1.0], samples=True)
+    with pytest.raises(ValueError, match="seed"):
+        bootstrap_mean_ci([1.0], seed=True)
+    with pytest.raises(ValueError, match="confidence_z"):
+        normal_mean_summary([1.0, 2.0], confidence_z=True)
