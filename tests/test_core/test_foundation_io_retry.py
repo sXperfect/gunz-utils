@@ -121,6 +121,18 @@ class TestStreamingWriters(unittest.TestCase):
             hashlib.sha256(b"abc").hexdigest(),
         )
 
+    def test_resource_bounds_reject_boolean_controls(self) -> None:
+        with self.assertRaises(ValueError):
+            BoundedWriter(io.BytesIO(), max_bytes=True)
+        with self.assertRaises(ValueError):
+            DigestWriter(io.BytesIO(), max_bytes=True)
+        with self.assertRaises(ValueError):
+            copy_and_hash(
+                io.BytesIO(b"x"),
+                io.BytesIO(),
+                chunk_size=True,
+            )
+
     def test_copy_and_hash(self) -> None:
         output = io.BytesIO()
         result = copy_and_hash(
