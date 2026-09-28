@@ -6,7 +6,7 @@ import math
 import random
 from collections.abc import Iterable
 from dataclasses import dataclass
-from statistics import fmean
+from statistics import fmean, stdev
 
 
 @dataclass(frozen=True)
@@ -147,7 +147,10 @@ def paired_effect(
     Raises
     ------
     ValueError
-        If samples are empty, unequal in length, or contain non-finite values.
+        If samples are empty, unequal in length, contain non-finite values, or
+        a pairwise difference is not representable as a finite float.
+    OverflowError
+        If the standardized effect is not representable as a finite float.
     """
     left_values = _finite_values(
         left,
@@ -168,6 +171,10 @@ def paired_effect(
             strict=True,
         )
     ]
+    if not all(math.isfinite(value) for value in differences):
+        raise ValueError(
+            "paired differences must be representable as finite floats"
+        )
     center = fmean(differences)
     if len(differences) < 2:
         return PairedEffect(
@@ -177,16 +184,19 @@ def paired_effect(
             observations=1,
         )
 
-    variance = sum(
-        (value - center) ** 2
-        for value in differences
-    ) / (len(differences) - 1)
-    standard_deviation = math.sqrt(variance)
+    standard_deviation = stdev(differences)
     standardized_effect = (
         center / standard_deviation
         if standard_deviation
         else None
     )
+    if (
+        standardized_effect is not None
+        and not math.isfinite(standardized_effect)
+    ):
+        raise OverflowError(
+            "standardized effect exceeds finite float range"
+        )
     return PairedEffect(
         mean_difference=center,
         standard_deviation=standard_deviation,
@@ -203,7 +213,6 @@ __all__ = [
     "normal_mean_summary",
     "paired_effect",
 ]
-
 
 
 @dataclass(frozen=True)
@@ -238,6 +247,11 @@ def normal_mean_summary(
     NormalMeanSummary
         Count, mean, sample standard deviation, and interval bounds.
 
+    Raises
+    ------
+    OverflowError
+        If the interval cannot be represented using finite floats.
+
     Notes
     -----
     This is a fast descriptive normal approximation, not a bootstrap or
@@ -265,21 +279,31 @@ def normal_mean_summary(
             confidence_z=confidence_z,
         )
 
-    variance = sum(
-        (value - center) ** 2
-        for value in observations
-    ) / (count - 1)
-    standard_deviation = math.sqrt(variance)
+    standard_deviation = stdev(observations)
     margin = (
         confidence_z
         * standard_deviation
         / math.sqrt(count)
     )
+    low = center - margin
+    high = center + margin
+    if not all(
+        math.isfinite(value)
+        for value in (
+            standard_deviation,
+            margin,
+            low,
+            high,
+        )
+    ):
+        raise OverflowError(
+            "normal-mean interval exceeds finite float range"
+        )
     return NormalMeanSummary(
         observations=count,
         mean=center,
         standard_deviation=standard_deviation,
-        low=center - margin,
-        high=center + margin,
+        low=low,
+        high=high,
         confidence_z=confidence_z,
     )
