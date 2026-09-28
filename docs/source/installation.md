@@ -62,7 +62,7 @@ Optional extras are defined in `pyproject.toml`:
 | `project` | `gitpython>=3.1.62` | Git-aware project-root discovery |
 | `observability` | `loguru>=0.7.0` | Structured logging setup |
 | `secure` | `cryptography>=50.0.1` | Encryption and secure storage |
-| `plot` | `matplotlib>=3.10.0` | Benchmark plotting |
+| `plot` | `matplotlib>=3.10.9` | Benchmark plotting |
 | `all` | validation + project + observability + secure | Common runtime integrations |
 | `docs` | Sphinx toolchain | Local documentation builds |
 
