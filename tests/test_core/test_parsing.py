@@ -130,6 +130,12 @@ class TestParseBool(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_bool(2)
 
+    def test_error_does_not_echo_rejected_value(self) -> None:
+        secret = "token=super-secret"
+        with self.assertRaises(ValueError) as caught:
+            parse_bool(secret)
+        self.assertNotIn(secret, str(caught.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
