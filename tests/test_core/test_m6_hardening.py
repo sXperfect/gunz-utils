@@ -37,6 +37,15 @@ class TestM6ProductionHardening(unittest.TestCase):
         migrated = migrate_performance_run(data)
         self.assertEqual(migrated["schema_version"], 1)
 
+    def test_schema_rejects_boolean_version(self) -> None:
+        run = PerformanceRun("demo", SystemInfo.capture())
+        data = run.to_dict()
+        data["schema_version"] = True
+        with self.assertRaises(ValueError):
+            validate_performance_run(data)
+        with self.assertRaises(ValueError):
+            migrate_performance_run(data)
+
     def test_artifact_integrity_detects_tampering(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "artifact.bin"
