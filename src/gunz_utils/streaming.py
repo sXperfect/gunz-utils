@@ -11,18 +11,29 @@ from typing import Any, BinaryIO, TextIO
 from .serialization import canonical_json
 
 
+def _reject_json_constant(value: str) -> object:
+    raise ValueError(f"non-standard JSON constant: {value}")
+
+
 def iter_jsonl(handle: TextIO) -> Iterator[Any]:
     """Decode non-empty JSON Lines records lazily."""
     for line in handle:
         if line.strip():
-            yield json.loads(line)
+            yield json.loads(line, parse_constant=_reject_json_constant)
 
 
 def write_jsonl(handle: TextIO, records: Iterable[Any]) -> int:
     """Write compact JSON Lines records and return the record count."""
     count = 0
     for record in records:
-        handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+        handle.write(
+            json.dumps(
+                record,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+            + "\n"
+        )
         count += 1
     return count
 
