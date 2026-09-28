@@ -57,7 +57,7 @@ def discover_plugins(
     tuple[PluginLoadResult, ...]
         Deterministically ordered load results.
     """
-    if not isinstance(group, str) or not group:
+    if not isinstance(group, str) or not group.strip():
         raise ValueError("group must be a non-empty string")
     if not isinstance(instantiate, bool):
         raise ValueError("instantiate must be bool")
