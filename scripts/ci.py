@@ -418,7 +418,7 @@ def run_packaging() -> int:
             status = int(exc.code) if isinstance(exc.code, int) else 1
         except Exception as exc:
             print(
-                f"!! packaging case {name} raised {type(exc).__name__}: {exc}",
+                f"!! packaging case {name} raised {type(exc).__name__}",
                 file=sys.stderr,
             )
             status = 70
