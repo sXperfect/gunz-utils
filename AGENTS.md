@@ -249,6 +249,15 @@ python -m ruff check src tests benchmarks scripts
 python -m mypy src/gunz_utils
 ```
 
+Algorithmic changes must follow
+`docs/guides/algorithm-correctness-audit.md` and update
+`docs/audits/algorithm-registry.md` when they add, change, repair, or retire
+an algorithmic contract. Explicitly cover parameter domains, numerical
+finiteness and bounds where applicable, invariants, independent oracles,
+special cases, complexity/boundedness, and failure atomicity. Do not promote an
+audit entry to A3 or A4 until the required focused/full verification has
+actually executed successfully.
+
 Do not weaken a test merely to make a gate green. Fix the implementation or the
 test's incorrect assumption and preserve a regression test for the discovered
 failure.
