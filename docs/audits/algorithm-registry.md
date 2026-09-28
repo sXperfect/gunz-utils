@@ -52,9 +52,9 @@ all packaging/isolation cases, and 864 Python 3.12 tests.
 | ALG-019 | Benchmark history trend summary | `benchmark.trends.summarize_history` | A2 | OLS slope, moving median, finite metric values, baseline window | hardened domains and unknown-metric errors |
 | ALG-020 | Stability diagnostics | `benchmark.diagnostics.analyze_stability` | A2 | CV/range/outlier diagnostics, finite non-negative samples/thresholds | fixed invalid config appearing stable |
 | ALG-021 | Retry backoff / deadline policy | `retry.RetryPolicy`, retry runners | A2 | bounded attempts, finite delays/timeouts, overflow-safe exponential cap | fixed NaN/inf timing acceptance and huge-exponent overflow |
-| ALG-022 | Renewable lease heartbeat race | `leases.run_with_lease_heartbeat` | A1 | lease-loss precedence, cleanup, cancellation | static review complete; focused race tests still pending |
-| ALG-023 | Bounded/digest streaming writes | `streaming.BoundedWriter`, `DigestWriter`, `copy_and_hash` | A1 | partial-write progress, committed-byte accounting, byte limits | static review complete; fault-injection proof pending |
-| ALG-024 | Partition overlap detection | `partitions.partition_overlaps` | A1 | deterministic pair order, set intersection | static review complete; broader property tests pending |
+| ALG-022 | Renewable lease heartbeat race | `leases.run_with_lease_heartbeat` | A2 | lease-loss precedence, cleanup, cancellation, Awaitable support, setup-failure cleanup | setup/race proof tests added; execution pending |
+| ALG-023 | Bounded/digest streaming writes | `streaming.BoundedWriter`, `DigestWriter`, `copy_and_hash` | A2 | partial-write progress, committed-byte accounting, byte limits, strict JSONL constants | partial-write/failure and JSONL proof tests added; execution pending |
+| ALG-024 | Partition overlap detection | `partitions.partition_overlaps`, `PartitionManifest` | A2 | deterministic pair order, overlap oracle, immutable manifest, invalid-shape handling | exhaustive small-domain overlap proof added; execution pending |
 | ALG-025 | TTL/LRU caches | `cache.ttl_cache`, `async_ttl_cache` | A2 | TTL expiry, capacity, coalesced async misses, finite TTL | fixed NaN/inf/bool TTL/capacity domains |
 | ALG-026 | Circuit breaker | `resilience.AsyncCircuitBreaker` | A2 | state transitions, failure threshold, recovery timer | hardened count/timing domains; race execution pending |
 | ALG-027 | Async bulkhead | `resilience.AsyncBulkhead` | A2 | concurrency bound, timeout acquisition | hardened limit/timeout domains |
@@ -80,14 +80,14 @@ all packaging/isolation cases, and 864 Python 3.12 tests.
 | ALG-047 | Project-root discovery/cache | `ext.project_stdlib`, `ext.project_gitpython` | A2 | ancestor search, cross-anchor cache correctness, optional sys.path injection | fixed cached root leakage and late-injection bug |
 | ALG-048 | Deep nested data utilities | `dict_utils.deep_get`, `deep_set`, `deep_merge` | A2 | path validation, override semantics, list strategies, non-mutation of roots | existing evidence reviewed; nested value aliasing remains contract-sensitive |
 | ALG-049 | Secure AES-GCM format/key derivation | `ext.secure_crypto` | A2 | explicit passphrase, PBKDF2/AES-GCM round trip, legacy rejection | existing security tests reviewed; malformed-length matrix still pending |
-| ALG-050 | Encrypted credential store | `ext.secure_store.SecureStore` | A1 | key modes, authenticated decrypt, ACLs, audit log, file permissions | interface/tests reviewed; full transaction/concurrency sweep pending |
-| ALG-051 | Stdlib runtime type checker | `ext.validation_stdlib.type_checked` | A1 | argument binding, unions, varargs/kwargs, no secret values in errors | reviewed; generic/container-depth parity remains limited |
-| ALG-052 | Version migration | `versioning.*` | A1 | version validation, migration order, unsupported paths | implementation reviewed; dedicated proof packet still pending |
-| ALG-053 | Plugin discovery/selection | `plugins.*` | A1 | deterministic discovery, isolation of broken plugins | implementation reviewed; differential/ordering tests need registry linkage |
-| ALG-054 | Content-addressed storage | `content_store.ContentAddressedStore` | A1 | digest/path mapping, integrity verification, atomic publication | reviewed; fallback publication race/fault injection remains |
-| ALG-055 | Atomic filesystem publication | `fs.*`, `io.*` atomic helpers | A1 | temp-file isolation, rename, cleanup, durability | reviewed; post-replace fsync failure semantics need explicit proof |
-| ALG-056 | Core concurrency schedulers | `concurrency.*`, `pipeline.*` | A1 | task/queue bounds, ordering, cancellation cleanup | static review complete; adversarial race suite pending |
-| ALG-057 | Signal/resource lifecycle | `signals.*`, `resources.*` | A1 | registration rollback, reverse cleanup, async cleanup | static review complete; fault-injection suite pending |
+| ALG-050 | Encrypted credential store | `ext.secure_store.SecureStore` | A2 | key modes, authenticated decrypt, ACLs, mutation/audit atomicity, threaded serialization, rotation recovery | transaction/concurrency/crash-recovery proofs added; execution pending |
+| ALG-051 | Stdlib runtime type checker | `ext.validation_stdlib.type_checked` | A2 | argument binding, PEP 604 unions, recursive containers, literals/Annotated, varargs/kwargs, redacted errors | recursive/differential proof tests added; execution pending |
+| ALG-052 | Version migration | `versioning.*` | A2 | version/envelope validation, one-step migration order, missing/downgrade paths, failure stop | focused failure-boundary proof added; execution pending |
+| ALG-053 | Plugin discovery/selection | `plugins.*` | A2 | deterministic ordering, sibling failure isolation, instantiation errors, process-control propagation | focused isolation proof added; execution pending |
+| ALG-054 | Content-addressed storage | `content_store.ContentAddressedStore` | A2 | digest/path mapping, integrity verification, symlinked fanout rejection, fallback publication, materialization domains | adversarial path/fallback proofs added; execution pending |
+| ALG-055 | Atomic filesystem publication | `fs.*`, `io.*` atomic helpers | A2 | temp isolation, replace failure cleanup, directory publication, no-overwrite symlinks, durability contract | fault/publication proofs added; execution pending |
+| ALG-056 | Core concurrency schedulers | `concurrency.*`, `pipeline.*` | A2 | task/queue bounds, initial-scheduling cleanup, ordering, worker-failure cancellation | adversarial setup/worker proofs added; execution pending |
+| ALG-057 | Signal/resource lifecycle | `signals.*`, `resources.*` | A2 | partial registration rollback, idempotent restore, reverse sync/async cleanup | lifecycle/failure proof tests added; execution pending |
 | ALG-058 | Collection transforms | `collections.unique/group_by/index_by/partition` | A4 | stable order, duplicate semantics, unhashable values, key-derived collisions | focused proof suite executed successfully |
 | ALG-059 | Human-readable formatting | `formatting.*` | A4 | SI/IEC boundaries, duration decomposition, precision domain, non-finite/bool rejection, huge integer counts | domain coercion hardened and executed |
 | ALG-060 | Deterministic/short identifiers | `identifiers.*` | A4 | determinism, prefix consistency, string contracts, length bounds and bool rejection | parameter contracts hardened and executed |
@@ -186,6 +186,43 @@ parameter structure before constructing the result.
 
 Resolved for ALG-068. Artifact registration and verification now reject symlinks
 instead of treating a symlink to a regular file as the registered file identity.
+
+### FIND-013 — lease/concurrency setup escaped cleanup scope
+
+Resolved for ALG-022/056. Initial task creation now occurs inside the same
+cleanup scope as steady-state execution, and the lease helper accepts the full
+Awaitable contract rather than only coroutine objects.
+
+### FIND-014 — JSONL accepted non-standard NaN/infinity constants
+
+Resolved for ALG-023. Streaming JSON Lines now rejects non-standard numeric
+constants on both encode and decode, matching the repository's strict JSON
+semantics.
+
+### FIND-015 — stdlib validator did not enforce documented PEP 604/container types
+
+Resolved for ALG-051. The stdlib backend now handles PEP 604 unions, recursive
+list/dict/tuple/set/frozenset element types, Literal, Annotated base types, and
+Callable outer types. Backend-specific decorator options are rejected rather
+than silently ignored.
+
+### FIND-016 — SecureStore mutation and success audit could commit separately
+
+Resolved for ALG-050. Individual and bulk secret mutations now couple successful
+audit events to the same SQLite transaction. Bulk failures roll back all secret
+changes and persist one post-rollback batch-denial event when possible.
+
+### FIND-017 — content-store fanout ancestors could be symlinked
+
+Resolved for ALG-054. Store roots and every digest fanout ancestor are checked
+for symlinks before publication/access, preventing a malicious prefix directory
+from redirecting a content path outside the intended store tree.
+
+### FIND-018 — transactional directory could replace a dangling symlink target
+
+Resolved for ALG-055. Publication treats both existing filesystem entries and
+dangling symlinks as occupied targets, preserving the advertised no-overwrite
+behavior.
 
 ## Open limitations / proof gaps
 
