@@ -92,6 +92,7 @@ def resolve_project_root(
         raise RuntimeError(f"Resolved root is not a directory: {root}")
 
     _PROJECT_ROOT = root
+    _PROJECT_ANCHOR = start
 
     if inject_to_sys_path:
         root_str = str(root)
