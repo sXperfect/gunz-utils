@@ -50,6 +50,8 @@ class VersionedEnvelope:
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> VersionedEnvelope:
         """Validate and reconstruct an envelope from a mapping."""
+        if not isinstance(value, Mapping):
+            raise SchemaMigrationError("envelope must be a mapping")
         try:
             schema = value["schema"]
             version = value["version"]
@@ -110,6 +112,8 @@ class SchemaMigrator:
         target_version: int,
     ) -> VersionedEnvelope:
         """Migrate an envelope forward to target_version."""
+        if not isinstance(envelope, VersionedEnvelope):
+            raise TypeError("envelope must be a VersionedEnvelope")
         _validate_version(target_version, name="target_version")
         if target_version < envelope.version:
             raise SchemaMigrationError("schema downgrades are not supported")
