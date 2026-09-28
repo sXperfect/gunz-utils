@@ -23,6 +23,10 @@ def env_overrides(
     separator: str = "__",
 ) -> dict[str, Any]:
     """Convert prefixed environment names into a nested config mapping."""
+    if not isinstance(prefix, str) or not prefix.strip("_"):
+        raise ValueError("prefix must be a non-empty string")
+    if not isinstance(separator, str) or not separator:
+        raise ValueError("separator must be a non-empty string")
     out: dict[str, Any] = {}
     prefix_value = prefix.upper().rstrip("_") + "_"
     for name, value in environ.items():
@@ -32,8 +36,10 @@ def env_overrides(
         suffix = name[len(prefix_value):]
         if not suffix:
             continue
-        cursor = out
         parts = [part.lower() for part in suffix.split(separator)]
+        if any(not part for part in parts):
+            raise ValueError(f"environment key {name!r} contains an empty path segment")
+        cursor = out
         for part in parts[:-1]:
             cursor = cursor.setdefault(part, {})
         cursor[parts[-1]] = value
