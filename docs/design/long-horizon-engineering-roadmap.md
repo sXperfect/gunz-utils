@@ -51,6 +51,17 @@ These are permanent requirements.
 
 ## Program A — Correctness and adversarial testing
 
+The canonical per-algorithm audit method is
+[`docs/guides/algorithm-correctness-audit.md`](../guides/algorithm-correctness-audit.md).
+It defines A0-A4 evidence levels, proof obligations, numerical parameter-domain
+checks, special cases, oracle requirements, and failure-atomicity review. The
+maintained implementation/evidence inventory is
+[`docs/audits/algorithm-registry.md`](../audits/algorithm-registry.md).
+
+An algorithm is not considered fully verified merely because examples pass:
+high-risk implementations should reach A4, which requires the focused proof
+tests plus the repository's full local verification gate.
+
 ### A1. Property-based invariants
 
 Implement deterministic/property-style generators without requiring Hypothesis
