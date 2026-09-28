@@ -82,7 +82,16 @@ class ResourceBudget:
         self.bytes_used = 0
         self.items_used = 0
         self._clock = clock
-        self._deadline = None if timeout is None else clock() + timeout
+        if timeout is None:
+            self._deadline = None
+        else:
+            now = self._clock_now()
+            deadline = now + timeout
+            if not math.isfinite(deadline):
+                raise OverflowError(
+                    "resource budget deadline exceeds finite float range"
+                )
+            self._deadline = deadline
 
     @classmethod
     def from_limits(
@@ -139,9 +148,24 @@ class ResourceBudget:
         if self.max_depth is not None and depth > self.max_depth:
             raise BudgetExceededError("depth budget exceeded")
 
+    def _clock_now(self) -> float:
+        value = self._clock()
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+        ):
+            raise ValueError(
+                "clock must return a finite numeric timestamp"
+            )
+        return float(value)
+
     def check_deadline(self) -> None:
         """Reject work at or after the configured monotonic deadline."""
-        if self._deadline is not None and self._clock() >= self._deadline:
+        if (
+            self._deadline is not None
+            and self._clock_now() >= self._deadline
+        ):
             raise BudgetExceededError("time budget exceeded")
 
     @property
@@ -163,7 +187,7 @@ class ResourceBudget:
         """Return non-negative time remaining or None when unbounded."""
         if self._deadline is None:
             return None
-        return max(0.0, self._deadline - self._clock())
+        return max(0.0, self._deadline - self._clock_now())
 
 
 __all__ = ["BudgetExceededError", "Limits", "ResourceBudget"]
