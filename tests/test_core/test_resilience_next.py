@@ -39,6 +39,17 @@ class TestCacheInfo(unittest.TestCase):
 
 
 class TestRetryPolicy(unittest.TestCase):
+    def test_backoff_caps_without_exponential_overflow(self) -> None:
+        policy = RetryPolicy(
+            attempts=2,
+            base_delay=1.0,
+            max_delay=3.0,
+            jitter=False,
+        )
+        self.assertEqual(policy.delay(1_000_000), 3.0)
+        with self.assertRaises(ValueError):
+            policy.delay(True)
+
     def test_rejects_non_finite_and_boolean_timing(self) -> None:
         invalid = (math.nan, math.inf, -math.inf, True)
         for value in invalid:
