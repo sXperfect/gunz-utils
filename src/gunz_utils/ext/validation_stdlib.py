@@ -24,6 +24,7 @@ __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import functools
 import inspect
+import types
 import typing as t
 
 from .._version import __version__ as __version__
@@ -40,7 +41,7 @@ def _check_one(value: t.Any, annotation: t.Any) -> bool:
             return False
         return isinstance(value, annotation)
 
-    if origin is t.Union:
+    if origin in (t.Union, types.UnionType):
         return any(_check_one(value, arg) for arg in t.get_args(annotation))
 
     if origin in (list, dict, tuple, set, frozenset):
