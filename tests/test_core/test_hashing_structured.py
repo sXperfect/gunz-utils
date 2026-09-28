@@ -104,3 +104,18 @@ def test_directory_manifest_validates_configuration_when_empty(
             tmp_path,
             chunk_size=0,
         )
+
+
+def test_directory_manifest_rejects_boolean_chunk_size(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="chunk_size"):
+        directory_manifest(
+            tmp_path,
+            chunk_size=True,
+        )
+
+
+def test_structured_hash_rejects_normalized_mapping_key_collision() -> None:
+    with pytest.raises(ValueError, match="mapping keys collide"):
+        structured_hash({1: "integer", "1": "string"})
