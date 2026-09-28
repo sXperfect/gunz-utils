@@ -17,7 +17,11 @@ class OverheadProbe:
 
 def measure_runner_overhead(*, iterations: int = 20) -> OverheadProbe:
     """Estimate framework overhead using a no-op benchmark."""
-    if isinstance(iterations, bool) or not isinstance(iterations, int) or iterations < 1:
+    if (
+        isinstance(iterations, bool)
+        or not isinstance(iterations, int)
+        or iterations < 1
+    ):
         raise ValueError("iterations must be a positive integer")
     timer_samples: list[float] = []
     for _ in range(iterations):
