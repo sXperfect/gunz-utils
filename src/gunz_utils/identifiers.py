@@ -23,7 +23,12 @@ def short_id(value: str, *, length: int = 12) -> str:
     """Return a deterministic compact identifier for display and keys."""
     if not isinstance(value, str):
         raise TypeError("value must be a string")
-    if isinstance(length, bool) or not isinstance(length, int) or length < 4 or length > 64:
+    if (
+        isinstance(length, bool)
+        or not isinstance(length, int)
+        or length < 4
+        or length > 64
+    ):
         raise ValueError("length must be between 4 and 64")
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:length]
 
