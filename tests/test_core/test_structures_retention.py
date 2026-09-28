@@ -78,3 +78,12 @@ def test_retain_priority_predicate_is_evaluated_once_per_item() -> None:
         2: 1,
         3: 1,
     }
+
+
+def test_retain_priority_and_recent_rejects_boolean_limit() -> None:
+    with pytest.raises(ValueError, match="max_recent"):
+        retain_priority_and_recent(
+            [1, 2, 3],
+            is_priority=lambda _value: False,
+            max_recent=True,
+        )
