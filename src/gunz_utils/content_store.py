@@ -56,6 +56,8 @@ class ContentAddressedStore:
     def __post_init__(self) -> None:
         """Normalize configuration and create the store root."""
         self.root = Path(self.root)
+        if self.root.is_symlink():
+            raise ValueError("content store root must not be a symlink")
         if self.algo not in SUPPORTED_ALGOS:
             raise ValueError(
                 f"unsupported algo {self.algo!r}; "
@@ -82,6 +84,8 @@ class ContentAddressedStore:
         if self.fanout_levels * self.fanout_chars > self.digest_chars:
             raise ValueError("fanout consumes more characters than the digest")
         self.root.mkdir(parents=True, exist_ok=True)
+        if self.root.is_symlink() or not self.root.is_dir():
+            raise ValueError("content store root must be a real directory")
 
     @property
     def digest_chars(self) -> int:
@@ -118,6 +122,34 @@ class ContentAddressedStore:
             stop = start + self.fanout_chars
             target = target / normalized[start:stop]
         return target / normalized
+
+    def _check_store_ancestors(
+        self,
+        target: Path,
+        *,
+        create: bool,
+    ) -> None:
+        """Reject symlinked fanout directories below the store root."""
+        try:
+            relative_parent = target.parent.relative_to(self.root)
+        except ValueError:
+            raise ValueError("content-addressed path escapes store root") from None
+
+        current = self.root
+        if current.is_symlink():
+            raise ValueError("content store root must not be a symlink")
+        for part in relative_parent.parts:
+            current = current / part
+            if current.is_symlink():
+                raise ValueError(
+                    "content-addressed prefix directory must not be a symlink"
+                )
+            if create:
+                current.mkdir(exist_ok=True)
+            elif current.exists() and not current.is_dir():
+                raise ValueError(
+                    "content-addressed prefix path must be a directory"
+                )
 
     def _verify_existing(
         self,
@@ -169,14 +201,10 @@ class ContentAddressedStore:
                 size_bytes=size_bytes,
             )
 
-        target.parent.mkdir(
-            parents=True,
-            exist_ok=True,
+        self._check_store_ancestors(
+            target,
+            create=True,
         )
-        if target.parent.is_symlink():
-            raise ValueError(
-                "content-addressed prefix directory must not be a symlink"
-            )
 
         try:
             os.link(
@@ -412,6 +440,10 @@ class ContentAddressedStore:
             raise ValueError("verify must be bool")
         normalized = self._validate_digest(digest)
         target = self.path_for(normalized)
+        self._check_store_ancestors(
+            target,
+            create=False,
+        )
         if not target.exists() and not target.is_symlink():
             raise KeyError(normalized)
         if verify:
