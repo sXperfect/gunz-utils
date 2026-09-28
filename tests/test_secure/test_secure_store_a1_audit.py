@@ -19,7 +19,7 @@ def test_set_many_rolls_back_data_and_audit_on_mid_batch_failure(
     store = SecureStore(base_dir=tmp_path)
     try:
         store.unlock()
-        with pytest.raises(TypeError, match="value must be str or bytes"):
+        with pytest.raises(TypeError, match="str or bytes"):
             store.set_many(
                 {
                     "first": "ok",

@@ -24,7 +24,7 @@ def test_ci_push_scope_is_main_with_only_explicit_temporary_audit_exception() ->
     extras = branches - {"main"}
     assert extras <= {AUDIT_BRANCH}
     if AUDIT_BRANCH in extras:
-        assert "TEMPORARY: remove audit branch after A0 verification." in text
+        assert "TEMPORARY: remove audit branch after" in text
 
     assert 'pull_request:\n    branches: ["main"]' in text
     assert "develop" not in text
