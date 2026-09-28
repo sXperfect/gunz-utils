@@ -128,6 +128,8 @@ async def run_with_lease_heartbeat(
         raise TypeError("operation must be callable")
     if not callable(renew):
         raise TypeError("renew must be callable")
+    if not isinstance(renew_immediately, bool):
+        raise ValueError("renew_immediately must be bool")
     if (
         isinstance(heartbeat_interval, bool)
         or not isinstance(heartbeat_interval, (int, float))
