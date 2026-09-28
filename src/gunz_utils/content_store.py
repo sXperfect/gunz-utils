@@ -161,9 +161,22 @@ class ContentAddressedStore:
                 f"content-addressed artifact is corrupted: {digest}"
             )
 
-    def _ensure_prefix_directory(self, target: Path) -> None:
-        """Create fanout directories without accepting symlink components."""
-        relative_parent = target.parent.relative_to(self.root)
+    def _check_prefix_path(
+        self,
+        target: Path,
+        *,
+        create: bool,
+    ) -> None:
+        """Reject symlinked/non-directory fanout components below the root."""
+        if self.root.is_symlink() or not self.root.is_dir():
+            raise ValueError(
+                "content-addressed store root must be a non-symlink directory"
+            )
+        try:
+            relative_parent = target.parent.relative_to(self.root)
+        except ValueError:
+            raise ValueError("content-addressed path escapes store root") from None
+
         current = self.root
         for component in relative_parent.parts:
             current = current / component
@@ -171,11 +184,16 @@ class ContentAddressedStore:
                 raise ValueError(
                     "content-addressed prefix directory must not be a symlink"
                 )
-            current.mkdir(exist_ok=True)
-            if current.is_symlink() or not current.is_dir():
+            if create:
+                current.mkdir(exist_ok=True)
+            if current.exists() and not current.is_dir():
                 raise ValueError(
                     "content-addressed prefix path must be a directory"
                 )
+
+    def _ensure_prefix_directory(self, target: Path) -> None:
+        """Create fanout directories without accepting symlink components."""
+        self._check_prefix_path(target, create=True)
 
     def _publish_temporary(
         self,
@@ -379,6 +397,13 @@ class ContentAddressedStore:
         """
         if strategy not in {"hardlink", "copy"}:
             raise ValueError("strategy must be 'hardlink' or 'copy'")
+        for name, value in (
+            ("replace", replace),
+            ("verify", verify),
+            ("fallback_copy", fallback_copy),
+        ):
+            if not isinstance(value, bool):
+                raise ValueError(f"{name} must be bool")
 
         source = self.get(
             digest,
@@ -439,6 +464,7 @@ class ContentAddressedStore:
         """Return a stored artifact path, optionally verifying its digest."""
         normalized = self._validate_digest(digest)
         target = self.path_for(normalized)
+        self._check_prefix_path(target, create=False)
         if not target.exists() and not target.is_symlink():
             raise KeyError(normalized)
         if verify:
