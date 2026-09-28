@@ -27,7 +27,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12 compatibility interpreter
+        id: py312
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Set up primary Python 3.11 interpreter
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
@@ -37,37 +45,27 @@ jobs:
       - name: Check release metadata
         run: python scripts/release.py check
 
-      - name: Install CI dependencies
+      - name: Install primary verification dependencies
         run: |
           python -m pip install pytest==9.0.3 ruff==0.14.10 mypy==1.19.1
           python -m pip install ".[all,plot,docs]"
 
-      - name: Run Ruff
-        run: python -m ruff check src tests benchmarks scripts
-
-      - name: Run mypy
-        run: python -m mypy src/gunz_utils
-
-      - name: Run full pytest on Python 3.11
-        run: python -m pytest
-
-      - name: Build documentation strictly
-        run: python scripts/ci.py docs
-
-      - name: Run packaging and dependency isolation
-        run: python scripts/ci.py packaging
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-
       - name: Install Python 3.12 compatibility dependencies
         run: |
-          python -m pip install pytest==9.0.3
-          python -m pip install ".[all]"
+          "${{ steps.py312.outputs.python-path }}" -m pip install pytest==9.0.3
+          "${{ steps.py312.outputs.python-path }}" -m pip install ".[all]"
 
-      - name: Run full pytest on Python 3.12
-        run: python -m pytest
+      - name: Run aggregate repository verification
+        run: |
+          python scripts/audit_ci.py \
+            --compat-python "${{ steps.py312.outputs.python-path }}" \
+            --summary-json tmp/ci-summary.json
+
+      - name: Upload verification summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-verification-summary
+          path: tmp/ci-summary.json
+          if-no-files-found: warn
+          retention-days: 14
