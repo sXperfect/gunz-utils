@@ -45,6 +45,12 @@ def test_package_metadata_declares_supported_contracts() -> None:
     assert project["license-files"] == ["LICENSE.md"]
     assert "hatchling>=1.27" in metadata["build-system"]["requires"]
 
+    extras = project["optional-dependencies"]
+    assert "gitpython>=3.1.62" in extras["project"]
+    assert "gitpython>=3.1.62" in extras["all"]
+    assert "cryptography>=50.0.1" in extras["secure"]
+    assert "cryptography>=50.0.1" in extras["all"]
+
     classifiers = set(project["classifiers"])
     assert "Programming Language :: Python :: 3.11" in classifiers
     assert "Programming Language :: Python :: 3.12" in classifiers
