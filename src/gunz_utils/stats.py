@@ -6,6 +6,7 @@ import math
 import random
 from collections.abc import Iterable
 from dataclasses import dataclass
+from numbers import Real
 from statistics import fmean, stdev
 
 
@@ -37,9 +38,15 @@ def _finite_values(
     name: str,
 ) -> list[float]:
     """Convert values to finite floats and require at least one observation."""
-    converted = [float(value) for value in values]
-    if not converted:
+    raw = list(values)
+    if not raw:
         raise ValueError(f"{name} must not be empty")
+    if any(
+        isinstance(value, bool) or not isinstance(value, Real)
+        for value in raw
+    ):
+        raise ValueError(f"{name} must contain only real numeric values")
+    converted = [float(value) for value in raw]
     if not all(math.isfinite(value) for value in converted):
         raise ValueError(f"{name} must contain only finite values")
     return converted
@@ -79,11 +86,25 @@ def bootstrap_mean_ci(
         values,
         name="values",
     )
-    if not 0.0 < confidence < 1.0:
-        raise ValueError("confidence must be strictly between 0 and 1")
-    if samples < 1:
-        raise ValueError("samples must be positive")
+    if (
+        isinstance(confidence, bool)
+        or not isinstance(confidence, Real)
+        or not math.isfinite(float(confidence))
+        or not 0.0 < float(confidence) < 1.0
+    ):
+        raise ValueError(
+            "confidence must be a finite number strictly between 0 and 1"
+        )
+    if (
+        isinstance(samples, bool)
+        or not isinstance(samples, int)
+        or samples < 1
+    ):
+        raise ValueError("samples must be a positive integer")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError("seed must be an integer")
 
+    confidence = float(confidence)
     rng = random.Random(seed)
     count = len(observations)
     estimates = [
@@ -262,10 +283,16 @@ def normal_mean_summary(
         values,
         name="values",
     )
-    if not math.isfinite(confidence_z) or confidence_z < 0:
+    if (
+        isinstance(confidence_z, bool)
+        or not isinstance(confidence_z, Real)
+        or not math.isfinite(float(confidence_z))
+        or confidence_z < 0
+    ):
         raise ValueError(
-            "confidence_z must be a non-negative finite value"
+            "confidence_z must be a non-negative finite number"
         )
+    confidence_z = float(confidence_z)
 
     center = fmean(observations)
     count = len(observations)
