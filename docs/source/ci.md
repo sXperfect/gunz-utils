@@ -6,7 +6,7 @@ time. GitHub Actions verifies only changes entering or already on `main`.
 
 ## Design guides
 
-The correctness-audit and CI rationale live under:
+The CI and correctness-audit rationale live under:
 
 - `docs/design/audit/algorithm-method-audit.md`
 - `docs/design/audit/proof-test-catalogue.md`
@@ -14,8 +14,11 @@ The correctness-audit and CI rationale live under:
 - `docs/guides/ci/design.md`
 - `docs/guides/ci/lessons-learned.md`
 
-The audit documents define how implementation claims become test evidence and
-why the hosted workflow favors one diagnostic-dense verification job.
+The audit documents define how implementation claims become test evidence. The
+hosted workflow retains the security properties of current `main`—immutable
+action SHAs, read-only permissions, main-only triggers, cancellation, and an
+early release-metadata preflight—then uses one diagnostic-dense aggregate
+verifier.
 
 ## Hosted trigger policy
 
@@ -30,8 +33,8 @@ same pull request or ref are cancelled.
 ## One hosted verification job
 
 The workflow exposes one stable required check: `CI / verify`. Checkout,
-interpreter setup, dependency installation, verification, and summary upload
-all happen on one runner.
+interpreter setup, a cheap release-metadata preflight, dependency installation,
+verification, and summary upload all happen on one runner.
 
 The verification itself is one aggregate command:
 
@@ -160,6 +163,11 @@ active environment.
 Hosted CI installs both Python 3.11 and 3.12 on the same runner. Python 3.11 is
 the primary verification interpreter. The aggregate orchestrator then invokes
 the full test suite with `python3.12` as an independent final gate.
+
+## Workflow supply-chain policy
+
+External GitHub Actions are pinned to reviewed full-length commit SHAs. Do not
+replace those pins with mutable major-version tags when editing the workflow.
 
 ## Tool version refresh
 
