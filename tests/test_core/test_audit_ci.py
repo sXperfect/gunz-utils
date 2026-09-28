@@ -23,6 +23,20 @@ def _load_audit_ci() -> ModuleType:
 audit_ci = _load_audit_ci()
 
 
+def _load_legacy_ci() -> ModuleType:
+    path = Path(__file__).resolve().parents[2] / "scripts" / "ci.py"
+    spec = importlib.util.spec_from_file_location("gunz_legacy_ci", path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+legacy_ci = _load_legacy_ci()
+
+
 def test_collect_results_keeps_running_after_independent_failures() -> None:
     calls: list[str] = []
     statuses = {
@@ -117,3 +131,36 @@ def test_json_summary_is_complete_and_machine_readable(tmp_path: Path) -> None:
         ],
         "schema_version": 1,
     }
+
+
+def test_packaging_gate_collects_all_case_failures(monkeypatch) -> None:
+    calls: list[str] = []
+
+    def case(name: str, status: int = 0):
+        def run() -> int:
+            calls.append(name)
+            return status
+
+        return run
+
+    def extra(name: str, _test_dir: str) -> int:
+        calls.append(name)
+        return 0
+
+    monkeypatch.setattr(legacy_ci, "_case_zero_dep", case("zero-dep", 2))
+    monkeypatch.setattr(legacy_ci, "_case_stdlib", case("stdlib"))
+    monkeypatch.setattr(legacy_ci, "_case_extra", extra)
+    monkeypatch.setattr(legacy_ci, "_case_plot", case("plot", 3))
+    monkeypatch.setattr(legacy_ci, "_case_wheel_sdist", case("wheel/sdist"))
+
+    assert legacy_ci.run_packaging() == 1
+    assert calls == [
+        "zero-dep",
+        "stdlib",
+        "validation",
+        "project",
+        "observability",
+        "secure",
+        "plot",
+        "wheel/sdist",
+    ]
