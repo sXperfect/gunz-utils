@@ -390,44 +390,48 @@ def run_packaging() -> int:
     previously installed extra can never leak into a later case and the
     *installed* package (not the worktree ``src/``) is what gets exercised.
 
-    Cases (see each ``_case_*`` for the exact command):
-      zero-dep      - install ``. --no-deps``; assert optional pkgs absent after
-                      ``import gunz_utils`` (import origin in venv site-packages).
-      stdlib        - install ``.`` (no extras); run ``tests/test_ext_stdlib`` and
-                      assert importing a pydantic-backed backend raises ImportError.
-      validation    - install ``.[validation]``; run ``tests/test_validation``.
-      project       - install ``.[project]``;     run ``tests/test_project``.
-      observability - install ``.[observability]``; run ``tests/test_observability``.
-      secure        - install ``.[secure]``;      run ``tests/test_secure``.
-      plot          - install ``.[plot]``; headless ``Agg`` render of a real figure.
-      wheel/sdist   - build wheel+sdist; install the wheel in a fresh venv; import
-                      from a CWD outside the checkout and assert it resolves to the
-                      venv ``site-packages`` (source-shadowing guard).
-
-    Returns 0 only when every locally-runnable case passes; otherwise returns
-    nonzero after printing the name of the first failing case.
+    The matrix intentionally continues after independent case failures so one
+    expensive packaging run reports the complete isolation failure set.
     """
     cases: list[tuple[str, Callable[[], int]]] = [
         ("zero-dep", _case_zero_dep),
         ("stdlib", _case_stdlib),
         ("validation", lambda: _case_extra("validation", "test_validation")),
         ("project", lambda: _case_extra("project", "test_project")),
-        ("observability", lambda: _case_extra("observability", "test_observability")),
+        (
+            "observability",
+            lambda: _case_extra("observability", "test_observability"),
+        ),
         ("secure", lambda: _case_extra("secure", "test_secure")),
         ("plot", _case_plot),
         ("wheel/sdist", _case_wheel_sdist),
     ]
+    failures: list[tuple[str, int]] = []
     for name, fn in cases:
         print()
         print("=" * 72)
         print(f"  packaging case: {name}")
         print("=" * 72)
-        status = fn()
+        try:
+            status = fn()
+        except SystemExit as exc:
+            status = int(exc.code) if isinstance(exc.code, int) else 1
+        except Exception as exc:
+            print(
+                f"!! packaging case {name} raised {type(exc).__name__}: {exc}",
+                file=sys.stderr,
+            )
+            status = 70
         if status != 0:
             print(f"!! packaging case failed: {name}", file=sys.stderr)
-            return status
-    return 0
+            failures.append((name, status))
 
+    if failures:
+        print("!! packaging failures:", file=sys.stderr)
+        for name, status in failures:
+            print(f"   - {name}: exit {status}", file=sys.stderr)
+        return 1
+    return 0
 
 GATES: dict[str, tuple[str, str]] = {
     "release": ("Validate release/version/changelog metadata", "release metadata"),
