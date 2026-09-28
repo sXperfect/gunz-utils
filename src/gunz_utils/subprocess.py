@@ -88,8 +88,9 @@ def _read_bounded_pipe(
 ) -> None:
     """Drain one pipe while retaining at most the shared output limit."""
     try:
+        read_chunk = getattr(stream, "read1", stream.read)
         while True:
-            chunk = stream.read(64 * 1024)
+            chunk = read_chunk(64 * 1024)
             if not chunk:
                 return
             with lock:
