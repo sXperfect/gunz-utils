@@ -165,7 +165,10 @@ class TestResourceBudget(unittest.TestCase):
         for value in (math.nan, math.inf, -math.inf, True):
             with self.subTest(initial=value):
                 with self.assertRaises(ValueError):
-                    ResourceBudget(timeout=1, clock=lambda: value)
+                    ResourceBudget(
+                        timeout=1,
+                        clock=lambda value=value: value,
+                    )
 
         now = [1.0]
         budget = ResourceBudget(timeout=2, clock=lambda: now[0])
