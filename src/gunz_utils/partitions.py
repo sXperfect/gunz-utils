@@ -129,7 +129,7 @@ def partition_overlaps(
     """
     groups: dict[str, set[Hashable]] = {}
     for name, values in partitions.items():
-        if not isinstance(name, str) or not name:
+        if not isinstance(name, str) or not name.strip():
             raise ValueError(
                 "partition names must be non-empty strings"
             )
