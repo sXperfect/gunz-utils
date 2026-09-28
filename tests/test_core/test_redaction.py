@@ -52,6 +52,12 @@ class TestRedact(unittest.TestCase):
         with self.assertRaises(ValueError):
             redact_dict({"password": "secret"}, show_chars=-1)
 
+    def test_show_chars_requires_integer_not_bool(self):
+        with self.assertRaises(ValueError):
+            redact("secret", show_chars=True)
+        with self.assertRaises(ValueError):
+            redact_dict({"password": "secret"}, show_chars=True)
+
     def test_show_chars_one(self):
         """``show_chars=1`` exposes a single character at each end."""
         self.assertEqual(redact("hunter2", show_chars=1), "h****2")
