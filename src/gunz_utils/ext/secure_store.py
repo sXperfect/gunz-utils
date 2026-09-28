@@ -312,7 +312,7 @@ class SecureStore:
         normalized: list[str] = []
         seen: set[str] = set()
         for caller in acl:
-            value = cls._validate_identity(caller, field="ACL entry")
+            value = cls._validate_identity(caller, field="ACL caller")
             if value not in seen:
                 normalized.append(value)
                 seen.add(value)
