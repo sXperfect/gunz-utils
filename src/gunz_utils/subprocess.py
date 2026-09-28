@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import signal
 import subprocess
@@ -42,6 +43,23 @@ class CommandOutputLimitError(RuntimeError):
 class _CaptureState:
     total: int = 0
     exceeded: bool = False
+
+
+def _validate_timeout_value(
+    value: float | None,
+    *,
+    name: str,
+) -> float | None:
+    if value is None:
+        return None
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        or value < 0
+    ):
+        raise ValueError(f"{name} must be a finite non-negative number or None")
+    return float(value)
 
 
 def _validate_output_limit(max_output_bytes: int | None) -> None:
@@ -204,6 +222,7 @@ def run_command(
     """Run a command without a shell and capture optionally bounded text output."""
     if not args:
         raise ValueError("args must not be empty")
+    timeout = _validate_timeout_value(timeout, name="timeout")
     _validate_output_limit(max_output_bytes)
     started = time.perf_counter()
     if max_output_bytes is None:
@@ -371,8 +390,13 @@ async def run_command_async(
     """Run a subprocess with graceful cleanup and optionally bounded output."""
     if not args:
         raise ValueError("args must not be empty")
-    if terminate_grace < 0:
-        raise ValueError("terminate_grace must be non-negative")
+    timeout = _validate_timeout_value(timeout, name="timeout")
+    validated_grace = _validate_timeout_value(
+        terminate_grace,
+        name="terminate_grace",
+    )
+    assert validated_grace is not None
+    terminate_grace = validated_grace
     _validate_output_limit(max_output_bytes)
     started = time.perf_counter()
     process = await asyncio.create_subprocess_exec(
