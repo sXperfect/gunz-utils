@@ -18,11 +18,17 @@ def load_result_checked(
 ) -> BenchmarkResult:
     """Load a benchmark result with size and structural validation."""
     item = Path(path)
-    if max_bytes < 1:
-        raise ValueError("max_bytes must be positive")
-    if item.stat().st_size > max_bytes:
+    if (
+        isinstance(max_bytes, bool)
+        or not isinstance(max_bytes, int)
+        or max_bytes < 1
+    ):
+        raise ValueError("max_bytes must be a positive integer")
+    with item.open("rb") as handle:
+        payload = handle.read(max_bytes + 1)
+    if len(payload) > max_bytes:
         raise ValueError("benchmark result exceeds size limit")
-    data: Any = json.loads(item.read_text(encoding="utf-8"))
+    data: Any = json.loads(payload.decode("utf-8"))
     if not isinstance(data, dict):
         raise ValueError("benchmark result must be a JSON object")
     required = {

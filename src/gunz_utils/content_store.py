@@ -6,6 +6,7 @@ import hashlib
 import io
 import os
 import shutil
+import stat
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -307,13 +308,26 @@ class ContentAddressedStore:
         self,
         source: str | Path,
     ) -> StoredArtifact:
-        """Store one non-symlink regular file and return its content identity."""
+        """Store one regular file without following a final-component symlink."""
         item = Path(source)
-        if not item.is_file() or item.is_symlink():
-            raise ValueError("source must be a non-symlink regular file")
-
-        with item.open("rb") as source_handle:
-            return self.put_stream(source_handle)
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
+            descriptor = os.open(item, flags)
+        except OSError as exc:
+            if item.is_symlink():
+                raise ValueError("source must be a non-symlink regular file") from exc
+            raise
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise ValueError("source must be a non-symlink regular file")
+            with os.fdopen(descriptor, "rb") as source_handle:
+                descriptor = -1
+                return self.put_stream(source_handle)
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
 
     def materialize(
         self,

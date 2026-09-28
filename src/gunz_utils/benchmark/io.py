@@ -6,6 +6,11 @@ import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from ..subprocess import (
+    CommandError,
+    CommandOutputLimitError,
+    run_command,
+)
 from .result import BenchmarkResult
 from .safe_io import DEFAULT_MAX_RESULT_BYTES, load_result_checked
 
@@ -23,14 +28,19 @@ def capture_git_info(cwd: str | None = None) -> GitInfo:
     """Capture git revision metadata without requiring GitPython."""
     def run(*args: str) -> str | None:
         try:
-            result = subprocess.run(
+            result = run_command(
                 ["git", *args],
                 cwd=cwd,
-                capture_output=True,
-                text=True,
                 check=True,
+                timeout=5.0,
+                max_output_bytes=1024 * 1024,
             )
-        except (OSError, subprocess.CalledProcessError):
+        except (
+            OSError,
+            subprocess.TimeoutExpired,
+            CommandError,
+            CommandOutputLimitError,
+        ):
             return None
         return result.stdout.strip()
 
