@@ -22,7 +22,7 @@ from gunz_utils.subprocess import CommandResult
 from gunz_utils.sync import _normalize_rsync_source, rsync_mirror
 
 
-def test_collection_transforms_preserve_declared_order_and_duplicate_semantics() -> None:
+def test_collection_transforms_preserve_order_and_duplicate_semantics() -> None:
     assert unique([3, 1, 3, 2, 1]) == [3, 1, 2]
     assert unique([[1], [1], [2]]) == [[1], [2]]
     assert unique(["aa", "b", "cc"], key=len) == ["aa", "b"]
@@ -122,8 +122,11 @@ def test_readonly_view_is_zero_copy_and_dispatch_is_exact() -> None:
     with pytest.raises(TypeError):
         view[0] = 1
 
-    reference = lambda: "reference"
-    accelerated = lambda: "accelerated"
+    def reference() -> str:
+        return "reference"
+
+    def accelerated() -> str:
+        return "accelerated"
     assert dispatch(reference) is reference
     assert dispatch(reference, accelerated) is accelerated
 
