@@ -1,4 +1,7 @@
 import unittest
+from typing import Annotated
+
+from pydantic import AfterValidator
 
 from gunz_utils import type_checked
 
@@ -33,6 +36,24 @@ class TestValidationLeak(unittest.TestCase):
 
         # Ensure we still get useful info (like the type)
         self.assertIn("got type 'str'", error_msg)
+
+    def test_custom_validator_message_cannot_leak_secret(self):
+        secret = "validator-secret-should-never-appear"
+
+        def reject(value: str) -> str:
+            raise ValueError(f"rejected secret: {value}")
+
+        @type_checked
+        def consume(value: Annotated[str, AfterValidator(reject)]) -> None:
+            return None
+
+        with self.assertRaises(TypeError) as cm:
+            consume(secret)
+
+        message = str(cm.exception)
+        self.assertNotIn(secret, message)
+        self.assertNotIn("rejected secret", message)
+        self.assertIn("validation failed", message)
 
 
 if __name__ == "__main__":
