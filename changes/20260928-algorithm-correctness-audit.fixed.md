@@ -1,0 +1,1 @@
+- Harden numerical, timing, serialization, parsing, project-discovery, and benchmark/profiling edge cases, with a maintained algorithm proof guide and audit registry.
