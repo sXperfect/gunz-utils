@@ -12,6 +12,13 @@ class TestSafeInt(unittest.TestCase):
     def test_integer_string(self) -> None:
         self.assertEqual(safe_int("42"), 42)
 
+    def test_integer_object_is_accepted(self) -> None:
+        self.assertEqual(safe_int(42), 42)
+
+    def test_boolean_is_not_silently_treated_as_integer(self) -> None:
+        self.assertIsNone(safe_int(True))
+        self.assertEqual(safe_int(False, default=7), 7)
+
     def test_whitespace(self) -> None:
         self.assertEqual(safe_int("  42  "), 42)
 
