@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import unittest
 
 from gunz_utils.async_utils import cancel_and_wait, with_timeout
@@ -61,6 +62,15 @@ class TestIdsTimeResult(unittest.TestCase):
         self.assertGreater(remaining(deadline), 0)
         self.assertFalse(expired(deadline))
 
+    def test_time_rejects_non_finite_deadlines(self) -> None:
+        for value in (math.nan, math.inf, -math.inf, True):
+            with self.subTest(timeout=value):
+                with self.assertRaises(ValueError):
+                    monotonic_deadline(value)
+            with self.subTest(deadline=value):
+                with self.assertRaises(ValueError):
+                    remaining(value)
+
     def test_result(self) -> None:
         self.assertEqual(Result[int, str].ok(3).unwrap(), 3)
         with self.assertRaises(RuntimeError):
@@ -74,6 +84,23 @@ class TestDiagnosticsTesting(unittest.TestCase):
 
     def test_eventually(self) -> None:
         eventually(lambda: True, timeout=0)
+
+    def test_eventually_rejects_non_finite_timing(self) -> None:
+        for timeout, interval in (
+            (math.nan, 0.01),
+            (math.inf, 0.01),
+            (1.0, math.nan),
+            (1.0, math.inf),
+            (True, 0.01),
+            (1.0, True),
+        ):
+            with self.subTest(timeout=timeout, interval=interval):
+                with self.assertRaises(ValueError):
+                    eventually(
+                        lambda: False,
+                        timeout=timeout,
+                        interval=interval,
+                    )
 
 
 class TestAsyncFoundation(unittest.IsolatedAsyncioTestCase):
