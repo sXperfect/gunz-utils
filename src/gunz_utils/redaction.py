@@ -46,6 +46,15 @@ SECRET_PATTERNS: frozenset[str] = frozenset(
 _MASK = "****"
 
 
+def _validate_show_chars(show_chars: int) -> None:
+    if (
+        isinstance(show_chars, bool)
+        or not isinstance(show_chars, int)
+        or show_chars < 0
+    ):
+        raise ValueError("show_chars must be a non-negative integer")
+
+
 def redact(value: object, *, show_chars: int = 2) -> object:
     """Mask a string value, preserving ``show_chars`` characters on each end.
 
@@ -81,8 +90,7 @@ def redact(value: object, *, show_chars: int = 2) -> object:
     >>> redact(12345)
     12345
     """
-    if show_chars < 0:
-        raise ValueError("show_chars must be non-negative")
+    _validate_show_chars(show_chars)
     if not isinstance(value, str):
         return value
     if show_chars == 0:
