@@ -76,7 +76,6 @@ class TestStdlibResolveProjectRoot(unittest.TestCase):
         from gunz_utils.ext import project_stdlib
         project_stdlib._PROJECT_ROOT = None
         project_stdlib._PROJECT_ANCHOR = None
-        project_stdlib._PROJECT_ANCHOR = None
         self._tmpdir = tempfile.mkdtemp(prefix="gutils-stdlib-test-")
         self._saved_cwd = os.getcwd()
 
@@ -85,6 +84,7 @@ class TestStdlibResolveProjectRoot(unittest.TestCase):
         subprocess.run(["rm", "-rf", self._tmpdir], check=False)
         from gunz_utils.ext import project_stdlib
         project_stdlib._PROJECT_ROOT = None
+        project_stdlib._PROJECT_ANCHOR = None
 
     def _make_repo(self, with_pyproject: bool = False) -> pathlib.Path:
         repo = pathlib.Path(self._tmpdir) / "myproj"
