@@ -1,127 +1,150 @@
 # Repository-wide algorithm correctness audit
 
-Status: active
+Status: active — implementation sweep complete enough for review; local execution
+verification pending
 Branch: `audit/algorithm-correctness`
 Started: 2026-09-28
 Base: `main@cf3697d7457c5901ee1c927bc6dae347d5428722`
 
 ## Goal
 
-Audit every algorithmic implementation in `gunz-utils` for contract
-correctness, numerical stability, parameter-domain validation, boundary/special
-cases, deterministic behavior, complexity/boundedness, and failure atomicity.
+Audit algorithmic implementations in `gunz-utils` for contract correctness,
+numerical stability, parameter-domain validation, boundary/special cases,
+deterministic behavior, complexity/boundedness, and failure atomicity.
 
-The audit must leave behind reusable proof guidance and a maintained evidence
-registry rather than a one-time review.
+The audit leaves behind a reusable proof method and maintained evidence registry,
+not a one-time review.
 
 ## Canonical artifacts
 
 - `docs/guides/algorithm-correctness-audit.md` — proof/audit method.
-- `docs/audits/algorithm-registry.md` — inventory, levels, evidence, findings.
-- `docs/design/long-horizon-engineering-roadmap.md` — broader correctness
-  program; link the audit method from Program A.
-- regression tests beside the existing subsystem tests.
+- `docs/audits/algorithm-registry.md` — inventory, evidence levels, findings.
+- `docs/design/long-horizon-engineering-roadmap.md` — Program A links the
+  canonical audit process.
+- `AGENTS.md` — requires algorithmic changes to maintain audit evidence.
+- focused regression tests beside each affected subsystem.
 
-## Workstreams
+## Completed implementation sweep
 
-### W1 — Audit framework and inventory
+### Numerical and timing correctness
 
-- [x] create dedicated audit branch from current main;
+- [x] replace overflow-prone hand-written sample variance with
+      `statistics.stdev`;
+- [x] fail explicitly when paired differences or normal-interval results exceed
+      finite float range;
+- [x] reject NaN/infinity/bool values from token-bucket rates, capacity,
+      requests and timeouts;
+- [x] enforce finite retry timing and positive integer attempt counts;
+- [x] enforce finite benchmark calibration, comparison, stability and regression
+      policy parameters;
+- [x] enforce finite TTL/cache, circuit-breaker, bulkhead, deadline, polling and
+      resource-budget timing;
+- [x] close the `eventually(timeout=NaN)` non-termination hole;
+- [x] validate manual-clock and deterministic-fuzz numeric domains.
+
+### Representation and bounded algorithms
+
+- [x] reject canonical JSON mapping keys that collide after string
+      normalization;
+- [x] enforce integer domains for hashing chunk/short-hash sizes;
+- [x] enforce integer domains for chunk/batch/depth limits and bounded
+      structures;
+- [x] enforce redaction reveal-count bounds;
+- [x] preserve existing varint transactionality/canonical-overflow evidence;
+- [x] review bounded/digest streaming semantics and record remaining proof gaps.
+
+### Parsing, process and project algorithms
+
+- [x] fix `safe_int` so documented ordinary integer inputs are accepted;
+- [x] validate async/subprocess/upstream timeout and concurrency domains;
+- [x] parse Linux `/proc/<pid>/stat` without corrupting fields when command
+      names contain spaces/parentheses;
+- [x] terminate a launched profiler child if sampling fails;
+- [x] fix project-root caches so cached roots cannot leak across independent
+      anchors and late `sys.path` injection still works.
+
+### Benchmark algorithms
+
+- [x] validate scaling-efficiency baseline and non-baseline observations;
+- [x] validate finite benchmark history/trend metrics and baseline windows;
+- [x] reject boolean schema versions;
+- [x] validate experiment repetition counts;
+- [x] validate regression comparison/policy/stability inputs;
+- [x] preserve zero-baseline behavior as an explicitly documented semantic;
+- [x] record process-sampling and persistence limitations separately from
+      correctness fixes.
+
+### Documentation and governance
+
 - [x] define A0-A4 evidence levels;
-- [x] define proof packet and numerical parameter checklist;
-- [x] create initial repository-wide algorithm inventory;
-- [x] identify high-risk first-wave algorithms;
-- [ ] reconcile inventory against every maintained public module and benchmark
-      submodule so no algorithmic unit is omitted.
+- [x] define proof packet, oracle guidance and numerical parameter checklist;
+- [x] reconcile inventory against maintained public API families and benchmark
+      namespace;
+- [x] link the method and registry from Program A;
+- [x] make registry maintenance an `AGENTS.md` rule;
+- [x] add a changelog fragment.
 
-### W2 — Numerical/statistical correctness
+## Remaining proof work
 
-- [x] review stats, experiment comparisons, benchmark calibration/policy,
-      stability diagnostics, retry timing, and rate limiter parameter domains;
-- [ ] replace overflow-prone sample variance calculations;
-- [ ] enforce finite/bounded token-bucket inputs;
-- [ ] enforce finite/bounded retry timing inputs;
-- [ ] enforce valid benchmark calibration and stability parameters;
-- [ ] enforce regression-policy direction/threshold/metric validity;
-- [ ] add extreme-magnitude, NaN, infinity, zero-baseline, singleton and bound
-      regression tests.
+These are intentionally not hidden by the audit.
 
-### W3 — Graph/traversal/deterministic selection
+### Graph/traversal
 
-- [x] review workflow DAG topological order/fingerprint propagation;
-- [x] review provenance graph cycle/ancestor behavior;
-- [x] review stable named-item sampling;
-- [ ] add exhaustive small-graph/property tests where current examples are
-      insufficient;
-- [ ] characterize recursion-depth limits and decide whether iterative traversal
-      is required.
+- [ ] add exhaustive small-graph/property tests beyond current DAG/provenance
+      examples;
+- [ ] decide whether recursion-depth limits warrant iterative traversal.
 
-### W4 — Binary/streaming/bounded algorithms
+### Stateful/concurrent
 
-- [x] review 64-bit canonical varint transactionality/overflow behavior;
-- [x] static-review bounded/digest writer forward-progress rules;
-- [ ] audit all partial read/write paths and content-store streaming paths;
-- [ ] add exhaustive varint boundary vectors and malformed encodings;
-- [ ] verify failure atomicity for every mutable cursor/writer.
+- [ ] exhaustive cancellation/simultaneous-completion race tests for
+      SingleFlight, worker pipelines, leases, circuit breaker and bulkhead;
+- [ ] prove queue/input boundedness for every concurrency primitive.
 
-### W5 — Stateful/concurrent algorithms
+### Filesystem/storage
 
-- [x] initial token bucket review;
-- [x] static-review lease-loss precedence;
-- [ ] TTL/LRU cache and async coalescing;
-- [ ] SingleFlight;
-- [ ] circuit breaker;
-- [ ] bulkhead;
-- [ ] worker pipeline/backpressure;
-- [ ] signal/resource lifecycle;
-- [ ] cancellation and simultaneous-completion race tests.
+- [ ] fault-inject rename/fsync/publication failure paths;
+- [ ] characterize content-store fallback publication races;
+- [ ] decide whether run-directory packaging needs transactional publication.
 
-### W6 — Hashing/serialization/filesystem/security
+### Subprocess/resource bounding
 
-- [ ] canonical JSON and structured hashes;
-- [ ] directory manifests/hashes;
-- [ ] partition/content fingerprints;
-- [ ] path containment and atomic filesystem algorithms;
-- [ ] redaction recursion;
-- [ ] crypto/store derivation and authenticated-decryption contracts.
+- [ ] redesign `max_output_bytes` if a true resident-memory bound is required;
+      current subprocess helpers validate captured output after collection.
 
-### W7 — Benchmark/profiling algorithms
+### Optional/security integrations
 
-- [ ] benchmark percentiles and descriptive summaries;
-- [ ] pairwise comparison and zero-baseline semantics;
-- [ ] history slope/moving baseline;
-- [ ] process-tree discovery/aggregation;
-- [ ] derived metrics;
-- [ ] regression gate;
-- [ ] artifact checksum/packaging;
-- [ ] schema migration;
-- [ ] experiment orchestration.
+- [ ] finish a line-by-line transactional/concurrency audit of SecureStore;
+- [ ] add malformed-length/tamper vectors around secure-crypto format parsing;
+- [ ] compare stdlib and optional validation/project backends with differential
+      property tests.
 
-### W8 — Documentation and policy integration
+## Verification state
 
-- [ ] link the audit guide/registry from Program A of the long-horizon roadmap;
-- [ ] add an algorithm-change rule to `AGENTS.md`;
-- [ ] add changelog fragment for behavioral fixes;
-- [ ] keep registry levels synchronized with test evidence.
+Hosted feature-branch CI remains untouched.
 
-### W9 — Verification
+Regression tests have been added/updated, but this environment has repository
+connector access rather than an executable local checkout. Therefore no audit
+entry is promoted to A3/A4 in this task record yet.
 
-Hosted feature-branch CI must remain disabled. Use repository-local gates.
+Still required in a local checkout:
 
-- [ ] focused tests for each repaired subsystem;
+- [ ] focused tests for repaired subsystems;
 - [ ] `python scripts/ci.py lint`;
 - [ ] `python scripts/ci.py test`;
 - [ ] `python scripts/ci.py docs`;
+- [ ] `python scripts/release.py check`;
 - [ ] `./scripts/verify.sh`;
-- [ ] promote qualifying registry entries to A3/A4 only after execution.
+- [ ] promote qualifying registry entries only after successful execution.
 
 ## Definition of done
 
-- comprehensive algorithm inventory with no unexplained A0 omissions;
-- every audited entry has contract, domains, invariants, oracle/test evidence,
-  special cases, and complexity/boundedness notes where relevant;
-- numerical APIs explicitly define NaN/infinity/zero/boundary behavior;
-- every discovered defect has a regression test;
-- high-risk families reach A4;
-- docs and registry are current at the final branch head;
-- no hosted CI is enabled or triggered solely for this feature branch.
+The long-horizon audit is complete when:
+
+1. every maintained algorithmic family has at least A1 evidence or an explicit
+   A0 reason;
+2. high-risk numerical, graph, binary, concurrency and state-machine families
+   reach A4;
+3. every discovered correctness defect has a regression test;
+4. explicit limitations have either a follow-up task or a documented accepted
+   contract;
+5. the full local verification gate passes on the final branch state.
