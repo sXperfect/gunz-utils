@@ -59,7 +59,7 @@ def _reject_json_constant(value: str) -> object:
 
 
 def worker_json(result: WorkerResult) -> object:
-    """Decode a successful worker\'s stdout as strict JSON."""
+    """Decode a successful worker's stdout as strict JSON."""
     if result.returncode:
         raise RuntimeError(
             f"benchmark worker failed with exit code {result.returncode}"
