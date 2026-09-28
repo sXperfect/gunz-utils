@@ -11,7 +11,7 @@ prefer executable configuration and current code over historical notes.
 Canonical sources:
 
 1. `pyproject.toml` — package metadata, Python floor, extras, Ruff, pytest, mypy.
-2. `.github/workflows/ci.yml` and `scripts/ci.py` — hosted/local CI behavior.
+2. `.github/workflows/ci.yml`, `scripts/audit_ci.py`, and `scripts/ci.py` — hosted/local CI behavior.
 3. `scripts/release.py`, `changes/README.md`, and
    `docs/development/releases.md` — versioning and releases.
 4. `SECURITY.md` — vulnerability reporting and disclosure.
@@ -91,11 +91,14 @@ Canonical local gate:
 ./scripts/verify.sh
 ```
 
-Equivalent dispatcher:
+Aggregate dispatcher:
 
 ```bash
-python scripts/ci.py all
+python scripts/audit_ci.py --summary-json tmp/ci-summary.json
 ```
+
+`scripts/ci.py all` remains a focused fail-fast helper; the aggregate
+dispatcher is the preferred pre-merge verification path.
 
 Useful focused gates:
 
@@ -108,7 +111,8 @@ python scripts/ci.py packaging
 ```
 
 Do not add parallel or duplicate workflows for checks already represented by
-`scripts/ci.py` unless a distinct permission or security boundary requires it.
+`scripts/audit_ci.py` / `scripts/ci.py` unless a distinct permission or security
+boundary requires it.
 Keep hosted workflow permissions minimal and preserve cancellation and timeout
 behavior.
 
@@ -250,7 +254,8 @@ python -m mypy src/gunz_utils
 ```
 
 Algorithmic changes must follow
-`docs/guides/algorithm-correctness-audit.md` and update
+`docs/guides/algorithm-correctness-audit.md`, the design protocol under
+`docs/design/audit/`, and update
 `docs/audits/algorithm-registry.md` when they add, change, repair, or retire
 an algorithmic contract. Explicitly cover parameter domains, numerical
 finiteness and bounds where applicable, invariants, independent oracles,
