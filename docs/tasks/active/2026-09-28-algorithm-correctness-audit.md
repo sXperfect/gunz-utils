@@ -1,7 +1,7 @@
 # Repository-wide algorithm correctness audit
 
 Status: active — security-hardened main and algorithm-audit histories composed;
-integrated verification pending before the next A2 sweep
+final integrated verification running before the next A2 sweep
 Branch: `audit/algorithm-correctness`
 Integration branch: `merge/algorithm-audit-main`
 Integration base: `main@07244be5e6d24d83b3b7dcde62bc1702ff1f6e9d`
