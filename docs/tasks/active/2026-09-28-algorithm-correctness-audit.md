@@ -1,7 +1,7 @@
 # Repository-wide algorithm correctness audit
 
-Status: active — A0 sweep complete and aggregate CI verified; remaining A1/A2
-high-risk proof work pending
+Status: active — A0 verified; A1 implementation/proof sweep complete with
+one consolidated verification pending
 Branch: `audit/algorithm-correctness`
 Started: 2026-09-28
 Base: `main@cf3697d7457c5901ee1c927bc6dae347d5428722`
@@ -107,14 +107,19 @@ These are intentionally not hidden by the audit.
 
 ### Stateful/concurrent
 
-- [ ] exhaustive cancellation/simultaneous-completion race tests for
-      SingleFlight, worker pipelines, leases, circuit breaker and bulkhead;
-- [ ] prove queue/input boundedness for every concurrency primitive.
+- [x] add lease setup-failure and Awaitable-contract proofs;
+- [x] add bounded scheduler initial-creation cleanup proofs;
+- [x] add worker-pipeline bound and sibling-cancellation proofs;
+- [ ] extend simultaneous-completion coverage to SingleFlight and any remaining
+      cache/circuit-breaker races beyond the former A1 set.
 
 ### Filesystem/storage
 
-- [ ] fault-inject rename/fsync/publication failure paths;
-- [ ] characterize content-store fallback publication races;
+- [x] fault-inject replace/publication failure paths for atomic files and
+      transactional directories;
+- [x] reject symlinked content-store roots/fanout ancestors and exercise the
+      fallback publication branch;
+- [ ] characterize the remaining cross-process fallback publication race;
 - [ ] decide whether run-directory packaging needs transactional publication.
 
 ### Subprocess/resource bounding
@@ -124,7 +129,10 @@ These are intentionally not hidden by the audit.
 
 ### Optional/security integrations
 
-- [ ] finish a line-by-line transactional/concurrency audit of SecureStore;
+- [x] add SecureStore mutation/audit transaction, threaded serialization, bulk
+      rollback, and key-publication recovery proofs;
+- [x] enforce/document recursive stdlib validation for PEP 604 unions and
+      container generics;
 - [ ] add malformed-length/tamper vectors around secure-crypto format parsing;
 - [x] compare stdlib and optional Pydantic validation behavior for the shared
       strict scalar contract; ALG-075 reached A4.
