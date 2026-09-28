@@ -53,9 +53,7 @@ def _check_one(value: t.Any, annotation: t.Any) -> bool:
 
 
 def _safe_args_repr(exc: Exception) -> str:
-    msg = str(exc)
-    head_line = msg.splitlines()[0] if msg else "argument binding failed"
-    return f"{type(exc).__name__}: {head_line}"
+    return f"{type(exc).__name__}: argument binding failed"
 
 
 def type_checked(
