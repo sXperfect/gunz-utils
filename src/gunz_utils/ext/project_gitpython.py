@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 # ? Cache the root to avoid repeated disk I/O
 _PROJECT_ROOT: pathlib.Path | None = None
+_PROJECT_ANCHOR: pathlib.Path | None = None
 
 
 def resolve_project_root(
@@ -58,14 +59,27 @@ def resolve_project_root(
     RuntimeError
         If the git repository root cannot be found.
     """
-    global _PROJECT_ROOT
+    global _PROJECT_ANCHOR, _PROJECT_ROOT
 
-    if _PROJECT_ROOT is not None:
+    start = pathlib.Path(anchor).resolve()
+    if (
+        _PROJECT_ROOT is not None
+        and _PROJECT_ANCHOR is not None
+        and (start == _PROJECT_ROOT or _PROJECT_ROOT in start.parents)
+    ):
+        if inject_to_sys_path:
+            root_str = str(_PROJECT_ROOT)
+            if root_str not in sys.path:
+                sys.path.insert(0, root_str)
+                logger.debug(
+                    "Added cached project root to sys.path: %s",
+                    root_str,
+                )
         return _PROJECT_ROOT
 
     try:
         # ? Search upwards for the .git directory
-        repo = Repo(anchor, search_parent_directories=True)
+        repo = Repo(start, search_parent_directories=True)
         #? working_tree_dir is typed as str | os.PathLike[str] | None by GitPython;
         #? bare repos expose None here, so guard explicitly.
         working_dir = repo.working_tree_dir
@@ -80,6 +94,7 @@ def resolve_project_root(
             raise RuntimeError(f"Resolved root is not a directory: {root_path}")
 
         _PROJECT_ROOT = root_path
+        _PROJECT_ANCHOR = start
 
         if inject_to_sys_path:
             root_str = str(root_path)
