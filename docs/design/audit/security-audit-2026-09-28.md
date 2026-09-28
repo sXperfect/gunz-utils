@@ -51,7 +51,7 @@ Manual review concentrated on:
 | ID | Risk | Area | Finding | Remediation |
 |---|---|---|---|---|
 | SA-01 | High | dependencies | Optional floors admitted releases with reviewed security advisories. | Raised Pydantic to >=2.4.0, GitPython to >=3.1.62, Cryptography to >=50.0.1 and Matplotlib to >=3.10.9; added contract tests. |
-| SA-02 | High | subprocess | `max_output_bytes` was checked after complete stdout/stderr buffering, so a noisy child could exhaust memory first. | Sync/async bounded capture now streams into capped buffers and terminates on overflow. |
+| SA-02 | High | subprocess | `max_output_bytes` was checked after complete stdout/stderr buffering, so a noisy child could exhaust memory first; descendants could also keep capture pipes alive after the direct child exited. | Sync/async bounded capture now streams into capped buffers and POSIX bounded/async cleanup uses isolated process groups. |
 | SA-03 | High | filesystem | `open_path_under_base` protected only the final component; intermediate directory replacement could race the open. | POSIX path walk now uses directory FDs plus `O_DIRECTORY|O_NOFOLLOW` for each component and `fstat` for the final regular file. |
 | SA-04 | High | rsync | `extra_args` admitted execution-affecting rsync options such as remote shell/path options and abbreviation variants. | Reject execution/destructive control options and abbreviations; insert `--` before source/target. |
 | SA-05 | High | secure store | Store/library paths, key/salt/database files, ACL labels and creation modes had incomplete traversal/symlink/permission guarantees. | Validate simple library names, reject symlink paths, enforce ownership/modes, create private files safely, descriptor-validate private reads, and validate ACL/caller/name fields. |
@@ -65,9 +65,10 @@ Manual review concentrated on:
 | SA-13 | High | crypto | Legacy predictable hostname/user passphrase helper remained callable and decrypt accepted plaintext as a silent downgrade. | System-derived passphrase helper now fails closed; plaintext decryption is rejected unless explicit migration opt-in is supplied; salt/format validation tightened. |
 | SA-14 | Medium | diagnostics | Benchmark worker failures embedded raw child stderr in raised errors. | Public error now contains only exit status; raw stderr remains available only in the explicit result object. |
 | SA-15 | Medium | diagnostics | GitPython and stdlib argument-binding wrappers copied arbitrary exception text into public errors. | Normalize to exception type/stable structural messages; add secret-bearing regression tests. |
-| SA-16 | Medium | benchmark artifacts | Artifact registration/run packaging could follow symlinked sources. | Descriptor-based regular-file hashing and symlink rejection; output directory checks and atomic run metadata publication. |
+| SA-16 | Medium | benchmark artifacts | Artifact registration/run packaging could follow or race symlinked/replaced sources. | Descriptor/path identity validation, exclusive output creation, no-follow source opens, output directory checks, and atomic run metadata publication. |
 | SA-17 | Medium | directory hashing | Directory enumeration could be followed by a later path-based open after a symlink swap. | Hash listed files through `open_path_under_base` so validation is bound to the opened path components. |
 | SA-18 | Medium | numeric/DoS | Several resource and timing APIs accepted non-finite controls. | Package-wide numeric security regression tests enforce finite values and proper integer/count types. |
+| SA-19 | Medium | CI tooling | The repository pinned pytest 9.0.2, which is affected by CVE-2025-71176 local tmpdir handling. | Raise all maintained pytest pins to 9.0.3 and enforce the patched pin in repository contract tests. |
 
 ## Dependency and advisory review
 
@@ -83,6 +84,8 @@ The audit distinguishes dependency advisories from local source findings.
   backported to 3.10.9; the branch floor is `>=3.10.9`.
 - **Loguru**: the existing `>=0.7.0` floor is already above the historical
   security-fixed 0.5.3 release.
+- **pytest**: CVE-2025-71176 affects versions `<9.0.3`; maintained CI/local
+  setup pins are raised to `9.0.3`.
 
 An advisory search is time-bounded evidence, not proof that a dependency has no
 unknown vulnerability.

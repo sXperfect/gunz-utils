@@ -32,6 +32,22 @@ class TestSubprocess(unittest.TestCase):
         self.assertNotIn(secret, str(cm.exception))
         self.assertIn(secret, cm.exception.result.args)
 
+    @unittest.skipIf(sys.platform == "win32", "requires POSIX process groups")
+    def test_bounded_output_kills_descendant_pipe_holders(self) -> None:
+        child = (
+            "import subprocess,sys,time;"
+            "subprocess.Popen([sys.executable,'-c','import time;time.sleep(10)']);"
+            "print('x'*100, flush=True);time.sleep(10)"
+        )
+        started = __import__("time").monotonic()
+        with self.assertRaises(CommandOutputLimitError):
+            run_command(
+                [sys.executable, "-c", child],
+                max_output_bytes=10,
+                timeout=2.0,
+            )
+        self.assertLess(__import__("time").monotonic() - started, 2.0)
+
     def test_output_limit(self) -> None:
         with self.assertRaises(CommandOutputLimitError):
             run_command(

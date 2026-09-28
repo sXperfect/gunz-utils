@@ -244,7 +244,7 @@ def _case_zero_dep() -> int:
 def _case_stdlib() -> int:
     """Install ``.`` (no extras): stdlib fallback works, missing optional raises."""
     py, _ = _fresh_venv_python("stdlib")
-    status = _pip_install(py, ".", "pytest==9.0.2")
+    status = _pip_install(py, ".", "pytest==9.0.3")
     if status != 0:
         return status
     status = _run_venv([str(py), "-m", "pytest", "-q", "tests/test_ext_stdlib"])
@@ -266,7 +266,7 @@ def _case_stdlib() -> int:
 def _case_extra(extra: str, test_dir: str) -> int:
     """Install ``.[<extra>]`` in a fresh venv and run that extra's test directory."""
     py, _ = _fresh_venv_python(extra)
-    status = _pip_install(py, f".[{extra}]", "pytest==9.0.2")
+    status = _pip_install(py, f".[{extra}]", "pytest==9.0.3")
     if status != 0:
         return status
     return _run_venv([str(py), "-m", "pytest", "-q", f"tests/{test_dir}"])

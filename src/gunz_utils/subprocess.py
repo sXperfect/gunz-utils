@@ -61,12 +61,18 @@ def _output_limit_error(max_output_bytes: int) -> CommandOutputLimitError:
 
 
 def _kill_process(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
-    try:
-        process.kill()
-    except OSError:
-        pass
+    """Kill a bounded-capture process and its POSIX process group."""
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+            return
+        except (OSError, ProcessLookupError):
+            pass
+    if process.poll() is None:
+        try:
+            process.kill()
+        except OSError:
+            pass
 
 
 def _read_bounded_pipe(
@@ -118,6 +124,7 @@ def _run_command_bounded(
         text=False,
         cwd=cwd,
         env=None if env is None else {**os.environ, **env},
+        start_new_session=os.name == "posix",
     )
     stdout_pipe = process.stdout
     stderr_pipe = process.stderr
@@ -236,13 +243,23 @@ async def _stop_process(
     *,
     terminate_grace: float,
 ) -> None:
-    if process.returncode is not None:
-        return
-    process.terminate()
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except (OSError, ProcessLookupError):
+            pass
+    elif process.returncode is None:
+        process.terminate()
     try:
         await asyncio.wait_for(process.wait(), timeout=terminate_grace)
     except TimeoutError:
-        process.kill()
+        if os.name == "posix":
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (OSError, ProcessLookupError):
+                pass
+        elif process.returncode is None:
+            process.kill()
         await process.wait()
 
 
@@ -267,7 +284,12 @@ async def _read_bounded_async_pipe(
             target.extend(chunk[:remaining])
             state.total += remaining
         state.exceeded = True
-        if process.returncode is None:
+        if os.name == "posix":
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (OSError, ProcessLookupError):
+                pass
+        elif process.returncode is None:
             try:
                 process.kill()
             except ProcessLookupError:
@@ -357,6 +379,7 @@ async def run_command_async(
         stderr=asyncio.subprocess.PIPE,
         cwd=cwd,
         env=None if env is None else {**os.environ, **env},
+        start_new_session=os.name == "posix",
     )
     if max_output_bytes is None:
         try:

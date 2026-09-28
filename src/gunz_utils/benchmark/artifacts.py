@@ -33,8 +33,13 @@ def _hash_regular_file(
         raise
     try:
         info = os.fstat(descriptor)
-        if not stat.S_ISREG(info.st_mode):
-            raise ValueError("artifact must be a non-symlink regular file")
+        path_info = os.stat(path, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or not stat.S_ISREG(path_info.st_mode)
+            or not os.path.samestat(info, path_info)
+        ):
+            raise ValueError("artifact path changed during secure open")
         digest = hashlib.sha256()
         with os.fdopen(descriptor, "rb") as handle:
             descriptor = -1

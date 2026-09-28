@@ -11,6 +11,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_DIR = PROJECT_ROOT / "src" / "gunz_utils"
 API_REFERENCE = PROJECT_ROOT / "docs" / "source" / "api.rst"
 CI_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "ci.yml"
+CI_SCRIPT = PROJECT_ROOT / "scripts" / "ci.py"
+CONTRIBUTING = PROJECT_ROOT / "CONTRIBUTING.md"
+README = PROJECT_ROOT / "README.md"
+INSTALLATION = PROJECT_ROOT / "docs" / "source" / "installation.md"
 
 
 def _declares_public_all(path: Path) -> bool:
@@ -113,3 +117,18 @@ def test_github_actions_are_pinned_to_full_commit_shas() -> None:
         if re.fullmatch(r"[0-9a-fA-F]{40}", revision) is None:
             offenders.append(ref)
     assert offenders == []
+
+
+def test_pytest_pin_is_past_cve_2025_71176() -> None:
+    vulnerable = "pytest==" + "9.0.2"
+    patched = "pytest==" + "9.0.3"
+    for path in (
+        CI_WORKFLOW,
+        CI_SCRIPT,
+        CONTRIBUTING,
+        README,
+        INSTALLATION,
+    ):
+        content = path.read_text(encoding="utf-8")
+        assert vulnerable not in content, path
+        assert patched in content, path

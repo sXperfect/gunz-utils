@@ -149,7 +149,7 @@ Install the package plus the same development tools used by hosted CI:
 
 ```bash
 python -m pip install -e ".[all,plot,docs]"
-python -m pip install pytest==9.0.2 ruff==0.14.10 mypy==1.19.1
+python -m pip install pytest==9.0.3 ruff==0.14.10 mypy==1.19.1
 ```
 
 Run the canonical local verification gate:
