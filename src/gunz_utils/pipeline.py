@@ -19,11 +19,15 @@ async def worker_map(
     queue_size: int | None = None,
 ) -> AsyncIterator[R]:
     """Map work through bounded queues, propagating failures and cancellation."""
-    if workers < 1:
-        raise ValueError("workers must be positive")
+    if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
+        raise ValueError("workers must be a positive integer")
+    if queue_size is not None and (
+        isinstance(queue_size, bool)
+        or not isinstance(queue_size, int)
+        or queue_size < 1
+    ):
+        raise ValueError("queue_size must be a positive integer or None")
     size = queue_size if queue_size is not None else workers * 2
-    if size < 1:
-        raise ValueError("queue_size must be positive")
     incoming: asyncio.Queue[T | object] = asyncio.Queue(size)
     outgoing: asyncio.Queue[tuple[bool, R | BaseException | object]] = asyncio.Queue(
         size
