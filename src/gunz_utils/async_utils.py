@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from collections.abc import Awaitable
 from typing import TypeVar
 
@@ -21,9 +22,16 @@ async def with_timeout(awaitable: Awaitable[T], timeout: float | None) -> T:
     """Await work with an optional timeout using asyncio.timeout."""
     if timeout is None:
         return await awaitable
-    if timeout < 0:
-        raise ValueError("timeout must be non-negative")
-    async with asyncio.timeout(timeout):
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
+        or timeout < 0
+    ):
+        raise ValueError(
+            "timeout must be a finite non-negative number or None"
+        )
+    async with asyncio.timeout(float(timeout)):
         return await awaitable
 
 

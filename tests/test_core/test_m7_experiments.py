@@ -28,6 +28,21 @@ class TestM7Experiments(unittest.TestCase):
         )
         self.assertEqual(len(results), 8)
 
+    def test_repetitions_reject_boolean_and_nonpositive_values(self) -> None:
+        def work(*, a: int) -> int:
+            return a
+
+        for value in (True, 0, -1):
+            with self.subTest(repetitions=value):
+                with self.assertRaises(ValueError):
+                    run_experiment(
+                        work,
+                        parameters={"a": [1]},
+                        repetitions=value,
+                        warmup=0,
+                        iterations=1,
+                    )
+
     def test_self_contained_run_directory(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "profile.txt"

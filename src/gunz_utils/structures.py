@@ -17,8 +17,12 @@ class RingBuffer(Generic[T]):
     """Fixed-capacity FIFO retaining the newest values."""
 
     def __init__(self, capacity: int) -> None:
-        if capacity < 1:
-            raise ValueError("capacity must be positive")
+        if (
+            isinstance(capacity, bool)
+            or not isinstance(capacity, int)
+            or capacity < 1
+        ):
+            raise ValueError("capacity must be a positive integer")
         self._data: deque[T] = deque(maxlen=capacity)
 
     def append(self, value: T) -> None:
@@ -33,8 +37,8 @@ class RingBuffer(Generic[T]):
 
 def top_k(items: Iterable[T], k: int) -> list[T]:
     """Return the largest k values without sorting the complete input."""
-    if k < 0:
-        raise ValueError("k must be non-negative")
+    if isinstance(k, bool) or not isinstance(k, int) or k < 0:
+        raise ValueError("k must be a non-negative integer")
     return heapq.nlargest(k, items)
 
 
@@ -95,8 +99,14 @@ def retain_priority_and_recent(
     values = list(items)
     if max_recent is None:
         return values
-    if max_recent < 0:
-        raise ValueError("max_recent must be non-negative or None")
+    if (
+        isinstance(max_recent, bool)
+        or not isinstance(max_recent, int)
+        or max_recent < 0
+    ):
+        raise ValueError(
+            "max_recent must be a non-negative integer or None"
+        )
 
     priorities = [
         bool(is_priority(item))

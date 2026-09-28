@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import unittest
 from datetime import UTC, datetime, timedelta
 
@@ -8,6 +9,16 @@ from gunz_utils.cache import RecencyTTLPolicy, SingleFlight, ttl_cache
 
 
 class TestTTLCache(unittest.TestCase):
+    def test_rejects_invalid_ttl_and_capacity_domains(self) -> None:
+        for value in (math.nan, math.inf, -math.inf, True):
+            with self.subTest(ttl=value):
+                with self.assertRaises(ValueError):
+                    ttl_cache(ttl=value)
+        for value in (0, -1, True):
+            with self.subTest(maxsize=value):
+                with self.assertRaises(ValueError):
+                    ttl_cache(ttl=1, maxsize=value)
+
     def test_cache_hit(self) -> None:
         calls = 0
 

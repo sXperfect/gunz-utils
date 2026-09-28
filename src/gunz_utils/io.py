@@ -30,6 +30,11 @@ def atomic_write(
 
     When permissions is provided, the temporary file receives that mode before
     any content is written, and the mode is preserved by atomic replacement.
+
+    With ``durable=True`` the file is fsynced before replacement and the parent
+    directory is fsynced afterwards. If that final directory fsync fails, the
+    replacement may already be visible even though durability was not confirmed
+    and this function raises.
     """
     if not isinstance(path, str | pathlib.Path):
         raise TypeError("path must be str or pathlib.Path")

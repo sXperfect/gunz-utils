@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import unittest
 
 from gunz_utils.cache import CacheInfo, ttl_cache
 from gunz_utils.concurrency import map_unordered
 from gunz_utils.rate_limit import AsyncRateLimiter
 from gunz_utils.result import Result
-from gunz_utils.retry import async_retry, retry
+from gunz_utils.retry import RetryPolicy, async_retry, retry
 
 
 class TestResultOperations(unittest.TestCase):
@@ -38,6 +39,33 @@ class TestCacheInfo(unittest.TestCase):
 
 
 class TestRetryPolicy(unittest.TestCase):
+    def test_backoff_caps_without_exponential_overflow(self) -> None:
+        policy = RetryPolicy(
+            attempts=2,
+            base_delay=1.0,
+            max_delay=3.0,
+            jitter=False,
+        )
+        self.assertEqual(policy.delay(1_000_000), 3.0)
+        with self.assertRaises(ValueError):
+            policy.delay(True)
+
+    def test_rejects_non_finite_and_boolean_timing(self) -> None:
+        invalid = (math.nan, math.inf, -math.inf, True)
+        for value in invalid:
+            with self.subTest(base_delay=value):
+                with self.assertRaises(ValueError):
+                    RetryPolicy(base_delay=value)
+            with self.subTest(max_delay=value):
+                with self.assertRaises(ValueError):
+                    RetryPolicy(max_delay=value)
+            with self.subTest(timeout=value):
+                with self.assertRaises(ValueError):
+                    RetryPolicy(timeout=value)
+
+        with self.assertRaises(ValueError):
+            RetryPolicy(attempts=True)
+
     def test_predicate_stops_retry(self) -> None:
         calls = 0
 
@@ -107,3 +135,22 @@ class TestAsyncResilience(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(limiter.available_tokens, 2)
         await limiter.acquire()
         self.assertLess(limiter.available_tokens, 2)
+
+    async def test_rate_limiter_rejects_non_finite_parameters(self) -> None:
+        invalid = (math.nan, math.inf, -math.inf, True)
+        for value in invalid:
+            with self.subTest(rate=value):
+                with self.assertRaises(ValueError):
+                    AsyncRateLimiter(value)
+            with self.subTest(capacity=value):
+                with self.assertRaises(ValueError):
+                    AsyncRateLimiter(1, capacity=value)
+
+        limiter = AsyncRateLimiter(1, capacity=2)
+        for value in invalid:
+            with self.subTest(tokens=value):
+                with self.assertRaises(ValueError):
+                    await limiter.try_acquire(value)
+            with self.subTest(timeout=value):
+                with self.assertRaises(ValueError):
+                    await limiter.acquire(timeout=value)

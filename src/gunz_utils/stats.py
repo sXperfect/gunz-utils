@@ -6,7 +6,8 @@ import math
 import random
 from collections.abc import Iterable
 from dataclasses import dataclass
-from statistics import fmean
+from numbers import Real
+from statistics import fmean, stdev
 
 
 @dataclass(frozen=True)
@@ -37,9 +38,15 @@ def _finite_values(
     name: str,
 ) -> list[float]:
     """Convert values to finite floats and require at least one observation."""
-    converted = [float(value) for value in values]
-    if not converted:
+    raw = list(values)
+    if not raw:
         raise ValueError(f"{name} must not be empty")
+    if any(
+        isinstance(value, bool) or not isinstance(value, Real)
+        for value in raw
+    ):
+        raise ValueError(f"{name} must contain only real numeric values")
+    converted = [float(value) for value in raw]
     if not all(math.isfinite(value) for value in converted):
         raise ValueError(f"{name} must contain only finite values")
     return converted
@@ -79,11 +86,25 @@ def bootstrap_mean_ci(
         values,
         name="values",
     )
-    if not 0.0 < confidence < 1.0:
-        raise ValueError("confidence must be strictly between 0 and 1")
-    if samples < 1:
-        raise ValueError("samples must be positive")
+    if (
+        isinstance(confidence, bool)
+        or not isinstance(confidence, Real)
+        or not math.isfinite(float(confidence))
+        or not 0.0 < float(confidence) < 1.0
+    ):
+        raise ValueError(
+            "confidence must be a finite number strictly between 0 and 1"
+        )
+    if (
+        isinstance(samples, bool)
+        or not isinstance(samples, int)
+        or samples < 1
+    ):
+        raise ValueError("samples must be a positive integer")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError("seed must be an integer")
 
+    confidence = float(confidence)
     rng = random.Random(seed)
     count = len(observations)
     estimates = [
@@ -147,7 +168,10 @@ def paired_effect(
     Raises
     ------
     ValueError
-        If samples are empty, unequal in length, or contain non-finite values.
+        If samples are empty, unequal in length, contain non-finite values, or
+        a pairwise difference is not representable as a finite float.
+    OverflowError
+        If the standardized effect is not representable as a finite float.
     """
     left_values = _finite_values(
         left,
@@ -168,6 +192,10 @@ def paired_effect(
             strict=True,
         )
     ]
+    if not all(math.isfinite(value) for value in differences):
+        raise ValueError(
+            "paired differences must be representable as finite floats"
+        )
     center = fmean(differences)
     if len(differences) < 2:
         return PairedEffect(
@@ -177,16 +205,19 @@ def paired_effect(
             observations=1,
         )
 
-    variance = sum(
-        (value - center) ** 2
-        for value in differences
-    ) / (len(differences) - 1)
-    standard_deviation = math.sqrt(variance)
+    standard_deviation = stdev(differences)
     standardized_effect = (
         center / standard_deviation
         if standard_deviation
         else None
     )
+    if (
+        standardized_effect is not None
+        and not math.isfinite(standardized_effect)
+    ):
+        raise OverflowError(
+            "standardized effect exceeds finite float range"
+        )
     return PairedEffect(
         mean_difference=center,
         standard_deviation=standard_deviation,
@@ -203,7 +234,6 @@ __all__ = [
     "normal_mean_summary",
     "paired_effect",
 ]
-
 
 
 @dataclass(frozen=True)
@@ -238,6 +268,11 @@ def normal_mean_summary(
     NormalMeanSummary
         Count, mean, sample standard deviation, and interval bounds.
 
+    Raises
+    ------
+    OverflowError
+        If the interval cannot be represented using finite floats.
+
     Notes
     -----
     This is a fast descriptive normal approximation, not a bootstrap or
@@ -248,10 +283,16 @@ def normal_mean_summary(
         values,
         name="values",
     )
-    if not math.isfinite(confidence_z) or confidence_z < 0:
+    if (
+        isinstance(confidence_z, bool)
+        or not isinstance(confidence_z, Real)
+        or not math.isfinite(float(confidence_z))
+        or confidence_z < 0
+    ):
         raise ValueError(
-            "confidence_z must be a non-negative finite value"
+            "confidence_z must be a non-negative finite number"
         )
+    confidence_z = float(confidence_z)
 
     center = fmean(observations)
     count = len(observations)
@@ -265,21 +306,31 @@ def normal_mean_summary(
             confidence_z=confidence_z,
         )
 
-    variance = sum(
-        (value - center) ** 2
-        for value in observations
-    ) / (count - 1)
-    standard_deviation = math.sqrt(variance)
+    standard_deviation = stdev(observations)
     margin = (
         confidence_z
         * standard_deviation
         / math.sqrt(count)
     )
+    low = center - margin
+    high = center + margin
+    if not all(
+        math.isfinite(value)
+        for value in (
+            standard_deviation,
+            margin,
+            low,
+            high,
+        )
+    ):
+        raise OverflowError(
+            "normal-mean interval exceeds finite float range"
+        )
     return NormalMeanSummary(
         observations=count,
         mean=center,
         standard_deviation=standard_deviation,
-        low=center - margin,
-        high=center + margin,
+        low=low,
+        high=high,
         confidence_z=confidence_z,
     )

@@ -30,6 +30,13 @@ class TestSerialization(unittest.TestCase):
         with self.assertRaises(TypeError):
             canonical_json({"raw": b"x"})
 
+    def test_mapping_key_normalization_collision_is_rejected(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "mapping keys collide",
+        ):
+            canonical_json({1: "integer", "1": "string"})
+
 
 
 @dataclasses.dataclass(frozen=True)

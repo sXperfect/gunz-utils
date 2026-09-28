@@ -17,8 +17,10 @@ async def gather_limited(
     return_exceptions: bool = False,
 ) -> list[T | BaseException]:
     """Gather awaitables while bounding active task creation."""
-    if limit < 1:
-        raise ValueError("limit must be at least 1")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ValueError("limit must be a positive integer")
+    if not isinstance(return_exceptions, bool):
+        raise ValueError("return_exceptions must be bool")
     iterator = iter(awaitables)
     pending: dict[asyncio.Task[T], int] = {}
     ordered: dict[int, T | BaseException] = {}
@@ -34,10 +36,10 @@ async def gather_limited(
         next_index += 1
         return True
 
-    for _ in range(limit):
-        if not schedule_one():
-            break
     try:
+        for _ in range(limit):
+            if not schedule_one():
+                break
         while pending:
             done, _ = await asyncio.wait(
                 pending,
@@ -84,8 +86,8 @@ async def map_unordered(
     limit: int,
 ) -> AsyncIterator[R]:
     """Yield mapping results as soon as each bounded task completes."""
-    if limit < 1:
-        raise ValueError("limit must be at least 1")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ValueError("limit must be a positive integer")
     iterator = iter(items)
     pending: set[asyncio.Task[R]] = set()
 
@@ -97,10 +99,10 @@ async def map_unordered(
         pending.add(asyncio.create_task(func(item)))
         return True
 
-    for _ in range(limit):
-        if not schedule_one():
-            break
     try:
+        for _ in range(limit):
+            if not schedule_one():
+                break
         while pending:
             done, pending = await asyncio.wait(
                 pending,

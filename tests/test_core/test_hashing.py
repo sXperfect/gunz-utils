@@ -130,6 +130,10 @@ class TestFileHash(unittest.TestCase):
         with self.assertRaises(ValueError):
             file_hash(self.path, chunk_size=-1)
 
+    def test_chunk_size_requires_integer_not_bool(self) -> None:
+        with self.assertRaises(ValueError):
+            file_hash(self.path, chunk_size=True)
+
     def test_invalid_algo_raises(self) -> None:
         with self.assertRaises(ValueError):
             file_hash(self.path, algo="unsupported")
@@ -160,6 +164,10 @@ class TestShortHash(unittest.TestCase):
     def test_chars_above_maximum_raises(self) -> None:
         with self.assertRaises(ValueError):
             short_hash(b"data", chars=129)
+
+    def test_chars_requires_integer_not_bool(self) -> None:
+        with self.assertRaises(ValueError):
+            short_hash(b"data", chars=True)
 
     def test_invalid_algo_raises(self) -> None:
         with self.assertRaises(ValueError):

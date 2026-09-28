@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import unittest
 
 from gunz_utils.resilience import (
@@ -12,6 +13,17 @@ from gunz_utils.resilience import (
 
 
 class TestCircuitBreaker(unittest.IsolatedAsyncioTestCase):
+    async def test_rejects_invalid_configuration(self) -> None:
+        for value in (0, -1, True):
+            with self.subTest(failure_threshold=value):
+                with self.assertRaises(ValueError):
+                    AsyncCircuitBreaker(failure_threshold=value)
+
+        for value in (math.nan, math.inf, -math.inf, True, -1.0):
+            with self.subTest(recovery_timeout=value):
+                with self.assertRaises(ValueError):
+                    AsyncCircuitBreaker(recovery_timeout=value)
+
     async def test_opens_and_recovers(self) -> None:
         breaker = AsyncCircuitBreaker(failure_threshold=2, recovery_timeout=0)
 
@@ -82,6 +94,19 @@ class TestBulkhead(unittest.IsolatedAsyncioTestCase):
         bulkhead = AsyncBulkhead(1)
         with self.assertRaises(ValueError):
             await bulkhead.run(lambda: asyncio.sleep(0), timeout=-1)
+
+    async def test_rejects_non_finite_timeout_and_boolean_limit(self) -> None:
+        with self.assertRaises(ValueError):
+            AsyncBulkhead(True)
+
+        bulkhead = AsyncBulkhead(1)
+        for value in (math.nan, math.inf, -math.inf, True):
+            with self.subTest(timeout=value):
+                with self.assertRaises(ValueError):
+                    await bulkhead.run(
+                        lambda: asyncio.sleep(0),
+                        timeout=value,
+                    )
 
 
 if __name__ == "__main__":

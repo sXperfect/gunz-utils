@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 from .perf import PerfStatResult
@@ -54,12 +55,33 @@ def scaling_efficiency(
     if len(workers) != len(durations) or not workers:
         raise ValueError("workers and durations must be non-empty and equally sized")
     base_workers, base_duration = workers[0], durations[0]
+    if (
+        isinstance(base_workers, bool)
+        or not isinstance(base_workers, int)
+        or base_workers <= 0
+        or isinstance(base_duration, bool)
+        or not isinstance(base_duration, (int, float))
+        or not math.isfinite(float(base_duration))
+        or base_duration <= 0
+    ):
+        raise ValueError(
+            "baseline worker count and duration must be finite and positive"
+        )
+
     result: list[float | None] = []
     for count, duration in zip(workers, durations, strict=True):
-        if count <= 0 or duration <= 0 or base_workers <= 0:
+        if (
+            isinstance(count, bool)
+            or not isinstance(count, int)
+            or count <= 0
+            or isinstance(duration, bool)
+            or not isinstance(duration, (int, float))
+            or not math.isfinite(float(duration))
+            or duration <= 0
+        ):
             result.append(None)
             continue
-        speedup = base_duration / duration
+        speedup = float(base_duration) / float(duration)
         ideal_scale = count / base_workers
         result.append(speedup / ideal_scale)
     return result

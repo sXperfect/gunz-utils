@@ -19,11 +19,15 @@ async def worker_map(
     queue_size: int | None = None,
 ) -> AsyncIterator[R]:
     """Map work through bounded queues, propagating failures and cancellation."""
-    if workers < 1:
-        raise ValueError("workers must be positive")
+    if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
+        raise ValueError("workers must be a positive integer")
+    if queue_size is not None and (
+        isinstance(queue_size, bool)
+        or not isinstance(queue_size, int)
+        or queue_size < 1
+    ):
+        raise ValueError("queue_size must be a positive integer or None")
     size = queue_size if queue_size is not None else workers * 2
-    if size < 1:
-        raise ValueError("queue_size must be positive")
     incoming: asyncio.Queue[T | object] = asyncio.Queue(size)
     outgoing: asyncio.Queue[tuple[bool, R | BaseException | object]] = asyncio.Queue(
         size
@@ -33,26 +37,28 @@ async def worker_map(
         try:
             for item in items:
                 await incoming.put(item)
-        finally:
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            await outgoing.put((False, exc))
+        else:
             for _ in range(workers):
                 await incoming.put(_DONE)
 
     async def worker() -> None:
-        try:
-            while True:
-                item = await incoming.get()
-                if item is _DONE:
-                    return
-                try:
-                    result = await func(cast(T, item))
-                except asyncio.CancelledError:
-                    raise
-                except BaseException as exc:
-                    await outgoing.put((False, exc))
-                    return
-                await outgoing.put((True, result))
-        finally:
-            await outgoing.put((True, _DONE))
+        while True:
+            item = await incoming.get()
+            if item is _DONE:
+                await outgoing.put((True, _DONE))
+                return
+            try:
+                result = await func(cast(T, item))
+            except asyncio.CancelledError:
+                raise
+            except BaseException as exc:
+                await outgoing.put((False, exc))
+                return
+            await outgoing.put((True, result))
 
     producer_task = asyncio.create_task(producer())
     tasks = [asyncio.create_task(worker()) for _ in range(workers)]

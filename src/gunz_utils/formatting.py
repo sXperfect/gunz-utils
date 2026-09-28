@@ -7,12 +7,37 @@ hand-rolling its own convention.
 
 from __future__ import annotations
 
+import math
+from decimal import Decimal
+
 from ._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = ["format_bytes", "format_duration", "format_count"]
+
+
+def _validated_precision(precision: int) -> int:
+    if (
+        isinstance(precision, bool)
+        or not isinstance(precision, int)
+        or not 0 <= precision <= 20
+    ):
+        raise ValueError("precision must be an integer in the range 0..20")
+    return precision
+
+
+def _finite_float(value: object, *, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a finite real number")
+    try:
+        result = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{name} must be representable as a finite float") from exc
+    if not math.isfinite(result):
+        raise ValueError(f"{name} must be a finite real number")
+    return result
 
 
 def format_bytes(
@@ -56,7 +81,8 @@ def format_bytes(
     """
     #? Negative values are formatted by recursing on the magnitude and
     #? prefixing a minus sign, which keeps the scaling logic single-path.
-    n = float(n)
+    precision = _validated_precision(precision)
+    n = _finite_float(n, name="n")
     if n < 0:
         return f"-{format_bytes(-n, precision=precision, binary=binary)}"
     base = 1024 if binary else 1000
@@ -110,7 +136,8 @@ def format_duration(
     >>> format_duration(3661)
     '1h 1m 1s'
     """
-    seconds = float(seconds)
+    precision = _validated_precision(precision)
+    seconds = _finite_float(seconds, name="seconds")
     if seconds < 0:
         return f"-{format_duration(-seconds, precision=precision)}"
     #? Sub-second values are reported as whole milliseconds to avoid
@@ -167,11 +194,13 @@ def format_count(
     >>> format_count(1_234_567)
     '1.2M'
     """
-    n = int(n)
+    precision = _validated_precision(precision)
+    if isinstance(n, bool) or not isinstance(n, int):
+        raise ValueError("n must be an integer")
     if abs(n) < 1000:
         return str(n)
     sign = "-" if n < 0 else ""
-    value = float(abs(n))
+    value = Decimal(abs(n))
     for suffix in ["K", "M", "B", "T"]:
         value /= 1000
         if value < 1000:

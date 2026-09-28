@@ -209,6 +209,10 @@ def install_termination_handler(
     """
     if not callable(callback):
         raise TypeError("callback must be callable")
+    if isinstance(signum, bool) or not isinstance(signum, int) or signum <= 0:
+        raise ValueError("signum must be a positive integer")
+    if not isinstance(exit_after, bool):
+        raise ValueError("exit_after must be bool")
 
     previous = signal.getsignal(signum)
 

@@ -28,8 +28,12 @@ def run_experiment(
     name: str | None = None,
 ) -> list[ExperimentResult]:
     """Run a Cartesian parameter matrix with explicit repetitions."""
-    if repetitions < 1:
-        raise ValueError("repetitions must be positive")
+    if (
+        isinstance(repetitions, bool)
+        or not isinstance(repetitions, int)
+        or repetitions < 1
+    ):
+        raise ValueError("repetitions must be a positive integer")
     keys = list(parameters)
     values = [parameters[key] for key in keys]
     if any(not value for value in values):

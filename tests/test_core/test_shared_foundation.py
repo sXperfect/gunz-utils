@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import math
 import os
 import unittest
 from importlib import import_module
+from typing import Any, cast
 from unittest.mock import patch
 
 import gunz_utils.io as io_module
@@ -94,6 +96,31 @@ class TestPlugins(unittest.TestCase):
 
 
 class TestResourceBudget(unittest.TestCase):
+    def test_limits_reject_invalid_numeric_domains(self) -> None:
+        for value in (math.nan, math.inf, -math.inf, True):
+            with self.subTest(timeout=value):
+                with self.assertRaises(ValueError):
+                    Limits(timeout=value)
+
+        for field in ("max_bytes", "max_items", "max_depth"):
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError):
+                    Limits(**{field: True})
+
+    def test_consumption_requires_non_negative_integers(self) -> None:
+        budget = ResourceBudget()
+        for value in (-1, True, 1.5):
+            invalid = cast(Any, value)
+            with self.subTest(bytes=value):
+                with self.assertRaises(ValueError):
+                    budget.consume_bytes(invalid)
+            with self.subTest(items=value):
+                with self.assertRaises(ValueError):
+                    budget.consume_items(invalid)
+            with self.subTest(depth=value):
+                with self.assertRaises(ValueError):
+                    budget.check_depth(invalid)
+
     def test_consumption_and_remaining_values(self) -> None:
         now = [10.0]
         budget = ResourceBudget(
@@ -133,6 +160,23 @@ class TestResourceBudget(unittest.TestCase):
         now[0] = 3.0
         with self.assertRaises(BudgetExceededError):
             budget.check_deadline()
+
+    def test_deadline_rejects_non_finite_injected_clock(self) -> None:
+        for value in (math.nan, math.inf, -math.inf, True):
+            with self.subTest(initial=value):
+                with self.assertRaises(ValueError):
+                    ResourceBudget(
+                        timeout=1,
+                        clock=lambda value=value: value,
+                    )
+
+        now = [1.0]
+        budget = ResourceBudget(timeout=2, clock=lambda: now[0])
+        now[0] = math.nan
+        with self.assertRaises(ValueError):
+            budget.check_deadline()
+        with self.assertRaises(ValueError):
+            _ = budget.remaining_seconds
 
     def test_from_limits(self) -> None:
         budget = ResourceBudget.from_limits(

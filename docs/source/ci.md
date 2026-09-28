@@ -6,14 +6,16 @@ time. GitHub Actions verifies only changes entering or already on `main`.
 
 ## Design guides
 
-The durable design rationale and validation history live under:
+The correctness-audit and CI rationale live under:
 
+- `docs/design/audit/algorithm-method-audit.md`
+- `docs/design/audit/proof-test-catalogue.md`
+- `docs/design/audit/ci-strategy.md`
 - `docs/guides/ci/design.md`
 - `docs/guides/ci/lessons-learned.md`
 
-Those guides explain why the hosted workflow is sequential, main-only,
-history-aware, strict on documentation warnings, and local-first for ordinary
-development.
+The audit documents define how implementation claims become test evidence and
+why the hosted workflow favors one diagnostic-dense verification job.
 
 ## Hosted trigger policy
 
@@ -22,31 +24,79 @@ development.
 - a push to `main`;
 - a pull request whose base branch is `main`.
 
-It does not run for feature-branch pushes, `develop`, or manual dispatch.
-Superseded runs for the same pull request or ref are cancelled.
+It does not run for ordinary feature-branch pushes. Superseded runs for the
+same pull request or ref are cancelled.
 
-## One hosted runner
+## One hosted verification job
 
-The workflow exposes one stable required check: `CI / verify`. Its steps run
-sequentially on one runner so setup/download work is reused and short jobs do
-not each pay separate runner-start/rounding overhead.
+The workflow exposes one stable required check: `CI / verify`. Checkout,
+interpreter setup, dependency installation, verification, and summary upload
+all happen on one runner.
 
-The order is deliberately fail-fast:
+The verification itself is one aggregate command:
+
+```bash
+python scripts/audit_ci.py \
+  --compat-python python3.12 \
+  --summary-json tmp/ci-summary.json
+```
+
+The orchestrator runs independent checks in this order:
 
 1. release/version/changelog metadata;
-2. Ruff;
-3. mypy;
-4. full Python 3.11 pytest suite;
-5. strict Sphinx documentation build;
-6. packaging and optional-dependency isolation matrix;
-7. full Python 3.12 compatibility pytest suite.
+2. Ruff and mypy;
+3. full Python 3.11 pytest;
+4. strict Sphinx documentation build;
+5. packaging and dependency-isolation checks;
+6. full Python 3.12 compatibility pytest.
 
-Cheap static checks therefore stop the run before the expensive isolation and
-compatibility stages when possible.
+Unlike the previous hosted sequence, a failure in one independent gate does
+not hide later gate results. The orchestrator collects all statuses, writes the
+summary, and only then returns a failing process status.
+
+Prerequisite setup remains fail-fast. If checkout or dependency installation
+does not succeed, downstream results would not be trustworthy.
+
+## Why aggregate instead of fail-fast
+
+The design optimizes diagnostic density per hosted run. A single execution can
+report lint, typing, functional, documentation, packaging, and compatibility
+problems together instead of requiring repeated paid runs to reveal them one at
+a time.
+
+This does not make checks less strict. Any failing gate still makes the final
+job fail.
+
+## Machine-readable result
+
+The aggregate verifier writes a stable JSON document:
+
+```json
+{
+  "schema_version": 1,
+  "passed": false,
+  "results": [
+    {"name": "release", "returncode": 0},
+    {"name": "lint", "returncode": 1}
+  ]
+}
+```
+
+On GitHub Actions the same results are written to the step summary. The JSON
+summary is uploaded with `if: always()` for post-failure inspection.
 
 ## Local commands
 
-The local dispatcher is the canonical implementation of repository gates:
+Run the same aggregate verifier used by hosted CI:
+
+```bash
+./scripts/verify.sh
+```
+
+If `python3.12` is installed, the wrapper includes the compatibility pass
+automatically.
+
+For focused diagnosis, individual gates remain available:
 
 ```bash
 python scripts/ci.py release
@@ -54,11 +104,10 @@ python scripts/ci.py lint
 python scripts/ci.py test
 python scripts/ci.py docs
 python scripts/ci.py packaging
-python scripts/ci.py all
 ```
 
-`scripts/verify.sh` is a convenience wrapper around
-`python scripts/ci.py all`.
+The legacy `python scripts/ci.py all` command remains a simple sequential
+fail-fast helper; `scripts/audit_ci.py` is the preferred pre-merge aggregate.
 
 ### Release gate
 
@@ -66,13 +115,8 @@ python scripts/ci.py all
 python scripts/release.py check
 ```
 
-This validates the `pyproject.toml` version, changelog structure, pending
-fragment names/categories, absence of stale module-level package versions, and
-the runtime/Sphinx version-source policy. Tag gaps are reported as warnings
-rather than fabricated automatically.
-
-See [Releases](releases.md) for the hosted-documentation summary. The full
-maintainer process remains in `docs/development/releases.md`.
+Validates package version, changelog structure, pending fragment naming, and
+release metadata.
 
 ### Lint gate
 
@@ -81,8 +125,8 @@ python -m ruff check src tests benchmarks scripts
 python -m mypy src/gunz_utils
 ```
 
-Ruff includes repository tooling so `scripts/release.py` and the CI dispatcher
-are validated rather than treated as unowned automation.
+Both tools are run by the gate so a Ruff failure does not suppress the mypy
+result.
 
 ### Test gate
 
@@ -90,8 +134,8 @@ are validated rather than treated as unowned automation.
 python -m pytest
 ```
 
-The hosted workflow executes the full suite on Python 3.11 and repeats it on
-Python 3.12 only after the earlier gates pass.
+Pytest runs the full collection without an artificial `maxfail` cap so one
+run can report multiple failing tests.
 
 ### Documentation gate
 
@@ -99,8 +143,7 @@ Python 3.12 only after the earlier gates pass.
 python scripts/ci.py docs
 ```
 
-This calls `scripts/build_docs.sh`, which performs a strict Sphinx build with
-warnings treated as errors.
+Builds Sphinx documentation strictly, with warnings treated as errors.
 
 ### Packaging/isolation gate
 
@@ -108,57 +151,39 @@ warnings treated as errors.
 python scripts/ci.py packaging
 ```
 
-Each case runs in its own fresh `python -m venv` under `tmp/c05-venvs/` with
-`PYTHONPATH` removed. The matrix verifies:
+Fresh virtual environments verify the zero-dependency core, optional extras,
+headless plotting, and wheel/sdist installation behavior without mutating the
+active environment.
 
-- zero-dependency package import;
-- standard-library fallback behavior;
-- `validation` extra in isolation;
-- `project` extra in isolation;
-- `observability` extra in isolation;
-- `secure` extra in isolation;
-- real headless plotting through the `plot` extra;
-- wheel and sdist creation plus an outside-checkout wheel import.
+## Python compatibility
 
-The virtual environments are never cached. Pip's download/wheel cache may be
-reused so isolation stays real without repeatedly downloading unchanged
-artifacts.
-
-## Hosted environment and caching
-
-The workflow starts on Python 3.11 and uses `actions/setup-python` pip caching
-keyed by `pyproject.toml`. CI dependencies are installed once for the primary
-stages; pip itself is not upgraded on every run.
-
-The packaging gate creates fresh virtual environments but can reuse pip's
-download cache. After the primary gates pass, the same job switches to Python
-3.12, installs the compatibility-test requirements, and runs the complete test
-suite.
-
-No build artifacts are uploaded by default. The workflow has read-only
-`contents: read` permission.
+Hosted CI installs both Python 3.11 and 3.12 on the same runner. Python 3.11 is
+the primary verification interpreter. The aggregate orchestrator then invokes
+the full test suite with `python3.12` as an independent final gate.
 
 ## Tool version refresh
 
-Hosted developer-tool pins are explicit. To update one:
+Hosted developer-tool pins are explicit. When changing a pin:
 
-1. update the relevant pin in `.github/workflows/ci.yml`;
-2. install/test the same version locally;
-3. run `python scripts/ci.py all`;
-4. commit only after local verification succeeds.
+1. update `.github/workflows/ci.yml`;
+2. install and test the same version locally;
+3. run `./scripts/verify.sh`;
+4. commit only after the aggregate verifier passes.
 
-Do not add a second workflow merely to test another gate. Prefer extending the
-local dispatcher and the single `verify` job unless a materially different
-security/permission boundary requires separation.
+Do not add a second workflow or job merely to expose another ordinary gate.
+Prefer extending the aggregate verifier unless a materially different
+permission, operating-system, hardware, or security boundary requires separate
+execution.
 
 ## Troubleshooting
 
-- Release gate: `python scripts/release.py status` and
-  `python scripts/release.py check`.
+- Aggregate status: `tmp/ci-summary.json`.
+- Release: `python scripts/release.py status`.
 - Ruff/mypy: `python scripts/ci.py lint`.
 - Tests: `python scripts/ci.py test`.
 - Docs: `python scripts/ci.py docs`.
 - Packaging: `python scripts/ci.py packaging`.
 
-For feature work, fix failures locally before opening or updating a pull request
-to `main`; ordinary feature-branch pushes intentionally have no hosted CI.
+For feature work, fix failures locally before opening or updating a pull
+request to `main`; ordinary feature-branch pushes intentionally have no hosted
+CI.

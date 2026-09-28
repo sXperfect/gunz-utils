@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Coroutine
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -80,8 +80,8 @@ async def _heartbeat_loop(
 
 
 async def run_with_lease_heartbeat(
-    operation: Callable[[], Coroutine[Any, Any, T]],
-    renew: Callable[[], Coroutine[Any, Any, bool]],
+    operation: Callable[[], Awaitable[T]],
+    renew: Callable[[], Awaitable[bool]],
     *,
     heartbeat_interval: float,
     renew_immediately: bool = False,
@@ -128,6 +128,8 @@ async def run_with_lease_heartbeat(
         raise TypeError("operation must be callable")
     if not callable(renew):
         raise TypeError("renew must be callable")
+    if not isinstance(renew_immediately, bool):
+        raise ValueError("renew_immediately must be bool")
     if (
         isinstance(heartbeat_interval, bool)
         or not isinstance(heartbeat_interval, (int, float))
@@ -138,16 +140,21 @@ async def run_with_lease_heartbeat(
             "heartbeat_interval must be a finite positive number"
         )
 
-    operation_task = asyncio.create_task(operation())
-    heartbeat_task = asyncio.create_task(
-        _heartbeat_loop(
-            renew,
-            interval=float(heartbeat_interval),
-            renew_immediately=renew_immediately,
-        )
-    )
-
+    operation_task: asyncio.Future[T] | None = None
+    heartbeat_task: asyncio.Task[None] | None = None
     try:
+        # ensure_future accepts any Awaitable promised by the public contract,
+        # including an already-created Future. Task creation is inside the
+        # cleanup scope so a later setup failure cannot orphan the operation.
+        operation_task = asyncio.ensure_future(operation())
+        heartbeat_task = asyncio.create_task(
+            _heartbeat_loop(
+                renew,
+                interval=float(heartbeat_interval),
+                renew_immediately=renew_immediately,
+            )
+        )
+
         done, _pending = await asyncio.wait(
             {operation_task, heartbeat_task},
             return_when=asyncio.FIRST_COMPLETED,
@@ -177,14 +184,19 @@ async def run_with_lease_heartbeat(
         )
         return result
     finally:
-        for task in (operation_task, heartbeat_task):
+        tasks = [
+            task
+            for task in (operation_task, heartbeat_task)
+            if task is not None
+        ]
+        for task in tasks:
             if not task.done():
                 task.cancel()
-        await asyncio.gather(
-            operation_task,
-            heartbeat_task,
-            return_exceptions=True,
-        )
+        if tasks:
+            await asyncio.gather(
+                *tasks,
+                return_exceptions=True,
+            )
 
 
 __all__ = [

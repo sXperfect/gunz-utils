@@ -127,3 +127,54 @@ def test_normal_mean_summary_validates_z_value() -> None:
             [1.0, 2.0],
             confidence_z=math.inf,
         )
+
+
+def test_paired_effect_handles_extreme_finite_values_stably() -> None:
+    result = paired_effect(
+        [1e308, -1e308],
+        [0.0, 0.0],
+    )
+
+    assert math.isfinite(result.standard_deviation)
+    assert result.standard_deviation > 1e308
+    assert result.standardized_effect == pytest.approx(0.0)
+
+
+def test_paired_effect_rejects_overflowing_pairwise_difference() -> None:
+    with pytest.raises(ValueError, match="paired differences"):
+        paired_effect(
+            [1e308],
+            [-1e308],
+        )
+
+
+def test_normal_mean_summary_handles_extreme_finite_values_stably() -> None:
+    result = normal_mean_summary(
+        [1e308, -1e308],
+        confidence_z=1.0,
+    )
+
+    assert math.isfinite(result.standard_deviation)
+    assert math.isfinite(result.low)
+    assert math.isfinite(result.high)
+    assert result.low == pytest.approx(-1e308)
+    assert result.high == pytest.approx(1e308)
+
+
+def test_normal_mean_summary_rejects_unrepresentable_interval() -> None:
+    with pytest.raises(OverflowError, match="interval"):
+        normal_mean_summary(
+            [1e308, -1e308],
+            confidence_z=1.96,
+        )
+
+
+def test_statistics_reject_boolean_and_non_numeric_domains() -> None:
+    with pytest.raises(ValueError, match="real numeric"):
+        paired_effect([True], [0.0])
+    with pytest.raises(ValueError, match="samples"):
+        bootstrap_mean_ci([1.0], samples=True)
+    with pytest.raises(ValueError, match="seed"):
+        bootstrap_mean_ci([1.0], seed=True)
+    with pytest.raises(ValueError, match="confidence_z"):
+        normal_mean_summary([1.0, 2.0], confidence_z=True)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import statistics
 from dataclasses import dataclass
 
@@ -26,7 +27,33 @@ def analyze_stability(
     max_relative_range: float = 0.20,
 ) -> StabilityReport:
     """Detect noisy timing distributions using robust simple diagnostics."""
+    for name, value in (
+        ("max_cv", max_cv),
+        ("max_relative_range", max_relative_range),
+    ):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or value < 0
+        ):
+            raise ValueError(
+                f"{name} must be a finite non-negative number"
+            )
+
     values = list(result.samples)
+    if not values:
+        raise ValueError("benchmark samples must not be empty")
+    if not all(
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+        and value >= 0
+        for value in values
+    ):
+        raise ValueError(
+            "benchmark samples must be finite non-negative numbers"
+        )
     mean = statistics.fmean(values)
     cv = 0.0 if mean == 0 else statistics.pstdev(values) / mean
     median = statistics.median(values)
