@@ -223,3 +223,32 @@ def test_passphrase_unlock_rejects_empty_or_wrong_passphrase(
             reopened.unlock(passphrase="wrong")
     finally:
         reopened.close()
+
+
+def test_passphrase_rotation_publication_failure_recovers_pending_salt(
+    tmp_path: Path,
+) -> None:
+    store = SecureStore(base_dir=tmp_path)
+    store.unlock()
+    store.set("secret", "value")
+
+    with patch.object(
+        store,
+        "_promote_pending_key_material",
+        side_effect=OSError("publish failed"),
+    ):
+        with pytest.raises(OSError, match="publish failed"):
+            store.rotate_master_key(new_passphrase="new-passphrase")
+
+    assert store._pending_salt_path.is_file()
+    store.close()
+
+    reopened = SecureStore(base_dir=tmp_path)
+    try:
+        reopened.unlock(passphrase="new-passphrase")
+        assert reopened.get("secret") == "value"
+        assert reopened._salt_path.is_file()
+        assert not reopened._master_key_path.exists()
+        assert not reopened._pending_salt_path.exists()
+    finally:
+        reopened.close()
