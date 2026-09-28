@@ -343,6 +343,13 @@ class ContentAddressedStore:
         """
         if strategy not in {"hardlink", "copy"}:
             raise ValueError("strategy must be 'hardlink' or 'copy'")
+        for name, value in (
+            ("replace", replace),
+            ("verify", verify),
+            ("fallback_copy", fallback_copy),
+        ):
+            if not isinstance(value, bool):
+                raise ValueError(f"{name} must be bool")
 
         source = self.get(
             digest,
@@ -401,6 +408,8 @@ class ContentAddressedStore:
         verify: bool = True,
     ) -> Path:
         """Return a stored artifact path, optionally verifying its digest."""
+        if not isinstance(verify, bool):
+            raise ValueError("verify must be bool")
         normalized = self._validate_digest(digest)
         target = self.path_for(normalized)
         if not target.exists() and not target.is_symlink():
