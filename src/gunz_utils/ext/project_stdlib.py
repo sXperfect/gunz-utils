@@ -17,6 +17,8 @@ import pathlib
 import subprocess
 import sys
 
+from ..subprocess import CommandError, CommandOutputLimitError, run_command
+
 from .._version import __version__ as __version__
 
 __all__ = ["resolve_project_root"]
@@ -27,17 +29,17 @@ _PROJECT_ROOT: pathlib.Path | None = None
 @functools.lru_cache(maxsize=1)
 def _git_rev_parse_toplevel(anchor: str) -> pathlib.Path | None:
     try:
-        r = subprocess.run(
+        result = run_command(
             ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
             check=True,
-            timeout=5,
+            timeout=5.0,
             cwd=anchor,
+            max_output_bytes=1024 * 1024,
         )
-        return pathlib.Path(r.stdout.strip()).resolve()
+        return pathlib.Path(result.stdout.strip()).resolve()
     except (
-        subprocess.CalledProcessError,
+        CommandError,
+        CommandOutputLimitError,
         subprocess.TimeoutExpired,
         FileNotFoundError,
         OSError,
