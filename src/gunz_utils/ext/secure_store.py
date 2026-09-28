@@ -278,7 +278,7 @@ class SecureStore:
     def _validate_secret_name(value: str) -> str:
         if (
             not isinstance(value, str)
-            or not value
+            or not value.strip()
             or len(value) > 512
             or "\x00" in value
             or any(ord(character) < 0x20 for character in value)
@@ -293,7 +293,7 @@ class SecureStore:
     def _validate_identity(value: str, *, field: str) -> str:
         if (
             not isinstance(value, str)
-            or not value
+            or not value.strip()
             or len(value) > 256
             or "," in value
             or "\x00" in value

@@ -462,6 +462,8 @@ class ContentAddressedStore:
         verify: bool = True,
     ) -> Path:
         """Return a stored artifact path, optionally verifying its digest."""
+        if not isinstance(verify, bool):
+            raise ValueError("verify must be bool")
         normalized = self._validate_digest(digest)
         target = self.path_for(normalized)
         self._check_prefix_path(target, create=False)
