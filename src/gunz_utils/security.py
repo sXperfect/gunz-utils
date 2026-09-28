@@ -259,7 +259,11 @@ def open_path_under_base(
     resolved = safe_path_join(base_dir, *paths)
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         return open(resolved, mode)
-    relative = os.path.relpath(resolved, os.path.realpath(base_dir))
+
+    # Preserve the caller's final path component for O_NOFOLLOW. Using the
+    # fully resolved path here would erase a final symlink before open(2) gets
+    # the chance to reject it.
+    relative = os.path.join(*paths) if paths else "."
     dir_fd = os.open(os.path.realpath(base_dir), os.O_RDONLY | os.O_DIRECTORY)
     try:
         flags = os.O_RDONLY | os.O_NOFOLLOW
