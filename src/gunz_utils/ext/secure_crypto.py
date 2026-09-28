@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from .._version import __version__ as __version__
+from ..deprecation import deprecated
 
 # Constants matching TypeScript implementation
 IV_LENGTH = 12
@@ -25,10 +26,15 @@ KEY_LENGTH = 32
 ITERATIONS = 600_000
 _FORMAT_PREFIX = "aes256:v2:"
 
+@deprecated(
+    "get_system_passphrase() is predictable machine identity, not secret key "
+    "material; provide an explicit high-entropy passphrase instead"
+)
 def get_system_passphrase() -> str:
-    """
-    Derives a standard passphrase from the actual system hostname and user.
-    Used for local MCP credential encryption.
+    """Return the legacy predictable hostname/user identifier.
+
+    This value is retained only for compatibility and must not be used as a
+    cryptographic secret. New encryption calls require an explicit passphrase.
     """
     hostname = os.uname().nodename
     username = os.environ.get("USER", "sxperfect")
