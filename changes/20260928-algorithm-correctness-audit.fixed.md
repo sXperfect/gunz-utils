@@ -1,1 +1,2 @@
 - Harden numerical, timing, serialization, parsing, project-discovery, and benchmark/profiling edge cases, with a maintained algorithm proof guide and audit registry.
+- Add method-audit design documentation, exhaustive graph/varint proof tests, and a single-job aggregate CI verifier that reports independent failures together.
