@@ -49,6 +49,8 @@ import os
 import sqlite3
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -379,6 +381,22 @@ class SecureStore:
                 (time.time(), caller, action, secret_name, 1 if allowed else 0),
             )
 
+    @contextmanager
+    def _transaction_locked(self) -> Iterator[None]:
+        """Join an active transaction or own one for this mutation."""
+        started = not self._conn.in_transaction
+        if started:
+            self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+        except BaseException:
+            if started and self._conn.in_transaction:
+                self._conn.execute("ROLLBACK")
+            raise
+        else:
+            if started:
+                self._conn.execute("COMMIT")
+
     def set(
         self,
         name: str,
@@ -387,43 +405,72 @@ class SecureStore:
         caller: str = "library",
         acl: list[str] | None = None,
     ) -> None:
-        """Encrypt and store a secret, preserving an existing ACL by default."""
+        """Encrypt and store a secret, preserving an existing ACL by default.
+
+        The secret mutation and its successful audit event commit atomically.
+        Unauthorized attempts are audited after the mutation transaction rolls
+        back, so a denied write cannot partially modify the secret.
+        """
         name = self._validate_name(name, label="name")
         caller = self._validate_caller(caller)
         acl = self._normalize_acl(acl)
         if not isinstance(value, (str, bytes)):
             raise TypeError("value must be str or bytes")
+
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
-            existing = self._conn.execute(
-                "SELECT acl FROM secrets WHERE name = ?", (name,)
-            ).fetchone()
-            if existing is not None:
-                current_acl = [s for s in (existing["acl"] or "").split(",") if s]
-                if current_acl and caller not in current_acl:
-                    self._audit(caller, "set", name, False)
-                    raise PermissionError(
-                        f"Caller {caller!r} not permitted to modify {name!r}"
+
+            try:
+                with self._transaction_locked():
+                    existing = self._conn.execute(
+                        "SELECT acl FROM secrets WHERE name = ?",
+                        (name,),
+                    ).fetchone()
+                    if existing is not None:
+                        current_acl = [
+                            item
+                            for item in (existing["acl"] or "").split(",")
+                            if item
+                        ]
+                        if current_acl and caller not in current_acl:
+                            raise PermissionError(
+                                f"Caller {caller!r} not permitted to modify "
+                                f"{name!r}"
+                            )
+                        acl_str = (
+                            existing["acl"]
+                            if acl is None
+                            else ",".join(acl)
+                        )
+                    else:
+                        acl_str = ",".join(acl) if acl else ""
+
+                    payload = value.encode() if isinstance(value, str) else value
+                    ciphertext = self._fernet.encrypt(payload)
+                    now = time.time()
+                    self._conn.execute(
+                        """
+                        INSERT INTO secrets (
+                            name, ciphertext, acl, created_at, updated_at
+                        )
+                        VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT(name) DO UPDATE SET
+                            ciphertext = excluded.ciphertext,
+                            acl = excluded.acl,
+                            updated_at = excluded.updated_at
+                        """,
+                        (name, ciphertext, acl_str, now, now),
                     )
-                acl_str = existing["acl"] if acl is None else ",".join(acl)
-            else:
-                acl_str = ",".join(acl) if acl else ""
-            payload = value.encode() if isinstance(value, str) else value
-            ciphertext = self._fernet.encrypt(payload)
-            now = time.time()
-            self._conn.execute(
-                """
-                INSERT INTO secrets (name, ciphertext, acl, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(name) DO UPDATE SET
-                    ciphertext = excluded.ciphertext,
-                    acl = excluded.acl,
-                    updated_at = excluded.updated_at
-                """,
-                (name, ciphertext, acl_str, now, now),
-            )
-            self._audit(caller, "set", name, True)
+                    self._audit(caller, "set", name, True)
+            except PermissionError:
+                # When this method owns the transaction it has already rolled
+                # back. If it is nested inside set_many, the outer transaction
+                # records the batch denial after its rollback.
+                if not self._conn.in_transaction:
+                    self._audit(caller, "set", name, False)
+                raise
+
     def get_bytes(self, name: str, *, caller: str = "library") -> bytes | None:
         """Decrypt and return raw secret bytes, or None if not found."""
         name = self._validate_name(name, label="name")
@@ -462,21 +509,39 @@ class SecureStore:
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
-            row = self._conn.execute(
-                "SELECT acl FROM secrets WHERE name = ?", (name,)
-            ).fetchone()
-            if row is None:
-                self._audit(caller, "delete", name, False)
-                return False
-            acl = [s for s in (row["acl"] or "").split(",") if s]
-            if acl and caller not in acl:
-                self._audit(caller, "delete", name, False)
-                raise PermissionError(
-                    f"Caller {caller!r} not permitted to delete {name!r}"
-                )
-            self._conn.execute("DELETE FROM secrets WHERE name = ?", (name,))
-            self._audit(caller, "delete", name, True)
-            return True
+
+            try:
+                with self._transaction_locked():
+                    row = self._conn.execute(
+                        "SELECT acl FROM secrets WHERE name = ?",
+                        (name,),
+                    ).fetchone()
+                    if row is None:
+                        self._audit(caller, "delete", name, False)
+                        return False
+
+                    acl = [
+                        item
+                        for item in (row["acl"] or "").split(",")
+                        if item
+                    ]
+                    if acl and caller not in acl:
+                        raise PermissionError(
+                            f"Caller {caller!r} not permitted to delete "
+                            f"{name!r}"
+                        )
+
+                    self._conn.execute(
+                        "DELETE FROM secrets WHERE name = ?",
+                        (name,),
+                    )
+                    self._audit(caller, "delete", name, True)
+                    return True
+            except PermissionError:
+                if not self._conn.in_transaction:
+                    self._audit(caller, "delete", name, False)
+                raise
+
     def set_many(
         self,
         values: dict[str, str | bytes],
@@ -484,15 +549,41 @@ class SecureStore:
         caller: str = "library",
         acl: list[str] | None = None,
     ) -> None:
-        """Store multiple values in one SQLite transaction."""
+        """Store multiple values and their audit events in one transaction."""
+        if not isinstance(values, dict):
+            raise ValueError("values must be a dict")
+        caller = self._validate_caller(caller)
+        acl = self._normalize_acl(acl)
+
+        normalized: list[tuple[str, str | bytes]] = []
+        for name, value in values.items():
+            normalized_name = self._validate_name(name, label="name")
+            if not isinstance(value, (str, bytes)):
+                raise TypeError("values must contain only str or bytes")
+            normalized.append((normalized_name, value))
+
         with self._lock:
-            self._conn.execute("BEGIN IMMEDIATE")
+            if self._fernet is None:
+                raise RuntimeError("Store is locked. Call unlock() first.")
             try:
-                for name, value in values.items():
-                    self.set(name, value, caller=caller, acl=acl)
-                self._conn.execute("COMMIT")
+                with self._transaction_locked():
+                    for name, value in normalized:
+                        self.set(
+                            name,
+                            value,
+                            caller=caller,
+                            acl=acl,
+                        )
+                    self._audit(caller, "set_many", None, True)
             except BaseException:
-                self._conn.execute("ROLLBACK")
+                # The owning transaction is rolled back before this executes.
+                # Record one durable batch-failure event without masking the
+                # original failure if audit persistence is also unavailable.
+                if not self._conn.in_transaction:
+                    try:
+                        self._audit(caller, "set_many", None, False)
+                    except sqlite3.Error:
+                        pass
                 raise
 
     def get_many(
