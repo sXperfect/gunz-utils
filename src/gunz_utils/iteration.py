@@ -50,8 +50,8 @@ def chunked(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
     >>> list(chunked(range(4), 2))
     [(0, 1), (2, 3)]
     """
-    if n <= 0:
-        raise ValueError(f"n must be positive, got {n}")
+    if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
+        raise ValueError(f"n must be a positive integer, got {n!r}")
     #? `iter()` accepts any iterable once; subsequent calls don't re-iterate,
     #? which is the desired lazy semantics. The `zip(..., strict=False)`
     #? default silently drops a partial final group — we want the partial
@@ -66,8 +66,8 @@ def chunked(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
 
 def batched(iterable: Iterable[T], n: int) -> Iterator[list[T]]:
     """Yield successive ``n``-sized lists from ``iterable`` lazily."""
-    if n <= 0:
-        raise ValueError(f"n must be positive, got {n}")
+    if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
+        raise ValueError(f"n must be a positive integer, got {n!r}")
     it = iter(iterable)
     while True:
         group = list(islice(it, n))
@@ -120,10 +120,23 @@ def flatten(
     >>> list(flatten((1, 2, 3)))
     [1, 2, 3]
     """
-    if max_depth is not None and max_depth < 0:
-        raise ValueError(f"max_depth must be non-negative, got {max_depth}")
-    if max_nesting <= 0:
-        raise ValueError(f"max_nesting must be positive, got {max_nesting}")
+    if max_depth is not None and (
+        isinstance(max_depth, bool)
+        or not isinstance(max_depth, int)
+        or max_depth < 0
+    ):
+        raise ValueError(
+            f"max_depth must be a non-negative integer or None, "
+            f"got {max_depth!r}"
+        )
+    if (
+        isinstance(max_nesting, bool)
+        or not isinstance(max_nesting, int)
+        or max_nesting <= 0
+    ):
+        raise ValueError(
+            f"max_nesting must be a positive integer, got {max_nesting!r}"
+        )
     active: set[int] = set()
 
     def _walk(item: Any, depth: int) -> Iterator:
