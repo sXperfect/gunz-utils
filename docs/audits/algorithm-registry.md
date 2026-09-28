@@ -33,12 +33,16 @@ tests, strict docs, all packaging/isolation cases, and 943 Python 3.12 tests.
 
 ## Integration verification status
 
-The algorithm-audit history has been merged onto security-hardened
+The algorithm-audit history is composed onto security-hardened
 `main@07244be5e6d24d83b3b7dcde62bc1702ff1f6e9d` on
-`merge/algorithm-audit-main`. The A4 levels below retain their historical
-evidence, but they are **not yet claims for the composed integration tree** when
-the implementation was changed by conflict resolution. A single aggregate
-cross-version verification is required before recording an integrated A4 SHA.
+`merge/algorithm-audit-main`.
+
+The combined implementation was verified on
+`416c1105404fa42f499f323fead8872644848103` by hosted CI run `36403271808`. Release preflight, Ruff,
+mypy, strict documentation, packaging/isolation, 991 Python 3.11 tests, and 991
+Python 3.12 tests all passed. Previously audited A4 families whose implementations
+were recomposed during integration are therefore revalidated on this integrated
+revision.
 
 The integrated tree deliberately keeps newer `main` security behavior
 (immutable CI action pins, dependency floors, bounded subprocess capture,
@@ -88,7 +92,7 @@ top.
 | ALG-036 | Recursive redaction | `redaction.redact`, `redact_dict` | A2 | secret-context propagation, non-mutation, reveal-count bound | strict reveal-count domain added |
 | ALG-037 | Safe integer parsing | `parsing.safe_int` | A2 | strings/bytes/ordinary ints, base handling, bounds/fallback | fixed documented integer inputs returning fallback |
 | ALG-038 | Generic async timeout wrapper | `async_utils.with_timeout` | A2 | None semantics, finite timeout, cancellation | finite timeout validation added |
-| ALG-039 | Subprocess timeout/output validation | `subprocess.run_command`, `run_command_async` | A2 | structured argv, finite timeout/grace domains, prompt streaming output cap, process-group cleanup | integrated main implementation now streams under the shared byte cap; combined verification pending |
+| ALG-039 | Subprocess timeout/output validation | `subprocess.run_command`, `run_command_async` | A4 | structured argv, finite timeout/grace domains, prompt streaming output cap, process-group cleanup | integrated bounded-capture/timing proofs passed on the composed tree |
 | ALG-040 | Upstream policy wrapper | `upstream_protocol.PolicyUpstream` | A2 | finite timeout, concurrency/attempt counts, idempotent retry set | parameter contracts hardened |
 | ALG-041 | Scaling efficiency | `benchmark.metrics.scaling_efficiency` | A2 | valid baseline, per-point validity, ideal-scale formula | fixed invalid baseline producing nonsensical values |
 | ALG-042 | Benchmark history trend | `benchmark.history.BenchmarkHistory.trend` | A2 | finite values, absolute/relative change, min/max | hardened unknown/non-finite metric handling |
@@ -121,7 +125,7 @@ top.
 | ALG-069 | Checked benchmark result loading | `benchmark.safe_io.load_result_checked` | A4 | bounded read, required structure, finite samples/stats, integer/schema domains | loader now bounds actual bytes read and validates persisted fields |
 | ALG-070 | Benchmark run-directory publication | `benchmark.run_directory.save_run_directory` | A4 | artifact-name collision handling, copied checksum validity, run metadata | collision proof executed; transactional publication remains GAP-004 |
 | ALG-071 | Linux perf integration | `benchmark.perf.*` | A4 | event/frequency domains, unavailable counters, non-finite parser values | invalid domains/non-finite counters hardened |
-| ALG-072 | Benchmark worker protocol | `benchmark.worker.*` | A4 | module/interpreter/timeout domains, failure propagation, strict JSON, bounded capture | integrated worker inherits streaming output bounds and redacted subprocess diagnostics; combined verification pending |
+| ALG-072 | Benchmark worker protocol | `benchmark.worker.*` | A4 | module/interpreter/timeout domains, failure propagation, strict JSON, bounded capture | integrated bounded worker capture and redacted diagnostics passed on the composed tree |
 | ALG-073 | Benchmark reporting/export/plot transforms | `benchmark.report/export/plot` | A4 | profile representation, CSV export, CPU-core transform, invalid metric rejection, real plot smoke | proof and isolated matplotlib smoke executed |
 | ALG-074 | Benchmark overhead probe | `benchmark.overhead.measure_runner_overhead` | A4 | positive integer iterations, bool rejection, zero timer-resolution semantics | focused proof executed |
 | ALG-075 | Optional Pydantic validation adapter | `ext.validation_pydantic.type_checked` | A4 | valid scalar behavior, strict-int differential parity, redacted validation errors | strict-mode differential proof executed; default Pydantic coercion remains intentional backend behavior |
@@ -243,14 +247,21 @@ Resolved for ALG-055. Publication treats both existing filesystem entries and
 dangling symlinks as occupied targets, preserving the advertised no-overwrite
 behavior.
 
+### FIND-019 — subprocess output bound became a true streaming cap
+
+Resolved for ALG-039 by integrating the newer `main` bounded-capture
+implementation with the audit timing contracts. Overflow terminates the process
+group promptly instead of buffering arbitrary output before checking the limit.
+The combined behavior passed hosted run `36403271808`.
+
+### FIND-020 — benchmark worker inherited bounded subprocess capture
+
+Resolved for ALG-072. Benchmark workers now use the bounded subprocess path
+while retaining strict JSON, finite timeout validation, and diagnostic
+redaction. The combined worker/package proofs passed hosted run
+`36403271808`.
+
 ## Open limitations / proof gaps
-
-### GAP-001 — subprocess streaming-bound integration verification
-
-The newer `main` implementation now streams stdout/stderr into buffers capped
-by the shared `max_output_bytes` budget and terminates the process group
-promptly on overflow. The design gap is implemented in the integration tree;
-close this gap after the combined revision passes the aggregate proof suite.
 
 ### GAP-002 — recursive graph depth
 
@@ -281,13 +292,6 @@ covered by an explicit failure-atomicity contract and injected tests.
 The normal hard-link publication path is concurrency-friendly; the fallback
 replace path still needs an adversarial concurrent-publication/fault-injection
 proof.
-
-### GAP-007 — benchmark worker bounded-capture integration verification
-
-The integrated worker delegates to the bounded subprocess helper with an
-8 MiB default output cap while retaining strict JSON and finite timeout
-validation. Close this gap after the combined revision passes packaging and
-cross-version verification.
 
 ### GAP-008 — SecureStore backend completeness
 

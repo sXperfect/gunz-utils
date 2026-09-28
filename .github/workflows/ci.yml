@@ -2,8 +2,7 @@ name: CI
 
 on:
   push:
-    # TEMPORARY: remove merge/algorithm-audit-main after integration verification.
-    branches: ["main", "merge/algorithm-audit-main"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
     types: ["opened", "synchronize", "reopened", "ready_for_review"]

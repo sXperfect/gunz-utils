@@ -1,7 +1,7 @@
 # Repository-wide algorithm correctness audit
 
-Status: active — security-hardened main and algorithm-audit histories composed;
-final integrated verification running before the next A2 sweep
+Status: active — security-hardened main and algorithm-audit histories composed
+and verified; integration branch is ready to merge before the next A2 sweep
 Branch: `audit/algorithm-correctness`
 Integration branch: `merge/algorithm-audit-main`
 Integration base: `main@07244be5e6d24d83b3b7dcde62bc1702ff1f6e9d`
@@ -130,7 +130,7 @@ These are intentionally not hidden by the audit.
 - [x] integrate current-main streaming bounded subprocess capture and
       process-group termination with the audit timing contracts;
 - [x] make benchmark workers inherit the bounded capture path;
-- [ ] record the integrated A4 evidence after the final combined verification.
+- [x] record integrated A4 evidence after the final combined verification.
 
 ### Optional/security integrations
 
@@ -154,9 +154,9 @@ These are intentionally not hidden by the audit.
 - [x] combine bounded subprocess capture with finite timing contracts;
 - [x] combine diagnostic redaction with recursive stdlib validation;
 - [x] preserve distinct security and algorithm regression tests;
-- [ ] run one aggregate verification on the composed tree;
-- [ ] record the integrated SHA/run, then merge the verified integration branch
-      into current `main`.
+- [x] run one aggregate verification on the composed tree;
+- [x] record the integrated SHA/run and restore main-only CI triggers;
+- [ ] merge the verified integration branch into current `main`.
 
 ## Verification state
 
@@ -193,6 +193,26 @@ semantics remain open gaps despite the A4 result for the implemented contract.
 
 The final evidence/trigger-cleanup commit changes no audited source or test
 logic, so execution evidence remains bound to `dc243517c01f9f9b2836df0dfb4570fa1519906f`.
+
+### Integrated composed tree
+
+Verified revision: `416c1105404fa42f499f323fead8872644848103`
+Hosted run: `36403271808`
+
+- [x] release/version/changelog preflight;
+- [x] Ruff;
+- [x] mypy — no issues in 97 source files;
+- [x] Python 3.11 full suite — 991 passed;
+- [x] strict Sphinx documentation build;
+- [x] packaging/isolation — zero-dep, stdlib (19), validation (14),
+      project (8), observability (4 + 4 subtests), secure (52), plot,
+      and wheel/sdist passed;
+- [x] Python 3.12 full suite — 991 passed;
+- [x] aggregate verifier reported every post-preflight gate PASS.
+
+This is the first verification of the composed security + algorithm-audit tree.
+The cleanup commit after this section changes only documentation and restores
+the intended main-only CI trigger.
 
 ## Definition of done
 
