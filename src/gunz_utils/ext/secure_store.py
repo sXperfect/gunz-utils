@@ -52,6 +52,8 @@ import stat
 import tempfile
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -136,6 +138,8 @@ class SecureStore:
         self._ensure_private_directory(self._base_dir)
         self._master_key_path = self._base_dir / "master.key"
         self._salt_path = self._base_dir / "master.salt"
+        self._pending_key_path = self._base_dir / ".master.key.pending"
+        self._pending_salt_path = self._base_dir / ".master.salt.pending"
         self._db_path = self._base_dir / "config.db"
         self._prepare_private_database(self._db_path)
         self._lock = threading.RLock()
@@ -303,7 +307,16 @@ class SecureStore:
     def _normalize_acl(cls, acl: list[str] | None) -> list[str] | None:
         if acl is None:
             return None
-        return [cls._validate_identity(item, field="ACL entry") for item in acl]
+        if not isinstance(acl, list):
+            raise ValueError("acl must be a list of caller names or None")
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for caller in acl:
+            value = cls._validate_identity(caller, field="ACL entry")
+            if value not in seen:
+                normalized.append(value)
+                seen.add(value)
+        return normalized
 
     @staticmethod
     def _write_private(path: Path, data: bytes) -> None:
@@ -323,12 +336,48 @@ class SecureStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, path)
+            if hasattr(os, "O_DIRECTORY"):
+                directory_fd = os.open(
+                    path.parent,
+                    os.O_RDONLY | os.O_DIRECTORY,
+                )
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
         except BaseException:
             temporary.unlink(missing_ok=True)
             raise
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
+
+    def _cleanup_pending_key_material(self) -> None:
+        self._pending_key_path.unlink(missing_ok=True)
+        self._pending_salt_path.unlink(missing_ok=True)
+
+    def _fsync_base_dir(self) -> None:
+        if not hasattr(os, "O_DIRECTORY"):
+            return
+        descriptor = os.open(
+            self._base_dir,
+            os.O_RDONLY | os.O_DIRECTORY,
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+    def _promote_pending_key_material(self, *, passphrase_mode: bool) -> None:
+        if passphrase_mode:
+            os.replace(self._pending_salt_path, self._salt_path)
+            self._master_key_path.unlink(missing_ok=True)
+            self._pending_key_path.unlink(missing_ok=True)
+        else:
+            os.replace(self._pending_key_path, self._master_key_path)
+            self._salt_path.unlink(missing_ok=True)
+            self._pending_salt_path.unlink(missing_ok=True)
+        self._fsync_base_dir()
 
     def _verify_or_initialize_key(self, fernet: Fernet) -> None:
         row = self._conn.execute(
@@ -349,36 +398,87 @@ class SecureStore:
         )
 
     def unlock(self, passphrase: str | None = None) -> None:
-        """Unlock the store and verify the selected key before publishing it."""
+        """Unlock the store, recovering interrupted key publication if needed."""
         if passphrase is not None and (
             not isinstance(passphrase, str) or not passphrase
         ):
             raise ValueError("passphrase must be a non-empty string")
+
         with self._lock:
+            candidates: list[tuple[Fernet, bool]] = []
             if passphrase is None:
-                if self._salt_path.exists() and not self._master_key_path.exists():
-                    raise RuntimeError(
-                        "Store is passphrase-protected; passphrase required"
-                    )
-                if self._master_key_path.exists():
-                    key = self._read_private(self._master_key_path).strip()
-                else:
+                key_paths = (
+                    self._master_key_path,
+                    self._pending_key_path,
+                )
+                existing = [path for path in key_paths if path.exists()]
+                if not existing:
+                    if (
+                        self._salt_path.exists()
+                        or self._pending_salt_path.exists()
+                    ):
+                        raise RuntimeError(
+                            "Store is passphrase-protected; passphrase required"
+                        )
                     key = Fernet.generate_key()
                     self._write_private(self._master_key_path, key)
-            else:
-                if self._master_key_path.exists() and not self._salt_path.exists():
-                    raise RuntimeError(
-                        "Store uses file-key mode; do not supply passphrase"
+                    existing = [self._master_key_path]
+
+                for path in existing:
+                    key = self._read_private(path).strip()
+                    candidates.append(
+                        (
+                            Fernet(key),
+                            path == self._pending_key_path,
+                        )
                     )
-                if self._salt_path.exists():
-                    salt = self._read_private(self._salt_path)
-                else:
+            else:
+                salt_paths = (
+                    self._salt_path,
+                    self._pending_salt_path,
+                )
+                existing = [path for path in salt_paths if path.exists()]
+                if not existing:
+                    if (
+                        self._master_key_path.exists()
+                        or self._pending_key_path.exists()
+                    ):
+                        raise RuntimeError(
+                            "Store uses file-key mode; do not supply passphrase"
+                        )
                     salt = os.urandom(16)
                     self._write_private(self._salt_path, salt)
-                key = self._derive_key(passphrase, salt)
-            candidate = Fernet(key)
-            self._verify_or_initialize_key(candidate)
-            self._fernet = candidate
+                    existing = [self._salt_path]
+
+                for path in existing:
+                    salt = self._read_private(path)
+                    candidates.append(
+                        (
+                            Fernet(self._derive_key(passphrase, salt)),
+                            path == self._pending_salt_path,
+                        )
+                    )
+
+            last_error: InvalidToken | None = None
+            for candidate, pending in candidates:
+                try:
+                    self._verify_or_initialize_key(candidate)
+                except InvalidToken as exc:
+                    last_error = exc
+                    continue
+
+                self._fernet = candidate
+                if pending:
+                    self._promote_pending_key_material(
+                        passphrase_mode=passphrase is not None,
+                    )
+                else:
+                    self._cleanup_pending_key_material()
+                return
+
+            if last_error is not None:
+                raise last_error
+            raise InvalidToken
 
     @staticmethod
     def _derive_key(passphrase: str, salt: bytes) -> bytes:
@@ -405,6 +505,22 @@ class SecureStore:
                 (time.time(), caller, action, secret_name, 1 if allowed else 0),
             )
 
+    @contextmanager
+    def _transaction_locked(self) -> Iterator[None]:
+        """Join an active transaction or own one for this mutation."""
+        started = not self._conn.in_transaction
+        if started:
+            self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+        except BaseException:
+            if started and self._conn.in_transaction:
+                self._conn.execute("ROLLBACK")
+            raise
+        else:
+            if started:
+                self._conn.execute("COMMIT")
+
     def set(
         self,
         name: str,
@@ -417,37 +533,59 @@ class SecureStore:
         name = self._validate_secret_name(name)
         caller = self._validate_identity(caller, field="caller")
         acl = self._normalize_acl(acl)
+        if not isinstance(value, (str, bytes)):
+            raise TypeError("value must be str or bytes")
+
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
-            existing = self._conn.execute(
-                "SELECT acl FROM secrets WHERE name = ?", (name,)
-            ).fetchone()
-            if existing is not None:
-                current_acl = [s for s in (existing["acl"] or "").split(",") if s]
-                if current_acl and caller not in current_acl:
-                    self._audit(caller, "set", name, False)
-                    raise PermissionError(
-                        f"Caller {caller!r} not permitted to modify {name!r}"
+            try:
+                with self._transaction_locked():
+                    existing = self._conn.execute(
+                        "SELECT acl FROM secrets WHERE name = ?",
+                        (name,),
+                    ).fetchone()
+                    if existing is not None:
+                        current_acl = [
+                            item
+                            for item in (existing["acl"] or "").split(",")
+                            if item
+                        ]
+                        if current_acl and caller not in current_acl:
+                            raise PermissionError(
+                                f"Caller {caller!r} not permitted to modify "
+                                f"{name!r}"
+                            )
+                        acl_str = (
+                            existing["acl"]
+                            if acl is None
+                            else ",".join(acl)
+                        )
+                    else:
+                        acl_str = ",".join(acl) if acl else ""
+
+                    payload = value.encode() if isinstance(value, str) else value
+                    ciphertext = self._fernet.encrypt(payload)
+                    now = time.time()
+                    self._conn.execute(
+                        """
+                        INSERT INTO secrets (
+                            name, ciphertext, acl, created_at, updated_at
+                        )
+                        VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT(name) DO UPDATE SET
+                            ciphertext = excluded.ciphertext,
+                            acl = excluded.acl,
+                            updated_at = excluded.updated_at
+                        """,
+                        (name, ciphertext, acl_str, now, now),
                     )
-                acl_str = existing["acl"] if acl is None else ",".join(acl)
-            else:
-                acl_str = ",".join(acl) if acl else ""
-            payload = value.encode() if isinstance(value, str) else value
-            ciphertext = self._fernet.encrypt(payload)
-            now = time.time()
-            self._conn.execute(
-                """
-                INSERT INTO secrets (name, ciphertext, acl, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(name) DO UPDATE SET
-                    ciphertext = excluded.ciphertext,
-                    acl = excluded.acl,
-                    updated_at = excluded.updated_at
-                """,
-                (name, ciphertext, acl_str, now, now),
-            )
-            self._audit(caller, "set", name, True)
+                    self._audit(caller, "set", name, True)
+            except PermissionError:
+                if not self._conn.in_transaction:
+                    self._audit(caller, "set", name, False)
+                raise
+
     def get_bytes(self, name: str, *, caller: str = "library") -> bytes | None:
         """Decrypt and return raw secret bytes, or None if not found."""
         name = self._validate_secret_name(name)
@@ -486,21 +624,38 @@ class SecureStore:
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
-            row = self._conn.execute(
-                "SELECT acl FROM secrets WHERE name = ?", (name,)
-            ).fetchone()
-            if row is None:
-                self._audit(caller, "delete", name, False)
-                return False
-            acl = [s for s in (row["acl"] or "").split(",") if s]
-            if acl and caller not in acl:
-                self._audit(caller, "delete", name, False)
-                raise PermissionError(
-                    f"Caller {caller!r} not permitted to delete {name!r}"
-                )
-            self._conn.execute("DELETE FROM secrets WHERE name = ?", (name,))
-            self._audit(caller, "delete", name, True)
-            return True
+            try:
+                with self._transaction_locked():
+                    row = self._conn.execute(
+                        "SELECT acl FROM secrets WHERE name = ?",
+                        (name,),
+                    ).fetchone()
+                    if row is None:
+                        self._audit(caller, "delete", name, False)
+                        return False
+
+                    acl = [
+                        item
+                        for item in (row["acl"] or "").split(",")
+                        if item
+                    ]
+                    if acl and caller not in acl:
+                        raise PermissionError(
+                            f"Caller {caller!r} not permitted to delete "
+                            f"{name!r}"
+                        )
+
+                    self._conn.execute(
+                        "DELETE FROM secrets WHERE name = ?",
+                        (name,),
+                    )
+                    self._audit(caller, "delete", name, True)
+                    return True
+            except PermissionError:
+                if not self._conn.in_transaction:
+                    self._audit(caller, "delete", name, False)
+                raise
+
     def set_many(
         self,
         values: dict[str, str | bytes],
@@ -508,27 +663,56 @@ class SecureStore:
         caller: str = "library",
         acl: list[str] | None = None,
     ) -> None:
-        """Store multiple values in one SQLite transaction."""
+        """Store multiple values and their audit events in one transaction."""
+        if not isinstance(values, dict):
+            raise ValueError("values must be a dict")
+        caller = self._validate_identity(caller, field="caller")
+        acl = self._normalize_acl(acl)
+
+        normalized: list[tuple[str, str | bytes]] = []
+        for name, value in values.items():
+            normalized_name = self._validate_secret_name(name)
+            if not isinstance(value, (str, bytes)):
+                raise TypeError("value must be str or bytes")
+            normalized.append((normalized_name, value))
+
         with self._lock:
-            self._conn.execute("BEGIN IMMEDIATE")
+            if self._fernet is None:
+                raise RuntimeError("Store is locked. Call unlock() first.")
             try:
-                for name, value in values.items():
-                    self.set(name, value, caller=caller, acl=acl)
-                self._conn.execute("COMMIT")
+                with self._transaction_locked():
+                    for name, value in normalized:
+                        self.set(
+                            name,
+                            value,
+                            caller=caller,
+                            acl=acl,
+                        )
+                    self._audit(caller, "set_many", None, True)
             except BaseException:
-                self._conn.execute("ROLLBACK")
+                if not self._conn.in_transaction:
+                    try:
+                        self._audit(caller, "set_many", None, False)
+                    except sqlite3.Error:
+                        pass
                 raise
 
     def get_many(
         self, names: list[str], *, caller: str = "library"
     ) -> dict[str, str | None]:
         """Retrieve multiple UTF-8 text secrets."""
-        return {name: self.get(name, caller=caller) for name in names}
+        if not isinstance(names, list):
+            raise ValueError("names must be a list")
+        caller = self._validate_identity(caller, field="caller")
+        validated = [self._validate_secret_name(name) for name in names]
+        return {name: self.get(name, caller=caller) for name in validated}
     def list_keys(
         self, *, caller: str = "library", acl_filter: bool = True
     ) -> list[SecretMetadata]:
         """List secret names with metadata. Respects ACL by default."""
         caller = self._validate_identity(caller, field="caller")
+        if not isinstance(acl_filter, bool):
+            raise ValueError("acl_filter must be bool")
         with self._lock:
             cur = self._conn.execute(
                 "SELECT name, acl, created_at, updated_at FROM secrets"
@@ -551,47 +735,64 @@ class SecureStore:
         return out
 
     def rotate_master_key(self, new_passphrase: str | None = None) -> None:
-        """Re-encrypt all secrets atomically and publish the new key last."""
+        """Re-encrypt secrets with crash-recoverable key publication."""
+        if new_passphrase is not None and (
+            not isinstance(new_passphrase, str) or not new_passphrase
+        ):
+            raise ValueError("new_passphrase must be a non-empty string or None")
+
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
+
+            self._cleanup_pending_key_material()
             old_fernet = self._fernet
             if new_passphrase is None:
                 new_key = Fernet.generate_key()
-                new_salt = None
+                self._write_private(self._pending_key_path, new_key)
             else:
                 new_salt = os.urandom(16)
                 new_key = self._derive_key(new_passphrase, new_salt)
+                self._write_private(self._pending_salt_path, new_salt)
+
             new_fernet = Fernet(new_key)
-            rows = self._conn.execute("SELECT name, ciphertext FROM secrets").fetchall()
+            rows = self._conn.execute(
+                "SELECT name, ciphertext FROM secrets"
+            ).fetchall()
             rewritten = [
-                (new_fernet.encrypt(old_fernet.decrypt(r["ciphertext"])), r["name"])
-                for r in rows
+                (
+                    new_fernet.encrypt(
+                        old_fernet.decrypt(row["ciphertext"])
+                    ),
+                    row["name"],
+                )
+                for row in rows
             ]
             check = new_fernet.encrypt(b"gunz-utils-secure-store-v1")
-            self._conn.execute("BEGIN IMMEDIATE")
+
             try:
+                self._conn.execute("BEGIN IMMEDIATE")
                 self._conn.executemany(
-                    "UPDATE secrets SET ciphertext = ? WHERE name = ?", rewritten
+                    "UPDATE secrets SET ciphertext = ? WHERE name = ?",
+                    rewritten,
                 )
                 self._conn.execute(
                     "INSERT OR REPLACE INTO store_meta(key, value) "
                     "VALUES ('key_check', ?)",
                     (check,),
                 )
-                if new_salt is None:
-                    self._write_private(self._master_key_path, new_key)
-                    if self._salt_path.exists():
-                        self._salt_path.unlink()
-                else:
-                    self._write_private(self._salt_path, new_salt)
-                    if self._master_key_path.exists():
-                        self._master_key_path.unlink()
                 self._conn.execute("COMMIT")
             except BaseException:
-                self._conn.execute("ROLLBACK")
+                if self._conn.in_transaction:
+                    self._conn.execute("ROLLBACK")
+                self._cleanup_pending_key_material()
                 raise
+
             self._fernet = new_fernet
+            self._promote_pending_key_material(
+                passphrase_mode=new_passphrase is not None,
+            )
+
     def lock(self) -> None:
         """Atomically clear the Fernet instance. Thread-safe."""
         with self._fernet_lock:
@@ -599,8 +800,13 @@ class SecureStore:
 
     def audit_events(self, *, limit: int = 100) -> list[dict[str, object]]:
         """Return the newest audit events without secret values."""
-        if limit <= 0 or limit > 10_000:
-            raise ValueError("limit must be in [1, 10000]")
+        if (
+            isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or limit <= 0
+            or limit > 10_000
+        ):
+            raise ValueError("limit must be an integer in [1, 10000]")
         with self._lock:
             rows = self._conn.execute(
                 "SELECT timestamp, caller, action, secret_name, allowed "
