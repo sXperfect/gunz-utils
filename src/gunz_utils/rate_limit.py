@@ -5,14 +5,13 @@ from __future__ import annotations
 import asyncio
 import math
 import time
-from numbers import Real
 
 
-def _finite_positive(name: str, value: Real) -> float:
+def _finite_positive(name: str, value: object) -> float:
     """Return a finite positive float or raise a stable validation error."""
     if (
         isinstance(value, bool)
-        or not isinstance(value, Real)
+        or not isinstance(value, (int, float))
         or not math.isfinite(float(value))
         or value <= 0
     ):
@@ -20,11 +19,11 @@ def _finite_positive(name: str, value: Real) -> float:
     return float(value)
 
 
-def _finite_non_negative(name: str, value: Real) -> float:
+def _finite_non_negative(name: str, value: object) -> float:
     """Return a finite non-negative float or raise a stable validation error."""
     if (
         isinstance(value, bool)
-        or not isinstance(value, Real)
+        or not isinstance(value, (int, float))
         or not math.isfinite(float(value))
         or value < 0
     ):
