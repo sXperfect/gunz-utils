@@ -53,6 +53,7 @@ def test_package_metadata_declares_supported_contracts() -> None:
     assert "gitpython>=3.1.62" in extras["all"]
     assert "cryptography>=50.0.1" in extras["secure"]
     assert "cryptography>=50.0.1" in extras["all"]
+    assert "matplotlib>=3.10.0" in extras["plot"]
 
     classifiers = set(project["classifiers"])
     assert "Programming Language :: Python :: 3.11" in classifiers
