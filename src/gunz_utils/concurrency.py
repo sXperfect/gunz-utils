@@ -36,10 +36,10 @@ async def gather_limited(
         next_index += 1
         return True
 
-    for _ in range(limit):
-        if not schedule_one():
-            break
     try:
+        for _ in range(limit):
+            if not schedule_one():
+                break
         while pending:
             done, _ = await asyncio.wait(
                 pending,
@@ -99,10 +99,10 @@ async def map_unordered(
         pending.add(asyncio.create_task(func(item)))
         return True
 
-    for _ in range(limit):
-        if not schedule_one():
-            break
     try:
+        for _ in range(limit):
+            if not schedule_one():
+                break
         while pending:
             done, pending = await asyncio.wait(
                 pending,
