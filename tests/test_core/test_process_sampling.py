@@ -126,7 +126,6 @@ class TestProcessSampling(unittest.TestCase):
                         profile_command(["command"], **options)
                     launch.assert_not_called()
 
-
     def test_sampler_failure_terminates_launched_process(self) -> None:
         process = Mock(pid=123, returncode=None)
         process.poll.return_value = None
