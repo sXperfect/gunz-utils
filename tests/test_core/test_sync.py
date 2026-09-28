@@ -180,14 +180,14 @@ def test_rsync_mirror_validates_tools_and_marker(tmp_path: Path) -> None:
 def test_rsync_mirror_rejects_hidden_destructive_extra_args(
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(ValueError, match="destructive"):
+    with pytest.raises(ValueError, match="unsafe rsync"):
         rsync_mirror(
             "source",
             tmp_path / "target",
             extra_args=("--delete-after",),
         )
 
-    with pytest.raises(ValueError, match="destructive"):
+    with pytest.raises(ValueError, match="unsafe rsync"):
         rsync_mirror(
             "source",
             tmp_path / "target",
