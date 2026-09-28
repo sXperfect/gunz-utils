@@ -37,26 +37,28 @@ async def worker_map(
         try:
             for item in items:
                 await incoming.put(item)
-        finally:
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            await outgoing.put((False, exc))
+        else:
             for _ in range(workers):
                 await incoming.put(_DONE)
 
     async def worker() -> None:
-        try:
-            while True:
-                item = await incoming.get()
-                if item is _DONE:
-                    return
-                try:
-                    result = await func(cast(T, item))
-                except asyncio.CancelledError:
-                    raise
-                except BaseException as exc:
-                    await outgoing.put((False, exc))
-                    return
-                await outgoing.put((True, result))
-        finally:
-            await outgoing.put((True, _DONE))
+        while True:
+            item = await incoming.get()
+            if item is _DONE:
+                await outgoing.put((True, _DONE))
+                return
+            try:
+                result = await func(cast(T, item))
+            except asyncio.CancelledError:
+                raise
+            except BaseException as exc:
+                await outgoing.put((False, exc))
+                return
+            await outgoing.put((True, result))
 
     producer_task = asyncio.create_task(producer())
     tasks = [asyncio.create_task(worker()) for _ in range(workers)]
