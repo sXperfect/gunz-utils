@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import math
 from decimal import Decimal
-from numbers import Real
 
 from ._version import __version__ as __version__
 
@@ -29,8 +28,8 @@ def _validated_precision(precision: int) -> int:
     return precision
 
 
-def _finite_float(value: Real, *, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, Real):
+def _finite_float(value: object, *, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} must be a finite real number")
     try:
         result = float(value)
