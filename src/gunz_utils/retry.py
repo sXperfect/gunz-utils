@@ -33,12 +33,30 @@ def _validate(
     max_delay: float,
     timeout: float | None,
 ) -> None:
-    if attempts < 1:
-        raise ValueError("attempts must be at least 1")
-    if base_delay < 0 or max_delay < 0:
-        raise ValueError("delays must be non-negative")
-    if timeout is not None and timeout < 0:
-        raise ValueError("timeout must be non-negative")
+    if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
+        raise ValueError("attempts must be a positive integer")
+    for name, value in (
+        ("base_delay", base_delay),
+        ("max_delay", max_delay),
+    ):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or value < 0
+        ):
+            raise ValueError(
+                f"{name} must be a finite non-negative number"
+            )
+    if timeout is not None and (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
+        or timeout < 0
+    ):
+        raise ValueError(
+            "timeout must be a finite non-negative number or None"
+        )
 
 
 @dataclass(frozen=True, slots=True)
