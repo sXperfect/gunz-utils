@@ -10,6 +10,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_DIR = PROJECT_ROOT / "src" / "gunz_utils"
 API_REFERENCE = PROJECT_ROOT / "docs" / "source" / "api.rst"
+CI_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _declares_public_all(path: Path) -> bool:
@@ -94,3 +95,20 @@ def test_api_reference_covers_optional_backends_and_benchmark_namespace() -> Non
 def test_agent_policy_and_documentation_layout() -> None:
     assert (PROJECT_ROOT / "AGENTS.md").is_file()
     assert not (PROJECT_ROOT / "guides").exists()
+
+
+def test_github_actions_are_pinned_to_full_commit_shas() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    refs = re.findall(r"^\s*-?\s*uses:\s+([^\s#]+)", workflow, re.MULTILINE)
+    assert refs
+    offenders = []
+    for ref in refs:
+        if ref.startswith("./"):
+            continue
+        if "@" not in ref:
+            offenders.append(ref)
+            continue
+        _action, revision = ref.rsplit("@", 1)
+        if re.fullmatch(r"[0-9a-fA-F]{40}", revision) is None:
+            offenders.append(ref)
+    assert offenders == []

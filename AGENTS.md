@@ -111,6 +111,7 @@ Do not add parallel or duplicate workflows for checks already represented by
 `scripts/ci.py` unless a distinct permission or security boundary requires it.
 Keep hosted workflow permissions minimal and preserve cancellation and timeout
 behavior.
+Pin external GitHub Actions to reviewed full-length commit SHAs; do not use mutable major tags in maintained workflows.
 
 Ruff formatting is configured but is not a repository gate. Ruff linting is.
 
