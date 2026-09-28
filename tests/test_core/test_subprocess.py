@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import sys
 import unittest
 
@@ -48,6 +49,22 @@ class TestSubprocess(unittest.TestCase):
             )
         self.assertLess(__import__("time").monotonic() - started, 2.0)
 
+    def test_invalid_timeout_and_output_limit_are_rejected(self) -> None:
+        for value in (math.nan, math.inf, -math.inf, True):
+            with self.subTest(timeout=value):
+                with self.assertRaises(ValueError):
+                    run_command(
+                        [sys.executable, "-c", "pass"],
+                        timeout=value,
+                    )
+        for value in (-1, True):
+            with self.subTest(max_output_bytes=value):
+                with self.assertRaises(ValueError):
+                    run_command(
+                        [sys.executable, "-c", "pass"],
+                        max_output_bytes=value,
+                    )
+
     def test_output_limit(self) -> None:
         with self.assertRaises(CommandOutputLimitError):
             run_command(
@@ -78,6 +95,21 @@ class TestAsyncSubprocess(unittest.IsolatedAsyncioTestCase):
                 timeout=0.01,
                 terminate_grace=0.01,
             )
+
+    async def test_invalid_async_timing_is_rejected(self) -> None:
+        for value in (math.nan, math.inf, -math.inf, True):
+            with self.subTest(timeout=value):
+                with self.assertRaises(ValueError):
+                    await run_command_async(
+                        [sys.executable, "-c", "pass"],
+                        timeout=value,
+                    )
+            with self.subTest(terminate_grace=value):
+                with self.assertRaises(ValueError):
+                    await run_command_async(
+                        [sys.executable, "-c", "pass"],
+                        terminate_grace=value,
+                    )
 
     async def test_cancellation_propagates(self) -> None:
         task = asyncio.create_task(
