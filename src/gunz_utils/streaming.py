@@ -41,8 +41,12 @@ def hash_stream(
     chunk_size: int = 1 << 20,
 ) -> str:
     """Hash a binary stream with bounded memory."""
-    if chunk_size < 1:
-        raise ValueError("chunk_size must be positive")
+    if (
+        isinstance(chunk_size, bool)
+        or not isinstance(chunk_size, int)
+        or chunk_size < 1
+    ):
+        raise ValueError("chunk_size must be a positive integer")
     digest = hashlib.new(algorithm)
     while chunk := handle.read(chunk_size):
         digest.update(chunk)
@@ -53,8 +57,12 @@ class BoundedWriter:
     """Binary writer that rejects writes exceeding a cumulative byte limit."""
 
     def __init__(self, handle: BinaryIO, *, max_bytes: int) -> None:
-        if max_bytes < 0:
-            raise ValueError("max_bytes must be non-negative")
+        if (
+            isinstance(max_bytes, bool)
+            or not isinstance(max_bytes, int)
+            or max_bytes < 0
+        ):
+            raise ValueError("max_bytes must be a non-negative integer")
         self.handle = handle
         self.max_bytes = max_bytes
         self.bytes_written = 0
@@ -86,8 +94,12 @@ class DigestWriter:
         algorithm: str = "sha256",
         max_bytes: int | None = None,
     ) -> None:
-        if max_bytes is not None and max_bytes < 0:
-            raise ValueError("max_bytes must be non-negative")
+        if max_bytes is not None and (
+            isinstance(max_bytes, bool)
+            or not isinstance(max_bytes, int)
+            or max_bytes < 0
+        ):
+            raise ValueError("max_bytes must be a non-negative integer or None")
         self.handle = handle
         self.algorithm = algorithm
         self.max_bytes = max_bytes
@@ -137,8 +149,12 @@ def copy_and_hash(
     max_bytes: int | None = None,
 ) -> StreamCopyResult:
     """Copy a binary stream while hashing and optionally bounding output size."""
-    if chunk_size < 1:
-        raise ValueError("chunk_size must be positive")
+    if (
+        isinstance(chunk_size, bool)
+        or not isinstance(chunk_size, int)
+        or chunk_size < 1
+    ):
+        raise ValueError("chunk_size must be a positive integer")
     writer = DigestWriter(
         destination,
         algorithm=algorithm,
