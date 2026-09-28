@@ -7,12 +7,14 @@ Raises `TypeError` on type mismatch with a value-redacted message.
 Coverage:
   - Bare classes (int, str, list, dict, tuple, set, bool, etc.)
   - `Optional[X]` / `X | None` / `Union[X, ...]`
+  - `Literal` and the underlying type of `Annotated`
   - `*args: T` → each element validated against T
   - `**kw: T`  → each value validated against T
-  - Container generics (list[X], dict[K, V], tuple[...]) → origin only
+  - Recursive list/dict/tuple/set/frozenset generics
+  - Callable outer-type validation
 
-Unsupported (treated as a pass): custom `Annotated` metadata, generic
-aliases, TypeVar resolution.
+Unsupported constructs are treated as pass-through rather than guessed.
+Backend-specific decorator options are rejected explicitly.
 """
 from __future__ import annotations
 
@@ -24,7 +26,9 @@ __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import functools
 import inspect
+import types
 import typing as t
+from collections import abc as cabc
 
 from .._version import __version__ as __version__
 
@@ -32,7 +36,15 @@ __all__ = ["type_checked"]
 
 
 def _check_one(value: t.Any, annotation: t.Any) -> bool:
+    """Recursively validate the runtime subset promised by this backend."""
+    if annotation is t.Any:
+        return True
+    if annotation is None or annotation is type(None):
+        return value is None
+
     origin = t.get_origin(annotation)
+    args = t.get_args(annotation)
+
     if origin is None:
         if not isinstance(annotation, type):
             return True
@@ -40,19 +52,63 @@ def _check_one(value: t.Any, annotation: t.Any) -> bool:
             return False
         return isinstance(value, annotation)
 
-    if origin is t.Union:
-        return any(_check_one(value, arg) for arg in t.get_args(annotation))
+    if origin is t.Annotated:
+        return _check_one(value, args[0])
 
-    if origin in (list, dict, tuple, set, frozenset):
-        try:
-            return isinstance(value, origin)
-        except TypeError:
+    if origin in (t.Union, types.UnionType):
+        return any(_check_one(value, arg) for arg in args)
+
+    if origin is t.Literal:
+        return any(
+            type(value) is type(candidate) and value == candidate
+            for candidate in args
+        )
+
+    if origin is list:
+        return isinstance(value, list) and (
+            not args or all(_check_one(item, args[0]) for item in value)
+        )
+
+    if origin is dict:
+        if not isinstance(value, dict):
+            return False
+        if len(args) != 2:
             return True
+        key_type, value_type = args
+        return all(
+            _check_one(key, key_type) and _check_one(item, value_type)
+            for key, item in value.items()
+        )
 
-    return True
+    if origin is tuple:
+        if not isinstance(value, tuple):
+            return False
+        if not args:
+            return True
+        if len(args) == 2 and args[1] is Ellipsis:
+            return all(_check_one(item, args[0]) for item in value)
+        return len(value) == len(args) and all(
+            _check_one(item, expected)
+            for item, expected in zip(value, args, strict=True)
+        )
+
+    if origin in (set, frozenset):
+        if not isinstance(value, origin):
+            return False
+        return not args or all(_check_one(item, args[0]) for item in value)
+
+    if origin is cabc.Callable:
+        return callable(value)
+
+    try:
+        return isinstance(value, origin)
+    except TypeError:
+        # Unsupported typing constructs intentionally remain pass-through.
+        return True
 
 
 def _safe_args_repr(exc: Exception) -> str:
+    """Describe a bind failure without reproducing value-bearing details."""
     return f"{type(exc).__name__}: argument binding failed"
 
 
@@ -60,6 +116,13 @@ def type_checked(
     func: t.Callable | None = None,
     **kwargs: t.Any,
 ) -> t.Callable:
+    if kwargs:
+        options = ", ".join(sorted(kwargs))
+        raise TypeError(
+            "stdlib type_checked does not support validator options: "
+            f"{options}"
+        )
+
     def decorator(f: t.Callable) -> t.Callable:
         try:
             hints = t.get_type_hints(f)
