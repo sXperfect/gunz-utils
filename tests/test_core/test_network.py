@@ -157,3 +157,11 @@ def test_build_network_uri_idna_normalizes_dns_host() -> None:
     )
 
     assert uri == "https://xn--mnich-kva.example"
+
+
+def test_build_network_uri_rejects_backslash_and_control_characters() -> None:
+    with pytest.raises(ValueError, match="authority characters"):
+        build_network_uri("https", r"example.com\evil.test")
+
+    with pytest.raises(ValueError, match="authority characters"):
+        build_network_uri("https", "example.com\x7fevil.test")

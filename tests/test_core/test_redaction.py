@@ -169,6 +169,20 @@ class TestRedactDict(unittest.TestCase):
         self.assertEqual(out["credentials"], {"primary": "****"})
         self.assertEqual(out["token"], "****")
 
+    def test_direct_scalar_secret_values_are_fully_masked(self):
+        out = redact_dict(
+            {
+                "password": 123456,
+                "api_key": True,
+                "token": 3.14159,
+                "secret": None,
+            }
+        )
+        self.assertEqual(out["password"], "****")
+        self.assertEqual(out["api_key"], "****")
+        self.assertEqual(out["token"], "****")
+        self.assertIsNone(out["secret"])
+
     def test_non_dict_input_passes_through(self):
         """Scalars and other non-collection inputs are returned unchanged."""
         self.assertEqual(redact_dict("just a string"), "just a string")

@@ -25,6 +25,14 @@ class TestBenchmarkReporting(unittest.TestCase):
         self.assertEqual(loaded.name, result.name)
         self.assertEqual(loaded.samples, result.samples)
 
+    def test_load_result_enforces_size_limit(self) -> None:
+        result = benchmark(lambda: sum(range(5)), warmup=0, iterations=2)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "result.json"
+            save_result(result, path)
+            with self.assertRaisesRegex(ValueError, "size limit"):
+                load_result(path, max_bytes=1)
+
     def test_suite(self) -> None:
         suite = BenchmarkSuite("demo")
         suite.add("sum", sum, range(10))

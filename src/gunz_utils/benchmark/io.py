@@ -6,9 +6,8 @@ import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
-from .result import BenchmarkResult, BenchmarkStats, SystemInfo
+from .result import BenchmarkResult
+from .safe_io import DEFAULT_MAX_RESULT_BYTES, load_result_checked
 
 
 @dataclass(frozen=True)
@@ -53,21 +52,13 @@ def save_result(result: BenchmarkResult, path: str | Path) -> None:
     )
 
 
-def load_result(path: str | Path) -> BenchmarkResult:
-    """Load a benchmark result from the versioned JSON schema."""
-    data: dict[str, Any] = json.loads(Path(path).read_text(encoding="utf-8"))
-    stats = BenchmarkStats(**data["stats"])
-    system = SystemInfo(**data["system"])
-    return BenchmarkResult(
-        name=data["name"],
-        samples=tuple(data["samples"]),
-        stats=stats,
-        warmup=data["warmup"],
-        iterations=data["iterations"],
-        system=system,
-        parameters=data.get("parameters", {}),
-        schema_version=data["schema_version"],
-    )
+def load_result(
+    path: str | Path,
+    *,
+    max_bytes: int = DEFAULT_MAX_RESULT_BYTES,
+) -> BenchmarkResult:
+    """Load and validate a benchmark result within a bounded input size."""
+    return load_result_checked(path, max_bytes=max_bytes)
 
 
 __all__ = ["GitInfo", "capture_git_info", "load_result", "save_result"]

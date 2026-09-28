@@ -8,11 +8,13 @@ from typing import Any
 
 from .result import BenchmarkResult, BenchmarkStats, SystemInfo
 
+DEFAULT_MAX_RESULT_BYTES = 16 * 1024 * 1024
+
 
 def load_result_checked(
     path: str | Path,
     *,
-    max_bytes: int = 16 * 1024 * 1024,
+    max_bytes: int = DEFAULT_MAX_RESULT_BYTES,
 ) -> BenchmarkResult:
     """Load a benchmark result with size and structural validation."""
     item = Path(path)
@@ -53,4 +55,4 @@ def load_result_checked(
     )
 
 
-__all__ = ["load_result_checked"]
+__all__ = ["DEFAULT_MAX_RESULT_BYTES", "load_result_checked"]

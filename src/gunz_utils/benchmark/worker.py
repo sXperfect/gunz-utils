@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
+
+from ..subprocess import run_command
 
 
 @dataclass(frozen=True)
@@ -24,14 +25,13 @@ def run_python_worker(
     args: Sequence[str] = (),
     python: str = sys.executable,
     timeout: float | None = None,
+    max_output_bytes: int | None = 8 * 1024 * 1024,
 ) -> WorkerResult:
-    """Execute a benchmark module in a fresh interpreter process."""
-    completed = subprocess.run(
+    """Execute a trusted benchmark module with bounded captured output."""
+    completed = run_command(
         [python, "-m", module, *args],
-        capture_output=True,
-        text=True,
         timeout=timeout,
-        check=False,
+        max_output_bytes=max_output_bytes,
     )
     return WorkerResult(
         returncode=completed.returncode,

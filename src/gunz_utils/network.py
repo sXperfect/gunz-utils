@@ -64,6 +64,11 @@ def build_network_uri(
     normalized_host = host.strip()
     if any(character.isspace() for character in normalized_host):
         raise ValueError("host must not contain whitespace")
+    if "\\" in normalized_host or any(
+        ord(character) < 0x20 or ord(character) == 0x7F
+        for character in normalized_host
+    ):
+        raise ValueError("host contains invalid authority characters")
     if any(character in normalized_host for character in "@/?#%"):
         raise ValueError("host contains invalid authority delimiters")
     if normalized_host.startswith("[") != normalized_host.endswith("]"):

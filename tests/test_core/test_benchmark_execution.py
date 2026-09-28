@@ -4,6 +4,8 @@ import gc
 import json
 import unittest
 
+from gunz_utils.subprocess import CommandOutputLimitError
+
 from gunz_utils.benchmark import (
     BenchmarkSuite,
     PerformanceArtifact,
@@ -63,6 +65,10 @@ class TestWorker(unittest.TestCase):
             args=(),
         )
         self.assertNotEqual(result.returncode, 0)
+
+    def test_worker_output_is_bounded(self) -> None:
+        with self.assertRaises(CommandOutputLimitError):
+            run_python_worker("this", max_output_bytes=16)
 
     def test_worker_json(self) -> None:
         self.assertEqual(
