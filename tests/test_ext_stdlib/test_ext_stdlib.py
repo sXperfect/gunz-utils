@@ -75,6 +75,8 @@ class TestStdlibResolveProjectRoot(unittest.TestCase):
     def setUp(self):
         from gunz_utils.ext import project_stdlib
         project_stdlib._PROJECT_ROOT = None
+        project_stdlib._PROJECT_ANCHOR = None
+        project_stdlib._PROJECT_ANCHOR = None
         self._tmpdir = tempfile.mkdtemp(prefix="gutils-stdlib-test-")
         self._saved_cwd = os.getcwd()
 
@@ -111,10 +113,35 @@ class TestStdlibResolveProjectRoot(unittest.TestCase):
         os.chdir(str(repo))
         original_path = list(sys.path)
         try:
+            stdlib_resolve_project_root(inject_to_sys_path=False)
+            self.assertEqual(sys.path, original_path)
             stdlib_resolve_project_root(inject_to_sys_path=True)
             self.assertEqual(sys.path[0], str(repo))
         finally:
             sys.path[:] = original_path
+
+    def test_cache_does_not_cross_project_anchors(self):
+        first = pathlib.Path(self._tmpdir) / "first"
+        second = pathlib.Path(self._tmpdir) / "second"
+        first.mkdir()
+        second.mkdir()
+        (first / "pyproject.toml").write_text("[project]\nname='first'\n")
+        (second / "pyproject.toml").write_text("[project]\nname='second'\n")
+
+        self.assertEqual(
+            stdlib_resolve_project_root(
+                str(first),
+                inject_to_sys_path=False,
+            ),
+            first.resolve(),
+        )
+        self.assertEqual(
+            stdlib_resolve_project_root(
+                str(second),
+                inject_to_sys_path=False,
+            ),
+            second.resolve(),
+        )
 
     def test_raises_outside_repo(self):
         os.chdir(self._tmpdir)
