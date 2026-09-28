@@ -28,7 +28,7 @@ class CommandError(RuntimeError):
 
     def __init__(self, result: CommandResult) -> None:
         super().__init__(
-            f"command {result.args!r} failed with exit code {result.returncode}"
+            f"command failed with exit code {result.returncode}"
         )
         self.result = result
 

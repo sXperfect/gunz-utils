@@ -72,6 +72,13 @@ class TestDiagnosticsTesting(unittest.TestCase):
         data = exception_dict(ValueError("bad"), context={"password": "secret"})
         self.assertEqual(data["context"], {"password": "****"})
 
+    def test_exception_message_is_opt_in(self) -> None:
+        secret = "exception-secret"
+        data = exception_dict(ValueError(secret))
+        self.assertNotIn("message", data)
+        trusted = exception_dict(ValueError("safe"), include_message=True)
+        self.assertEqual(trusted["message"], "safe")
+
     def test_eventually(self) -> None:
         eventually(lambda: True, timeout=0)
 

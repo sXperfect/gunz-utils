@@ -22,6 +22,16 @@ class TestSubprocess(unittest.TestCase):
         with self.assertRaises(CommandError):
             run_command([sys.executable, "-c", "raise SystemExit(3)"], check=True)
 
+    def test_command_error_message_does_not_echo_arguments(self) -> None:
+        secret = "command-line-secret"
+        with self.assertRaises(CommandError) as cm:
+            run_command(
+                [sys.executable, "-c", "raise SystemExit(3)", secret],
+                check=True,
+            )
+        self.assertNotIn(secret, str(cm.exception))
+        self.assertIn(secret, cm.exception.result.args)
+
     def test_output_limit(self) -> None:
         with self.assertRaises(CommandOutputLimitError):
             run_command(
