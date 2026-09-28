@@ -105,8 +105,12 @@ class RetryPolicy(Generic[T]):
         return an exact non-negative delay. Returning None falls back to the
         configured exponential backoff and jitter.
         """
-        if attempt < 1:
-            raise ValueError("attempt must be at least 1")
+        if (
+            isinstance(attempt, bool)
+            or not isinstance(attempt, int)
+            or attempt < 1
+        ):
+            raise ValueError("attempt must be a positive integer")
 
         if self.delay_override is not None:
             override = self.delay_override(
