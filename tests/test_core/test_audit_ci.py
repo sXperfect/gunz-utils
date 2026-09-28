@@ -164,3 +164,20 @@ def test_packaging_gate_collects_all_case_failures(monkeypatch) -> None:
         "plot",
         "wheel/sdist",
     ]
+
+
+def test_gate_exception_output_redacts_exception_message(capsys) -> None:
+    secret = "tooling-secret-value"
+
+    def runner(_name: str) -> int:
+        raise RuntimeError(secret)
+
+    results = audit_ci.collect_results(
+        gates=("lint",),
+        gate_runner=runner,
+    )
+
+    captured = capsys.readouterr()
+    assert results == [audit_ci.GateResult("lint", 70)]
+    assert "RuntimeError" in captured.err
+    assert secret not in captured.err
