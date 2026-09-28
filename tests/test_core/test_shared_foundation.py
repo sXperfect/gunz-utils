@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import os
 import unittest
+from typing import Any, cast
 from importlib import import_module
 from unittest.mock import patch
 
@@ -109,15 +110,16 @@ class TestResourceBudget(unittest.TestCase):
     def test_consumption_requires_non_negative_integers(self) -> None:
         budget = ResourceBudget()
         for value in (-1, True, 1.5):
+            invalid = cast(Any, value)
             with self.subTest(bytes=value):
                 with self.assertRaises(ValueError):
-                    budget.consume_bytes(value)
+                    budget.consume_bytes(invalid)
             with self.subTest(items=value):
                 with self.assertRaises(ValueError):
-                    budget.consume_items(value)
+                    budget.consume_items(invalid)
             with self.subTest(depth=value):
                 with self.assertRaises(ValueError):
-                    budget.check_depth(value)
+                    budget.check_depth(invalid)
 
     def test_consumption_and_remaining_values(self) -> None:
         now = [10.0]
