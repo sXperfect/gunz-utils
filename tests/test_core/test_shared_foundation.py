@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import unittest
 from importlib import import_module
@@ -94,6 +95,30 @@ class TestPlugins(unittest.TestCase):
 
 
 class TestResourceBudget(unittest.TestCase):
+    def test_limits_reject_invalid_numeric_domains(self) -> None:
+        for value in (math.nan, math.inf, -math.inf, True):
+            with self.subTest(timeout=value):
+                with self.assertRaises(ValueError):
+                    Limits(timeout=value)
+
+        for field in ("max_bytes", "max_items", "max_depth"):
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError):
+                    Limits(**{field: True})
+
+    def test_consumption_requires_non_negative_integers(self) -> None:
+        budget = ResourceBudget()
+        for value in (-1, True, 1.5):
+            with self.subTest(bytes=value):
+                with self.assertRaises(ValueError):
+                    budget.consume_bytes(value)
+            with self.subTest(items=value):
+                with self.assertRaises(ValueError):
+                    budget.consume_items(value)
+            with self.subTest(depth=value):
+                with self.assertRaises(ValueError):
+                    budget.check_depth(value)
+
     def test_consumption_and_remaining_values(self) -> None:
         now = [10.0]
         budget = ResourceBudget(
