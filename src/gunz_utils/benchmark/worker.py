@@ -44,8 +44,7 @@ def worker_json(result: WorkerResult) -> object:
     """Decode a successful worker's stdout as JSON."""
     if result.returncode:
         raise RuntimeError(
-            f"benchmark worker failed with exit code {result.returncode}: "
-            f"{result.stderr.strip()}"
+            f"benchmark worker failed with exit code {result.returncode}"
         )
     return json.loads(result.stdout)
 
