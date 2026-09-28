@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import subprocess
 import time
@@ -90,6 +91,23 @@ def _memory_rollup(path: Path) -> tuple[int | None, int | None]:
         return None, None
 
 
+def _parse_proc_stat(text: str) -> tuple[int, str, list[str]]:
+    """Parse /proc/<pid>/stat without splitting spaces inside comm."""
+    first_space = text.find(" ")
+    close_paren = text.rfind(")")
+    if first_space <= 0 or close_paren <= first_space + 1:
+        raise ValueError("malformed /proc stat record")
+    pid = int(text[:first_space])
+    if text[first_space + 1] != "(":
+        raise ValueError("malformed /proc stat command field")
+    command = text[first_space + 2:close_paren]
+    tail = text[close_paren + 1:].strip().split()
+    if len(tail) < 22:
+        raise ValueError("truncated /proc stat record")
+    fields = [str(pid), f"({command})", *tail]
+    return pid, command, fields
+
+
 def _linux_snapshot(
     root_pid: int,
     started: float,
@@ -106,8 +124,10 @@ def _linux_snapshot(
         if not entry.name.isdigit():
             continue
         try:
-            stat = (entry / "stat").read_text().split()
-            rows[int(entry.name)] = (int(stat[3]), stat)
+            parsed_pid, _command, stat = _parse_proc_stat(
+                (entry / "stat").read_text()
+            )
+            rows[parsed_pid] = (int(stat[3]), stat)
         except (
             FileNotFoundError,
             ProcessLookupError,
@@ -256,8 +276,13 @@ def profile_command(
     """
     if not args:
         raise ValueError("args must not be empty")
-    if interval <= 0:
-        raise ValueError("interval must be positive")
+    if (
+        isinstance(interval, bool)
+        or not isinstance(interval, (int, float))
+        or not math.isfinite(float(interval))
+        or interval <= 0
+    ):
+        raise ValueError("interval must be a finite positive number")
     if memory_detail not in {"rss", "pss", "full"}:
         raise ValueError("memory_detail must be rss, pss, or full")
     if (
@@ -276,13 +301,31 @@ def profile_command(
     )
     samples: list[ProcessSample] = []
     snapshot_index = 0
-    while process.poll() is None:
-        detail = memory_detail if snapshot_index % detailed_memory_every == 0 else "rss"
-        sample = _linux_snapshot(process.pid, started, memory_detail=detail)
-        if sample.process_count:
-            samples.append(sample)
-        snapshot_index += 1
-        time.sleep(interval)
+    try:
+        while process.poll() is None:
+            detail = (
+                memory_detail
+                if snapshot_index % detailed_memory_every == 0
+                else "rss"
+            )
+            sample = _linux_snapshot(
+                process.pid,
+                started,
+                memory_detail=detail,
+            )
+            if sample.process_count:
+                samples.append(sample)
+            snapshot_index += 1
+            time.sleep(float(interval))
+    except BaseException:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+        raise
     wall = time.perf_counter() - started
     if check and process.returncode:
         raise subprocess.CalledProcessError(process.returncode, list(args))
