@@ -27,8 +27,8 @@ def register_artifact(
 ) -> PerformanceRun:
     """Attach a checksummed regular-file artifact to a performance run."""
     item = Path(path)
-    if not item.is_file():
-        raise ValueError("artifact must be a regular file")
+    if item.is_symlink() or not item.is_file():
+        raise ValueError("artifact must be a non-symlink regular file")
     stat = item.stat()
     artifact = PerformanceArtifact(
         kind=kind,
@@ -47,7 +47,11 @@ def verify_artifact(artifact: PerformanceArtifact) -> bool:
         return False
     item = Path(artifact.path)
     try:
-        if not item.is_file() or item.stat().st_size != artifact.size_bytes:
+        if (
+            item.is_symlink()
+            or not item.is_file()
+            or item.stat().st_size != artifact.size_bytes
+        ):
             return False
         digest = _sha256_file(item)
     except OSError:
