@@ -27,14 +27,14 @@ dependencies = []
 
 [project.optional-dependencies]
 validation = ["pydantic>=2.0.0"]
-project = ["gitpython>=3.1.0"]
+project = ["gitpython>=3.1.62"]
 observability = ["loguru>=0.7.0"]
-secure = ["cryptography>=42.0.0"]
+secure = ["cryptography>=50.0.1"]
 plot = ["matplotlib>=3.8.0"]
 all = [
     "pydantic>=2.0.0",
-    "cryptography>=42.0.0",
-    "gitpython>=3.1.0",
+    "cryptography>=50.0.1",
+    "gitpython>=3.1.62",
     "loguru>=0.7.0",
 ]
 docs = [
