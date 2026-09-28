@@ -19,6 +19,8 @@ async def gather_limited(
     """Gather awaitables while bounding active task creation."""
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
         raise ValueError("limit must be a positive integer")
+    if not isinstance(return_exceptions, bool):
+        raise ValueError("return_exceptions must be bool")
     iterator = iter(awaitables)
     pending: dict[asyncio.Task[T], int] = {}
     ordered: dict[int, T | BaseException] = {}
