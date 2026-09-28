@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 from pathlib import Path
 
@@ -103,6 +104,55 @@ def test_content_store_rejects_symlink_source(
     with pytest.raises(ValueError, match="non-symlink"):
         store.put(source)
 
+
+
+def test_content_store_rejects_collision_prone_identity_algorithms(
+    tmp_path: Path,
+) -> None:
+    for algorithm in ("md5", "sha1"):
+        with pytest.raises(ValueError, match="collision-resistant"):
+            ContentAddressedStore(
+                tmp_path / algorithm,
+                algo=algorithm,
+            )
+
+
+def test_content_store_rejects_symlink_root(tmp_path: Path) -> None:
+    real = tmp_path / "real-store"
+    real.mkdir()
+    link = tmp_path / "store-link"
+    try:
+        link.symlink_to(real, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable")
+
+    with pytest.raises(ValueError, match="root.*symlink"):
+        ContentAddressedStore(link)
+
+
+def test_content_store_rejects_symlinked_fanout_component(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "store"
+    store = ContentAddressedStore(
+        root,
+        fanout_levels=2,
+        fanout_chars=2,
+    )
+    payload = b"fanout-symlink"
+    digest = hashlib.sha256(payload).hexdigest()
+    first = root / digest[:2]
+    first.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    second = first / digest[2:4]
+    try:
+        second.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable")
+
+    with pytest.raises(ValueError, match="prefix directory.*symlink"):
+        store.put_bytes(payload)
 
 
 def test_content_store_supports_configurable_digest_fanout(

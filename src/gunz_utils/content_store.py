@@ -14,6 +14,8 @@ from typing import BinaryIO, Literal
 from .hashing import DEFAULT_ALGO, SUPPORTED_ALGOS, file_hash
 from .streaming import copy_and_hash
 
+_CONTENT_ID_ALGOS = frozenset({"sha256", "sha512", "sha3_256", "blake2b", "blake2s"})
+
 
 @dataclass(frozen=True)
 class StoredArtifact:
@@ -61,6 +63,11 @@ class ContentAddressedStore:
                 f"unsupported algo {self.algo!r}; "
                 f"expected one of {sorted(SUPPORTED_ALGOS)}"
             )
+        if self.algo not in _CONTENT_ID_ALGOS:
+            raise ValueError(
+                "content-addressed storage requires a collision-resistant "
+                f"algorithm; expected one of {sorted(_CONTENT_ID_ALGOS)}"
+            )
         if (
             isinstance(self.chunk_size, bool)
             or not isinstance(self.chunk_size, int)
@@ -81,7 +88,13 @@ class ContentAddressedStore:
             raise ValueError("fanout_chars must be a positive integer")
         if self.fanout_levels * self.fanout_chars > self.digest_chars:
             raise ValueError("fanout consumes more characters than the digest")
+        if self.root.is_symlink():
+            raise ValueError("content-addressed store root must not be a symlink")
         self.root.mkdir(parents=True, exist_ok=True)
+        if self.root.is_symlink() or not self.root.is_dir():
+            raise ValueError(
+                "content-addressed store root must be a non-symlink directory"
+            )
 
     @property
     def digest_chars(self) -> int:
@@ -147,6 +160,22 @@ class ContentAddressedStore:
                 f"content-addressed artifact is corrupted: {digest}"
             )
 
+    def _ensure_prefix_directory(self, target: Path) -> None:
+        """Create fanout directories without accepting symlink components."""
+        relative_parent = target.parent.relative_to(self.root)
+        current = self.root
+        for component in relative_parent.parts:
+            current = current / component
+            if current.is_symlink():
+                raise ValueError(
+                    "content-addressed prefix directory must not be a symlink"
+                )
+            current.mkdir(exist_ok=True)
+            if current.is_symlink() or not current.is_dir():
+                raise ValueError(
+                    "content-addressed prefix path must be a directory"
+                )
+
     def _publish_temporary(
         self,
         temporary: Path,
@@ -169,14 +198,7 @@ class ContentAddressedStore:
                 size_bytes=size_bytes,
             )
 
-        target.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-        if target.parent.is_symlink():
-            raise ValueError(
-                "content-addressed prefix directory must not be a symlink"
-            )
+        self._ensure_prefix_directory(target)
 
         try:
             os.link(
