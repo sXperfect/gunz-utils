@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import math
 import re
 import socket
 from collections.abc import Mapping, Sequence
@@ -179,9 +180,10 @@ def tcp_reachable(
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
         or timeout <= 0
     ):
-        raise ValueError("timeout must be a positive number")
+        raise ValueError("timeout must be a finite positive number")
 
     try:
         with socket.create_connection(
