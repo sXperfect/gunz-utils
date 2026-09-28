@@ -59,7 +59,7 @@ Manual review concentrated on:
 | SA-07 | Medium | persisted input | Benchmark result JSON used unbounded reads and worker/Git helpers had unbounded captured output. | Bounded byte reads plus structural validation; worker and Git helpers use bounded subprocess capture/timeouts. |
 | SA-08 | Medium | URI authority | Host validation did not explicitly reject backslashes/control characters. | Reject control/backslash authority characters before URI construction. |
 | SA-09 | Medium | redaction | Secret-key values with non-string scalar types could pass through unmasked. | Secret-context scalar values are masked consistently. |
-| SA-10 | Medium | diagnostics | Validator, logging, experiment and generic diagnostic paths could expose arbitrary exception/input text. | Type/structure-only public diagnostics, full context redaction, sanitized log metadata and `diagnose=False`. |
+| SA-10 | Medium | diagnostics | Validator, parser, logging, experiment and generic diagnostic paths could expose arbitrary exception/input text. | Type/structure-only public diagnostics, strict-boolean value redaction, full context redaction, sanitized log metadata and `diagnose=False`. |
 | SA-11 | Medium | resource controls | NaN/infinity/boolean edge cases could bypass positive-number/count assumptions or produce pathological retry calculations. | Added finite/type validation and saturating retry-delay behavior across limits, cache, retry, resilience, rate limiting and upstream policy. |
 | SA-12 | Medium | CI supply chain | GitHub Actions used moving version tags. | Pin checkout/setup-python to immutable commit SHAs. |
 | SA-13 | High | crypto | Legacy predictable hostname/user passphrase helper remained callable and decrypt accepted plaintext as a silent downgrade. | System-derived passphrase helper now fails closed; plaintext decryption is rejected unless explicit migration opt-in is supplied; salt/format validation tightened. |
@@ -67,7 +67,7 @@ Manual review concentrated on:
 | SA-15 | Medium | diagnostics | GitPython and stdlib argument-binding wrappers copied arbitrary exception text into public errors. | Normalize to exception type/stable structural messages; add secret-bearing regression tests. |
 | SA-16 | Medium | benchmark artifacts | Artifact registration/run packaging could follow or race symlinked/replaced sources. | Descriptor/path identity validation, exclusive output creation, no-follow source opens, output directory checks, and atomic run metadata publication. |
 | SA-17 | Medium | directory hashing | Directory enumeration could be followed by a later path-based open after a symlink swap. | Hash listed files through `open_path_under_base` so validation is bound to the opened path components. |
-| SA-18 | Medium | numeric/DoS | Several resource and timing APIs accepted non-finite controls. | Package-wide numeric security regression tests enforce finite values and proper integer/count types. |
+| SA-18 | Medium | numeric/DoS | Several resource, streaming, and profiling APIs accepted non-finite or boolean controls. | Package-wide numeric security regression tests enforce finite values and proper integer/count/byte-limit types. |
 | SA-19 | Medium | CI tooling | The repository pinned pytest 9.0.2, which is affected by CVE-2025-71176 local tmpdir handling. | Raise all maintained pytest pins to 9.0.3 and enforce the patched pin in repository contract tests. |
 
 ## Dependency and advisory review
@@ -89,6 +89,21 @@ The audit distinguishes dependency advisories from local source findings.
 
 An advisory search is time-bounded evidence, not proof that a dependency has no
 unknown vulnerability.
+
+### Advisory references
+
+- Pydantic CVE-2024-3772 / GHSA-mr82-8j83-vxmv:
+  https://github.com/advisories/GHSA-mr82-8j83-vxmv
+- GitPython GHSA-8mcc-hrx5-hvxc:
+  https://github.com/gitpython-developers/GitPython/security/advisories/GHSA-8mcc-hrx5-hvxc
+- GitPython GHSA-284h-m62q-gf8w:
+  https://github.com/gitpython-developers/GitPython/security/advisories/GHSA-284h-m62q-gf8w
+- GitPython GHSA-7833-fr7j-v32q:
+  https://github.com/gitpython-developers/GitPython/security/advisories/GHSA-7833-fr7j-v32q
+- Cryptography changelog/security fixes:
+  https://cryptography.io/en/49.0.0/changelog/
+- Matplotlib 3.10.9 security-related API change:
+  https://matplotlib.org/stable/api/prev_api_changes/api_changes_3.10.9.html
 
 ## Permanent security regression contracts
 
