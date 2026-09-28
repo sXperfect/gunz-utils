@@ -15,9 +15,10 @@ Canonical sources:
 3. `scripts/release.py`, `changes/README.md`, and
    `docs/development/releases.md` — versioning and releases.
 4. `SECURITY.md` — vulnerability reporting and disclosure.
-5. `docs/design/package-api-policy.md` — public API and dependency boundaries.
-6. `CONTRIBUTING.md` — contributor workflow.
-7. Maintained documentation under `docs/source/`, `docs/development/`,
+5. `docs/design/audit/security-audit-methodology.md` — repeatable deep-audit process.
+6. `docs/design/package-api-policy.md` — public API and dependency boundaries.
+7. `CONTRIBUTING.md` — contributor workflow.
+8. Maintained documentation under `docs/source/`, `docs/development/`,
    `docs/design/`, and `docs/guides/`.
 
 Files under `docs/tasks/done/` are historical records. They may describe
