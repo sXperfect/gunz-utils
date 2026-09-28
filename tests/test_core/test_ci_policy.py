@@ -14,9 +14,21 @@ def _workflow_text() -> str:
     return WORKFLOW.read_text(encoding="utf-8")
 
 
-def test_ci_triggers_only_main_pushes_and_main_pull_requests() -> None:
+def test_ci_push_scope_is_main_with_only_explicit_integration_exception() -> None:
     text = _workflow_text()
-    assert 'push:\n    branches: ["main"]' in text
+    push_match = re.search(
+        r'push:\n(?:    #.*\n)*    branches: \[(.*?)\]',
+        text,
+    )
+    assert push_match is not None
+    branches = set(re.findall(r'"([^"]+)"', push_match.group(1)))
+    assert "main" in branches
+    extras = branches - {"main"}
+    integration_branch = "merge/algorithm-audit-main"
+    assert extras <= {integration_branch}
+    if integration_branch in extras:
+        assert "TEMPORARY: remove merge/algorithm-audit-main" in text
+
     assert 'pull_request:\n    branches: ["main"]' in text
     assert "develop" not in text
     assert "workflow_dispatch" not in text
