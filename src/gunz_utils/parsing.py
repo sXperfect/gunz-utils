@@ -53,9 +53,15 @@ def safe_int(
     int or None
         Parsed integer, or ``default`` on failure.
     """
+    stripped = _stripped(value)
+    if isinstance(stripped, bool):
+        return default
     try:
-        result = int(_stripped(value), base)
-    except (ValueError, TypeError):
+        if isinstance(stripped, (str, bytes, bytearray)):
+            result = int(stripped, base)
+        else:
+            result = int(stripped)
+    except (ValueError, TypeError, OverflowError):
         return default
     if min is not None and result < min:
         return default
