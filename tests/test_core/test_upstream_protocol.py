@@ -9,6 +9,7 @@ These tests live in ``test_core/`` because the protocol + exception
 hierarchy are zero-dependency (stdlib only).
 """
 import asyncio
+import math
 import unittest
 
 from gunz_utils.upstream_protocol import (
@@ -199,6 +200,21 @@ class TestBaseUpstream(unittest.TestCase):
 
 
 class TestPolicyUpstream(unittest.IsolatedAsyncioTestCase):
+    async def test_policy_rejects_invalid_bounds(self) -> None:
+        client = _ValidImpl()
+        for value in (math.nan, math.inf, -math.inf, 0.0, -1.0, True):
+            with self.subTest(timeout_seconds=value):
+                with self.assertRaises(ValueError):
+                    PolicyUpstream(client, timeout_seconds=value)
+
+        for value in (0, -1, True):
+            with self.subTest(max_concurrency=value):
+                with self.assertRaises(ValueError):
+                    PolicyUpstream(client, max_concurrency=value)
+            with self.subTest(max_attempts=value):
+                with self.assertRaises(ValueError):
+                    PolicyUpstream(client, max_attempts=value)
+
     async def test_timeout_is_translated(self) -> None:
         class Slow:
             name = "slow"
