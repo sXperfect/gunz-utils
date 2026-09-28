@@ -24,6 +24,12 @@ class TestM8M10(unittest.TestCase):
         self.assertEqual(list(stable_unique([2, 1, 2, 3, 1])), [2, 1, 3])
         self.assertEqual(top_k(range(10), 3), [9, 8, 7])
 
+    def test_structure_bounds_reject_boolean_sizes(self) -> None:
+        with self.assertRaises(ValueError):
+            RingBuffer[int](True)
+        with self.assertRaises(ValueError):
+            top_k([1, 2, 3], True)
+
     def test_filesystem_safety(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
