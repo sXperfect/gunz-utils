@@ -559,7 +559,7 @@ class SecureStore:
         for name, value in values.items():
             normalized_name = self._validate_name(name, label="name")
             if not isinstance(value, (str, bytes)):
-                raise TypeError("values must contain only str or bytes")
+                raise TypeError("value must be str or bytes")
             normalized.append((normalized_name, value))
 
         with self._lock:
