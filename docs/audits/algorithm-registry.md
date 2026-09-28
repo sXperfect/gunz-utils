@@ -31,6 +31,21 @@ The former A1 sweep is independently verified by hosted CI run
 `36389874370` on `dc243517c01f9f9b2836df0dfb4570fa1519906f`: release, Ruff/mypy, 943 Python 3.11
 tests, strict docs, all packaging/isolation cases, and 943 Python 3.12 tests.
 
+## Integration verification status
+
+The algorithm-audit history has been merged onto security-hardened
+`main@07244be5e6d24d83b3b7dcde62bc1702ff1f6e9d` on
+`merge/algorithm-audit-main`. The A4 levels below retain their historical
+evidence, but they are **not yet claims for the composed integration tree** when
+the implementation was changed by conflict resolution. A single aggregate
+cross-version verification is required before recording an integrated A4 SHA.
+
+The integrated tree deliberately keeps newer `main` security behavior
+(immutable CI action pins, dependency floors, bounded subprocess capture,
+filesystem/file-identity hardening, diagnostic redaction, and crypto downgrade
+protection) while layering the algorithm-audit contracts and proof suites on
+top.
+
 ## Audited algorithm set
 
 | ID | Algorithm / family | Location | Level | Main proof obligations / evidence | Current result |
@@ -73,7 +88,7 @@ tests, strict docs, all packaging/isolation cases, and 943 Python 3.12 tests.
 | ALG-036 | Recursive redaction | `redaction.redact`, `redact_dict` | A2 | secret-context propagation, non-mutation, reveal-count bound | strict reveal-count domain added |
 | ALG-037 | Safe integer parsing | `parsing.safe_int` | A2 | strings/bytes/ordinary ints, base handling, bounds/fallback | fixed documented integer inputs returning fallback |
 | ALG-038 | Generic async timeout wrapper | `async_utils.with_timeout` | A2 | None semantics, finite timeout, cancellation | finite timeout validation added |
-| ALG-039 | Subprocess timeout/output validation | `subprocess.run_command`, `run_command_async` | A2 | structured argv, timeout/grace domains, output-size rejection | input domains hardened; output cap is post-capture, not memory-bound |
+| ALG-039 | Subprocess timeout/output validation | `subprocess.run_command`, `run_command_async` | A2 | structured argv, finite timeout/grace domains, prompt streaming output cap, process-group cleanup | integrated main implementation now streams under the shared byte cap; combined verification pending |
 | ALG-040 | Upstream policy wrapper | `upstream_protocol.PolicyUpstream` | A2 | finite timeout, concurrency/attempt counts, idempotent retry set | parameter contracts hardened |
 | ALG-041 | Scaling efficiency | `benchmark.metrics.scaling_efficiency` | A2 | valid baseline, per-point validity, ideal-scale formula | fixed invalid baseline producing nonsensical values |
 | ALG-042 | Benchmark history trend | `benchmark.history.BenchmarkHistory.trend` | A2 | finite values, absolute/relative change, min/max | hardened unknown/non-finite metric handling |
@@ -106,7 +121,7 @@ tests, strict docs, all packaging/isolation cases, and 943 Python 3.12 tests.
 | ALG-069 | Checked benchmark result loading | `benchmark.safe_io.load_result_checked` | A4 | bounded read, required structure, finite samples/stats, integer/schema domains | loader now bounds actual bytes read and validates persisted fields |
 | ALG-070 | Benchmark run-directory publication | `benchmark.run_directory.save_run_directory` | A4 | artifact-name collision handling, copied checksum validity, run metadata | collision proof executed; transactional publication remains GAP-004 |
 | ALG-071 | Linux perf integration | `benchmark.perf.*` | A4 | event/frequency domains, unavailable counters, non-finite parser values | invalid domains/non-finite counters hardened |
-| ALG-072 | Benchmark worker protocol | `benchmark.worker.*` | A4 | module/interpreter/timeout domains, failure propagation, strict JSON | strict JSON and timing domains proven; captured output remains unbounded |
+| ALG-072 | Benchmark worker protocol | `benchmark.worker.*` | A4 | module/interpreter/timeout domains, failure propagation, strict JSON, bounded capture | integrated worker inherits streaming output bounds and redacted subprocess diagnostics; combined verification pending |
 | ALG-073 | Benchmark reporting/export/plot transforms | `benchmark.report/export/plot` | A4 | profile representation, CSV export, CPU-core transform, invalid metric rejection, real plot smoke | proof and isolated matplotlib smoke executed |
 | ALG-074 | Benchmark overhead probe | `benchmark.overhead.measure_runner_overhead` | A4 | positive integer iterations, bool rejection, zero timer-resolution semantics | focused proof executed |
 | ALG-075 | Optional Pydantic validation adapter | `ext.validation_pydantic.type_checked` | A4 | valid scalar behavior, strict-int differential parity, redacted validation errors | strict-mode differential proof executed; default Pydantic coercion remains intentional backend behavior |
@@ -230,12 +245,12 @@ behavior.
 
 ## Open limitations / proof gaps
 
-### GAP-001 — subprocess output limit is not a resident-memory bound
+### GAP-001 — subprocess streaming-bound integration verification
 
-ALG-039 checks captured stdout/stderr after `subprocess.run`/communication.
-It rejects oversized results but cannot prevent the capture itself from
-consuming more than `max_output_bytes`. A streaming bounded-capture redesign is
-required if this API is intended as a memory-safety boundary.
+The newer `main` implementation now streams stdout/stderr into buffers capped
+by the shared `max_output_bytes` budget and terminates the process group
+promptly on overflow. The design gap is implemented in the integration tree;
+close this gap after the combined revision passes the aggregate proof suite.
 
 ### GAP-002 — recursive graph depth
 
@@ -267,11 +282,12 @@ The normal hard-link publication path is concurrency-friendly; the fallback
 replace path still needs an adversarial concurrent-publication/fault-injection
 proof.
 
-### GAP-007 — benchmark worker output is not memory bounded
+### GAP-007 — benchmark worker bounded-capture integration verification
 
-ALG-072 uses `subprocess.run(..., capture_output=True)`. Its timeout and JSON
-protocol are audited, but stdout/stderr have no streaming byte cap. Add a
-bounded-capture protocol if worker output can be untrusted or arbitrarily large.
+The integrated worker delegates to the bounded subprocess helper with an
+8 MiB default output cap while retaining strict JSON and finite timeout
+validation. Close this gap after the combined revision passes packaging and
+cross-version verification.
 
 ### GAP-008 — SecureStore backend completeness
 
