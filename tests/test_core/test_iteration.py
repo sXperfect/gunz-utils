@@ -43,6 +43,10 @@ class TestChunked(unittest.TestCase):
         with self.assertRaises(ValueError):
             list(chunked([1, 2, 3], -1))
 
+    def test_n_rejects_boolean(self) -> None:
+        with self.assertRaises(ValueError):
+            list(chunked([1, 2, 3], True))
+
     def test_accepts_generator(self) -> None:
         #? One-pass generator: chunked must consume lazily without buffering.
         def gen():
@@ -104,6 +108,10 @@ class TestBatched(unittest.TestCase):
         with self.assertRaises(ValueError):
             list(batched([1, 2, 3], -2))
 
+    def test_n_rejects_boolean(self) -> None:
+        with self.assertRaises(ValueError):
+            list(batched([1, 2, 3], True))
+
     def test_returns_lists_not_tuples(self) -> None:
         groups = list(batched([1, 2, 3], 2))
         for group in groups:
@@ -162,6 +170,12 @@ class TestFlatten(unittest.TestCase):
     def test_max_depth_negative_raises(self) -> None:
         with self.assertRaises(ValueError):
             list(flatten([1, 2], max_depth=-1))
+
+    def test_depth_limits_reject_boolean(self) -> None:
+        with self.assertRaises(ValueError):
+            list(flatten([1, 2], max_depth=True))
+        with self.assertRaises(ValueError):
+            list(flatten([1, 2], max_nesting=True))
 
     def test_custom_types_set(self) -> None:
         #? With `types=(list, set)`, sets are descended into but tuples are not.
