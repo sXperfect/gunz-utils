@@ -171,7 +171,7 @@ def _linux_snapshot(
             pss, private = _memory_rollup(proc / str(pid) / "smaps_rollup")
             if memory_detail == "pss":
                 private = None
-        command = stat[1].strip("()")
+        command = stat[1][1:-1]
         user += pid_user
         system += pid_system
         rss += pid_rss
