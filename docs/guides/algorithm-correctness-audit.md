@@ -12,6 +12,9 @@ correctness depends on more than direct field plumbing.
 The maintained inventory and evidence ledger is
 [`docs/audits/algorithm-registry.md`](../audits/algorithm-registry.md).
 
+The durable design-level protocol and reusable proof-test patterns are also
+maintained in [`docs/design/audit/`](../design/audit/README.md).
+
 ## Audit levels
 
 | Level | Meaning |
