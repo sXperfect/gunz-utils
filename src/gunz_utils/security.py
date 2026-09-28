@@ -90,8 +90,12 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     # ? across platforms.
     if "/" in replacement or "\\" in replacement or "\0" in replacement:
         raise ValueError("Replacement string contains unsafe path characters")
+    # Security (VULN-2026-003): bound replacement length and reject
+    # control characters to limit cache churn and string-allocation abuse.
     if len(replacement) > 16:
         raise ValueError("Replacement string is too long (max 16 chars)")
+    if any(ord(c) < 0x20 for c in replacement):
+        raise ValueError("Replacement string contains control characters")
 
     # 2. Get base name to avoid directories/path traversal via slashes
     # ? os.path.basename strips any directory components, neutralizing ".." attacks
@@ -113,9 +117,12 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
             pattern = _get_replacement_pattern(replacement)
             filename = pattern.sub(replacement, filename)
 
-    # 5. Strip leading/trailing replacements or dots
+    # 5. Strip leading/trailing replacements, dots, or dashes
     # ? Dots at boundaries can be dangerous (e.g., ".hidden" or "file..")
-    filename = filename.strip(replacement + ".")
+    # Security (VULN-2026-001): leading dashes can be parsed as options
+    # when a sanitized filename is later passed to a command-line program.
+    # Strip them so the returned basename is not option-shaped.
+    filename = filename.strip(replacement + ".-")
 
     # 6. Check empty
     if not filename:

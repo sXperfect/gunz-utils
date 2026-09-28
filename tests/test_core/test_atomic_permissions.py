@@ -66,3 +66,20 @@ def test_atomic_write_rejects_invalid_permissions(
             "value",
             permissions=permissions,
         )
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX mode semantics required")
+def test_atomic_write_private_target_uses_private_parent_mode(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "private" / "secret.txt"
+
+    atomic_write(
+        target,
+        "secret",
+        mkdir=True,
+        permissions=0o600,
+    )
+
+    parent_mode = stat.S_IMODE(target.parent.stat().st_mode)
+    assert parent_mode & 0o077 == 0

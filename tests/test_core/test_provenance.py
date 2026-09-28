@@ -210,3 +210,34 @@ def test_execution_manifest_rejects_invalid_package_names(
             project_root=tmp_path,
             package_names=("",),
         )
+
+
+def test_runtime_provenance_redacts_allowlisted_secret_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gunz_utils.provenance import capture_runtime_provenance
+
+    monkeypatch.setenv("API_TOKEN", "synthetic-secret-token")
+    runtime = capture_runtime_provenance(
+        environment_allowlist=("API_TOKEN",),
+    )
+
+    assert runtime.environment == {"API_TOKEN": "****"}
+
+
+def test_runtime_provenance_redacts_password_embedded_in_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gunz_utils.provenance import capture_runtime_provenance
+
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgres://admin:synthetic-password@localhost:5432/db",
+    )
+    runtime = capture_runtime_provenance(
+        environment_allowlist=("DATABASE_URL",),
+    )
+
+    assert runtime.environment == {
+        "DATABASE_URL": "postgres://admin:****@localhost:5432/db"
+    }

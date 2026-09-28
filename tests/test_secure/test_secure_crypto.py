@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 import warnings
+from unittest.mock import patch
 
 from gunz_utils.deprecation import GunzDeprecationWarning
 from gunz_utils.ext.secure_crypto import (
@@ -56,6 +57,22 @@ class TestSecureCrypto(unittest.TestCase):
             decrypt("plain-text", allow_plaintext=True),
             "plain-text",
         )
+
+    def test_invalid_component_lengths_are_rejected_before_kdf(self) -> None:
+        payload = (
+            "aes256:v2:00:"
+            "000000000000000000000000:"
+            "00000000000000000000000000000000:00"
+        )
+        with patch(
+            "gunz_utils.ext.secure_crypto.get_derived_key",
+            side_effect=AssertionError("KDF must not run"),
+        ):
+            with self.assertRaisesRegex(ValueError, "Invalid encrypted format"):
+                decrypt(
+                    payload,
+                    passphrase="test-passphrase",
+                )
 
     def test_malformed_hex_is_normalized_to_value_error(self) -> None:
         with self.assertRaisesRegex(ValueError, "Invalid encrypted format"):

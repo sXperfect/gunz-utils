@@ -25,6 +25,12 @@ class TestSecureStore(unittest.TestCase):
     def tearDown(self):
         self.store.close()
 
+    def test_connection_has_bounded_busy_timeout(self):
+        value = self.store._conn.execute(
+            "PRAGMA busy_timeout"
+        ).fetchone()[0]
+        self.assertEqual(value, 10000)
+
     def test_set_and_get_round_trip(self):
         self.store.set("google.api_key", "AIza-secret")
         self.assertEqual(self.store.get("google.api_key"), "AIza-secret")

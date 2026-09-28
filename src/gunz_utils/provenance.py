@@ -12,9 +12,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from .benchmark.io import GitInfo, capture_git_info
 from .io import atomic_json_write
+from .redaction import SECRET_PATTERNS, redact
 from .structures import freeze_structure
 
 
@@ -39,6 +41,29 @@ class RuntimeProvenance:
         )
 
 
+def _redact_environment_value(name: str, value: str) -> str:
+    """Redact secret-named values and passwords embedded in URI user-info."""
+    normalized_name = name.casefold()
+    if any(pattern in normalized_name for pattern in SECRET_PATTERNS):
+        return str(redact(value, show_chars=0))
+
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return value
+    if not parsed.scheme or "@" not in parsed.netloc:
+        return value
+
+    userinfo, hostinfo = parsed.netloc.rsplit("@", 1)
+    if ":" not in userinfo:
+        return value
+    username, _password = userinfo.split(":", 1)
+    sanitized = parsed._replace(
+        netloc=f"{username}:****@{hostinfo}",
+    )
+    return urlunsplit(sanitized)
+
+
 def capture_runtime_provenance(
     *,
     environment_allowlist: Iterable[str] = (),
@@ -54,7 +79,7 @@ def capture_runtime_provenance(
         )
     allowed = sorted(set(requested))
     environment = {
-        name: os.environ[name]
+        name: _redact_environment_value(name, os.environ[name])
         for name in allowed
         if name in os.environ
     }

@@ -55,7 +55,14 @@ def atomic_write(
 
     target = pathlib.Path(path)
     if mkdir:
-        target.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+        # Security (VULN-2026-002): when the target is owner-private,
+        # create missing parent directories with owner-private permissions too.
+        private_target = (
+            permissions is not None
+            and (permissions & 0o077) == 0
+        )
+        dir_mode = 0o700 if private_target else 0o755
+        target.parent.mkdir(parents=True, exist_ok=True, mode=dir_mode)
     elif not target.parent.exists():
         raise FileNotFoundError(f"Parent directory does not exist: {target.parent}")
 

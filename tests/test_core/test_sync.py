@@ -301,3 +301,18 @@ def test_advisory_lock_rejects_symlink_path(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="symlink"):
         with _advisory_lock(link):
             pass
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "-e",
+        "--rsync-path=evil",
+        "host:/data\nother",
+    ],
+)
+def test_normalize_rsync_source_rejects_option_and_control_input(
+    source: str,
+) -> None:
+    with pytest.raises(ValueError):
+        _normalize_rsync_source(source)

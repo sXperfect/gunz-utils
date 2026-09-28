@@ -151,6 +151,9 @@ class SecureStore:
             isolation_level=None,
         )
         self._conn.row_factory = sqlite3.Row
+        # Security (VULN-2026-006): bound SQLite lock waiting so concurrent
+        # processes cannot leave this connection waiting indefinitely.
+        self._conn.execute("PRAGMA busy_timeout = 10000")
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._init_schema()
         self._ensure_private_file(self._db_path)

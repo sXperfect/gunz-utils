@@ -30,6 +30,17 @@ class TestSerialization(unittest.TestCase):
         with self.assertRaises(TypeError):
             canonical_json({"raw": b"x"})
 
+    def test_recursive_structure_depth_is_bounded(self) -> None:
+        value: object = "leaf"
+        for _ in range(6):
+            value = [value]
+
+        with self.assertRaisesRegex(ValueError, "maximum nesting depth"):
+            to_jsonable(
+                value,
+                _max_depth=3,
+            )
+
     def test_mapping_key_normalization_collision_is_rejected(self) -> None:
         with self.assertRaisesRegex(
             ValueError,

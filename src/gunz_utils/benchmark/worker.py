@@ -33,6 +33,13 @@ def run_python_worker(
         raise ValueError("module must be a non-empty string")
     if not isinstance(python, str) or not python:
         raise ValueError("python must be a non-empty string")
+
+    # ? Security (VULN-2026-009): Validate python interpreter path to reject
+    # ? leading dashes ('-') or control characters that could inject subshell flags.
+    if python.strip().startswith("-"):
+        raise ValueError("python binary path must not start with a dash")
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in python):
+        raise ValueError("python binary path contains invalid control characters")
     if any(not isinstance(argument, str) for argument in args):
         raise ValueError("args must contain strings")
     if timeout is not None and (

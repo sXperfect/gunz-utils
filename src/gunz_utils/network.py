@@ -146,36 +146,40 @@ def build_network_uri(
     )
 
 
+def _is_non_public_address(address: str) -> bool:
+    """Return whether an IP address is unsafe for an external-only probe."""
+    normalized = address.split("%", 1)[0]
+    ip = ipaddress.ip_address(normalized)
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_unspecified
+        or ip.is_multicast
+        or ip.is_reserved
+    )
+
+
 def tcp_reachable(
     host: str,
     port: int,
     *,
     timeout: float = 5.0,
+    allow_private: bool = True,
 ) -> bool:
     """Return whether a TCP connection can be established within a timeout.
 
-    Parameters
-    ----------
-    host : str
-        Hostname or IP address.
-    port : int
-        TCP port in the inclusive range 1..65535.
-    timeout : float, optional
-        Connection timeout in seconds. Must be positive.
-
-    Returns
-    -------
-    bool
-        True when a connection succeeds, otherwise False.
-
-    Raises
-    ------
-    ValueError
-        If host, port, or timeout is invalid.
+    When allow_private is false, all resolved addresses are checked before any
+    connection is attempted. The connection is then made to the validated
+    numeric address, preventing a second DNS lookup from bypassing the policy.
     """
     if not isinstance(host, str) or not host.strip():
         raise ValueError("host must be a non-empty string")
-    if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+    if (
+        isinstance(port, bool)
+        or not isinstance(port, int)
+        or not 1 <= port <= 65535
+    ):
         raise ValueError("port must be an integer in the range 1..65535")
     if (
         isinstance(timeout, bool)
@@ -184,15 +188,57 @@ def tcp_reachable(
         or timeout <= 0
     ):
         raise ValueError("timeout must be a finite positive number")
+    if not isinstance(allow_private, bool):
+        raise TypeError("allow_private must be bool")
+
+    target_host = host.strip()
+    if allow_private:
+        try:
+            with socket.create_connection(
+                (target_host, port),
+                timeout=timeout,
+            ):
+                return True
+        except OSError:
+            return False
 
     try:
-        with socket.create_connection(
-            (host.strip(), port),
-            timeout=timeout,
-        ):
-            return True
-    except OSError:
+        literal = ipaddress.ip_address(target_host.split("%", 1)[0])
+    except ValueError:
+        try:
+            address_info = socket.getaddrinfo(
+                target_host,
+                port,
+                type=socket.SOCK_STREAM,
+            )
+        except OSError:
+            return False
+        resolved_values: list[str] = []
+        for info in address_info:
+            address = info[4][0]
+            if isinstance(address, str):
+                resolved_values.append(address)
+        resolved = tuple(dict.fromkeys(resolved_values))
+    else:
+        resolved = (str(literal),)
+
+    if not resolved:
         return False
+    if any(_is_non_public_address(address) for address in resolved):
+        raise ValueError(
+            "connection to non-public IP addresses is disallowed"
+        )
+
+    for address in resolved:
+        try:
+            with socket.create_connection(
+                (address, port),
+                timeout=timeout,
+            ):
+                return True
+        except OSError:
+            continue
+    return False
 
 
 __all__ = ["build_network_uri", "tcp_reachable"]

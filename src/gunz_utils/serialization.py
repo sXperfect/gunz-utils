@@ -9,11 +9,28 @@ from pathlib import Path
 from typing import Any
 
 
-def to_jsonable(value: Any) -> Any:
+def to_jsonable(
+    value: Any,
+    *,
+    _depth: int = 0,
+    _max_depth: int = 100,
+) -> Any:
     """Convert common Python objects into JSON-compatible values."""
+    # Security (VULN-2026-008): bound recursive traversal of attacker-shaped
+    # objects before Python's own recursion limit can be exhausted.
+    if _depth > _max_depth:
+        raise ValueError(
+            "object hierarchy exceeds maximum nesting depth "
+            f"({_max_depth})"
+        )
+
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {
-            field.name: to_jsonable(getattr(value, field.name))
+            field.name: to_jsonable(
+                getattr(value, field.name),
+                _depth=_depth + 1,
+                _max_depth=_max_depth,
+            )
             for field in dataclasses.fields(value)
         }
     if isinstance(value, Path):
@@ -27,12 +44,30 @@ def to_jsonable(value: Any) -> Any:
                     "mapping keys collide after JSON key normalization: "
                     f"{normalized!r}"
                 )
-            converted[normalized] = to_jsonable(item)
+            converted[normalized] = to_jsonable(
+                item,
+                _depth=_depth + 1,
+                _max_depth=_max_depth,
+            )
         return converted
     if isinstance(value, (list, tuple)):
-        return [to_jsonable(item) for item in value]
+        return [
+            to_jsonable(
+                item,
+                _depth=_depth + 1,
+                _max_depth=_max_depth,
+            )
+            for item in value
+        ]
     if isinstance(value, (set, frozenset)):
-        items = [to_jsonable(item) for item in value]
+        items = [
+            to_jsonable(
+                item,
+                _depth=_depth + 1,
+                _max_depth=_max_depth,
+            )
+            for item in value
+        ]
         return sorted(items, key=lambda item: repr(item))
     if isinstance(value, bytes):
         raise TypeError("bytes are not implicitly JSON serializable")

@@ -40,6 +40,10 @@ def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
         raise ValueError(f"salt must be exactly {SALT_LENGTH} bytes")
     if not isinstance(passphrase, str) or not passphrase:
         raise ValueError("passphrase is required for encryption")
+
+    # Security (VULN-2026-012): keep passphrases out of process-wide caches.
+    # Callers exposing repeated decrypt attempts must additionally rate-limit
+    # those attempts; varying attacker-controlled salts defeats key caching.
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=KEY_LENGTH,
