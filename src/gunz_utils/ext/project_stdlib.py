@@ -23,6 +23,7 @@ from ..subprocess import CommandError, CommandOutputLimitError, run_command
 __all__ = ["resolve_project_root"]
 
 _PROJECT_ROOT: pathlib.Path | None = None
+_PROJECT_ANCHOR: pathlib.Path | None = None
 
 
 @functools.lru_cache(maxsize=1)
@@ -67,12 +68,19 @@ def resolve_project_root(
     Caches the result. When `inject_to_sys_path` is True, inserts the
     resolved root at `sys.path[0]` (deduped).
     """
-    global _PROJECT_ROOT
-
-    if _PROJECT_ROOT is not None:
-        return _PROJECT_ROOT
+    global _PROJECT_ANCHOR, _PROJECT_ROOT
 
     start = pathlib.Path(anchor).resolve()
+    if (
+        _PROJECT_ROOT is not None
+        and _PROJECT_ANCHOR is not None
+        and (start == _PROJECT_ROOT or _PROJECT_ROOT in start.parents)
+    ):
+        if inject_to_sys_path:
+            root_str = str(_PROJECT_ROOT)
+            if root_str not in sys.path:
+                sys.path.insert(0, root_str)
+        return _PROJECT_ROOT
     root = _walk_up_for_marker(start) or _git_rev_parse_toplevel(str(start))
     if root is None:
         raise RuntimeError(
