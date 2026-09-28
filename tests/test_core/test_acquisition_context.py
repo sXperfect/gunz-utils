@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import unittest
 
 from gunz_utils.context import correlation_id, ensure_correlation_id, operation_context
@@ -81,7 +82,17 @@ class TestAsyncTesting(unittest.IsolatedAsyncioTestCase):
         async def predicate() -> bool:
             self.fail("invalid timing must not invoke the predicate")
 
-        for timeout, interval in [(-1, 0.01), (1, 0), (1, -1)]:
+        for timeout, interval in [
+            (-1, 0.01),
+            (1, 0),
+            (1, -1),
+            (math.nan, 0.01),
+            (math.inf, 0.01),
+            (1, math.nan),
+            (1, math.inf),
+            (True, 0.01),
+            (1, True),
+        ]:
             with self.subTest(timeout=timeout, interval=interval):
                 with self.assertRaises(ValueError):
                     await eventually_async(
