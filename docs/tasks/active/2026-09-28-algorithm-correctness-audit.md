@@ -1,8 +1,11 @@
 # Repository-wide algorithm correctness audit
 
-Status: active — A0 and former A1 families verified to A4; remaining A2 and
-explicit proof gaps are the next audit phase
+Status: active — security-hardened main and algorithm-audit histories composed;
+integrated verification pending before the next A2 sweep
 Branch: `audit/algorithm-correctness`
+Integration branch: `merge/algorithm-audit-main`
+Integration base: `main@07244be5e6d24d83b3b7dcde62bc1702ff1f6e9d`
+Audit parent: `36846e285bfec8624cb24a3b38bcfb7a6f62ad7a`
 Started: 2026-09-28
 Base: `main@cf3697d7457c5901ee1c927bc6dae347d5428722`
 
@@ -124,8 +127,10 @@ These are intentionally not hidden by the audit.
 
 ### Subprocess/resource bounding
 
-- [ ] redesign `max_output_bytes` if a true resident-memory bound is required;
-      current subprocess helpers validate captured output after collection.
+- [x] integrate current-main streaming bounded subprocess capture and
+      process-group termination with the audit timing contracts;
+- [x] make benchmark workers inherit the bounded capture path;
+- [ ] record the integrated A4 evidence after the final combined verification.
 
 ### Optional/security integrations
 
@@ -136,6 +141,22 @@ These are intentionally not hidden by the audit.
 - [ ] add malformed-length/tamper vectors around secure-crypto format parsing;
 - [x] compare stdlib and optional Pydantic validation behavior for the shared
       strict scalar contract; ALG-075 reached A4.
+
+## Main/audit integration
+
+- [x] preserve the full two-parent history rather than squashing either branch;
+- [x] import all audit-only files and retain current-main security behavior on
+      overlapping paths;
+- [x] combine immutable CI action pins, pytest 9.0.3, dependency security
+      floors, release preflight, and aggregate failure collection;
+- [x] combine SecureStore filesystem trust with transaction/audit atomicity and
+      recoverable key rotation;
+- [x] combine bounded subprocess capture with finite timing contracts;
+- [x] combine diagnostic redaction with recursive stdlib validation;
+- [x] preserve distinct security and algorithm regression tests;
+- [ ] run one aggregate verification on the composed tree;
+- [ ] record the integrated SHA/run, then merge the verified integration branch
+      into current `main`.
 
 ## Verification state
 
