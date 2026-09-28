@@ -48,6 +48,7 @@ def test_ci_release_preflight_precedes_install_then_uses_aggregate_verifier() ->
     upload = text.index("actions/upload-artifact@")
 
     assert release < primary_install < compatibility_install < aggregate < upload
+    assert "--skip-release" in text
     assert "--compat-python" in text
     assert "--summary-json tmp/ci-summary.json" in text
     assert "if: ${{ always() }}" in text
