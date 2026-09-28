@@ -52,6 +52,17 @@ class TestStdlibTypeChecked(unittest.TestCase):
         self.assertNotIn(sensitive_password, msg)
         self.assertIn("got type 'str'", msg)
 
+    def test_binding_error_does_not_echo_unexpected_keyword(self):
+        @stdlib_type_checked
+        def f(value: int):
+            return value
+
+        secret_name = "token_super_secret"
+        with self.assertRaises(TypeError) as caught:
+            f(**{secret_name: 1})
+        self.assertNotIn(secret_name, str(caught.exception))
+        self.assertIn("argument binding failed", str(caught.exception))
+
     def test_varargs(self):
         @stdlib_type_checked
         def f(*args: int):
