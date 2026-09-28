@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import math
 import threading
 import time
 from collections import OrderedDict
@@ -33,6 +34,18 @@ def _cache_key(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Hashable | None
     except TypeError:
         return None
     return key
+
+
+def _validate_cache_bounds(*, ttl: float, maxsize: int) -> None:
+    if (
+        isinstance(ttl, bool)
+        or not isinstance(ttl, (int, float))
+        or not math.isfinite(float(ttl))
+        or ttl < 0
+    ):
+        raise ValueError("ttl must be a finite non-negative number")
+    if isinstance(maxsize, bool) or not isinstance(maxsize, int) or maxsize < 1:
+        raise ValueError("maxsize must be a positive integer")
 
 
 class _TTLCache(Generic[P, T]):
@@ -109,10 +122,7 @@ def ttl_cache(
     maxsize: int = 128,
 ) -> Callable[[Callable[P, T]], _TTLCache[P, T]]:
     """Cache synchronous function results for a bounded amount of time."""
-    if ttl < 0:
-        raise ValueError("ttl must be non-negative")
-    if maxsize < 1:
-        raise ValueError("maxsize must be at least 1")
+    _validate_cache_bounds(ttl=ttl, maxsize=maxsize)
 
     def decorate(func: Callable[P, T]) -> _TTLCache[P, T]:
         return _TTLCache(func, ttl=ttl, maxsize=maxsize)
@@ -191,10 +201,7 @@ def async_ttl_cache(
     [Callable[P, Coroutine[Any, Any, T]]], _AsyncTTLCache[P, T]
 ]:
     """Cache async results and coalesce concurrent misses for each key."""
-    if ttl < 0:
-        raise ValueError("ttl must be non-negative")
-    if maxsize < 1:
-        raise ValueError("maxsize must be at least 1")
+    _validate_cache_bounds(ttl=ttl, maxsize=maxsize)
 
     def decorate(
         func: Callable[P, Coroutine[Any, Any, T]],

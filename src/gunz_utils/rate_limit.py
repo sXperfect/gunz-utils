@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 
 
@@ -10,12 +11,9 @@ class AsyncRateLimiter:
     """Token-bucket limiter with bounded burst capacity."""
 
     def __init__(self, rate: float, *, capacity: float | None = None) -> None:
-        if rate <= 0:
-            raise ValueError("rate must be positive")
-        self.rate = rate
-        self.capacity = capacity if capacity is not None else rate
-        if self.capacity <= 0:
-            raise ValueError("capacity must be positive")
+        self.rate = self._finite_positive(rate, name="rate")
+        raw_capacity = self.rate if capacity is None else capacity
+        self.capacity = self._finite_positive(raw_capacity, name="capacity")
         self._tokens = self.capacity
         self._updated = time.monotonic()
         self._lock = asyncio.Lock()
@@ -44,8 +42,13 @@ class AsyncRateLimiter:
     ) -> None:
         """Wait until tokens are available or the optional timeout expires."""
         self._validate_tokens(tokens)
-        if timeout is not None and timeout < 0:
-            raise ValueError("timeout must be non-negative")
+        if timeout is not None and (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(float(timeout))
+            or timeout < 0
+        ):
+            raise ValueError("timeout must be a finite non-negative number or None")
         deadline = None if timeout is None else time.monotonic() + timeout
         while True:
             async with self._lock:
@@ -60,8 +63,20 @@ class AsyncRateLimiter:
                     raise TimeoutError("rate-limit acquisition timed out")
             await asyncio.sleep(wait)
 
+    @staticmethod
+    def _finite_positive(value: float, *, name: str) -> float:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or value <= 0
+        ):
+            raise ValueError(f"{name} must be a finite positive number")
+        return float(value)
+
     def _validate_tokens(self, tokens: float) -> None:
-        if tokens <= 0 or tokens > self.capacity:
+        value = self._finite_positive(tokens, name="tokens")
+        if value > self.capacity:
             raise ValueError("tokens must be positive and <= capacity")
 
     def _refill(self) -> None:

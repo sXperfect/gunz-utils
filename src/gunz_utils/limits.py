@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -23,16 +24,29 @@ class Limits:
     def __post_init__(self) -> None:
         for name in ("max_bytes", "max_items", "max_depth"):
             value = getattr(self, name)
-            if value is not None and value < 0:
-                raise ValueError(f"{name} must be non-negative")
-        if self.timeout is not None and self.timeout < 0:
-            raise ValueError("timeout must be non-negative")
+            if value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ValueError(f"{name} must be a non-negative integer or None")
+        if self.timeout is not None and (
+            isinstance(self.timeout, bool)
+            or not isinstance(self.timeout, (int, float))
+            or not math.isfinite(float(self.timeout))
+            or self.timeout < 0
+        ):
+            raise ValueError("timeout must be a finite non-negative number or None")
 
     def check_bytes(self, size: int) -> None:
+        if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+            raise ValueError("size must be a non-negative integer")
         if self.max_bytes is not None and size > self.max_bytes:
             raise ValueError("byte limit exceeded")
 
     def check_items(self, count: int) -> None:
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise ValueError("count must be a non-negative integer")
         if self.max_items is not None and count > self.max_items:
             raise ValueError("item limit exceeded")
 
@@ -88,8 +102,8 @@ class ResourceBudget:
 
     def consume_bytes(self, amount: int) -> int:
         """Consume bytes and return the new cumulative count."""
-        if amount < 0:
-            raise ValueError("amount must be non-negative")
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
+            raise ValueError("amount must be a non-negative integer")
         candidate = self.bytes_used + amount
         if self.max_bytes is not None and candidate > self.max_bytes:
             raise BudgetExceededError("byte budget exceeded")
@@ -98,8 +112,8 @@ class ResourceBudget:
 
     def consume_items(self, amount: int = 1) -> int:
         """Consume items and return the new cumulative count."""
-        if amount < 0:
-            raise ValueError("amount must be non-negative")
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
+            raise ValueError("amount must be a non-negative integer")
         candidate = self.items_used + amount
         if self.max_items is not None and candidate > self.max_items:
             raise BudgetExceededError("item budget exceeded")
@@ -108,8 +122,8 @@ class ResourceBudget:
 
     def check_depth(self, depth: int) -> None:
         """Reject a nesting depth beyond the configured maximum."""
-        if depth < 0:
-            raise ValueError("depth must be non-negative")
+        if isinstance(depth, bool) or not isinstance(depth, int) or depth < 0:
+            raise ValueError("depth must be a non-negative integer")
         if self.max_depth is not None and depth > self.max_depth:
             raise BudgetExceededError("depth budget exceeded")
 

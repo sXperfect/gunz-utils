@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
@@ -31,10 +32,19 @@ class AsyncCircuitBreaker:
         recovery_timeout: float = 30.0,
         failure_predicate: Callable[[BaseException], bool] | None = None,
     ) -> None:
-        if failure_threshold < 1:
-            raise ValueError("failure_threshold must be at least 1")
-        if recovery_timeout < 0:
-            raise ValueError("recovery_timeout must be non-negative")
+        if (
+            isinstance(failure_threshold, bool)
+            or not isinstance(failure_threshold, int)
+            or failure_threshold < 1
+        ):
+            raise ValueError("failure_threshold must be a positive integer")
+        if (
+            isinstance(recovery_timeout, bool)
+            or not isinstance(recovery_timeout, (int, float))
+            or not math.isfinite(float(recovery_timeout))
+            or recovery_timeout < 0
+        ):
+            raise ValueError("recovery_timeout must be finite and non-negative")
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.failure_predicate = failure_predicate
@@ -93,8 +103,8 @@ class AsyncBulkhead:
     """Limit concurrent work for one dependency or resource class."""
 
     def __init__(self, limit: int) -> None:
-        if limit < 1:
-            raise ValueError("limit must be at least 1")
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ValueError("limit must be a positive integer")
         self.limit = limit
         self._semaphore = asyncio.Semaphore(limit)
         self._active = 0
@@ -111,8 +121,13 @@ class AsyncBulkhead:
         timeout: float | None = None,
     ) -> T:
         """Execute one operation after bounded permit acquisition."""
-        if timeout is not None and timeout < 0:
-            raise ValueError("timeout must be non-negative")
+        if timeout is not None and (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(float(timeout))
+            or timeout < 0
+        ):
+            raise ValueError("timeout must be a finite non-negative number or None")
         try:
             if timeout is None:
                 await self._semaphore.acquire()
