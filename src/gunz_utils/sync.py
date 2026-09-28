@@ -28,12 +28,36 @@ _FORBIDDEN_EXTRA_OPTIONS = frozenset(
         "--partial-dir",
         "--password-file",
         "--remote-option",
+        "--remove-source-files",
         "--rsh",
         "--rsync-path",
         "--temp-dir",
         "--write-batch",
     }
 )
+_FORBIDDEN_LONG_OPTIONS = frozenset(
+    option for option in _FORBIDDEN_EXTRA_OPTIONS if option.startswith("--")
+)
+
+
+def _unsafe_rsync_extra_argument(argument: str) -> bool:
+    """Reject destructive/execution-affecting options, including abbreviations."""
+    option = argument.split("=", 1)[0]
+    if argument == "--" or argument.startswith("--delete"):
+        return True
+    if argument.startswith(("-e", "-f", "-M")):
+        return True
+    if not option.startswith("--"):
+        return option in _FORBIDDEN_EXTRA_OPTIONS
+    if option in _FORBIDDEN_LONG_OPTIONS:
+        return True
+    # GNU-style long options may accept unique abbreviations. Treat any
+    # prefix of a forbidden long option as forbidden rather than maintaining
+    # a brittle exact-name blocklist.
+    return len(option) >= 3 and any(
+        forbidden.startswith(option)
+        for forbidden in _FORBIDDEN_LONG_OPTIONS
+    )
 
 
 @dataclass(frozen=True)
@@ -199,18 +223,11 @@ def rsync_mirror(
         for argument in extra_args
     ):
         raise ValueError("extra_args must contain non-empty strings")
-    unsafe_arguments: list[str] = []
-    for argument in extra_args:
-        option = argument.split("=", 1)[0]
-        if (
-            argument == "--"
-            or argument.startswith("--delete")
-            or argument == "--remove-source-files"
-            or option in _FORBIDDEN_EXTRA_OPTIONS
-            or argument.startswith("-e")
-            or argument.startswith("-M")
-        ):
-            unsafe_arguments.append(argument)
+    unsafe_arguments = [
+        argument
+        for argument in extra_args
+        if _unsafe_rsync_extra_argument(argument)
+    ]
     if unsafe_arguments:
         raise ValueError(
             "unsafe rsync options are not accepted through extra_args"
