@@ -32,8 +32,8 @@ def to_jsonable(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [to_jsonable(item) for item in value]
     if isinstance(value, (set, frozenset)):
-        converted = [to_jsonable(item) for item in value]
-        return sorted(converted, key=lambda item: repr(item))
+        items = [to_jsonable(item) for item in value]
+        return sorted(items, key=lambda item: repr(item))
     if isinstance(value, bytes):
         raise TypeError("bytes are not implicitly JSON serializable")
     return value
