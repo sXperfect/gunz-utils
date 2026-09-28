@@ -19,7 +19,16 @@ def to_jsonable(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, Mapping):
-        return {str(key): to_jsonable(item) for key, item in value.items()}
+        converted: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized = str(key)
+            if normalized in converted:
+                raise ValueError(
+                    "mapping keys collide after JSON key normalization: "
+                    f"{normalized!r}"
+                )
+            converted[normalized] = to_jsonable(item)
+        return converted
     if isinstance(value, (list, tuple)):
         return [to_jsonable(item) for item in value]
     if isinstance(value, (set, frozenset)):
