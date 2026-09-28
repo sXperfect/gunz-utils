@@ -266,14 +266,16 @@ class PolicyUpstream:
             or max_attempts <= 0
         ):
             raise ValueError("max_attempts must be a positive integer")
-        if any(
+        if not isinstance(idempotent_tools, frozenset) or any(
             not isinstance(name, str) or not name
             for name in idempotent_tools
         ):
-            raise ValueError("idempotent_tools must contain non-empty strings")
+            raise ValueError(
+                "idempotent_tools must be a frozenset of non-empty strings"
+            )
         self._client = client
         self.name = client.name
-        self._timeout_seconds = timeout_seconds
+        self._timeout_seconds = float(timeout_seconds)
         self._max_attempts = max_attempts
         self._idempotent_tools = idempotent_tools
         self._semaphore = asyncio.Semaphore(max_concurrency)
