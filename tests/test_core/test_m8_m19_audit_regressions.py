@@ -53,6 +53,31 @@ class TestAuditRegressions(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             lexical_contained_path(root, "/absolute")
 
+    async def test_run_directory_rejects_symlink_artifact_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target.bin"
+            target.write_bytes(b"secret")
+            link = root / "artifact.bin"
+            try:
+                link.symlink_to(target)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation unavailable")
+            run = PerformanceRun(
+                "demo",
+                SystemInfo.capture(),
+                artifacts=(
+                    type("Artifact", (), {
+                        "path": str(link),
+                        "kind": "x",
+                        "media_type": None,
+                        "description": None,
+                    })(),
+                ),
+            )
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                save_run_directory(run, root / "run")
+
     async def test_duplicate_artifact_basenames_are_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -79,6 +79,17 @@ def test_package_sources_avoid_code_execution_and_unsafe_deserialization() -> No
     assert offenders == []
 
 
+def test_package_sources_do_not_use_assert_for_runtime_validation() -> None:
+    offenders: list[str] = []
+    for path in _source_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        relative = path.relative_to(PROJECT_ROOT)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assert):
+                offenders.append(f"{relative}:{node.lineno}: assert")
+    assert offenders == []
+
+
 def test_package_sources_do_not_disable_tls_verification() -> None:
     offenders: list[str] = []
     for path in _source_files():

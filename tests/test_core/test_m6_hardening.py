@@ -51,7 +51,24 @@ class TestM6ProductionHardening(unittest.TestCase):
             path.write_bytes(b"tampered")
             self.assertFalse(verify_artifact(artifact))
 
-    def test_regression_gate_respects_comparability(self) -> None:
+    def test_artifact_registry_rejects_symlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target.bin"
+            target.write_bytes(b"secret")
+            link = root / "artifact.bin"
+            try:
+                link.symlink_to(target)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation unavailable")
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                register_artifact(
+                    PerformanceRun("demo", SystemInfo.capture()),
+                    link,
+                    kind="profile",
+                )
+
+        def test_regression_gate_respects_comparability(self) -> None:
         policy = MetricPolicy(
             "latency",
             "lower",

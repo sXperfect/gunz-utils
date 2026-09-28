@@ -81,6 +81,18 @@ def content_hash(data: bytes | str, *, algo: str = DEFAULT_ALGO) -> str:
     return hashlib.new(algo, payload).hexdigest()
 
 
+def _hash_binary_handle(
+    handle: BinaryIO,
+    *,
+    algo: str,
+    chunk_size: int,
+) -> str:
+    hasher = hashlib.new(algo)
+    while block := handle.read(chunk_size):
+        hasher.update(block)
+    return hasher.hexdigest()
+
+
 def file_hash(
     path: str | pathlib.Path,
     *,
@@ -121,17 +133,18 @@ def file_hash(
         raise ValueError(
             f"unsupported algo {algo!r}; expected one of {sorted(SUPPORTED_ALGOS)}"
         )
-    if chunk_size <= 0:
+    if (
+        isinstance(chunk_size, bool)
+        or not isinstance(chunk_size, int)
+        or chunk_size <= 0
+    ):
         raise ValueError(f"chunk_size must be positive, got {chunk_size}")
-    hasher = hashlib.new(algo)
-    # ? `with` guarantees the file handle closes even if the loop is interrupted.
-    with open(path, "rb") as fh:
-        while True:
-            block = fh.read(chunk_size)
-            if not block:
-                break
-            hasher.update(block)
-    return hasher.hexdigest()
+    with open(path, "rb") as handle:
+        return _hash_binary_handle(
+            handle,
+            algo=algo,
+            chunk_size=chunk_size,
+        )
 
 
 def short_hash(data: bytes | str, *, chars: int = 8, algo: str = DEFAULT_ALGO) -> str:
@@ -246,7 +259,7 @@ def directory_manifest(
     if chunk_size <= 0:
         raise ValueError(f"chunk_size must be positive, got {chunk_size}")
 
-    base = pathlib.Path(root)
+    base = pathlib.Path(root).resolve()
     if not base.is_dir():
         raise NotADirectoryError(str(base))
 
@@ -258,14 +271,22 @@ def directory_manifest(
         ),
         key=lambda path: path.relative_to(base).as_posix(),
     )
-    return {
-        path.relative_to(base).as_posix(): file_hash(
-            path,
-            algo=algo,
-            chunk_size=chunk_size,
-        )
-        for path in files
-    }
+    from .security import open_path_under_base
+
+    manifest: dict[str, str] = {}
+    for path in files:
+        relative = path.relative_to(base).as_posix()
+        with open_path_under_base(
+            str(base),
+            relative,
+            mode="rb",
+        ) as handle:
+            manifest[relative] = _hash_binary_handle(
+                handle,
+                algo=algo,
+                chunk_size=chunk_size,
+            )
+    return manifest
 
 
 def directory_hash(

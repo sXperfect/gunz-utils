@@ -136,10 +136,7 @@ class SecureStore:
         self._master_key_path = self._base_dir / "master.key"
         self._salt_path = self._base_dir / "master.salt"
         self._db_path = self._base_dir / "config.db"
-        if self._db_path.is_symlink():
-            raise ValueError("secure-store database path must not be a symlink")
-        if self._db_path.exists() and not self._db_path.is_file():
-            raise ValueError("secure-store database path must be a regular file")
+        self._prepare_private_database(self._db_path)
         self._lock = threading.RLock()
         self._fernet_lock = self._lock
         self._fernet: Fernet | None = None
@@ -224,9 +221,68 @@ class SecureStore:
                 raise PermissionError(f"private file is not mode 0600: {path.name}")
 
     @classmethod
-    def _read_private(cls, path: Path) -> bytes:
+    def _prepare_private_database(cls, path: Path) -> None:
+        """Create the SQLite file without a world-readable creation window."""
+        if path.is_symlink():
+            raise ValueError("secure-store database path must not be a symlink")
+        if not path.exists():
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if hasattr(os, "O_CLOEXEC"):
+                flags |= os.O_CLOEXEC
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            try:
+                descriptor = os.open(path, flags, _KEY_FILE_MODE)
+            except FileExistsError:
+                pass
+            else:
+                os.close(descriptor)
         cls._ensure_private_file(path)
-        return path.read_bytes()
+
+    @classmethod
+    def _read_private(cls, path: Path) -> bytes:
+        """Read key material through the descriptor that was type-checked."""
+        if path.is_symlink():
+            raise ValueError(f"private path must not be a symlink: {path.name}")
+        flags = os.O_RDONLY
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        descriptor = os.open(path, flags)
+        try:
+            info = os.fstat(descriptor)
+            if not stat.S_ISREG(info.st_mode):
+                raise ValueError(
+                    f"private path must be a regular file: {path.name}"
+                )
+            if os.name == "posix":
+                if info.st_uid != os.getuid():
+                    raise PermissionError(
+                        f"private file has wrong owner: {path.name}"
+                    )
+                os.fchmod(descriptor, _KEY_FILE_MODE)
+            with os.fdopen(descriptor, "rb") as handle:
+                descriptor = -1
+                return handle.read()
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+
+    @staticmethod
+    def _validate_secret_name(value: str) -> str:
+        if (
+            not isinstance(value, str)
+            or not value
+            or len(value) > 512
+            or "\x00" in value
+            or any(ord(character) < 0x20 for character in value)
+        ):
+            raise ValueError(
+                "secret name must be a non-empty bounded string "
+                "without control characters"
+            )
+        return value
 
     @staticmethod
     def _validate_identity(value: str, *, field: str) -> str:
@@ -251,20 +307,27 @@ class SecureStore:
     @staticmethod
     def _write_private(path: Path, data: bytes) -> None:
         """Create or replace a private file without a world-readable window."""
-        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, _KEY_FILE_MODE)
+        descriptor, temporary_name = tempfile.mkstemp(
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+        )
+        temporary = Path(temporary_name)
         try:
-            with os.fdopen(fd, "wb") as handle:
+            if os.name == "posix":
+                os.fchmod(descriptor, _KEY_FILE_MODE)
+            with os.fdopen(descriptor, "wb") as handle:
+                descriptor = -1
                 handle.write(data)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(tmp, path)
+            os.replace(temporary, path)
         except BaseException:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
+            temporary.unlink(missing_ok=True)
             raise
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
 
     def _verify_or_initialize_key(self, fernet: Fernet) -> None:
         row = self._conn.execute(
@@ -350,6 +413,7 @@ class SecureStore:
         acl: list[str] | None = None,
     ) -> None:
         """Encrypt and store a secret, preserving an existing ACL by default."""
+        name = self._validate_secret_name(name)
         caller = self._validate_identity(caller, field="caller")
         acl = self._normalize_acl(acl)
         with self._lock:
@@ -385,6 +449,8 @@ class SecureStore:
             self._audit(caller, "set", name, True)
     def get_bytes(self, name: str, *, caller: str = "library") -> bytes | None:
         """Decrypt and return raw secret bytes, or None if not found."""
+        name = self._validate_secret_name(name)
+        name = self._validate_secret_name(name)
         caller = self._validate_identity(caller, field="caller")
         with self._lock:
             if self._fernet is None:
