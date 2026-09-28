@@ -31,20 +31,38 @@ class TestSecureCrypto(unittest.TestCase):
         with self.assertRaises(ValueError):
             get_derived_key(b"0" * 16)
 
+    def test_key_derivation_rejects_invalid_salt_length(self) -> None:
+        with self.assertRaisesRegex(ValueError, "salt"):
+            get_derived_key(b"short", "test-passphrase")
+
     def test_legacy_ciphertext_is_not_silently_decrypted(self) -> None:
         with self.assertRaises(ValueError):
             decrypt("aes256:00:00:00:00", passphrase="test-passphrase")
 
-    def test_system_passphrase_is_explicitly_deprecated(self) -> None:
+    def test_system_passphrase_fails_closed(self) -> None:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always", GunzDeprecationWarning)
-            value = get_system_passphrase()
-        self.assertIsInstance(value, str)
+            with self.assertRaisesRegex(RuntimeError, "disabled"):
+                get_system_passphrase()
         self.assertTrue(caught)
         self.assertIs(caught[0].category, GunzDeprecationWarning)
 
-    def test_plaintext_passthrough_is_preserved(self) -> None:
-        self.assertEqual(decrypt("plain-text"), "plain-text")
+    def test_plaintext_is_rejected_by_default(self) -> None:
+        with self.assertRaisesRegex(ValueError, "authenticated aes256"):
+            decrypt("plain-text")
+
+    def test_plaintext_passthrough_requires_explicit_migration_opt_in(self) -> None:
+        self.assertEqual(
+            decrypt("plain-text", allow_plaintext=True),
+            "plain-text",
+        )
+
+    def test_malformed_hex_is_normalized_to_value_error(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Invalid encrypted format"):
+            decrypt(
+                "aes256:v2:zz:00:00:00",
+                passphrase="test-passphrase",
+            )
 
 
 if __name__ == "__main__":
