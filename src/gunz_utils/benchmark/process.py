@@ -91,6 +91,23 @@ def _memory_rollup(path: Path) -> tuple[int | None, int | None]:
         return None, None
 
 
+def _parse_proc_stat(text: str) -> tuple[int, str, list[str]]:
+    """Parse /proc/<pid>/stat without splitting spaces inside comm."""
+    first_space = text.find(" ")
+    close_paren = text.rfind(")")
+    if first_space <= 0 or close_paren <= first_space + 1:
+        raise ValueError("malformed /proc stat record")
+    pid = int(text[:first_space])
+    if text[first_space + 1] != "(":
+        raise ValueError("malformed /proc stat command field")
+    command = text[first_space + 2 : close_paren]
+    tail = text[close_paren + 1 :].strip().split()
+    if len(tail) < 22:
+        raise ValueError("truncated /proc stat record")
+    fields = [str(pid), f"({command})", *tail]
+    return pid, command, fields
+
+
 def _linux_snapshot(
     root_pid: int,
     started: float,
@@ -107,8 +124,10 @@ def _linux_snapshot(
         if not entry.name.isdigit():
             continue
         try:
-            stat = (entry / "stat").read_text().split()
-            rows[int(entry.name)] = (int(stat[3]), stat)
+            parsed_pid, _command, stat = _parse_proc_stat(
+                (entry / "stat").read_text()
+            )
+            rows[parsed_pid] = (int(stat[3]), stat)
         except (
             FileNotFoundError,
             ProcessLookupError,
@@ -152,7 +171,7 @@ def _linux_snapshot(
             pss, private = _memory_rollup(proc / str(pid) / "smaps_rollup")
             if memory_detail == "pss":
                 private = None
-        command = stat[1].strip("()")
+        command = stat[1][1:-1]
         user += pid_user
         system += pid_system
         rss += pid_rss
