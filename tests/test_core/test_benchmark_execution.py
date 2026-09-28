@@ -65,6 +65,20 @@ class TestWorker(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
 
+    def test_worker_rejects_option_shaped_interpreter(self) -> None:
+        with self.assertRaisesRegex(ValueError, "dash"):
+            run_python_worker(
+                "json.tool",
+                python="-I",
+            )
+
+    def test_worker_rejects_control_character_in_interpreter(self) -> None:
+        with self.assertRaisesRegex(ValueError, "control"):
+            run_python_worker(
+                "json.tool",
+                python="python\n-I",
+            )
+
     def test_worker_output_is_bounded(self) -> None:
         with self.assertRaises(CommandOutputLimitError):
             run_python_worker("this", max_output_bytes=16)

@@ -90,8 +90,8 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     # ? across platforms.
     if "/" in replacement or "\\" in replacement or "\0" in replacement:
         raise ValueError("Replacement string contains unsafe path characters")
-    # ? Security (VULN-2026-003): Bound replacement length and restrict control characters to prevent
-    # ? LRU cache invalidation churn and excessive string allocation / ReDoS CPU resource exhaustion.
+    # Security (VULN-2026-003): bound replacement length and reject
+    # control characters to limit cache churn and string-allocation abuse.
     if len(replacement) > 16:
         raise ValueError("Replacement string is too long (max 16 chars)")
     if any(ord(c) < 0x20 for c in replacement):
@@ -119,9 +119,9 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
 
     # 5. Strip leading/trailing replacements, dots, or dashes
     # ? Dots at boundaries can be dangerous (e.g., ".hidden" or "file..")
-    # ? Security (VULN-2026-001): Leading dashes ('-' or '--') cause option/argument injection
-    # ? when filenames are passed as positional arguments to external CLI binaries (e.g. tar, rm, git).
-    # ? Stripping leading dashes prevents option flag parsing in downstream command-line interfaces.
+    # Security (VULN-2026-001): leading dashes can be parsed as options
+    # when a sanitized filename is later passed to a command-line program.
+    # Strip them so the returned basename is not option-shaped.
     filename = filename.strip(replacement + ".-")
 
     # 6. Check empty

@@ -34,6 +34,23 @@ class TestSecurity(unittest.TestCase):
         self.assertEqual(sanitize_filename("file|name.txt"), "file_name.txt")
         self.assertEqual(sanitize_filename("file:name.txt"), "file_name.txt")
 
+    def test_sanitize_filename_rejects_option_shaped_prefix(self):
+        """Leading dashes are removed from sanitized basenames."""
+        self.assertEqual(sanitize_filename("--danger.txt"), "danger.txt")
+        self.assertEqual(sanitize_filename("-rf"), "rf")
+
+    def test_sanitize_filename_bounds_replacement(self):
+        with self.assertRaisesRegex(ValueError, "too long"):
+            sanitize_filename(
+                "file name.txt",
+                replacement="x" * 17,
+            )
+        with self.assertRaisesRegex(ValueError, "control"):
+            sanitize_filename(
+                "file name.txt",
+                replacement="x\n",
+            )
+
     def test_sanitize_filename_spaces(self):
         """Test handling of spaces."""
         self.assertEqual(sanitize_filename("my file name.txt"), "my_file_name.txt")

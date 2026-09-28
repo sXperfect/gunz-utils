@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import socket
+from unittest.mock import patch
 
 import pytest
 
@@ -165,3 +166,78 @@ def test_build_network_uri_rejects_backslash_and_control_characters() -> None:
 
     with pytest.raises(ValueError, match="authority characters"):
         build_network_uri("https", "example.com\x7fevil.test")
+
+
+def test_tcp_reachable_blocks_literal_private_address_before_connect() -> None:
+    with patch("gunz_utils.network.socket.create_connection") as connect:
+        with pytest.raises(ValueError, match="non-public"):
+            tcp_reachable(
+                "127.0.0.1",
+                80,
+                allow_private=False,
+            )
+    connect.assert_not_called()
+
+
+def test_tcp_reachable_blocks_hostname_resolving_to_private_address() -> None:
+    address_info = [
+        (
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP,
+            "",
+            ("10.0.0.5", 443),
+        )
+    ]
+    with (
+        patch(
+            "gunz_utils.network.socket.getaddrinfo",
+            return_value=address_info,
+        ),
+        patch("gunz_utils.network.socket.create_connection") as connect,
+    ):
+        with pytest.raises(ValueError, match="non-public"):
+            tcp_reachable(
+                "internal.example",
+                443,
+                allow_private=False,
+            )
+    connect.assert_not_called()
+
+
+def test_tcp_reachable_connects_to_validated_public_numeric_address() -> None:
+    address_info = [
+        (
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP,
+            "",
+            ("93.184.216.34", 443),
+        )
+    ]
+    with (
+        patch(
+            "gunz_utils.network.socket.getaddrinfo",
+            return_value=address_info,
+        ),
+        patch("gunz_utils.network.socket.create_connection") as connect,
+    ):
+        assert tcp_reachable(
+            "example.test",
+            443,
+            allow_private=False,
+        )
+
+    connect.assert_called_once_with(
+        ("93.184.216.34", 443),
+        timeout=5.0,
+    )
+
+
+def test_tcp_reachable_validates_allow_private_type() -> None:
+    with pytest.raises(TypeError, match="allow_private"):
+        tcp_reachable(
+            "example.test",
+            443,
+            allow_private="no",
+        )

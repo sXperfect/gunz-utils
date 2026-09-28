@@ -292,8 +292,8 @@ def directory_manifest(
     for path in files:
         relative = path.relative_to(base).as_posix()
         try:
-            # ? Security (VULN-2026-011): Handle open_path_under_base traversal errors
-            # ? gracefully so directory symlinks resolving outside root do not cause unhandled crashes.
+            # Security (VULN-2026-011): containment failures can occur
+            # when enumeration encounters a path through an unsafe symlink.
             with open_path_under_base(
                 str(base),
                 relative,

@@ -56,8 +56,8 @@ def transactional_directory(path: str | Path) -> Iterator[Path]:
     staging = Path(tempfile.mkdtemp(dir=target.parent, prefix=f".{target.name}."))
     try:
         yield staging
-        # ? Security (VULN-2026-010): Perform target symlink check and reject symlinked targets
-        # ? to mitigate TOCTOU symlink injection attacks prior to atomic replacement.
+        # Security (VULN-2026-010): reject pre-existing targets, including
+        # symlinks, before publishing the staged directory.
         if target.is_symlink() or target.exists():
             raise FileExistsError(target)
         os.replace(staging, target)
