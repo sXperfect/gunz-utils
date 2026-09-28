@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import math
 import shutil
 import subprocess
 import tempfile
@@ -53,6 +54,8 @@ def perf_stat(
     """Run a command under perf stat and parse machine-readable counters."""
     if not args:
         raise ValueError("args must not be empty")
+    if any(not isinstance(event, str) or not event for event in events):
+        raise ValueError("events must contain non-empty strings")
     if not perf_available():
         raise RuntimeError("Linux perf is not installed or not on PATH")
     with tempfile.NamedTemporaryFile() as output:
@@ -79,7 +82,8 @@ def perf_stat(
         unit = row[1].strip() or None
         event = row[2].strip()
         try:
-            value = float(raw_value.replace(",", ""))
+            parsed = float(raw_value.replace(",", ""))
+            value = parsed if math.isfinite(parsed) else None
         except ValueError:
             value = None
         counters.append(PerfCounter(event=event, value=value, unit=unit))
@@ -101,8 +105,10 @@ def perf_record(
     """Record perf samples suitable for later perf-script/flamegraph use."""
     if not args:
         raise ValueError("args must not be empty")
-    if frequency < 1:
-        raise ValueError("frequency must be positive")
+    if isinstance(frequency, bool) or not isinstance(frequency, int) or frequency < 1:
+        raise ValueError("frequency must be a positive integer")
+    if not isinstance(call_graph, str) or not call_graph:
+        raise ValueError("call_graph must be a non-empty string")
     if not perf_available():
         raise RuntimeError("Linux perf is not installed or not on PATH")
     completed = subprocess.run(
