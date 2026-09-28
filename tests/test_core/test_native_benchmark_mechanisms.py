@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import sys
 import unittest
 
@@ -16,6 +17,17 @@ class TestNativeBenchmarkMechanisms(unittest.TestCase):
         loops = calibrate_loops(lambda: None, target_time=0.0001)
         self.assertGreaterEqual(loops, 1)
 
+    def test_calibration_rejects_invalid_numeric_domain(self) -> None:
+        for value in (0.0, -1.0, math.nan, math.inf, -math.inf, True):
+            with self.subTest(target_time=value):
+                with self.assertRaises(ValueError):
+                    calibrate_loops(lambda: None, target_time=value)
+
+        for value in (0, -1, True):
+            with self.subTest(max_loops=value):
+                with self.assertRaises(ValueError):
+                    calibrate_loops(lambda: None, max_loops=value)
+
     def test_benchmark_records_loops(self) -> None:
         result = benchmark(
             lambda: None,
@@ -26,6 +38,24 @@ class TestNativeBenchmarkMechanisms(unittest.TestCase):
         self.assertGreaterEqual(result.parameters["_loops"], 1)
         report = analyze_stability(result)
         self.assertGreaterEqual(report.coefficient_of_variation, 0)
+
+    def test_stability_rejects_invalid_thresholds(self) -> None:
+        result = benchmark(
+            lambda: None,
+            warmup=0,
+            iterations=2,
+            loops=1,
+        )
+        for value in (-1.0, math.nan, math.inf, -math.inf, True):
+            with self.subTest(max_cv=value):
+                with self.assertRaises(ValueError):
+                    analyze_stability(result, max_cv=value)
+            with self.subTest(max_relative_range=value):
+                with self.assertRaises(ValueError):
+                    analyze_stability(
+                        result,
+                        max_relative_range=value,
+                    )
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc required")
     def test_rss_only_profile(self) -> None:
