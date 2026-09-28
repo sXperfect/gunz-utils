@@ -28,6 +28,7 @@ import functools
 import inspect
 import types
 import typing as t
+from collections import abc as cabc
 
 from .._version import __version__ as __version__
 
