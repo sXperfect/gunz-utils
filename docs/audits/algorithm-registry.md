@@ -30,7 +30,7 @@ execution.
 
 | ID | Algorithm / family | Location | Level | Main proof obligations / evidence | Current result |
 |---|---|---|---|---|---|
-| ALG-001 | Percentile bootstrap mean CI | `stats.bootstrap_mean_ci` | A2 | seeded determinism, confidence bounds, finite samples; `test_stats.py` | reviewed; basic percentile semantics retained |
+| ALG-001 | Percentile bootstrap mean CI | `stats.bootstrap_mean_ci` | A2 | seeded determinism, confidence/sample/seed domains, finite real observations; `test_stats.py` | strict numerical parameter domains added; basic percentile semantics retained |
 | ALG-002 | Paired standardized effect | `stats.paired_effect` | A2 | paired-length invariant, sample SD, singleton/zero variance, huge finite values | fixed overflow-prone variance and overflowed pair differences |
 | ALG-003 | Normal mean summary / z interval | `stats.normal_mean_summary` | A2 | sample SD, singleton, z domain, representability | fixed unstable variance; unrepresentable intervals fail explicitly |
 | ALG-004 | Numeric metric comparison | `experiments.compare_numeric_metrics` | A2 | missing keys, numeric filtering, relative delta | reviewed; zero-baseline semantics remain explicit follow-up |
@@ -50,7 +50,7 @@ execution.
 | ALG-018 | Multi-metric regression gate | `benchmark.gate.evaluate_regression_gate` | A2 | required metrics, policy aggregation, comparability warnings | inherits hardened policy validation |
 | ALG-019 | Benchmark history trend summary | `benchmark.trends.summarize_history` | A2 | OLS slope, moving median, finite metric values, baseline window | hardened domains and unknown-metric errors |
 | ALG-020 | Stability diagnostics | `benchmark.diagnostics.analyze_stability` | A2 | CV/range/outlier diagnostics, finite non-negative samples/thresholds | fixed invalid config appearing stable |
-| ALG-021 | Retry backoff / deadline policy | `retry.RetryPolicy`, retry runners | A2 | bounded attempts, finite delays/timeouts, retry exception filtering | fixed NaN/inf timing acceptance |
+| ALG-021 | Retry backoff / deadline policy | `retry.RetryPolicy`, retry runners | A2 | bounded attempts, finite delays/timeouts, overflow-safe exponential cap | fixed NaN/inf timing acceptance and huge-exponent overflow |
 | ALG-022 | Renewable lease heartbeat race | `leases.run_with_lease_heartbeat` | A1 | lease-loss precedence, cleanup, cancellation | static review complete; focused race tests still pending |
 | ALG-023 | Bounded/digest streaming writes | `streaming.BoundedWriter`, `DigestWriter`, `copy_and_hash` | A1 | partial-write progress, committed-byte accounting, byte limits | static review complete; fault-injection proof pending |
 | ALG-024 | Partition overlap detection | `partitions.partition_overlaps` | A1 | deterministic pair order, set intersection | static review complete; broader property tests pending |
@@ -60,7 +60,7 @@ execution.
 | ALG-028 | Monotonic deadline arithmetic | `time_utils.monotonic_deadline`, `remaining` | A2 | finite monotonic deadlines, non-negative remaining time | fixed NaN/inf deadline semantics |
 | ALG-029 | Sync/async eventually polling | `testing.eventually`, `eventually_async` | A2 | termination, interval positivity, timeout | fixed `timeout=NaN` non-termination class |
 | ALG-030 | Manual clock / deterministic integer fuzz | `testkit.ManualClock`, `fuzz_integers` | A2 | monotonic clock, finite advance, integer generator bounds | hardened domains and overflow behavior |
-| ALG-031 | Resource budgets | `limits.Limits`, `ResourceBudget` | A2 | byte/item/depth monotonic consumption, finite deadlines | fixed non-finite and bool-domain acceptance |
+| ALG-031 | Resource budgets | `limits.Limits`, `ResourceBudget` | A2 | byte/item/depth monotonic consumption, finite deadlines and injected clocks | fixed non-finite/bool domains and NaN-clock deadline poisoning |
 | ALG-032 | Canonical JSON conversion | `serialization.to_jsonable`, `canonical_json` | A2 | deterministic mappings/sets, JSON compatibility, collision freedom | fixed normalized-key collision data loss |
 | ALG-033 | Structured/content hashing parameters | `hashing.*` | A2 | deterministic digest, bounded reads, size domains | strict chunk/short-hash integer bounds added |
 | ALG-034 | Chunk/batch/flatten iteration | `iteration.chunked`, `batched`, `flatten` | A2 | laziness, grouping, cycle rejection, depth bounds | strict integer/depth domains added |
@@ -137,7 +137,7 @@ now fail explicitly on invalid numerical configuration.
 ### FIND-004 — retry/cache/resilience/deadline NaN semantics
 
 Resolved for reviewed timing paths. Most importantly,
-`eventually(timeout=NaN)` can no longer create a non-expiring NaN deadline.
+`eventually(timeout=NaN)` can no longer create a non-expiring NaN deadline. Resource budgets also validate injected clock readings, and retry backoff caps huge exponents without overflowing the intermediate.
 
 ### FIND-005 — canonical mapping-key collision
 
