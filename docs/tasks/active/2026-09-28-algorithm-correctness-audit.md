@@ -1,7 +1,7 @@
 # Repository-wide algorithm correctness audit
 
-Status: active — A0 verified; A1 implementation/proof sweep complete with
-one consolidated verification pending
+Status: active — A0 and former A1 families verified to A4; remaining A2 and
+explicit proof gaps are the next audit phase
 Branch: `audit/algorithm-correctness`
 Started: 2026-09-28
 Base: `main@cf3697d7457c5901ee1c927bc6dae347d5428722`
@@ -139,26 +139,39 @@ These are intentionally not hidden by the audit.
 
 ## Verification state
 
-Hosted aggregate CI was deliberately enabled for the audit branch for the A0
-sweep, then disabled again after success.
+Two consolidated hosted verification sweeps are retained as execution evidence.
+
+### A0 sweep
 
 Verified revision: `f55c510e014cf0233fd18f279808d3e9b22caf4a`
 Hosted run: `36382828055`
 
-Evidence from the successful run:
+- Python 3.11: 864 passed;
+- Python 3.12: 864 passed;
+- release, Ruff/mypy, strict docs, packaging/isolation: PASS.
+
+### Former A1 sweep
+
+Verified revision: `dc243517c01f9f9b2836df0dfb4570fa1519906f`
+Hosted run: `36389874370`
 
 - [x] release/version/changelog metadata;
 - [x] Ruff;
 - [x] mypy — no issues in 97 source files;
-- [x] Python 3.11 full suite — 864 passed;
+- [x] Python 3.11 full suite — 943 passed;
 - [x] strict Sphinx documentation build;
-- [x] packaging/isolation — zero-dep, stdlib, validation, project,
-      observability, secure, plot, and wheel/sdist all passed;
-- [x] Python 3.12 full suite — 864 passed;
+- [x] packaging/isolation — zero-dep, stdlib (18), validation (13),
+      project (7), observability (2), secure (42), plot, and wheel/sdist passed;
+- [x] Python 3.12 full suite — 943 passed;
 - [x] aggregate verifier reported every gate PASS.
 
-The final documentation/trigger-cleanup commit changes no audited source or test
-logic, so execution evidence remains bound to the code revision above.
+ALG-022, ALG-023, ALG-024, and ALG-050 through ALG-057 therefore satisfy the
+repository's A4 evidence rule on the verified revision. Explicit limitations
+such as the content-store fallback race and post-replace directory-fsync
+semantics remain open gaps despite the A4 result for the implemented contract.
+
+The final evidence/trigger-cleanup commit changes no audited source or test
+logic, so execution evidence remains bound to `dc243517c01f9f9b2836df0dfb4570fa1519906f`.
 
 ## Definition of done
 

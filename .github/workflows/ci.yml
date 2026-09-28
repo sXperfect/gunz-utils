@@ -2,8 +2,7 @@ name: CI
 
 on:
   push:
-    # TEMPORARY: remove audit branch after A1 verification.
-    branches: ["main", "audit/algorithm-correctness"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
     types: ["opened", "synchronize", "reopened", "ready_for_review"]

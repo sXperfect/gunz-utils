@@ -27,6 +27,10 @@ Execution evidence is recorded per audited revision. Hosted CI run
 `f55c510e014cf0233fd18f279808d3e9b22caf4a`: release, Ruff/mypy, 864 Python 3.11 tests, strict docs,
 all packaging/isolation cases, and 864 Python 3.12 tests.
 
+The former A1 sweep is independently verified by hosted CI run
+`36389874370` on `dc243517c01f9f9b2836df0dfb4570fa1519906f`: release, Ruff/mypy, 943 Python 3.11
+tests, strict docs, all packaging/isolation cases, and 943 Python 3.12 tests.
+
 ## Audited algorithm set
 
 | ID | Algorithm / family | Location | Level | Main proof obligations / evidence | Current result |
@@ -52,9 +56,9 @@ all packaging/isolation cases, and 864 Python 3.12 tests.
 | ALG-019 | Benchmark history trend summary | `benchmark.trends.summarize_history` | A2 | OLS slope, moving median, finite metric values, baseline window | hardened domains and unknown-metric errors |
 | ALG-020 | Stability diagnostics | `benchmark.diagnostics.analyze_stability` | A2 | CV/range/outlier diagnostics, finite non-negative samples/thresholds | fixed invalid config appearing stable |
 | ALG-021 | Retry backoff / deadline policy | `retry.RetryPolicy`, retry runners | A2 | bounded attempts, finite delays/timeouts, overflow-safe exponential cap | fixed NaN/inf timing acceptance and huge-exponent overflow |
-| ALG-022 | Renewable lease heartbeat race | `leases.run_with_lease_heartbeat` | A2 | lease-loss precedence, cleanup, cancellation, Awaitable support, setup-failure cleanup | setup/race proof tests added; execution pending |
-| ALG-023 | Bounded/digest streaming writes | `streaming.BoundedWriter`, `DigestWriter`, `copy_and_hash` | A2 | partial-write progress, committed-byte accounting, byte limits, strict JSONL constants | partial-write/failure and JSONL proof tests added; execution pending |
-| ALG-024 | Partition overlap detection | `partitions.partition_overlaps`, `PartitionManifest` | A2 | deterministic pair order, overlap oracle, immutable manifest, invalid-shape handling | exhaustive small-domain overlap proof added; execution pending |
+| ALG-022 | Renewable lease heartbeat race | `leases.run_with_lease_heartbeat` | A4 | lease-loss precedence, cleanup, cancellation, Awaitable support, setup-failure cleanup | setup/race proofs executed successfully in aggregate CI |
+| ALG-023 | Bounded/digest streaming writes | `streaming.BoundedWriter`, `DigestWriter`, `copy_and_hash` | A4 | partial-write progress, committed-byte accounting, byte limits, strict JSONL constants | partial-write/failure and strict-JSONL proofs executed successfully |
+| ALG-024 | Partition overlap detection | `partitions.partition_overlaps`, `PartitionManifest` | A4 | deterministic pair order, overlap oracle, immutable manifest, invalid-shape handling | exhaustive small-domain overlap proof executed successfully |
 | ALG-025 | TTL/LRU caches | `cache.ttl_cache`, `async_ttl_cache` | A2 | TTL expiry, capacity, coalesced async misses, finite TTL | fixed NaN/inf/bool TTL/capacity domains |
 | ALG-026 | Circuit breaker | `resilience.AsyncCircuitBreaker` | A2 | state transitions, failure threshold, recovery timer | hardened count/timing domains; race execution pending |
 | ALG-027 | Async bulkhead | `resilience.AsyncBulkhead` | A2 | concurrency bound, timeout acquisition | hardened limit/timeout domains |
@@ -80,14 +84,14 @@ all packaging/isolation cases, and 864 Python 3.12 tests.
 | ALG-047 | Project-root discovery/cache | `ext.project_stdlib`, `ext.project_gitpython` | A2 | ancestor search, cross-anchor cache correctness, optional sys.path injection | fixed cached root leakage and late-injection bug |
 | ALG-048 | Deep nested data utilities | `dict_utils.deep_get`, `deep_set`, `deep_merge` | A2 | path validation, override semantics, list strategies, non-mutation of roots | existing evidence reviewed; nested value aliasing remains contract-sensitive |
 | ALG-049 | Secure AES-GCM format/key derivation | `ext.secure_crypto` | A2 | explicit passphrase, PBKDF2/AES-GCM round trip, legacy rejection | existing security tests reviewed; malformed-length matrix still pending |
-| ALG-050 | Encrypted credential store | `ext.secure_store.SecureStore` | A2 | key modes, authenticated decrypt, ACLs, mutation/audit atomicity, threaded serialization, rotation recovery | transaction/concurrency/crash-recovery proofs added; execution pending |
-| ALG-051 | Stdlib runtime type checker | `ext.validation_stdlib.type_checked` | A2 | argument binding, PEP 604 unions, recursive containers, literals/Annotated, varargs/kwargs, redacted errors | recursive/differential proof tests added; execution pending |
-| ALG-052 | Version migration | `versioning.*` | A2 | version/envelope validation, one-step migration order, missing/downgrade paths, failure stop | focused failure-boundary proof added; execution pending |
-| ALG-053 | Plugin discovery/selection | `plugins.*` | A2 | deterministic ordering, sibling failure isolation, instantiation errors, process-control propagation | focused isolation proof added; execution pending |
-| ALG-054 | Content-addressed storage | `content_store.ContentAddressedStore` | A2 | digest/path mapping, integrity verification, symlinked fanout rejection, fallback publication, materialization domains | adversarial path/fallback proofs added; execution pending |
-| ALG-055 | Atomic filesystem publication | `fs.*`, `io.*` atomic helpers | A2 | temp isolation, replace failure cleanup, directory publication, no-overwrite symlinks, durability contract | fault/publication proofs added; execution pending |
-| ALG-056 | Core concurrency schedulers | `concurrency.*`, `pipeline.*` | A2 | task/queue bounds, initial-scheduling cleanup, ordering, worker-failure cancellation | adversarial setup/worker proofs added; execution pending |
-| ALG-057 | Signal/resource lifecycle | `signals.*`, `resources.*` | A2 | partial registration rollback, idempotent restore, reverse sync/async cleanup | lifecycle/failure proof tests added; execution pending |
+| ALG-050 | Encrypted credential store | `ext.secure_store.SecureStore` | A4 | key modes, authenticated decrypt, ACLs, mutation/audit atomicity, threaded serialization, rotation recovery | transaction/concurrency/crash-recovery proofs executed; secure isolation had 42 passing tests |
+| ALG-051 | Stdlib runtime type checker | `ext.validation_stdlib.type_checked` | A4 | argument binding, PEP 604 unions, recursive containers, literals/Annotated, varargs/kwargs, redacted errors | recursive/type-boundary proofs executed; stdlib isolation had 18 passing tests |
+| ALG-052 | Version migration | `versioning.*` | A4 | version/envelope validation, one-step migration order, missing/downgrade paths, failure stop | focused migration/failure-boundary proof executed successfully |
+| ALG-053 | Plugin discovery/selection | `plugins.*` | A4 | deterministic ordering, sibling failure isolation, instantiation errors, process-control propagation | focused discovery/isolation proof executed successfully |
+| ALG-054 | Content-addressed storage | `content_store.ContentAddressedStore` | A4 | digest/path mapping, integrity verification, symlinked fanout rejection, fallback publication, materialization domains | adversarial path/fallback proofs executed; cross-process fallback race remains GAP-006 |
+| ALG-055 | Atomic filesystem publication | `fs.*`, `io.*` atomic helpers | A4 | temp isolation, replace failure cleanup, directory publication, no-overwrite symlinks, durability contract | injected replace/publication proofs executed; post-replace fsync semantics remain GAP-005 |
+| ALG-056 | Core concurrency schedulers | `concurrency.*`, `pipeline.*` | A4 | task/queue bounds, initial-scheduling cleanup, ordering, worker-failure cancellation | adversarial setup/cancellation/worker-bound proofs executed successfully |
+| ALG-057 | Signal/resource lifecycle | `signals.*`, `resources.*` | A4 | partial registration rollback, idempotent restore, reverse sync/async cleanup | lifecycle/failure proofs executed successfully |
 | ALG-058 | Collection transforms | `collections.unique/group_by/index_by/partition` | A4 | stable order, duplicate semantics, unhashable values, key-derived collisions | focused proof suite executed successfully |
 | ALG-059 | Human-readable formatting | `formatting.*` | A4 | SI/IEC boundaries, duration decomposition, precision domain, non-finite/bool rejection, huge integer counts | domain coercion hardened and executed |
 | ALG-060 | Deterministic/short identifiers | `identifiers.*` | A4 | determinism, prefix consistency, string contracts, length bounds and bool rejection | parameter contracts hardened and executed |
