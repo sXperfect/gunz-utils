@@ -1,1 +1,1 @@
-- Raise the optional Matplotlib floor to 3.10.0 so the plotting extra resolves only to upstream-supported security lines.
+- Raise the optional Matplotlib floor to 3.10.9 so the plotting extra includes the security backport restricting `axes.prop_cycle` expression evaluation.
