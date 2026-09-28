@@ -161,6 +161,20 @@ class TestResourceBudget(unittest.TestCase):
         with self.assertRaises(BudgetExceededError):
             budget.check_deadline()
 
+    def test_deadline_rejects_non_finite_injected_clock(self) -> None:
+        for value in (math.nan, math.inf, -math.inf, True):
+            with self.subTest(initial=value):
+                with self.assertRaises(ValueError):
+                    ResourceBudget(timeout=1, clock=lambda: value)
+
+        now = [1.0]
+        budget = ResourceBudget(timeout=2, clock=lambda: now[0])
+        now[0] = math.nan
+        with self.assertRaises(ValueError):
+            budget.check_deadline()
+        with self.assertRaises(ValueError):
+            _ = budget.remaining_seconds
+
     def test_from_limits(self) -> None:
         budget = ResourceBudget.from_limits(
             Limits(max_bytes=7, max_items=4)
