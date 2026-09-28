@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Local verification entry point mirroring the intended hosted gates.
-# Delegates to scripts/ci.py so the local surface always matches CI.
+# Local aggregate verification entry point.
+# The hosted workflow additionally supplies --compat-python python3.12.
 set -euo pipefail
 
-python scripts/ci.py all
+args=(--summary-json tmp/ci-summary.json)
+if command -v python3.12 >/dev/null 2>&1; then
+    args+=(--compat-python python3.12)
+fi
+
+python scripts/audit_ci.py "${args[@]}"
