@@ -1,0 +1,1 @@
+- Redact rejected strict-boolean values and enforce finite/integer resource controls for process sampling and bounded streaming helpers.
