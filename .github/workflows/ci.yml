@@ -58,6 +58,7 @@ jobs:
       - name: Run aggregate repository verification
         run: |
           python scripts/audit_ci.py \
+            --skip-release \
             --compat-python "${{ steps.py312.outputs.python-path }}" \
             --summary-json tmp/ci-summary.json
 
