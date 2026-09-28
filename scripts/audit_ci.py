@@ -80,7 +80,7 @@ def collect_results(
             returncode = int(gate_runner(name))
         except Exception as exc:
             print(
-                f"!! audit gate {name} raised {type(exc).__name__}: {exc}",
+                f"!! audit gate {name} raised {type(exc).__name__}",
                 file=sys.stderr,
             )
             returncode = 70
@@ -98,7 +98,7 @@ def collect_results(
             returncode = int(compatibility_runner(compatibility_python))
         except Exception as exc:
             print(
-                f"!! audit gate {name} raised {type(exc).__name__}: {exc}",
+                f"!! audit gate {name} raised {type(exc).__name__}",
                 file=sys.stderr,
             )
             returncode = 70
@@ -185,13 +185,20 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="stop after the first failing primary gate",
     )
+    parser.add_argument(
+        "--skip-release",
+        action="store_true",
+        help="skip the release gate when it already ran as a hosted preflight",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the aggregate verifier."""
     args = build_parser().parse_args(argv)
+    gates = DEFAULT_GATES[1:] if args.skip_release else DEFAULT_GATES
     results = collect_results(
+        gates=gates,
         compatibility_python=args.compat_python,
         fail_fast=args.fail_fast,
     )
