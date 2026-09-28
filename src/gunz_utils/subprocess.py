@@ -395,7 +395,8 @@ async def run_command_async(
         terminate_grace,
         name="terminate_grace",
     )
-    assert validated_grace is not None
+    if validated_grace is None:
+        raise RuntimeError("validated terminate_grace unexpectedly became None")
     terminate_grace = validated_grace
     _validate_output_limit(max_output_bytes)
     started = time.perf_counter()
