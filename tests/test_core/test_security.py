@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from gunz_utils.security import safe_path_join, sanitize_filename
+from gunz_utils.security import open_path_under_base, safe_path_join, sanitize_filename
 
 
 class TestSecurity(unittest.TestCase):
@@ -157,6 +157,56 @@ class TestSecurity(unittest.TestCase):
     def test_absolute_component_is_rejected(self):
         with self.assertRaises(ValueError):
             safe_path_join("/tmp/base", "/etc/passwd")
+
+    def test_open_path_under_base_reads_nested_regular_file(self):
+        with tempfile.TemporaryDirectory() as tmp_path:
+            base = os.path.realpath(tmp_path)
+            nested = os.path.join(base, "nested")
+            os.mkdir(nested)
+            path = os.path.join(nested, "value.txt")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("safe")
+            with open_path_under_base(base, "nested", "value.txt", mode="r") as handle:
+                self.assertEqual(handle.read(), "safe")
+
+    @unittest.skipUnless(
+        os.name == "posix" and hasattr(os, "O_NOFOLLOW"),
+        "requires POSIX O_NOFOLLOW",
+    )
+    def test_open_path_under_base_rejects_final_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp_path:
+            base = os.path.realpath(tmp_path)
+            outside = tempfile.NamedTemporaryFile(delete=False)
+            outside.write(b"secret")
+            outside.close()
+            link = os.path.join(base, "link")
+            try:
+                os.symlink(outside.name, link)
+                with self.assertRaises((OSError, ValueError)):
+                    open_path_under_base(base, "link")
+            finally:
+                os.unlink(outside.name)
+
+    @unittest.skipUnless(
+        os.name == "posix" and hasattr(os, "O_NOFOLLOW"),
+        "requires POSIX O_NOFOLLOW",
+    )
+    def test_open_path_under_base_rejects_intermediate_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp_path:
+            base = os.path.realpath(tmp_path)
+            outside_dir = tempfile.mkdtemp()
+            outside_file = os.path.join(outside_dir, "secret.txt")
+            with open(outside_file, "w", encoding="utf-8") as handle:
+                handle.write("secret")
+            link = os.path.join(base, "nested")
+            try:
+                os.symlink(outside_dir, link)
+                with self.assertRaises(ValueError):
+                    open_path_under_base(base, "nested", "secret.txt")
+            finally:
+                import shutil
+
+                shutil.rmtree(outside_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":

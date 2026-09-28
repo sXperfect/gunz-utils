@@ -67,6 +67,7 @@ def test_rsync_mirror_holds_lock_through_transfer_and_marker(
     command = captured[0]
     assert command[0] == "rsync"
     assert "--human-readable" in command
+    assert command[-3] == "--"
     assert command[-2].endswith("/source/")
     assert command[-1] == str(target.resolve())
     assert result.completion_marker is not None
@@ -192,6 +193,28 @@ def test_rsync_mirror_rejects_hidden_destructive_extra_args(
             tmp_path / "target",
             extra_args=("--remove-source-files",),
         )
+
+
+def test_rsync_mirror_rejects_execution_affecting_extra_args(
+    tmp_path: Path,
+) -> None:
+    for argument in (
+        "-e",
+        "-essh -oProxyCommand=evil",
+        "--rsh=evil",
+        "--rsync-path=evil",
+        "--files-from=/etc/passwd",
+        "--password-file=/tmp/secret",
+        "--filter=merge /tmp/rules",
+        "-M--copy-as=root",
+        "--",
+    ):
+        with pytest.raises(ValueError, match="unsafe rsync"):
+            rsync_mirror(
+                "source",
+                tmp_path / "target",
+                extra_args=(argument,),
+            )
 
 
 def test_rsync_mirror_rejects_completion_marker_lock_collision(

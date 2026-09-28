@@ -17,6 +17,8 @@ __license__ = "Clear BSD"
 import functools
 import os
 import re
+import stat
+from pathlib import Path
 from typing import IO, Any
 
 # Pre-compile the regex for invalid characters (anything not alphanumeric, dot, or dash)
@@ -248,24 +250,50 @@ def open_path_under_base(
     *paths: str,
     mode: str = "rb",
 ) -> IO[Any]:
-    """Open a contained path while rejecting symlinks in the final component.
+    """Open a contained regular file without following path-component symlinks.
 
-    This helper reduces the check/open race present when callers separately use
-    :func:`safe_path_join` and :func:`open`. On POSIX it opens relative to a
-    directory descriptor and refuses a symlink final component.
+    `safe_path_join` performs the containment check. On POSIX systems with
+    `O_NOFOLLOW`, every path component is then opened relative to an already
+    opened directory descriptor. This closes the intermediate-directory symlink
+    race that remains when only the final component uses `O_NOFOLLOW`.
     """
     if any(flag in mode for flag in ("w", "a", "+", "x")):
         raise ValueError("open_path_under_base currently supports read-only modes")
     resolved = safe_path_join(base_dir, *paths)
+    base_path = os.path.realpath(base_dir)
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         return open(resolved, mode)
-    relative = os.path.relpath(resolved, os.path.realpath(base_dir))
-    dir_fd = os.open(os.path.realpath(base_dir), os.O_RDONLY | os.O_DIRECTORY)
+
+    relative = os.path.relpath(resolved, base_path)
+    parts = Path(relative).parts
+    if not parts or parts == (".",):
+        raise ValueError("path must identify a regular file under base directory")
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    current_fd = os.open(base_path, os.O_RDONLY | os.O_DIRECTORY)
     try:
-        flags = os.O_RDONLY | os.O_NOFOLLOW
-        fd = os.open(relative, flags, dir_fd=dir_fd)
+        for component in parts[:-1]:
+            next_fd = os.open(
+                component,
+                directory_flags,
+                dir_fd=current_fd,
+            )
+            os.close(current_fd)
+            current_fd = next_fd
+
+        fd = os.open(
+            parts[-1],
+            os.O_RDONLY | os.O_NOFOLLOW,
+            dir_fd=current_fd,
+        )
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise ValueError("path must identify a regular file")
+        except BaseException:
+            os.close(fd)
+            raise
     finally:
-        os.close(dir_fd)
+        os.close(current_fd)
     return os.fdopen(fd, mode)
 
 

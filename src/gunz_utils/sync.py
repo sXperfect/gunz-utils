@@ -15,6 +15,25 @@ from .subprocess import CommandResult, run_command
 
 _REMOTE_SHELL_SOURCE = re.compile(r"^[^/\\:]+:.+$")
 _WINDOWS_DRIVE_SOURCE = re.compile(r"^[A-Za-z]:[\\/].*$")
+_FORBIDDEN_EXTRA_OPTIONS = frozenset(
+    {
+        "-e",
+        "-f",
+        "-M",
+        "--backup-dir",
+        "--files-from",
+        "--filter",
+        "--log-file",
+        "--only-write-batch",
+        "--partial-dir",
+        "--password-file",
+        "--remote-option",
+        "--rsh",
+        "--rsync-path",
+        "--temp-dir",
+        "--write-batch",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -180,17 +199,21 @@ def rsync_mirror(
         for argument in extra_args
     ):
         raise ValueError("extra_args must contain non-empty strings")
-    destructive = [
-        argument
-        for argument in extra_args
+    unsafe_arguments: list[str] = []
+    for argument in extra_args:
+        option = argument.split("=", 1)[0]
         if (
-            argument.startswith("--delete")
+            argument == "--"
+            or argument.startswith("--delete")
             or argument == "--remove-source-files"
-        )
-    ]
-    if destructive:
+            or option in _FORBIDDEN_EXTRA_OPTIONS
+            or argument.startswith("-e")
+            or argument.startswith("-M")
+        ):
+            unsafe_arguments.append(argument)
+    if unsafe_arguments:
         raise ValueError(
-            "destructive rsync options must use explicit supported parameters"
+            "unsafe rsync options are not accepted through extra_args"
         )
     if lock and completion_marker == ".gunz-sync.lock":
         raise ValueError(
@@ -223,6 +246,7 @@ def rsync_mirror(
     rsync_args.extend(extra_args)
     rsync_args.extend(
         [
+            "--",
             source_text,
             str(destination),
         ]
