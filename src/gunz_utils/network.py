@@ -213,9 +213,12 @@ def tcp_reachable(
             )
         except OSError:
             return False
-        resolved = tuple(
-            dict.fromkeys(info[4][0] for info in address_info)
-        )
+        resolved_values: list[str] = []
+        for info in address_info:
+            address = info[4][0]
+            if isinstance(address, str):
+                resolved_values.append(address)
+        resolved = tuple(dict.fromkeys(resolved_values))
     else:
         resolved = (str(literal),)
 
