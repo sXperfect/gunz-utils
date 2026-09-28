@@ -28,6 +28,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python 3.12 compatibility interpreter
+        id: py312
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -48,12 +49,12 @@ jobs:
 
       - name: Install Python 3.12 compatibility dependencies
         run: |
-          python3.12 -m pip install pytest==9.0.2
-          python3.12 -m pip install ".[all]"
+          "${{ steps.py312.outputs.python-path }}" -m pip install pytest==9.0.2
+          "${{ steps.py312.outputs.python-path }}" -m pip install ".[all]"
 
       - name: Run aggregate repository verification
         run: |
-          python scripts/audit_ci.py             --compat-python python3.12             --summary-json tmp/ci-summary.json
+          python scripts/audit_ci.py --compat-python "${{ steps.py312.outputs.python-path }}" --summary-json tmp/ci-summary.json
 
       - name: Upload verification summary
         if: ${{ always() }}
