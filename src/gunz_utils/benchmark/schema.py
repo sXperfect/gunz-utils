@@ -14,7 +14,11 @@ class PerformanceSchemaError(ValueError):
 def validate_performance_run(data: dict[str, Any]) -> None:
     """Validate required PerformanceRun fields and supported schema version."""
     version = data.get("schema_version")
-    if version != PERFORMANCE_SCHEMA_VERSION:
+    if (
+        isinstance(version, bool)
+        or not isinstance(version, int)
+        or version != PERFORMANCE_SCHEMA_VERSION
+    ):
         raise PerformanceSchemaError(
             f"unsupported PerformanceRun schema version: {version!r}"
         )
@@ -34,7 +38,11 @@ def migrate_performance_run(data: dict[str, Any]) -> dict[str, Any]:
     """Migrate supported historical PerformanceRun mappings to current schema."""
     version = data.get("schema_version", 1)
     migrated = dict(data)
-    if version == 1:
+    if (
+        isinstance(version, int)
+        and not isinstance(version, bool)
+        and version == 1
+    ):
         migrated.setdefault("parameters", {})
         migrated.setdefault("metrics", {})
         migrated.setdefault("artifacts", [])
