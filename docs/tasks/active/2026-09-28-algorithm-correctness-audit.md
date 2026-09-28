@@ -1,7 +1,7 @@
 # Repository-wide algorithm correctness audit
 
-Status: active — implementation sweep complete enough for review; local execution
-verification pending
+Status: active — A0 sweep complete and aggregate CI verified; remaining A1/A2
+high-risk proof work pending
 Branch: `audit/algorithm-correctness`
 Started: 2026-09-28
 Base: `main@cf3697d7457c5901ee1c927bc6dae347d5428722`
@@ -87,7 +87,12 @@ not a one-time review.
 - [x] add exhaustive small-domain proof tests for workflow DAGs and uint64 varints;
 - [x] add a one-job aggregate CI verifier that continues through independent
       gates and emits a machine-readable summary;
-- [x] keep hosted triggers restricted to `main` and PRs targeting `main`.
+- [x] keep hosted triggers restricted to `main` and PRs targeting `main`;
+- [x] clear the A0 inventory with focused proof tests for collections,
+      formatting, identifiers, config, security paths, faults, buffers,
+      provenance, network/sync, and benchmark persistence/protocol families;
+- [x] execute aggregate hosted verification on `f55c510e014cf0233fd18f279808d3e9b22caf4a`
+      (run `36382828055`).
 
 ## Remaining proof work
 
@@ -98,7 +103,7 @@ These are intentionally not hidden by the audit.
 - [x] add exhaustive four-node graph/property tests with an independent
       Kahn-style cycle oracle;
 - [ ] decide whether recursion-depth limits warrant iterative traversal;
-- [ ] execute the exhaustive proof test before promoting the DAG audit above A2.
+- [x] execute the exhaustive proof test; ALG-009 reached A4 in aggregate CI.
 
 ### Stateful/concurrent
 
@@ -121,28 +126,31 @@ These are intentionally not hidden by the audit.
 
 - [ ] finish a line-by-line transactional/concurrency audit of SecureStore;
 - [ ] add malformed-length/tamper vectors around secure-crypto format parsing;
-- [ ] compare stdlib and optional validation/project backends with differential
-      property tests.
+- [x] compare stdlib and optional Pydantic validation behavior for the shared
+      strict scalar contract; ALG-075 reached A4.
 
 ## Verification state
 
-Hosted feature-branch CI remains disabled by trigger policy. The workflow now
-contains one aggregate `verify` job that runs independent gates through
-`scripts/audit_ci.py` and captures all gate statuses before failing.
+Hosted aggregate CI was deliberately enabled for the audit branch for the A0
+sweep, then disabled again after success.
 
-Regression tests have been added/updated, but this environment has repository
-connector access rather than an executable local checkout. Therefore no audit
-entry is promoted to A3/A4 in this task record yet.
+Verified revision: `f55c510e014cf0233fd18f279808d3e9b22caf4a`
+Hosted run: `36382828055`
 
-Still required in a local checkout:
+Evidence from the successful run:
 
-- [ ] focused tests for repaired subsystems;
-- [ ] `python scripts/ci.py lint`;
-- [ ] `python scripts/ci.py test`;
-- [ ] `python scripts/ci.py docs`;
-- [ ] `python scripts/release.py check`;
-- [ ] `./scripts/verify.sh`;
-- [ ] promote qualifying registry entries only after successful execution.
+- [x] release/version/changelog metadata;
+- [x] Ruff;
+- [x] mypy — no issues in 97 source files;
+- [x] Python 3.11 full suite — 864 passed;
+- [x] strict Sphinx documentation build;
+- [x] packaging/isolation — zero-dep, stdlib, validation, project,
+      observability, secure, plot, and wheel/sdist all passed;
+- [x] Python 3.12 full suite — 864 passed;
+- [x] aggregate verifier reported every gate PASS.
+
+The final documentation/trigger-cleanup commit changes no audited source or test
+logic, so execution evidence remains bound to the code revision above.
 
 ## Definition of done
 

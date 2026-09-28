@@ -23,7 +23,7 @@ maintained in [`docs/design/audit/`](../design/audit/README.md).
 | A1 | Implementation reviewed against an explicit contract and invariants. |
 | A2 | A1 plus existing tests reviewed against the proof obligations. |
 | A3 | A2 plus missing oracle/adversarial/property tests added and focused tests executed successfully. |
-| A4 | A3 plus the full local verification gate passes on the final branch state. |
+| A4 | A3 plus the canonical aggregate verification gate passes on the same audited revision, locally or in hosted CI. |
 
 Do not use "audited" without a level. A0 is not an audit result.
 
@@ -193,7 +193,7 @@ For integer count parameters also test `bool` because `bool` is a subclass of
    evidence is linked.
 6. Add missing adversarial/oracle/property tests and fix defects discovered.
 7. Run the focused test module(s); move to A3.
-8. Run `./scripts/verify.sh` on the final branch; move to A4.
+8. Run `./scripts/verify.sh` locally or the equivalent hosted `scripts/audit_ci.py` aggregate gate on the same audited revision; move to A4 only when every gate passes.
 9. Add/update the changelog fragment for observable behavior changes.
 
 ## Review rule for new algorithms

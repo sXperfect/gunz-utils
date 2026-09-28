@@ -20,11 +20,12 @@ Inventory baseline: **2026-09-28**, starting from
 - **A1** — implementation reviewed against an explicit contract/invariants.
 - **A2** — A1 plus test evidence reviewed/added.
 - **A3** — A2 plus focused proof/adversarial tests executed successfully.
-- **A4** — A3 plus the full local verification gate passes.
+- **A4** — A3 plus the canonical aggregate verification gate passes on the same revision, locally or in hosted CI.
 
-This branch is intentionally capped at **A2** until tests are actually executed
-in a local checkout. Added tests are evidence artifacts, not proof of successful
-execution.
+Execution evidence is recorded per audited revision. Hosted CI run
+`36382828055` passed the canonical aggregate verifier on
+`f55c510e014cf0233fd18f279808d3e9b22caf4a`: release, Ruff/mypy, 864 Python 3.11 tests, strict docs,
+all packaging/isolation cases, and 864 Python 3.12 tests.
 
 ## Audited algorithm set
 
@@ -38,10 +39,10 @@ execution.
 | ALG-006 | Cartesian parameter grid | `experiments.parameter_grid` | A2 | Cartesian product order, empty factors | reviewed; no defect found |
 | ALG-007 | Stable priority hash | `sampling.stable_priority` | A2 | deterministic BLAKE2b output, seed influence | reviewed; bool-as-int seed semantics remain a minor gap |
 | ALG-008 | Stable named-item sampling | `sampling.sample_named_items` | A2 | order independence, duplicate rejection, budget/filter ordering | reviewed; no defect found |
-| ALG-009 | Workflow topological order | `dag.WorkflowDAG._topological_order` | A2 | dependency-before-consumer, missing dependency, cycles; exhaustive four-node directed-graph test against independent Kahn oracle | proof test added; execution pending, recursion depth remains a limitation |
+| ALG-009 | Workflow topological order | `dag.WorkflowDAG._topological_order` | A4 | dependency-before-consumer, missing dependency, cycles; exhaustive four-node directed-graph test against independent Kahn oracle | exhaustive proof executed in CI; recursion depth remains a limitation |
 | ALG-010 | Effective transitive fingerprint | `dag.WorkflowDAG.effective_fingerprint` | A2 | dependency sensitivity, propagation, cache invalidation | reviewed; no defect found |
 | ALG-011 | Provenance DAG cycle/ancestor traversal | `provenance_graph.ProvenanceGraph` | A2 | cycle rollback, unresolved nodes, deterministic ancestors | reviewed; recursion depth is a limitation |
-| ALG-012 | Unsigned 64-bit canonical varint | `binary.encode_uvarint`, `ByteReader.read_uvarint` | A2 | exhaustive 0..65535 reference/round trip, uint64 boundaries, canonical form, malformed/truncation rollback | stronger proof vectors added; execution pending |
+| ALG-012 | Unsigned 64-bit canonical varint | `binary.encode_uvarint`, `ByteReader.read_uvarint` | A4 | exhaustive 0..65535 reference/round trip, uint64 boundaries, canonical form, malformed/truncation rollback | exhaustive/reference proof executed in CI |
 | ALG-013 | Priority + recent retention | `structures.retain_priority_and_recent` | A2 | stable order, priority preservation, zero/None limits | strengthened bound validation |
 | ALG-014 | Async token bucket | `rate_limit.AsyncRateLimiter` | A2 | balance in [0, capacity], no overdraw, timeout, finite parameters | fixed NaN/inf/bool state poisoning |
 | ALG-015 | Benchmark loop calibration | `benchmark.runner.calibrate_loops` | A2 | monotonic loop growth, target/max bounds | fixed non-finite target and invalid max-loop domains |
@@ -87,33 +88,35 @@ execution.
 | ALG-055 | Atomic filesystem publication | `fs.*`, `io.*` atomic helpers | A1 | temp-file isolation, rename, cleanup, durability | reviewed; post-replace fsync failure semantics need explicit proof |
 | ALG-056 | Core concurrency schedulers | `concurrency.*`, `pipeline.*` | A1 | task/queue bounds, ordering, cancellation cleanup | static review complete; adversarial race suite pending |
 | ALG-057 | Signal/resource lifecycle | `signals.*`, `resources.*` | A1 | registration rollback, reverse cleanup, async cleanup | static review complete; fault-injection suite pending |
+| ALG-058 | Collection transforms | `collections.unique/group_by/index_by/partition` | A4 | stable order, duplicate semantics, unhashable values, key-derived collisions | focused proof suite executed successfully |
+| ALG-059 | Human-readable formatting | `formatting.*` | A4 | SI/IEC boundaries, duration decomposition, precision domain, non-finite/bool rejection, huge integer counts | domain coercion hardened and executed |
+| ALG-060 | Deterministic/short identifiers | `identifiers.*` | A4 | determinism, prefix consistency, string contracts, length bounds and bool rejection | parameter contracts hardened and executed |
+| ALG-061 | Layered configuration construction | `config.merge_configs`, `env_overrides` | A4 | recursive precedence, caller non-mutation, prefix/separator/path-segment validity | malformed override paths now fail explicitly |
+| ALG-062 | Security path containment/open | `security.safe_path_join`, `open_path_under_base`, `NameAccessPolicy` | A4 | parent escape rejection, deny precedence, POSIX final-component no-follow | fixed final-symlink contract; broader parent-component race remains platform-dependent |
+| ALG-063 | Deterministic fault injection | `faults.FailAfter`, `FaultSequence` | A4 | exact one-based transitions, configured failure indices, call accounting | focused transition proof executed |
+| ALG-064 | Read-only buffers/backend dispatch | `buffers.as_readonly_view`, `dispatch` | A4 | zero-copy aliasing, read-only enforcement, exact backend selection | focused aliasing/dispatch proof executed |
+| ALG-065 | Provenance manifests | `provenance.*` | A4 | allowlisted environment, copied/frozen caller mappings, identifier/version domains | immutability and allowlist evidence executed |
+| ALG-066 | URI construction/TCP reachability | `network.*` | A4 | IPv6 brackets, IDNA, user-info escaping, ports, finite timeout | non-finite timeout hole fixed and executed |
+| ALG-067 | Rsync mirror completion protocol | `sync.rsync_mirror` | A4 | source normalization, destructive-argument rejection, success-only completion marker | success/failure publication proof executed |
+| ALG-068 | Benchmark artifact registry | `benchmark.artifacts.*` | A4 | checksum/tamper detection, regular-file identity, symlink rejection | symlink artifacts now rejected |
+| ALG-069 | Checked benchmark result loading | `benchmark.safe_io.load_result_checked` | A4 | bounded read, required structure, finite samples/stats, integer/schema domains | loader now bounds actual bytes read and validates persisted fields |
+| ALG-070 | Benchmark run-directory publication | `benchmark.run_directory.save_run_directory` | A4 | artifact-name collision handling, copied checksum validity, run metadata | collision proof executed; transactional publication remains GAP-004 |
+| ALG-071 | Linux perf integration | `benchmark.perf.*` | A4 | event/frequency domains, unavailable counters, non-finite parser values | invalid domains/non-finite counters hardened |
+| ALG-072 | Benchmark worker protocol | `benchmark.worker.*` | A4 | module/interpreter/timeout domains, failure propagation, strict JSON | strict JSON and timing domains proven; captured output remains unbounded |
+| ALG-073 | Benchmark reporting/export/plot transforms | `benchmark.report/export/plot` | A4 | profile representation, CSV export, CPU-core transform, invalid metric rejection, real plot smoke | proof and isolated matplotlib smoke executed |
+| ALG-074 | Benchmark overhead probe | `benchmark.overhead.measure_runner_overhead` | A4 | positive integer iterations, bool rejection, zero timer-resolution semantics | focused proof executed |
+| ALG-075 | Optional Pydantic validation adapter | `ext.validation_pydantic.type_checked` | A4 | valid scalar behavior, strict-int differential parity, redacted validation errors | strict-mode differential proof executed; default Pydantic coercion remains intentional backend behavior |
 
-## Inventoried but not yet audited to A1
+## A0 sweep result
 
-The following maintained algorithmic families are present in the complete
-inventory but still require a dedicated proof packet. A0 is explicit so the
-registry does not imply coverage that has not happened.
+The initial A0 backlog is cleared. Families ALG-058 through ALG-075 were
+reviewed, given focused proof tests, and executed successfully in hosted
+aggregate CI run `36382828055` on `f55c510e014cf0233fd18f279808d3e9b22caf4a`.
 
-| Family | Main units | Level / next proof focus |
-|---|---|---|
-| Collections | `collections.unique/group_by/index_by/partition` | A0 — collision/order/property sweep |
-| Formatting | byte/count magnitude and duration formatting | A0 — boundaries, rounding, negative values |
-| Identifiers | deterministic and short IDs | A0 — collision representation and length domains |
-| Configuration | recursive merge/environment override construction | A0 — precedence and aliasing |
-| Security paths | `security.safe_path_join`, rooted open/name policy | A0 — symlink/TOCTOU matrix belongs with security audit |
-| Fault injection | `faults.FailAfter`, `FaultSequence` | A0 — deterministic transition proof |
-| Buffers | readonly/bounded buffer helpers and acceleration dispatch | A0 — aliasing/bounds/backend equivalence |
-| Provenance manifests | runtime/environment capture and filtering | A0 — allowlist/determinism/secret-exclusion proof |
-| Network | URI construction and reachability | A0 — IPv6/IDNA/delimiter/timeouts |
-| Sync/mirror | rsync/mirror completion markers | A0 — partial-failure/publication proof |
-| Benchmark artifacts | checksum registration/verification | A0 — mutation races/symlink semantics |
-| Benchmark safe I/O | `benchmark.safe_io.load_result_checked` | A0 — TOCTOU, finite numeric fields, schema validation |
-| Benchmark run directories | `save_run_directory` | A0 — collision and transactional publication |
-| Benchmark perf integration | `perf_stat/record/script` | A0 — parser invalid values/event names/frequency domains |
-| Benchmark worker protocol | `run_python_worker`, `worker_json` | A0 — finite timeout, malformed/oversized output |
-| Benchmark reporting/export/plot | report/export aggregation | A0 — representation and invalid-data behavior |
-| Benchmark overhead probe | `measure_runner_overhead` | A0 — zero timer and iteration domain |
-| Optional Pydantic validation | validation adapter/backend equivalence | A0 — differential parity with stdlib backend |
+A green A4 execution level does not erase explicitly documented limitations.
+GAP-004 and the worker/process/resource gaps below remain active where the
+public contract is narrower than a stronger transactional or memory-bound
+guarantee.
 
 ## Resolved findings
 
@@ -160,6 +163,30 @@ command boundary rather than generic whitespace splitting.
 Resolved for ALG-047. A cached root is reused only for anchors within that root,
 and a later request for `sys.path` injection is honored.
 
+### FIND-009 — rooted open erased the final symlink before O_NOFOLLOW
+
+Resolved for ALG-062. `open_path_under_base` previously used the resolved path
+for the POSIX open, so a final in-base symlink had already disappeared before
+`O_NOFOLLOW` could reject it. The containment check still resolves the target,
+but the descriptor-relative open now preserves the caller's final component.
+
+### FIND-010 — A0 parameter-domain coercion
+
+Resolved across ALG-059-061/066/071-072/074. Formatting, identifier,
+configuration, TCP, perf, worker, and overhead APIs now reject invalid bool,
+non-finite, empty, or malformed parameter values before work starts.
+
+### FIND-011 — checked benchmark loader trusted persisted numeric structure
+
+Resolved for ALG-069. The loader now performs a bounded binary read and validates
+sample finiteness, count/schema integer domains, statistics, system metadata, and
+parameter structure before constructing the result.
+
+### FIND-012 — performance artifacts followed symlinks
+
+Resolved for ALG-068. Artifact registration and verification now reject symlinks
+instead of treating a symlink to a regular file as the registered file identity.
+
 ## Open limitations / proof gaps
 
 ### GAP-001 — subprocess output limit is not a resident-memory bound
@@ -199,16 +226,17 @@ The normal hard-link publication path is concurrency-friendly; the fallback
 replace path still needs an adversarial concurrent-publication/fault-injection
 proof.
 
-### GAP-007 — benchmark safe-I/O model validation
+### GAP-007 — benchmark worker output is not memory bounded
 
-The checked loader bounds file size before reading but still needs a full schema
-and finite-numeric validation pass, including mutation/TOCTOU considerations.
+ALG-072 uses `subprocess.run(..., capture_output=True)`. Its timeout and JSON
+protocol are audited, but stdout/stderr have no streaming byte cap. Add a
+bounded-capture protocol if worker output can be untrusted or arbitrarily large.
 
-### GAP-008 — optional/security backend completeness
+### GAP-008 — SecureStore backend completeness
 
-SecureStore and optional validation backends have meaningful existing tests,
-but this branch has not yet completed every internal transaction/concurrency and
-cross-backend differential proof.
+SecureStore has meaningful existing tests, but this branch has not yet completed
+every internal transaction/concurrency and malformed-format proof. The optional
+Pydantic validation adapter itself is now covered by ALG-075.
 
 ## Completion rule
 
@@ -220,5 +248,5 @@ The long-horizon repository-wide algorithm audit is complete only when:
 3. high-risk numerical, graph, binary, concurrency and state-machine families
    reach A4;
 4. every discovered correctness defect has a regression test;
-5. `./scripts/verify.sh` passes on the final branch state;
+5. the canonical aggregate verifier passes on the audited code revision;
 6. this registry is updated with the final audited commit and execution evidence.
