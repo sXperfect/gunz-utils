@@ -264,7 +264,10 @@ def open_path_under_base(
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         return open(resolved, mode)
 
-    relative = os.path.relpath(resolved, base_path)
+    # Use the caller's lexical components for descriptor-relative opening.
+    # The containment check above resolves symlinks, while this path preserves
+    # them so O_NOFOLLOW can reject both intermediate and final components.
+    relative = os.path.join(*paths) if paths else "."
     parts = Path(relative).parts
     if not parts or parts == (".",):
         raise ValueError("path must identify a regular file under base directory")
