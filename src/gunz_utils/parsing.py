@@ -163,4 +163,7 @@ def parse_bool(value: Any) -> bool:
     if result is not None:
         return result
     expected = sorted(_TRUE_STRINGS | _FALSE_STRINGS)
-    raise ValueError(f"Cannot parse bool from {value!r}; expected one of {expected}")
+    raise ValueError(
+        f"Cannot parse bool from type {type(value).__name__}; "
+        f"expected one of {expected}"
+    )
