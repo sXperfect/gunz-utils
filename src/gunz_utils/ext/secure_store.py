@@ -49,6 +49,7 @@ import os
 import re
 import sqlite3
 import stat
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -450,7 +451,6 @@ class SecureStore:
     def get_bytes(self, name: str, *, caller: str = "library") -> bytes | None:
         """Decrypt and return raw secret bytes, or None if not found."""
         name = self._validate_secret_name(name)
-        name = self._validate_secret_name(name)
         caller = self._validate_identity(caller, field="caller")
         with self._lock:
             if self._fernet is None:
@@ -481,6 +481,7 @@ class SecureStore:
         return None if value is None else value.decode("utf-8")
     def delete(self, name: str, *, caller: str = "library") -> bool:
         """Delete an authorized secret. The store must be unlocked."""
+        name = self._validate_secret_name(name)
         caller = self._validate_identity(caller, field="caller")
         with self._lock:
             if self._fernet is None:

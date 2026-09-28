@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import pathlib
+from typing import BinaryIO
 
 from ._version import __version__ as __version__
 
@@ -32,6 +33,8 @@ DEFAULT_CHUNK_SIZE: int = 65536
 SUPPORTED_ALGOS: frozenset[str] = frozenset(
     {"sha256", "sha512", "sha1", "blake2b", "blake2s", "sha3_256", "md5"}
 )
+# MD5 and SHA-1 remain for compatibility and non-adversarial fingerprints only.
+# Security-sensitive identity code such as ContentAddressedStore rejects them.
 _MIN_SHORT_CHARS: int = 4
 _MAX_SHORT_CHARS: int = 128
 

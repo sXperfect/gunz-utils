@@ -68,7 +68,7 @@ class TestM6ProductionHardening(unittest.TestCase):
                     kind="profile",
                 )
 
-        def test_regression_gate_respects_comparability(self) -> None:
+    def test_regression_gate_respects_comparability(self) -> None:
         policy = MetricPolicy(
             "latency",
             "lower",

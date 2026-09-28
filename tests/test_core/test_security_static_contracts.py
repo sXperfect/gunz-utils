@@ -15,6 +15,7 @@ _BANNED_CALLS = {
     ("subprocess", "getoutput"),
     ("subprocess", "getstatusoutput"),
     ("tempfile", "mktemp"),
+    ("yaml", "load"),
     ("yaml", "unsafe_load"),
 }
 

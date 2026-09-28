@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from gunz_utils.benchmark import (
+    PerformanceArtifact,
     PerformanceRun,
     SystemInfo,
     register_artifact,
@@ -63,17 +64,16 @@ class TestAuditRegressions(unittest.IsolatedAsyncioTestCase):
                 link.symlink_to(target)
             except (OSError, NotImplementedError):
                 self.skipTest("symlink creation unavailable")
+            artifact = PerformanceArtifact(
+                kind="x",
+                path=str(link),
+                checksum_sha256="0" * 64,
+                size_bytes=6,
+            )
             run = PerformanceRun(
                 "demo",
                 SystemInfo.capture(),
-                artifacts=(
-                    type("Artifact", (), {
-                        "path": str(link),
-                        "kind": "x",
-                        "media_type": None,
-                        "description": None,
-                    })(),
-                ),
+                artifacts=(artifact,),
             )
             with self.assertRaisesRegex(ValueError, "symlink"):
                 save_run_directory(run, root / "run")
@@ -93,7 +93,10 @@ class TestAuditRegressions(unittest.IsolatedAsyncioTestCase):
             packaged = save_run_directory(run, root / "run")
             paths = [Path(item.path) for item in packaged.artifacts]
             self.assertEqual(len({path.name for path in paths}), 2)
-            self.assertEqual({path.read_bytes() for path in paths}, {b"one", b"two"})
+            self.assertEqual(
+                {path.read_bytes() for path in paths},
+                {b"one", b"two"},
+            )
 
 
 if __name__ == "__main__":
