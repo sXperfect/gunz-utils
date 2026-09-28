@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import subprocess
 import time
@@ -256,8 +257,13 @@ def profile_command(
     """
     if not args:
         raise ValueError("args must not be empty")
-    if interval <= 0:
-        raise ValueError("interval must be positive")
+    if (
+        isinstance(interval, bool)
+        or not isinstance(interval, (int, float))
+        or not math.isfinite(float(interval))
+        or interval <= 0
+    ):
+        raise ValueError("interval must be a finite positive number")
     if memory_detail not in {"rss", "pss", "full"}:
         raise ValueError("memory_detail must be rss, pss, or full")
     if (
