@@ -31,7 +31,7 @@ class VersionedEnvelope:
     def __post_init__(self) -> None:
         if not isinstance(self.schema, str):
             raise TypeError("schema must be a string")
-        if not self.schema:
+        if not self.schema.strip():
             raise ValueError("schema must not be empty")
         _validate_version(self.version, name="version")
         if not isinstance(self.metadata, Mapping):
@@ -61,6 +61,8 @@ class VersionedEnvelope:
         metadata = value.get("metadata", {})
         if not isinstance(schema, str):
             raise SchemaMigrationError("schema must be a string")
+        if not schema.strip():
+            raise SchemaMigrationError("schema must not be empty")
         if not isinstance(version, int) or isinstance(version, bool):
             raise SchemaMigrationError("version must be an integer")
         if version < 1:
@@ -88,7 +90,7 @@ class SchemaMigrator:
         """Register a migration from version N to N+1."""
         if not isinstance(schema, str):
             raise TypeError("schema must be a string")
-        if not schema:
+        if not schema.strip():
             raise ValueError("schema must not be empty")
         _validate_version(from_version, name="from_version")
         if not callable(migration):
