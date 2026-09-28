@@ -67,6 +67,7 @@ __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import abc
 import asyncio
+import math
 from typing import Any, Protocol, runtime_checkable
 
 from ._version import __version__ as __version__
@@ -246,15 +247,39 @@ class PolicyUpstream:
         max_attempts: int = 1,
         idempotent_tools: frozenset[str] = frozenset(),
     ) -> None:
-        if timeout_seconds <= 0:
-            raise ValueError("timeout_seconds must be positive")
-        if max_concurrency <= 0:
-            raise ValueError("max_concurrency must be positive")
-        if max_attempts <= 0:
-            raise ValueError("max_attempts must be positive")
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not math.isfinite(float(timeout_seconds))
+            or timeout_seconds <= 0
+        ):
+            raise ValueError(
+                "timeout_seconds must be a finite positive number"
+            )
+        if (
+            isinstance(max_concurrency, bool)
+            or not isinstance(max_concurrency, int)
+            or max_concurrency <= 0
+        ):
+            raise ValueError(
+                "max_concurrency must be a positive integer"
+            )
+        if (
+            isinstance(max_attempts, bool)
+            or not isinstance(max_attempts, int)
+            or max_attempts <= 0
+        ):
+            raise ValueError("max_attempts must be a positive integer")
+        if not isinstance(idempotent_tools, frozenset) or any(
+            not isinstance(name, str) or not name
+            for name in idempotent_tools
+        ):
+            raise ValueError(
+                "idempotent_tools must be a frozenset of non-empty strings"
+            )
         self._client = client
         self.name = client.name
-        self._timeout_seconds = timeout_seconds
+        self._timeout_seconds = float(timeout_seconds)
         self._max_attempts = max_attempts
         self._idempotent_tools = idempotent_tools
         self._semaphore = asyncio.Semaphore(max_concurrency)
