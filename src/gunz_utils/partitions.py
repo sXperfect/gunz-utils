@@ -26,14 +26,26 @@ class PartitionManifest:
 
     def __post_init__(self) -> None:
         """Normalize caller input into an immutable mapping of tuples."""
+        if not isinstance(self.partitions, Mapping):
+            raise TypeError("partitions must be a mapping")
         normalized: dict[str, tuple[str, ...]] = {}
         for name, identifiers in self.partitions.items():
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("partition names must be non-empty strings")
             if isinstance(identifiers, (str, bytes, bytearray)):
                 raise ValueError(
                     f"partition {name!r} identifiers must be an iterable "
                     "of strings, not one string"
                 )
-            normalized[name] = tuple(identifiers)
+            values = tuple(identifiers)
+            if any(
+                not isinstance(identifier, str) or not identifier
+                for identifier in values
+            ):
+                raise ValueError(
+                    f"partition {name!r} contains an invalid item identifier"
+                )
+            normalized[name] = values
         object.__setattr__(
             self,
             "partitions",
@@ -48,18 +60,12 @@ class PartitionManifest:
 
         seen: dict[str, str] = {}
         for name, identifiers in self.partitions.items():
-            if not isinstance(name, str) or not name.strip():
-                raise ValueError("partition names must be non-empty strings")
             identifiers_tuple = tuple(identifiers)
             if len(set(identifiers_tuple)) != len(identifiers_tuple):
                 raise ValueError(
                     f"duplicate item identifiers in partition {name!r}"
                 )
             for identifier in identifiers_tuple:
-                if not isinstance(identifier, str) or not identifier:
-                    raise ValueError(
-                        f"partition {name!r} contains an invalid item identifier"
-                    )
                 previous = seen.get(identifier)
                 if previous is not None:
                     raise ValueError(
@@ -127,13 +133,20 @@ def partition_overlaps(
         Pair names mapped to their shared identifiers. Empty intersections are
         omitted and pair ordering is deterministic by partition name.
     """
+    if not isinstance(partitions, Mapping):
+        raise TypeError("partitions must be a mapping")
     groups: dict[str, set[Hashable]] = {}
     for name, values in partitions.items():
         if not isinstance(name, str) or not name.strip():
             raise ValueError(
                 "partition names must be non-empty strings"
             )
-        groups[name] = set(values)
+        try:
+            groups[name] = set(values)
+        except TypeError as exc:
+            raise ValueError(
+                f"partition {name!r} contains an unhashable identifier"
+            ) from exc
 
     names = sorted(groups)
     result: dict[
