@@ -34,6 +34,18 @@ def fingerprint(value: Any, algorithm: str = "sha256") -> str:
     return digest.hexdigest()
 
 
+def _positive_int(value: object, *, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{name} must be a positive integer")
+    return value
+
+
+def _non_negative_int(value: object, *, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{name} must be a non-negative integer")
+    return value
+
+
 def hash_stream(
     handle: BinaryIO,
     *,
@@ -41,8 +53,7 @@ def hash_stream(
     chunk_size: int = 1 << 20,
 ) -> str:
     """Hash a binary stream with bounded memory."""
-    if chunk_size < 1:
-        raise ValueError("chunk_size must be positive")
+    chunk_size = _positive_int(chunk_size, name="chunk_size")
     digest = hashlib.new(algorithm)
     while chunk := handle.read(chunk_size):
         digest.update(chunk)
@@ -53,10 +64,8 @@ class BoundedWriter:
     """Binary writer that rejects writes exceeding a cumulative byte limit."""
 
     def __init__(self, handle: BinaryIO, *, max_bytes: int) -> None:
-        if max_bytes < 0:
-            raise ValueError("max_bytes must be non-negative")
         self.handle = handle
-        self.max_bytes = max_bytes
+        self.max_bytes = _non_negative_int(max_bytes, name="max_bytes")
         self.bytes_written = 0
 
     def write(self, data: bytes) -> int:
@@ -86,8 +95,8 @@ class DigestWriter:
         algorithm: str = "sha256",
         max_bytes: int | None = None,
     ) -> None:
-        if max_bytes is not None and max_bytes < 0:
-            raise ValueError("max_bytes must be non-negative")
+        if max_bytes is not None:
+            max_bytes = _non_negative_int(max_bytes, name="max_bytes")
         self.handle = handle
         self.algorithm = algorithm
         self.max_bytes = max_bytes
@@ -137,8 +146,7 @@ def copy_and_hash(
     max_bytes: int | None = None,
 ) -> StreamCopyResult:
     """Copy a binary stream while hashing and optionally bounding output size."""
-    if chunk_size < 1:
-        raise ValueError("chunk_size must be positive")
+    chunk_size = _positive_int(chunk_size, name="chunk_size")
     writer = DigestWriter(
         destination,
         algorithm=algorithm,
