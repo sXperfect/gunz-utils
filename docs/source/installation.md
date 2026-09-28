@@ -58,7 +58,7 @@ Optional extras are defined in `pyproject.toml`:
 
 | Extra | Adds | Representative functionality |
 |---|---|---|
-| `validation` | `pydantic>=2.0.0` | Pydantic-backed runtime validation |
+| `validation` | `pydantic>=2.4.0` | Pydantic-backed runtime validation |
 | `project` | `gitpython>=3.1.62` | Git-aware project-root discovery |
 | `observability` | `loguru>=0.7.0` | Structured logging setup |
 | `secure` | `cryptography>=50.0.1` | Encryption and secure storage |

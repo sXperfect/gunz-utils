@@ -46,6 +46,8 @@ def test_package_metadata_declares_supported_contracts() -> None:
     assert "hatchling>=1.27" in metadata["build-system"]["requires"]
 
     extras = project["optional-dependencies"]
+    assert "pydantic>=2.4.0" in extras["validation"]
+    assert "pydantic>=2.4.0" in extras["all"]
     assert "gitpython>=3.1.62" in extras["project"]
     assert "gitpython>=3.1.62" in extras["all"]
     assert "cryptography>=50.0.1" in extras["secure"]
