@@ -46,7 +46,9 @@ __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import base64
 import os
+import re
 import sqlite3
+import stat
 import threading
 import time
 from dataclasses import dataclass
@@ -60,6 +62,8 @@ from .._version import __version__ as __version__
 
 _PBKDF2_ITERATIONS = 600_000  # OWASP 2023 recommendation for SHA-256
 _KEY_FILE_MODE = 0o600  # owner read/write only
+_DIR_MODE = 0o700
+_LIBRARY_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
 def default_base_dir(library_name: str) -> Path:
@@ -75,6 +79,12 @@ def default_base_dir(library_name: str) -> Path:
     ``DEFAULT_BASE_DIR`` evaluates ``os.environ`` exactly once at
     import; we keep that pattern by deferring the evaluation here.
     """
+    if (
+        not isinstance(library_name, str)
+        or library_name in {".", ".."}
+        or _LIBRARY_NAME_RE.fullmatch(library_name) is None
+    ):
+        raise ValueError("library_name must be a simple filesystem-safe name")
     override = os.environ.get("HYPERHEDRON_CONFIG_DIR")
     if override:
         return Path(override)
@@ -120,16 +130,16 @@ class SecureStore:
         library_name: str = "hyperhedron",
     ) -> None:
         self._base_dir = (
-            Path(base_dir) if base_dir else default_base_dir(library_name)
+            Path(base_dir) if base_dir is not None else default_base_dir(library_name)
         )
-        self._base_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-        try:
-            os.chmod(self._base_dir, 0o700)
-        except OSError:
-            pass
+        self._ensure_private_directory(self._base_dir)
         self._master_key_path = self._base_dir / "master.key"
         self._salt_path = self._base_dir / "master.salt"
         self._db_path = self._base_dir / "config.db"
+        if self._db_path.is_symlink():
+            raise ValueError("secure-store database path must not be a symlink")
+        if self._db_path.exists() and not self._db_path.is_file():
+            raise ValueError("secure-store database path must be a regular file")
         self._lock = threading.RLock()
         self._fernet_lock = self._lock
         self._fernet: Fernet | None = None
@@ -141,10 +151,7 @@ class SecureStore:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._init_schema()
-        try:
-            os.chmod(self._db_path, _KEY_FILE_MODE)
-        except OSError:
-            pass
+        self._ensure_private_file(self._db_path)
 
     def _init_schema(self) -> None:
         with self._lock:
@@ -185,6 +192,63 @@ class SecureStore:
             return self._fernet
 
     @staticmethod
+    def _ensure_private_directory(path: Path) -> None:
+        """Create and verify an owner-private non-symlink directory."""
+        if path.is_symlink():
+            raise ValueError("secure-store base directory must not be a symlink")
+        path.mkdir(parents=True, exist_ok=True, mode=_DIR_MODE)
+        info = os.stat(path, follow_symlinks=False)
+        if not stat.S_ISDIR(info.st_mode):
+            raise ValueError("secure-store base path must be a directory")
+        if os.name == "posix":
+            if info.st_uid != os.getuid():
+                raise PermissionError("secure-store base directory has wrong owner")
+            os.chmod(path, _DIR_MODE)
+            if stat.S_IMODE(os.stat(path, follow_symlinks=False).st_mode) != _DIR_MODE:
+                raise PermissionError("secure-store base directory is not mode 0700")
+
+    @staticmethod
+    def _ensure_private_file(path: Path) -> None:
+        """Reject symlinks/non-files and enforce owner-only permissions."""
+        if path.is_symlink():
+            raise ValueError(f"private path must not be a symlink: {path.name}")
+        info = os.stat(path, follow_symlinks=False)
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError(f"private path must be a regular file: {path.name}")
+        if os.name == "posix":
+            if info.st_uid != os.getuid():
+                raise PermissionError(f"private file has wrong owner: {path.name}")
+            os.chmod(path, _KEY_FILE_MODE)
+            mode = stat.S_IMODE(os.stat(path, follow_symlinks=False).st_mode)
+            if mode != _KEY_FILE_MODE:
+                raise PermissionError(f"private file is not mode 0600: {path.name}")
+
+    @classmethod
+    def _read_private(cls, path: Path) -> bytes:
+        cls._ensure_private_file(path)
+        return path.read_bytes()
+
+    @staticmethod
+    def _validate_identity(value: str, *, field: str) -> str:
+        if (
+            not isinstance(value, str)
+            or not value
+            or len(value) > 256
+            or "," in value
+            or "\x00" in value
+        ):
+            raise ValueError(
+                f"{field} must be a non-empty identifier without commas or NULs"
+            )
+        return value
+
+    @classmethod
+    def _normalize_acl(cls, acl: list[str] | None) -> list[str] | None:
+        if acl is None:
+            return None
+        return [cls._validate_identity(item, field="ACL entry") for item in acl]
+
+    @staticmethod
     def _write_private(path: Path, data: bytes) -> None:
         """Create or replace a private file without a world-readable window."""
         tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -222,6 +286,10 @@ class SecureStore:
 
     def unlock(self, passphrase: str | None = None) -> None:
         """Unlock the store and verify the selected key before publishing it."""
+        if passphrase is not None and (
+            not isinstance(passphrase, str) or not passphrase
+        ):
+            raise ValueError("passphrase must be a non-empty string")
         with self._lock:
             if passphrase is None:
                 if self._salt_path.exists() and not self._master_key_path.exists():
@@ -229,7 +297,7 @@ class SecureStore:
                         "Store is passphrase-protected; passphrase required"
                     )
                 if self._master_key_path.exists():
-                    key = self._master_key_path.read_bytes().strip()
+                    key = self._read_private(self._master_key_path).strip()
                 else:
                     key = Fernet.generate_key()
                     self._write_private(self._master_key_path, key)
@@ -239,7 +307,7 @@ class SecureStore:
                         "Store uses file-key mode; do not supply passphrase"
                     )
                 if self._salt_path.exists():
-                    salt = self._salt_path.read_bytes()
+                    salt = self._read_private(self._salt_path)
                 else:
                     salt = os.urandom(16)
                     self._write_private(self._salt_path, salt)
@@ -250,6 +318,8 @@ class SecureStore:
 
     @staticmethod
     def _derive_key(passphrase: str, salt: bytes) -> bytes:
+        if not isinstance(passphrase, str) or not passphrase:
+            raise ValueError("passphrase must be a non-empty string")
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(), length=32, salt=salt,
             iterations=_PBKDF2_ITERATIONS,
@@ -280,6 +350,8 @@ class SecureStore:
         acl: list[str] | None = None,
     ) -> None:
         """Encrypt and store a secret, preserving an existing ACL by default."""
+        caller = self._validate_identity(caller, field="caller")
+        acl = self._normalize_acl(acl)
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
@@ -313,6 +385,7 @@ class SecureStore:
             self._audit(caller, "set", name, True)
     def get_bytes(self, name: str, *, caller: str = "library") -> bytes | None:
         """Decrypt and return raw secret bytes, or None if not found."""
+        caller = self._validate_identity(caller, field="caller")
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
@@ -342,6 +415,7 @@ class SecureStore:
         return None if value is None else value.decode("utf-8")
     def delete(self, name: str, *, caller: str = "library") -> bool:
         """Delete an authorized secret. The store must be unlocked."""
+        caller = self._validate_identity(caller, field="caller")
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
@@ -387,6 +461,7 @@ class SecureStore:
         self, *, caller: str = "library", acl_filter: bool = True
     ) -> list[SecretMetadata]:
         """List secret names with metadata. Respects ACL by default."""
+        caller = self._validate_identity(caller, field="caller")
         with self._lock:
             cur = self._conn.execute(
                 "SELECT name, acl, created_at, updated_at FROM secrets"

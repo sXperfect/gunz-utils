@@ -6,11 +6,14 @@ The SecureStore implementation was promoted from
 ``hyperhedron_google.secure_store`` to ``gunz_utils.secure_store``;
 this test file followed.
 """
+import os
 import sqlite3
 import tempfile
 import unittest
+from pathlib import Path
 
 from gunz_utils import SecureStore
+from gunz_utils.ext.secure_store import default_base_dir
 
 
 class TestSecureStore(unittest.TestCase):
@@ -168,6 +171,92 @@ class TestSecureStore(unittest.TestCase):
         finally:
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+    def test_rejects_empty_passphrase(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            store = SecureStore(base_dir=tmp)
+            with self.assertRaisesRegex(ValueError, "passphrase"):
+                store.unlock(passphrase="")
+            self.assertFalse(store._salt_path.exists())
+            store.close()
+        finally:
+            import shutil
+
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_rejects_invalid_library_name(self):
+        with self.assertRaisesRegex(ValueError, "library_name"):
+            default_base_dir("../escape")
+        with self.assertRaisesRegex(ValueError, "library_name"):
+            default_base_dir("nested/name")
+
+    def test_rejects_acl_delimiter_injection(self):
+        with self.assertRaisesRegex(ValueError, "ACL entry"):
+            self.store.set("k", "v", acl=["mcp,library"])
+        with self.assertRaisesRegex(ValueError, "caller"):
+            self.store.set("k", "v", caller="mcp,library")
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
+    def test_rejects_symlink_base_directory(self):
+        root = Path(tempfile.mkdtemp())
+        target = root / "target"
+        target.mkdir()
+        link = root / "link"
+        try:
+            link.symlink_to(target, target_is_directory=True)
+        except OSError:
+            self.skipTest("symlink creation unavailable")
+        try:
+            with self.assertRaisesRegex(ValueError, "base directory"):
+                SecureStore(base_dir=link)
+        finally:
+            import shutil
+
+            shutil.rmtree(root, ignore_errors=True)
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
+    def test_rejects_symlink_master_key(self):
+        root = Path(tempfile.mkdtemp())
+        outside = root / "outside.key"
+        outside.write_bytes(b"x" * 44)
+        store_dir = root / "store"
+        store = SecureStore(base_dir=store_dir)
+        link = store._master_key_path
+        try:
+            link.symlink_to(outside)
+        except OSError:
+            store.close()
+            self.skipTest("symlink creation unavailable")
+        try:
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                store.unlock()
+        finally:
+            store.close()
+            import shutil
+
+            shutil.rmtree(root, ignore_errors=True)
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlinks unavailable")
+    def test_rejects_symlink_database(self):
+        root = Path(tempfile.mkdtemp())
+        store_dir = root / "store"
+        store_dir.mkdir()
+        outside = root / "outside.db"
+        outside.write_bytes(b"")
+        link = store_dir / "config.db"
+        try:
+            link.symlink_to(outside)
+        except OSError:
+            self.skipTest("symlink creation unavailable")
+        try:
+            with self.assertRaisesRegex(ValueError, "database path"):
+                SecureStore(base_dir=store_dir)
+        finally:
+            import shutil
+
+            shutil.rmtree(root, ignore_errors=True)
 
 
 if __name__ == "__main__":
