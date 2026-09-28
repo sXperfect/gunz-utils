@@ -1,0 +1,119 @@
+"""Tests for the aggregate audit CI orchestrator."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+from types import ModuleType
+
+
+def _load_audit_ci() -> ModuleType:
+    path = Path(__file__).resolve().parents[2] / "scripts" / "audit_ci.py"
+    spec = importlib.util.spec_from_file_location("gunz_audit_ci", path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+audit_ci = _load_audit_ci()
+
+
+def test_collect_results_keeps_running_after_independent_failures() -> None:
+    calls: list[str] = []
+    statuses = {
+        "release": 2,
+        "lint": 1,
+        "test": 0,
+        "docs": 3,
+        "packaging": 0,
+    }
+
+    def runner(name: str) -> int:
+        calls.append(name)
+        return statuses[name]
+
+    compatibility: list[str] = []
+
+    def compat(python: str) -> int:
+        compatibility.append(python)
+        return 4
+
+    results = audit_ci.collect_results(
+        gate_runner=runner,
+        compatibility_python="python3.12",
+        compatibility_runner=compat,
+    )
+
+    assert calls == list(audit_ci.DEFAULT_GATES)
+    assert compatibility == ["python3.12"]
+    assert [(item.name, item.returncode) for item in results] == [
+        ("release", 2),
+        ("lint", 1),
+        ("test", 0),
+        ("docs", 3),
+        ("packaging", 0),
+        ("python-compatibility", 4),
+    ]
+
+
+def test_collect_results_can_fail_fast_for_local_diagnosis() -> None:
+    calls: list[str] = []
+
+    def runner(name: str) -> int:
+        calls.append(name)
+        return 1 if name == "lint" else 0
+
+    results = audit_ci.collect_results(
+        gate_runner=runner,
+        fail_fast=True,
+    )
+
+    assert calls == ["release", "lint"]
+    assert [(item.name, item.returncode) for item in results] == [
+        ("release", 0),
+        ("lint", 1),
+    ]
+
+
+def test_gate_exception_becomes_visible_failure_and_collection_continues() -> None:
+    calls: list[str] = []
+
+    def runner(name: str) -> int:
+        calls.append(name)
+        if name == "release":
+            raise RuntimeError("boom")
+        return 0
+
+    results = audit_ci.collect_results(gate_runner=runner)
+
+    assert calls == list(audit_ci.DEFAULT_GATES)
+    assert results[0].name == "release"
+    assert results[0].returncode == 70
+    assert all(item.returncode == 0 for item in results[1:])
+
+
+def test_json_summary_is_complete_and_machine_readable(tmp_path: Path) -> None:
+    results = [
+        audit_ci.GateResult("release", 0),
+        audit_ci.GateResult("lint", 1),
+        audit_ci.GateResult("test", 0),
+    ]
+    target = tmp_path / "nested" / "summary.json"
+
+    audit_ci.write_json_summary(target, results)
+
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload == {
+        "passed": False,
+        "results": [
+            {"name": "release", "returncode": 0},
+            {"name": "lint", "returncode": 1},
+            {"name": "test", "returncode": 0},
+        ],
+        "schema_version": 1,
+    }
