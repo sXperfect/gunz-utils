@@ -299,7 +299,10 @@ class SecureStore:
                     existing = [self._master_key_path]
                 for path in existing:
                     candidates.append(
-                        (Fernet(path.read_bytes().strip()), path == self._pending_key_path)
+                        (
+                            Fernet(path.read_bytes().strip()),
+                            path == self._pending_key_path,
+                        )
                     )
             else:
                 salt_paths = [
