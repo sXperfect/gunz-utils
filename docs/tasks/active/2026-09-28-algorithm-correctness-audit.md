@@ -95,9 +95,10 @@ These are intentionally not hidden by the audit.
 
 ### Graph/traversal
 
-- [ ] add exhaustive small-graph/property tests beyond current DAG/provenance
-      examples;
-- [ ] decide whether recursion-depth limits warrant iterative traversal.
+- [x] add exhaustive four-node graph/property tests with an independent
+      Kahn-style cycle oracle;
+- [ ] decide whether recursion-depth limits warrant iterative traversal;
+- [ ] execute the exhaustive proof test before promoting the DAG audit above A2.
 
 ### Stateful/concurrent
 
