@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import subprocess
 import time
@@ -42,8 +43,14 @@ def _check_output_limit(
 ) -> None:
     if max_output_bytes is None:
         return
-    if max_output_bytes < 0:
-        raise ValueError("max_output_bytes must be non-negative")
+    if (
+        isinstance(max_output_bytes, bool)
+        or not isinstance(max_output_bytes, int)
+        or max_output_bytes < 0
+    ):
+        raise ValueError(
+            "max_output_bytes must be a non-negative integer or None"
+        )
     size = len(stdout) + len(stderr)
     if size > max_output_bytes:
         raise CommandOutputLimitError(
@@ -65,6 +72,16 @@ def run_command(
     """Run a command without a shell and capture bounded text output."""
     if not args:
         raise ValueError("args must not be empty")
+    if timeout is not None and (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
+        or timeout < 0
+    ):
+        raise ValueError(
+            "timeout must be a finite non-negative number or None"
+        )
+    _check_output_limit(b"", b"", max_output_bytes)
     started = time.perf_counter()
     completed = subprocess.run(
         list(args),
@@ -118,10 +135,25 @@ async def run_command_async(
     """Run a subprocess with graceful timeout and cancellation cleanup."""
     if not args:
         raise ValueError("args must not be empty")
-    if terminate_grace < 0:
-        raise ValueError("terminate_grace must be non-negative")
-    if max_output_bytes is not None and max_output_bytes < 0:
-        raise ValueError("max_output_bytes must be non-negative")
+    if timeout is not None and (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
+        or timeout < 0
+    ):
+        raise ValueError(
+            "timeout must be a finite non-negative number or None"
+        )
+    if (
+        isinstance(terminate_grace, bool)
+        or not isinstance(terminate_grace, (int, float))
+        or not math.isfinite(float(terminate_grace))
+        or terminate_grace < 0
+    ):
+        raise ValueError(
+            "terminate_grace must be a finite non-negative number"
+        )
+    _check_output_limit(b"", b"", max_output_bytes)
     started = time.perf_counter()
     process = await asyncio.create_subprocess_exec(
         *args,
