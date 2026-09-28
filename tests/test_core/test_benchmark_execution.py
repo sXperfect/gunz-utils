@@ -70,6 +70,17 @@ class TestWorker(unittest.TestCase):
         with self.assertRaises(CommandOutputLimitError):
             run_python_worker("this", max_output_bytes=16)
 
+    def test_worker_json_failure_does_not_leak_stderr(self) -> None:
+        secret = "api_key=super-secret"
+        failed = type(
+            "R",
+            (),
+            {"returncode": 2, "stdout": "", "stderr": secret},
+        )()
+        with self.assertRaises(RuntimeError) as caught:
+            worker_json(failed)
+        self.assertNotIn(secret, str(caught.exception))
+
     def test_worker_json(self) -> None:
         self.assertEqual(
             worker_json(
