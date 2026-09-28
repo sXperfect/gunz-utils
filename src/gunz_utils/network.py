@@ -151,6 +151,7 @@ def tcp_reachable(
     port: int,
     *,
     timeout: float = 5.0,
+    allow_private: bool = True,
 ) -> bool:
     """Return whether a TCP connection can be established within a timeout.
 
@@ -185,9 +186,24 @@ def tcp_reachable(
     ):
         raise ValueError("timeout must be a finite positive number")
 
+    # ? Security (VULN-2026-007): Optionally restrict connections to private/loopback IP ranges
+    # ? to prevent Server-Side Request Forgery (SSRF) when target parameters come from untrusted users.
+    if not isinstance(allow_private, bool):
+        raise TypeError("allow_private must be bool")
+
+    target_host = host.strip()
+    if not allow_private:
+        try:
+            ip = ipaddress.ip_address(target_host)
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                raise ValueError("connection to private/loopback IP addresses is disallowed")
+        except ValueError:
+            if target_host.lower() in ("localhost", "loopback"):
+                raise ValueError("connection to localhost is disallowed")
+
     try:
         with socket.create_connection(
-            (host.strip(), port),
+            (target_host, port),
             timeout=timeout,
         ):
             return True

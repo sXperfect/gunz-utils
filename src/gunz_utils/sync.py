@@ -79,6 +79,13 @@ def _normalize_rsync_source(
     if not text:
         raise ValueError("source must not be empty")
 
+    # ? Security (VULN-2026-004): Reject source strings starting with dashes ('-')
+    # ? or containing control characters to prevent option/flag injection into rsync.
+    if text.startswith("-"):
+        raise ValueError("source must not start with a dash")
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in text):
+        raise ValueError("source contains invalid control characters")
+
     windows_drive = bool(_WINDOWS_DRIVE_SOURCE.match(text))
     remote = (
         not explicit_path

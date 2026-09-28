@@ -151,6 +151,9 @@ class SecureStore:
             isolation_level=None,
         )
         self._conn.row_factory = sqlite3.Row
+        # ? Security (VULN-2026-006): Set a busy timeout on the SQLite connection
+        # ? to prevent local lock starvation and DoS when multiple processes access config.db.
+        self._conn.execute("PRAGMA busy_timeout = 10000")
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._init_schema()
         self._ensure_private_file(self._db_path)

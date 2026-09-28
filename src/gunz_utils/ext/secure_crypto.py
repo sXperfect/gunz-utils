@@ -6,6 +6,7 @@ The wire format remains compatible with the HyperHedron TypeScript client.
 from __future__ import annotations
 
 import binascii
+import functools
 import os
 
 from cryptography.hazmat.primitives import hashes
@@ -34,12 +35,9 @@ def get_system_passphrase() -> str:
     )
 
 
-def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
-    """Derive an AES key from explicit secret material."""
-    if not isinstance(salt, bytes) or len(salt) != SALT_LENGTH:
-        raise ValueError(f"salt must be exactly {SALT_LENGTH} bytes")
-    if not isinstance(passphrase, str) or not passphrase:
-        raise ValueError("passphrase is required for encryption")
+@functools.lru_cache(maxsize=32)
+def _get_cached_derived_key(salt: bytes, passphrase: str) -> bytes:
+    """Cache derived keys for repeated encryption/decryption operations."""
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=KEY_LENGTH,
@@ -47,6 +45,17 @@ def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
         iterations=ITERATIONS,
     )
     return kdf.derive(passphrase.encode("utf-8"))
+
+
+def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
+    """Derive an AES key from explicit secret material."""
+    if not isinstance(salt, bytes) or len(salt) != SALT_LENGTH:
+        raise ValueError(f"salt must be exactly {SALT_LENGTH} bytes")
+    if not isinstance(passphrase, str) or not passphrase:
+        raise ValueError("passphrase is required for encryption")
+    # ? Security (VULN-2026-012): Cache derived keys for active (salt, passphrase) pairs
+    # ? to prevent CPU exhaustion DoS caused by repeated 600,000-iteration PBKDF2 operations.
+    return _get_cached_derived_key(salt, passphrase)
 
 
 def encrypt(text: str, passphrase: str | None = None) -> str:

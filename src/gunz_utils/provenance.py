@@ -53,8 +53,12 @@ def capture_runtime_provenance(
             "environment_allowlist must contain non-empty strings"
         )
     allowed = sorted(set(requested))
+    # ? Security (VULN-2026-005): Pass captured environment values through redact()
+    # ? to mask any sensitive secrets (tokens, passwords, keys) before persisting runtime provenance.
+    from .redaction import redact
+
     environment = {
-        name: os.environ[name]
+        name: str(redact(os.environ[name])) if name in os.environ else ""
         for name in allowed
         if name in os.environ
     }
