@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import math
 import os
 import statistics
 import time
@@ -60,8 +61,19 @@ def calibrate_loops(
     max_loops: int = 1 << 30,
     **kwargs: Any,
 ) -> int:
-    if target_time <= 0:
-        raise ValueError("target_time must be positive")
+    if (
+        isinstance(target_time, bool)
+        or not isinstance(target_time, (int, float))
+        or not math.isfinite(float(target_time))
+        or target_time <= 0
+    ):
+        raise ValueError("target_time must be a finite positive number")
+    if (
+        isinstance(max_loops, bool)
+        or not isinstance(max_loops, int)
+        or max_loops < 1
+    ):
+        raise ValueError("max_loops must be a positive integer")
     loops = 1
     while True:
         started = time.perf_counter()
@@ -102,12 +114,40 @@ def benchmark(
     **kwargs: Any,
 ) -> BenchmarkResult:
     """Benchmark a callable with calibration and controlled execution."""
-    if warmup < 0 or iterations < 1 or max_iterations < iterations:
+    if (
+        isinstance(warmup, bool)
+        or not isinstance(warmup, int)
+        or warmup < 0
+        or isinstance(iterations, bool)
+        or not isinstance(iterations, int)
+        or iterations < 1
+        or isinstance(max_iterations, bool)
+        or not isinstance(max_iterations, int)
+        or max_iterations < iterations
+    ):
         raise ValueError("invalid warmup/iteration configuration")
-    if min_time is not None and min_time < 0:
-        raise ValueError("min_time must be non-negative")
-    if loops is not None and loops < 1:
-        raise ValueError("loops must be positive")
+    if min_time is not None and (
+        isinstance(min_time, bool)
+        or not isinstance(min_time, (int, float))
+        or not math.isfinite(float(min_time))
+        or min_time < 0
+    ):
+        raise ValueError(
+            "min_time must be a finite non-negative number or None"
+        )
+    if loops is not None and (
+        isinstance(loops, bool)
+        or not isinstance(loops, int)
+        or loops < 1
+    ):
+        raise ValueError("loops must be a positive integer or None")
+    if (
+        isinstance(target_time, bool)
+        or not isinstance(target_time, (int, float))
+        or not math.isfinite(float(target_time))
+        or target_time <= 0
+    ):
+        raise ValueError("target_time must be a finite positive number")
 
     with benchmark_environment(
         disable_gc=disable_gc,
