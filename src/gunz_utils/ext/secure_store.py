@@ -197,6 +197,12 @@ class SecureStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(tmp, path)
+            if hasattr(os, "O_DIRECTORY"):
+                dir_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
         except BaseException:
             try:
                 os.unlink(tmp)
@@ -206,7 +212,7 @@ class SecureStore:
 
     @staticmethod
     def _validate_name(value: object, *, label: str) -> str:
-        if not isinstance(value, str) or not value:
+        if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{label} must be a non-empty string")
         return value
 
