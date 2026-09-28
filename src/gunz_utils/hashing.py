@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import pathlib
-from typing import BinaryIO
+from typing import BinaryIO, cast
 
 from ._version import __version__ as __version__
 
@@ -285,7 +285,7 @@ def directory_manifest(
             mode="rb",
         ) as handle:
             manifest[relative] = _hash_binary_handle(
-                handle,
+                cast(BinaryIO, handle),
                 algo=algo,
                 chunk_size=chunk_size,
             )
