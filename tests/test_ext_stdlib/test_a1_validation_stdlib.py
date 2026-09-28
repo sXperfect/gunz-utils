@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Annotated, Literal
 
 import pytest
@@ -78,10 +79,12 @@ def test_annotated_validates_underlying_type() -> None:
 
 def test_callable_outer_type_is_validated() -> None:
     @type_checked
-    def accepts(callback: callable) -> object:  # type: ignore[valid-type]
+    def accepts(callback: Callable[[], None]) -> object:
         return callback
 
-    function = lambda: None
+    def function() -> None:
+        return None
+
     assert accepts(function) is function
 
     with pytest.raises(TypeError):
