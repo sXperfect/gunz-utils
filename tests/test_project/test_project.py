@@ -2,6 +2,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from gunz_utils import resolve_project_root
 from gunz_utils.ext import project_gitpython as project_module
@@ -41,6 +42,19 @@ class TestProject(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with self.assertRaisesRegex(RuntimeError, "Could not find project root"):
                 resolve_project_root(anchor=tmpdir, inject_to_sys_path=False)
+
+    def test_unexpected_gitpython_error_does_not_leak_message(self):
+        project_module._PROJECT_ROOT = None
+        secret = "token=super-secret"
+        with patch.object(
+            project_module,
+            "Repo",
+            side_effect=RuntimeError(secret),
+        ):
+            with self.assertRaises(RuntimeError) as caught:
+                resolve_project_root(anchor=".", inject_to_sys_path=False)
+        self.assertNotIn(secret, str(caught.exception))
+        self.assertIn("RuntimeError", str(caught.exception))
 
     def test_resolve_project_root_custom_anchor(self):
         project_module._PROJECT_ROOT = None
