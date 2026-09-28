@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import io
-import os
 import signal
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
