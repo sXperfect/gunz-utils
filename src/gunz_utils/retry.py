@@ -23,7 +23,11 @@ def _delay(
     max_delay: float,
     jitter: bool,
 ) -> float:
-    delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+    try:
+        exponential = math.ldexp(base_delay, attempt - 1)
+    except OverflowError:
+        exponential = max_delay
+    delay = min(max_delay, exponential)
     return random.uniform(0.0, delay) if jitter and delay else delay
 
 
@@ -99,8 +103,12 @@ class RetryPolicy(Generic[T]):
         return an exact non-negative delay. Returning None falls back to the
         configured exponential backoff and jitter.
         """
-        if attempt < 1:
-            raise ValueError("attempt must be at least 1")
+        if (
+            isinstance(attempt, bool)
+            or not isinstance(attempt, int)
+            or attempt < 1
+        ):
+            raise ValueError("attempt must be a positive integer")
 
         if self.delay_override is not None:
             override = self.delay_override(
