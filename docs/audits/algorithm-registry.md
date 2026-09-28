@@ -38,10 +38,10 @@ execution.
 | ALG-006 | Cartesian parameter grid | `experiments.parameter_grid` | A2 | Cartesian product order, empty factors | reviewed; no defect found |
 | ALG-007 | Stable priority hash | `sampling.stable_priority` | A2 | deterministic BLAKE2b output, seed influence | reviewed; bool-as-int seed semantics remain a minor gap |
 | ALG-008 | Stable named-item sampling | `sampling.sample_named_items` | A2 | order independence, duplicate rejection, budget/filter ordering | reviewed; no defect found |
-| ALG-009 | Workflow topological order | `dag.WorkflowDAG._topological_order` | A2 | dependency-before-consumer, missing dependency, cycles | correct for reviewed cases; recursion depth is a limitation |
+| ALG-009 | Workflow topological order | `dag.WorkflowDAG._topological_order` | A2 | dependency-before-consumer, missing dependency, cycles; exhaustive four-node directed-graph test against independent Kahn oracle | proof test added; execution pending, recursion depth remains a limitation |
 | ALG-010 | Effective transitive fingerprint | `dag.WorkflowDAG.effective_fingerprint` | A2 | dependency sensitivity, propagation, cache invalidation | reviewed; no defect found |
 | ALG-011 | Provenance DAG cycle/ancestor traversal | `provenance_graph.ProvenanceGraph` | A2 | cycle rollback, unresolved nodes, deterministic ancestors | reviewed; recursion depth is a limitation |
-| ALG-012 | Unsigned 64-bit canonical varint | `binary.encode_uvarint`, `ByteReader.read_uvarint` | A2 | round trip, overflow, canonical form, truncation rollback | existing strong evidence reviewed |
+| ALG-012 | Unsigned 64-bit canonical varint | `binary.encode_uvarint`, `ByteReader.read_uvarint` | A2 | exhaustive 0..65535 reference/round trip, uint64 boundaries, canonical form, malformed/truncation rollback | stronger proof vectors added; execution pending |
 | ALG-013 | Priority + recent retention | `structures.retain_priority_and_recent` | A2 | stable order, priority preservation, zero/None limits | strengthened bound validation |
 | ALG-014 | Async token bucket | `rate_limit.AsyncRateLimiter` | A2 | balance in [0, capacity], no overdraw, timeout, finite parameters | fixed NaN/inf/bool state poisoning |
 | ALG-015 | Benchmark loop calibration | `benchmark.runner.calibrate_loops` | A2 | monotonic loop growth, target/max bounds | fixed non-finite target and invalid max-loop domains |
