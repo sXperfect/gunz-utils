@@ -30,6 +30,11 @@ subprocess execution, secret redaction or storage, serialization, network
 boundaries, content-addressed storage, resource limits, and dependency
 isolation. This list is not exhaustive.
 
+The repeatable repository review process is documented in
+[`docs/design/audit/security-audit-methodology.md`](docs/design/audit/security-audit-methodology.md).
+The latest dated audit result is indexed under
+[`docs/design/audit/`](docs/design/audit/).
+
 ## Disclosure
 
 Please allow time for the issue to be reproduced and a fix to be prepared before
