@@ -83,6 +83,11 @@ not a one-time review.
 - [x] link the method and registry from Program A;
 - [x] make registry maintenance an `AGENTS.md` rule;
 - [x] add a changelog fragment.
+- [x] add method-audit design documents under `docs/design/audit/`;
+- [x] add exhaustive small-domain proof tests for workflow DAGs and uint64 varints;
+- [x] add a one-job aggregate CI verifier that continues through independent
+      gates and emits a machine-readable summary;
+- [x] keep hosted triggers restricted to `main` and PRs targeting `main`.
 
 ## Remaining proof work
 
@@ -120,7 +125,9 @@ These are intentionally not hidden by the audit.
 
 ## Verification state
 
-Hosted feature-branch CI remains untouched.
+Hosted feature-branch CI remains disabled by trigger policy. The workflow now
+contains one aggregate `verify` job that runs independent gates through
+`scripts/audit_ci.py` and captures all gate statuses before failing.
 
 Regression tests have been added/updated, but this environment has repository
 connector access rather than an executable local checkout. Therefore no audit
