@@ -417,15 +417,31 @@ def run_packaging() -> int:
         ("plot", _case_plot),
         ("wheel/sdist", _case_wheel_sdist),
     ]
+    failures: list[tuple[str, int]] = []
     for name, fn in cases:
         print()
         print("=" * 72)
         print(f"  packaging case: {name}")
         print("=" * 72)
-        status = fn()
+        try:
+            status = fn()
+        except SystemExit as exc:
+            status = int(exc.code) if isinstance(exc.code, int) else 1
+        except Exception as exc:
+            print(
+                f"!! packaging case {name} raised {type(exc).__name__}: {exc}",
+                file=sys.stderr,
+            )
+            status = 70
         if status != 0:
             print(f"!! packaging case failed: {name}", file=sys.stderr)
-            return status
+            failures.append((name, status))
+
+    if failures:
+        print("!! packaging failures:", file=sys.stderr)
+        for name, status in failures:
+            print(f"   - {name}: exit {status}", file=sys.stderr)
+        return 1
     return 0
 
 
