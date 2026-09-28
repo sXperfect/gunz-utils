@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import time
 from collections.abc import Awaitable, Callable, Iterator, Mapping
@@ -37,8 +38,20 @@ def eventually(
     interval: float = 0.01,
 ) -> None:
     """Wait until a predicate succeeds or raise TimeoutError."""
-    if timeout < 0 or interval <= 0:
-        raise ValueError("timeout must be non-negative and interval positive")
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
+        or timeout < 0
+        or isinstance(interval, bool)
+        or not isinstance(interval, (int, float))
+        or not math.isfinite(float(interval))
+        or interval <= 0
+    ):
+        raise ValueError(
+            "timeout must be finite and non-negative and interval "
+            "must be finite and positive"
+        )
     deadline = time.monotonic() + timeout
     while True:
         if predicate():
@@ -65,8 +78,20 @@ async def eventually_async(
         ValueError: If timeout is negative or interval is not positive.
         TimeoutError: If the condition remains false until the deadline.
     """
-    if timeout < 0 or interval <= 0:
-        raise ValueError("timeout must be non-negative and interval positive")
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
+        or timeout < 0
+        or isinstance(interval, bool)
+        or not isinstance(interval, (int, float))
+        or not math.isfinite(float(interval))
+        or interval <= 0
+    ):
+        raise ValueError(
+            "timeout must be finite and non-negative and interval "
+            "must be finite and positive"
+        )
     deadline = time.monotonic() + timeout
     while True:
         if await predicate():
