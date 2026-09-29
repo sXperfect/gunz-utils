@@ -57,13 +57,15 @@ runner startup, and per-job billing granularity.
 The job order is intentionally cheapest-first:
 
 ```text
-release metadata
+shallow checkout + tag fetch
     ↓
-dependency install
+release metadata check
     ↓
-Ruff
+early Ruff lint preflight
     ↓
-mypy
+primary dependency install
+    ↓
+mypy type checking
     ↓
 Python 3.11 full pytest
     ↓

@@ -190,13 +190,25 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip the release gate when it already ran as a hosted preflight",
     )
+    parser.add_argument(
+        "--skip-packaging",
+        action="store_true",
+        help="skip the packaging gate when packaging files are unchanged",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the aggregate verifier."""
     args = build_parser().parse_args(argv)
-    gates = DEFAULT_GATES[1:] if args.skip_release else DEFAULT_GATES
+    gates = [
+        g
+        for g in DEFAULT_GATES
+        if not (
+            (args.skip_release and g == "release")
+            or (args.skip_packaging and g == "packaging")
+        )
+    ]
     results = collect_results(
         gates=gates,
         compatibility_python=args.compat_python,

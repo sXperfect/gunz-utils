@@ -5,6 +5,14 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+try:
+    import pytest
+
+    pytestmark = pytest.mark.policy
+except ImportError:
+    pytest = None  # type: ignore[assignment]
+
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "ci.yml"
 LEGACY_DOCS_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "deploy_docs.yml"
@@ -51,7 +59,9 @@ def test_ci_is_read_only_and_cancels_superseded_runs() -> None:
 
 def test_ci_release_preflight_precedes_install_then_uses_aggregate_verifier() -> None:
     text = _workflow_text()
+    fetch_tags = text.index("git fetch --tags --depth=1")
     release = text.index("python scripts/release.py check")
+    early_lint = text.index("python -m ruff check src tests benchmarks scripts")
     primary_install = text.index("python -m pip install pytest==9.0.3")
     compatibility_install = text.index(
         'steps.py312.outputs.python-path }}" -m pip install pytest==9.0.3'
@@ -59,11 +69,20 @@ def test_ci_release_preflight_precedes_install_then_uses_aggregate_verifier() ->
     aggregate = text.index("python scripts/audit_ci.py")
     upload = text.index("actions/upload-artifact@")
 
-    assert release < primary_install < compatibility_install < aggregate < upload
+    assert (
+        fetch_tags
+        < release
+        < early_lint
+        < primary_install
+        < compatibility_install
+        < aggregate
+        < upload
+    )
     assert "--skip-release" in text
     assert "--compat-python" in text
     assert "--summary-json tmp/ci-summary.json" in text
     assert "if: ${{ always() }}" in text
+
 
 
 def test_external_actions_are_pinned_to_full_commit_shas() -> None:

@@ -477,7 +477,7 @@ class ReleaseRepo:
         tmp.write_text(text, encoding="utf-8")
         tmp.replace(path)
 
-    def prepare(self, target_text: str) -> int:
+    def prepare(self, target_text: str = "auto", *, dry_run: bool = False) -> int:
         result = self.check()
         if not result.ok:
             for error in result.errors:
@@ -485,21 +485,39 @@ class ReleaseRepo:
             return 1
 
         current = self.current_version()
-        target = SemVer.parse(target_text)
         fragments = self.fragments()
         if not fragments:
             raise ReleaseError("no changelog fragments to release")
 
         required = self.required_bump(fragments)
-        if not self.target_satisfies(current, target, required):
-            minimum = self.minimum_target(current, required)
-            raise ReleaseError(
-                f"{target} is too small for {required} changes; "
-                f"minimum allowed target is {minimum}"
-            )
+        effective_bump = "patch" if required == "none" else required
+
+        if target_text.strip().lower() == "auto":
+            target = self.minimum_target(current, effective_bump)
+        else:
+            target = SemVer.parse(target_text)
+            if not self.target_satisfies(current, target, required):
+                minimum = self.minimum_target(current, required)
+                raise ReleaseError(
+                    f"{target} is too small for {required} changes; "
+                    f"minimum allowed target is {minimum}"
+                )
 
         pyproject_text = self._updated_pyproject(target)
         changelog_text = self._updated_changelog(target, fragments, dt.date.today())
+
+        if dry_run:
+            print(f"[DRY-RUN] Target version: {target} (bump: {required})")
+            print(f"[DRY-RUN] Fragments consumed ({len(fragments)}):")
+            for frag in fragments:
+                print(f"  - {frag.path.name}")
+            print("\n[DRY-RUN] Proposed CHANGELOG.md addition:")
+            print("-" * 60)
+            release_body = self._render_release_sections(fragments)
+            print(f"## [{target}] — {dt.date.today().isoformat()}\n\n{release_body}")
+            print("-" * 60)
+            print(f"[DRY-RUN] No files modified and no fragments deleted.")
+            return 0
 
         self._atomic_write(self.pyproject, pyproject_text)
         self._atomic_write(self.changelog, changelog_text)
@@ -556,7 +574,17 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status", help="show version, tags, fragments and minimum bump")
     sub.add_parser("check", help="validate release metadata without modifying files")
     prepare = sub.add_parser("prepare", help="prepare a release in the working tree")
-    prepare.add_argument("version", help="target MAJOR.MINOR.PATCH version")
+    prepare.add_argument(
+        "version",
+        nargs="?",
+        default="auto",
+        help="target MAJOR.MINOR.PATCH version or 'auto' (default: auto)",
+    )
+    prepare.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="preview changes without modifying files or deleting fragments",
+    )
     sub.add_parser("verify", help="verify a prepared release before tagging")
     return parser
 
@@ -570,7 +598,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "check":
             return repo.check_command()
         if args.command == "prepare":
-            return repo.prepare(args.version)
+            return repo.prepare(args.version, dry_run=args.dry_run)
         if args.command == "verify":
             return repo.verify()
     except (OSError, tomllib.TOMLDecodeError, ReleaseError) as exc:

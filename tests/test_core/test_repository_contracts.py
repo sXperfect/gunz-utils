@@ -7,6 +7,14 @@ import re
 import tomllib
 from pathlib import Path
 
+try:
+    import pytest
+
+    pytestmark = pytest.mark.policy
+except ImportError:
+    pytest = None  # type: ignore[assignment]
+
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_DIR = PROJECT_ROOT / "src" / "gunz_utils"
 API_REFERENCE = PROJECT_ROOT / "docs" / "source" / "api.rst"

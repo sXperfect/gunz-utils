@@ -10,6 +10,7 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [`2026-09-29-infra-ci_testing_release_optimization`](tasks/done/2026-09-29-infra-ci_testing_release_optimization.md)
 - [`2026.09.27-protocol-integrate_all_branches`](tasks/done/2026.09.27-protocol-integrate_all_branches.md)
 - [`2026.09.27-gunz_utils-repair_suite_regressions`](tasks/done/2026.09.27-gunz_utils-repair_suite_regressions.md)
 - [`2026.09.27-core-shared_foundation`](tasks/done/2026.09.27-core-shared_foundation.md)

@@ -8,6 +8,14 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+try:
+    import pytest
+
+    pytestmark = pytest.mark.policy
+except ImportError:
+    pytest = None  # type: ignore[assignment]
+
+
 
 def _load_audit_ci() -> ModuleType:
     path = Path(__file__).resolve().parents[2] / "scripts" / "audit_ci.py"
@@ -181,3 +189,22 @@ def test_gate_exception_output_redacts_exception_message(capsys) -> None:
     assert results == [audit_ci.GateResult("lint", 70)]
     assert "RuntimeError" in captured.err
     assert secret not in captured.err
+
+
+def test_audit_ci_skips_packaging_when_requested(monkeypatch) -> None:
+    captured_gates: list[str] = []
+
+    def fake_collect(gates, **_kwargs):
+        captured_gates.extend(gates)
+        return []
+
+    monkeypatch.setattr(audit_ci, "collect_results", fake_collect)
+    monkeypatch.setattr(audit_ci, "print_summary", lambda _res: None)
+    monkeypatch.setattr(audit_ci, "write_github_summary", lambda _res: None)
+
+    exit_code = audit_ci.main(["--skip-release", "--skip-packaging"])
+    assert exit_code == 0
+    assert "release" not in captured_gates
+    assert "packaging" not in captured_gates
+    assert captured_gates == ["lint", "test", "docs"]
+

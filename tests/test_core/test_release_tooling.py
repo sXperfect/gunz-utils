@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.policy
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_PY = PROJECT_ROOT / "scripts" / "release.py"
 
@@ -141,7 +143,43 @@ def test_check_rejects_module_version_literals(tmp_path: Path) -> None:
     )
 
 
+def test_prepare_auto_resolves_minimum_valid_target(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    fragment = tmp_path / "changes" / "feature.added.md"
+    fragment.write_text("Add new feature.", encoding="utf-8")
+
+    assert repo.prepare("auto") == 0
+
+    pyproject = (tmp_path / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'version = "1.11.0"' in pyproject
+    assert not fragment.exists()
+    assert repo.verify() == 0
+
+
+def test_prepare_dry_run_does_not_modify_files_or_unlink_fragments(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    fragment = tmp_path / "changes" / "fix.fixed.md"
+    fragment.write_text("Fix a small bug.", encoding="utf-8")
+
+    pyproject_before = (tmp_path / "pyproject.toml").read_text(encoding="utf-8")
+    changelog_before = (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8")
+
+    assert repo.prepare("auto", dry_run=True) == 0
+
+    captured = capsys.readouterr()
+    assert "[DRY-RUN]" in captured.out
+    assert "Target version: 1.10.1" in captured.out
+    assert "fix.fixed.md" in captured.out
+
+    assert (tmp_path / "pyproject.toml").read_text(encoding="utf-8") == pyproject_before
+    assert (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8") == changelog_before
+    assert fragment.exists()
+
+
 def test_repository_release_metadata_is_self_consistent() -> None:
     repo = release.ReleaseRepo(PROJECT_ROOT)
     result = repo.check()
     assert result.ok, result.errors
+

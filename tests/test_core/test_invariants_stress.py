@@ -3,6 +3,14 @@ from __future__ import annotations
 import asyncio
 import unittest
 
+try:
+    import pytest
+
+    pytestmark = pytest.mark.slow
+except ImportError:
+    pytest = None  # type: ignore[assignment]
+
+
 from gunz_utils.cache import SingleFlight, ttl_cache
 from gunz_utils.faults import FailAfter, FaultSequence
 from gunz_utils.rate_limit import AsyncRateLimiter

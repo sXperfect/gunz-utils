@@ -88,6 +88,12 @@ skip-magic-trailing-comma = false
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = [
+    "slow: marks tests as slow / resource intensive (deselect with '-m \"not slow\"')",
+    "integration: marks tests as cross-subsystem end-to-end integration tests",
+    "policy: marks repository contract, governance, and CI/release policy tests",
+    "isolation: marks environment isolation or packaging matrix tests",
+]
 
 # --- mypy --------------------------------------------------------------------
 # Static type checking. Targets Python 3.11 (see requires-python above).

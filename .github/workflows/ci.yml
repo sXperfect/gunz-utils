@@ -24,8 +24,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+
+      - name: Fetch base branch and release tags
+        run: |
+          git fetch origin ${{ github.base_ref || 'main' }} --depth=1
+          git fetch --tags --depth=1
 
       - name: Set up Python 3.12 compatibility interpreter
         id: py312
@@ -45,9 +50,14 @@ jobs:
       - name: Check release metadata
         run: python scripts/release.py check
 
+      - name: Early lint preflight
+        run: |
+          python -m pip install ruff==0.14.10
+          python -m ruff check src tests benchmarks scripts
+
       - name: Install primary verification dependencies
         run: |
-          python -m pip install pytest==9.0.3 ruff==0.14.10 mypy==1.19.1
+          python -m pip install pytest==9.0.3 mypy==1.19.1
           python -m pip install ".[all,plot,docs]"
 
       - name: Install Python 3.12 compatibility dependencies
@@ -57,8 +67,18 @@ jobs:
 
       - name: Run aggregate repository verification
         run: |
+          extra_args=()
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base_ref="origin/${{ github.base_ref }}"
+            if ! git diff --name-only "$base_ref"...HEAD | grep -qE "^(pyproject\.toml|src/gunz_utils/ext/|scripts/ci\.py|\.github/)"; then
+              echo "Packaging files unchanged in PR; skipping heavy venv packaging isolation matrix."
+              extra_args+=(--skip-packaging)
+            fi
+          fi
+
           python scripts/audit_ci.py \
             --skip-release \
+            "${extra_args[@]}" \
             --compat-python "${{ steps.py312.outputs.python-path }}" \
             --summary-json tmp/ci-summary.json
 

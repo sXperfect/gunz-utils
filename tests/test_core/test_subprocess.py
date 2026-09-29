@@ -5,6 +5,14 @@ import math
 import sys
 import unittest
 
+try:
+    import pytest
+
+    pytestmark = pytest.mark.slow
+except ImportError:
+    pytest = None  # type: ignore[assignment]
+
+
 from gunz_utils.subprocess import (
     CommandError,
     CommandOutputLimitError,
