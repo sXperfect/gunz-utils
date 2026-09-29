@@ -10,6 +10,7 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [`2026.09.30-testing-clean_room_property_generators`](tasks/done/2026.09.30-testing-clean_room_property_generators.md)
 - [`2026.09.30-docs-cross_project_integration_design`](tasks/done/2026.09.30-docs-cross_project_integration_design.md)
 - [`2026-09-29-infra-release_tooling_enhancements`](tasks/done/2026-09-29-infra-release_tooling_enhancements.md)
 - [`2026-09-29-infra-ci_testing_release_optimization`](tasks/done/2026-09-29-infra-ci_testing_release_optimization.md)
