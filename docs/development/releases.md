@@ -26,6 +26,12 @@ without depending on a GitHub Actions workflow.
 Do not edit the top of `CHANGELOG.md` for an ordinary feature or fix. Add one
 small fragment instead:
 
+```bash
+python scripts/release.py new -c <category> -m "<description>"
+```
+
+Or manually create:
+
 ```text
 changes/<unique-id>.added.md
 changes/<unique-id>.fixed.md
@@ -52,12 +58,16 @@ python scripts/release.py check
 python scripts/ci.py all
 ```
 
-`check` validates metadata and fragments but does not change files.
+`check` validates metadata, fragment names, and absence of unresolved merge conflicts.
 
 ## Inspect pending release impact
 
 ```bash
+# View current version, latest tag, fragment counts, and minimum bump
 python scripts/release.py status
+
+# Render formatted unreleased changelog markdown
+python scripts/release.py unreleased
 ```
 
 The command reports the current package version, the latest available Git tag,
@@ -66,10 +76,17 @@ Versioning bump implied by those fragments.
 
 ## Prepare a release
 
-Choose a target version after inspecting `status`, then run:
+Preview the release without mutating any files:
 
 ```bash
-python scripts/release.py prepare X.Y.Z
+python scripts/release.py prepare --dry-run
+```
+
+Prepare the release automatically (or with an explicit version `X.Y.Z`):
+
+```bash
+python scripts/release.py prepare auto
+# or: python scripts/release.py prepare 1.12.0
 ```
 
 Preparation is intentionally a working-tree operation. It:
@@ -100,18 +117,27 @@ and verified.
 
 ## Publish
 
-After the release commit is present and verified on `main`:
+After the release commit is present and verified on `main`, validate release readiness:
 
 ```bash
-git tag -a vX.Y.Z -m "vX.Y.Z"
+python scripts/release.py tag
+```
+
+To create the verified annotated tag:
+
+```bash
+python scripts/release.py tag --create
 git push origin vX.Y.Z
 ```
 
-Create a GitHub Release named `vX.Y.Z` from that exact tag and use the
-corresponding `CHANGELOG.md` section as its release notes.
+Extract the release notes directly for GitHub Releases:
+
+```bash
+python scripts/release.py notes | gh release create vX.Y.Z -t "vX.Y.Z" -F -
+```
 
 The release tooling deliberately does not push, tag, publish packages, or create
-GitHub Releases. Those are explicit operations so an accidental local command
+GitHub Releases automatically without explicit flags. Those are explicit operations so an accidental local command
 cannot publish a release.
 
 ## Historical versions

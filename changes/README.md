@@ -29,6 +29,12 @@ categories and their minimum Semantic Versioning impact are:
 Each file should contain one concise changelog entry. Plain text is converted to
 a bullet automatically; Markdown beginning with `- ` is preserved.
 
+You can create a fragment automatically using the release tool:
+
+```bash
+python scripts/release.py new -c <category> -m "<description>"
+```
+
 Examples:
 
 ```text

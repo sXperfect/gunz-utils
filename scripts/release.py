@@ -249,6 +249,17 @@ class ReleaseRepo:
             errors.append(str(exc))
             fragments = []
 
+        for frag in fragments:
+            for marker in ("<<<<<<<", "=======", ">>>>>>>"):
+                if marker in frag.text:
+                    errors.append(
+                        f"changelog fragment {frag.path.name} contains unresolved git conflict marker {marker!r}"
+                    )
+            if frag.text.startswith("* "):
+                warnings.append(
+                    f"changelog fragment {frag.path.name} uses '*' bullet; standard format prefers '- '"
+                )
+
         if not self.changelog.is_file():
             errors.append("missing CHANGELOG.md")
             changelog_text = ""
@@ -567,12 +578,202 @@ class ReleaseRepo:
         print(f"expected tag: v{current}")
         return 0
 
+    def unreleased(self) -> int:
+        fragments = self.fragments()
+        if not fragments:
+            print("No unreleased fragments in changes/.")
+            return 0
+        sections = self._render_release_sections(fragments)
+        print(sections)
+        return 0
+
+    def notes(self, version_text: str | None = None) -> int:
+        if version_text is None:
+            target = self.current_version()
+        else:
+            target = SemVer.parse(version_text)
+
+        if not self.changelog.is_file():
+            print("ERROR: missing CHANGELOG.md", file=sys.stderr)
+            return 1
+
+        text = self.changelog.read_text(encoding="utf-8")
+        heading_pattern = rf"^## \[{re.escape(str(target))}\](?:\s+—\s+.+)?$"
+        match = re.search(heading_pattern, text, re.MULTILINE)
+        if match is None:
+            print(
+                f"ERROR: release section [{target}] not found in CHANGELOG.md",
+                file=sys.stderr,
+            )
+            return 1
+
+        body_start = match.end()
+        next_match = re.search(r"^## \[", text[body_start:], re.MULTILINE)
+        if next_match is not None:
+            notes_text = text[body_start : body_start + next_match.start()].strip()
+        else:
+            notes_text = text[body_start:].strip()
+
+        print(notes_text)
+        return 0
+
+    def new_fragment(
+        self,
+        category: str,
+        message: str,
+        identifier: str | None = None,
+    ) -> int:
+        category = category.lower().strip()
+        if category not in CATEGORY_TITLES:
+            allowed = ", ".join(CATEGORY_ORDER)
+            print(
+                f"ERROR: invalid category {category!r}; allowed: {allowed}",
+                file=sys.stderr,
+            )
+            return 1
+
+        msg = message.strip()
+        if not msg:
+            print("ERROR: fragment message cannot be empty", file=sys.stderr)
+            return 1
+
+        if not identifier:
+            slug = re.sub(r"[^a-z0-9]+", "-", msg.lower()).strip("-")[:35]
+            date_str = dt.date.today().strftime("%Y%m%d")
+            identifier = f"{date_str}-{slug}" if slug else f"{date_str}-change"
+
+        valid_identifier = re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", identifier)
+        if valid_identifier is None:
+            print(f"ERROR: invalid fragment id {identifier!r}", file=sys.stderr)
+            return 1
+
+        filename = f"{identifier}.{category}.md"
+        path = self.fragments_dir / filename
+        if path.exists():
+            print(f"ERROR: fragment {filename} already exists", file=sys.stderr)
+            return 1
+
+        formatted_message = self._render_fragment_text(msg) + "\n"
+        self.fragments_dir.mkdir(parents=True, exist_ok=True)
+        path.write_text(formatted_message, encoding="utf-8")
+        print(f"Created fragment: {path.relative_to(self.root)}")
+        return 0
+
+    def tag_release(self, create: bool = False) -> int:
+        current = self.current_version()
+        tag_name = f"v{current}"
+
+        verify_status = self.verify()
+        if verify_status != 0:
+            return verify_status
+
+        status_proc = subprocess.run(
+            ["git", "-C", str(self.root), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if status_proc.returncode != 0:
+            print("ERROR: git status failed", file=sys.stderr)
+            return 1
+        if status_proc.stdout.strip():
+            print("ERROR: working tree contains uncommitted changes:", file=sys.stderr)
+            for line in status_proc.stdout.splitlines():
+                print(f"  {line}", file=sys.stderr)
+            return 1
+
+        branch_proc = subprocess.run(
+            ["git", "-C", str(self.root), "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        branch = branch_proc.stdout.strip()
+        if branch != "main":
+            print(
+                f"WARNING: current branch is {branch!r}; releases should normally be tagged on 'main'",
+                file=sys.stderr,
+            )
+
+        log_proc = subprocess.run(
+            ["git", "-C", str(self.root), "log", "-1", "--format=%s"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        head_commit = log_proc.stdout.strip()
+        expected_commit = f"chore(release): {tag_name}"
+        if head_commit != expected_commit:
+            print(
+                f"ERROR: HEAD commit message is {head_commit!r}; expected {expected_commit!r}",
+                file=sys.stderr,
+            )
+            return 1
+
+        tags = self._git_tags()
+        if current in tags:
+            print(
+                f"ERROR: tag {tag_name} already exists in repository",
+                file=sys.stderr,
+            )
+            return 1
+
+        if create:
+            tag_proc = subprocess.run(
+                ["git", "-C", str(self.root), "tag", "-a", tag_name, "-m", tag_name],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if tag_proc.returncode != 0:
+                print(
+                    f"ERROR: failed to create tag: {tag_proc.stderr}",
+                    file=sys.stderr,
+                )
+                return tag_proc.returncode
+            print(f"Created annotated tag: {tag_name}")
+            print(f"Push with: git push origin {tag_name}")
+            return 0
+        else:
+            print(f"Tag {tag_name} is valid and ready to be created.")
+            print(f"Run: git tag -a {tag_name} -m \"{tag_name}\"")
+            print(f"Or rerun with --create: python scripts/release.py tag --create")
+            return 0
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status", help="show version, tags, fragments and minimum bump")
     sub.add_parser("check", help="validate release metadata without modifying files")
+    sub.add_parser("unreleased", help="render pending fragments in changelog format")
+
+    notes = sub.add_parser(
+        "notes",
+        help="extract release notes for a version from CHANGELOG.md",
+    )
+    notes.add_argument(
+        "version",
+        nargs="?",
+        default=None,
+        help="target version (default: current version in pyproject.toml)",
+    )
+
+    new = sub.add_parser("new", help="create a new changelog fragment file")
+    new.add_argument(
+        "-c",
+        "--category",
+        required=True,
+        choices=CATEGORY_ORDER,
+        help="change category",
+    )
+    new.add_argument("-m", "--message", required=True, help="description of the change")
+    new.add_argument(
+        "--id",
+        default=None,
+        help="optional unique fragment ID (default: date + slug)",
+    )
+
     prepare = sub.add_parser("prepare", help="prepare a release in the working tree")
     prepare.add_argument(
         "version",
@@ -585,7 +786,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="preview changes without modifying files or deleting fragments",
     )
+
     sub.add_parser("verify", help="verify a prepared release before tagging")
+
+    tag = sub.add_parser(
+        "tag",
+        help="validate release commit and optionally create git tag",
+    )
+    tag.add_argument(
+        "--create",
+        action="store_true",
+        help="create the annotated git tag",
+    )
+
     return parser
 
 
@@ -597,14 +810,23 @@ def main(argv: list[str] | None = None) -> int:
             return repo.status()
         if args.command == "check":
             return repo.check_command()
+        if args.command == "unreleased":
+            return repo.unreleased()
+        if args.command == "notes":
+            return repo.notes(args.version)
+        if args.command == "new":
+            return repo.new_fragment(args.category, args.message, args.id)
         if args.command == "prepare":
             return repo.prepare(args.version, dry_run=args.dry_run)
         if args.command == "verify":
             return repo.verify()
+        if args.command == "tag":
+            return repo.tag_release(create=args.create)
     except (OSError, tomllib.TOMLDecodeError, ReleaseError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     raise AssertionError(f"unhandled command: {args.command}")
+
 
 
 if __name__ == "__main__":

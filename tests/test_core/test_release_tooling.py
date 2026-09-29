@@ -178,8 +178,56 @@ def test_prepare_dry_run_does_not_modify_files_or_unlink_fragments(
     assert fragment.exists()
 
 
+def test_notes_extracts_specified_and_current_version(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    assert repo.notes("1.10.0") == 0
+    captured = capsys.readouterr()
+    assert "- Previous release." in captured.out
+
+    assert repo.notes() == 0
+    captured_default = capsys.readouterr()
+    assert "- Previous release." in captured_default.out
+
+
+def test_unreleased_renders_pending_fragments(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    (tmp_path / "changes" / "f1.fixed.md").write_text("Fix crash.", encoding="utf-8")
+    assert repo.unreleased() == 0
+    captured = capsys.readouterr()
+    assert "### Fixed" in captured.out
+    assert "- Fix crash." in captured.out
+
+
+def test_new_fragment_creates_properly_formatted_file(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    status = repo.new_fragment(
+        category="security",
+        message="Harden input validation",
+        identifier="sec-1",
+    )
+    assert status == 0
+    created = tmp_path / "changes" / "sec-1.security.md"
+    assert created.is_file()
+    assert created.read_text(encoding="utf-8") == "- Harden input validation\n"
+
+
+def test_check_rejects_unresolved_conflict_markers(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    fragment = tmp_path / "changes" / "conflict.fixed.md"
+    fragment.write_text("<<<<<<< HEAD\nFix a bug.\n=======\nFix bug differently.\n>>>>>>> branch\n", encoding="utf-8")
+
+    result = repo.check()
+    assert not result.ok
+    assert any("conflict marker" in err for err in result.errors)
+
+
 def test_repository_release_metadata_is_self_consistent() -> None:
     repo = release.ReleaseRepo(PROJECT_ROOT)
     result = repo.check()
     assert result.ok, result.errors
+
 
