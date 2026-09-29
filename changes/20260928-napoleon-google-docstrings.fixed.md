@@ -1,1 +1,0 @@
-- Enable Google-style Napoleon parsing so expanded API documentation builds correctly for existing public docstrings.

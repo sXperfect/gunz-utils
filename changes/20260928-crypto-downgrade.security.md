@@ -1,1 +1,0 @@
-- Fail closed on unauthenticated plaintext decryption and disable the predictable hostname/user-derived system passphrase helper; legacy plaintext migration now requires an explicit opt-in.

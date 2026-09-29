@@ -1,1 +1,0 @@
-- Add `--dry-run` and `auto` target version resolution to `scripts/release.py`, optimize GitHub Actions checkout and early lint preflight, and introduce standard test markers and taxonomy.

@@ -1,1 +1,0 @@
-- Stop embedding raw benchmark-worker stderr in raised exception messages, preventing child-process secrets from leaking through ordinary diagnostics.

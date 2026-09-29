@@ -1,1 +1,0 @@
-- Prevent optional logging path/format injection and redact custom Pydantic validator messages that could echo secret-bearing inputs.

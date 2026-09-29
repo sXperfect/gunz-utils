@@ -1,1 +1,0 @@
-- Finish the deep audit by binding benchmark artifact copies to opened files, cleaning up POSIX subprocess descendant groups, and raising pytest to 9.0.3 for CVE-2025-71176.

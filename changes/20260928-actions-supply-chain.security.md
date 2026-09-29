@@ -1,1 +1,0 @@
-- Pin GitHub Actions to immutable current release SHAs and add a repository contract preventing mutable action references from returning.

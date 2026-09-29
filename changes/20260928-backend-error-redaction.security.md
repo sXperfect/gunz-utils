@@ -1,1 +1,0 @@
-- Redact raw GitPython and stdlib argument-binding exception messages so arbitrary secret-bearing error text is not copied into public diagnostics.

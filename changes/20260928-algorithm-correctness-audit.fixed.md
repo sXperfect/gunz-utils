@@ -1,6 +1,0 @@
-- Harden numerical, timing, serialization, parsing, project-discovery, and benchmark/profiling edge cases, with a maintained algorithm proof guide and audit registry.
-- Add method-audit design documentation, exhaustive graph/varint proof tests, and a single-job aggregate CI verifier that reports independent failures together.
-- Audit and harden the initial A0 backlog, including path symlink handling, strict formatting/identifier/config/network domains, bounded benchmark-result loading, artifact symlink rejection, perf/worker validation, and executed cross-version proof tests.
-- Harden former A1 families: lease/concurrency setup cleanup, strict JSONL, partition boundaries, recursive stdlib type validation, SecureStore audit-atomic transactions, content-store fanout symlink protection, and filesystem no-overwrite failure paths.
-- Verify the former A1 algorithm families with 943 passing tests on Python 3.11 and 3.12 plus lint, typing, docs, and packaging/isolation gates.\n
-- Compose the algorithm audit with the newer security-hardened main implementation and verify the combined tree across lint, typing, docs, packaging, and Python 3.11/3.12 tests.

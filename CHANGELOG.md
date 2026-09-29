@@ -7,8 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Unreleased changes are collected as conflict-free fragments in `changes/`.
-Run `python scripts/release.py status` to inspect the pending release impact.
+Unreleased changes are collected as conflict-free fragments in `changes/`. Run `python scripts/release.py status` to inspect them.
+
+## [1.12.0] — 2026-09-29
+
+### Security
+
+- Pin GitHub Actions to immutable current release SHAs and add a repository contract preventing mutable action references from returning.
+
+- Redact raw GitPython and stdlib argument-binding exception messages so arbitrary secret-bearing error text is not copied into public diagnostics.
+
+- Stop embedding raw benchmark-worker stderr in raised exception messages, preventing child-process secrets from leaking through ordinary diagnostics.
+
+- Fail closed on unauthenticated plaintext decryption and disable the predictable hostname/user-derived system passphrase helper; legacy plaintext migration now requires an explicit opt-in.
+
+- Finish the deep audit by binding benchmark artifact copies to opened files, cleaning up POSIX subprocess descendant groups, and raising pytest to 9.0.3 for CVE-2025-71176.
+
+- Make raw exception diagnostics opt-in and stop `CommandError` from echoing subprocess arguments that may contain credentials.
+
+- Raise the optional Matplotlib floor to 3.10.9 so the plotting extra includes the security backport restricting `axes.prop_cycle` expression evaluation.
+
+- Prevent optional logging path/format injection and redact custom Pydantic validator messages that could echo secret-bearing inputs.
+
+- Redact rejected strict-boolean values and enforce finite/integer resource controls for process sampling and bounded streaming helpers.
+
+- Raise the Pydantic optional-dependency floor to 2.4.0 so validation extras cannot resolve versions affected by CVE-2024-3772 (regular-expression denial of service).
+
+### Added
+
+- Publish a PEP 561 `py.typed` marker and complete public namespace API-reference coverage for downstream users and type checkers.
+
+### Fixed
+
+- Harden numerical, timing, serialization, parsing, project-discovery, and benchmark/profiling edge cases, with a maintained algorithm proof guide and audit registry.
+- Add method-audit design documentation, exhaustive graph/varint proof tests, and a single-job aggregate CI verifier that reports independent failures together.
+- Audit and harden the initial A0 backlog, including path symlink handling, strict formatting/identifier/config/network domains, bounded benchmark-result loading, artifact symlink rejection, perf/worker validation, and executed cross-version proof tests.
+- Harden former A1 families: lease/concurrency setup cleanup, strict JSONL, partition boundaries, recursive stdlib type validation, SecureStore audit-atomic transactions, content-store fanout symlink protection, and filesystem no-overwrite failure paths.
+- Verify the former A1 algorithm families with 943 passing tests on Python 3.11 and 3.12 plus lint, typing, docs, and packaging/isolation gates.
+- Compose the algorithm audit with the newer security-hardened main implementation and verify the combined tree across lint, typing, docs, packaging, and Python 3.11/3.12 tests.
+
+- Enable Google-style Napoleon parsing so expanded API documentation builds correctly for existing public docstrings.
+
+### Documentation
+
+- Remove the obsolete top-level `guides/` tree and establish a tool-neutral `AGENTS.md` covering CI, versioning, security audit, API, testing, and repository-hygiene rules.
+
+- Document the complete 97-file deep security audit, repeatable methodology, confirmed remediations, dependency advisory review, and residual trust boundaries.
+
+- Refresh README installation and feature documentation, add contributor guidance, and remove obsolete tool-generated repository metadata.
+
+- Add a private vulnerability-reporting policy, richer package metadata, current release-history guidance, and maintainable task-archive navigation.
 
 ## [1.11.0] — 2026-09-28
 

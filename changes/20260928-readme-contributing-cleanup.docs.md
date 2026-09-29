@@ -1,1 +1,0 @@
-- Refresh README installation and feature documentation, add contributor guidance, and remove obsolete tool-generated repository metadata.

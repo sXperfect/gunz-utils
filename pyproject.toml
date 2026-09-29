@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gunz-utils"
-version = "1.11.0"
+version = "1.12.0"
 description = "Dependency-free Python utility primitives for reliable, reusable systems"
 license = "BSD-3-Clause-Clear"
 license-files = ["LICENSE.md"]

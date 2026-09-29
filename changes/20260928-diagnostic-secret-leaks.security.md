@@ -1,1 +1,0 @@
-- Make raw exception diagnostics opt-in and stop `CommandError` from echoing subprocess arguments that may contain credentials.

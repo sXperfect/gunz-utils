@@ -1,1 +1,0 @@
-- Add a private vulnerability-reporting policy, richer package metadata, current release-history guidance, and maintainable task-archive navigation.
