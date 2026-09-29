@@ -1,0 +1,1 @@
+- Document cross-project reusable runtime adoption blueprints, architectural definitions, and behavioural specifications.

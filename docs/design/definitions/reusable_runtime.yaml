@@ -1,0 +1,113 @@
+component: "ReusableRuntime"
+type: "ModuleGroup"
+purpose: |
+  Dependency-free runtime primitives providing distributed coordination,
+  content-addressed storage, deterministic sampling, workflow DAGs,
+  experiment matrices, safe I/O, and cross-project integration capabilities.
+modules:
+  - name: "gunz_utils.content_store"
+    classes:
+      - name: "ContentAddressedStore"
+        methods:
+          - name: "put_bytes"
+            args: ["data", "suffix"]
+          - name: "put_stream"
+            args: ["stream", "suffix"]
+          - name: "verify"
+            args: ["digest"]
+          - name: "materialize"
+            args: ["digest", "target_path", "mode"]
+  - name: "gunz_utils.leases"
+    classes:
+      - name: "LeaseTiming"
+        fields: ["lease_duration", "heartbeat_interval", "grace_period"]
+    functions:
+      - name: "run_with_lease_heartbeat"
+        args: ["renew_fn", "work_fn", "timing", "on_lost"]
+  - name: "gunz_utils.sampling"
+    functions:
+      - name: "sample_named_items"
+        args: ["items", "k", "seed"]
+      - name: "stable_priority"
+        args: ["name", "seed"]
+  - name: "gunz_utils.experiments"
+    classes:
+      - name: "VariantMatrix"
+        methods:
+          - name: "add_variant"
+            args: ["name", "transform_fn"]
+          - name: "run_all"
+            args: ["eval_fn"]
+    functions:
+      - name: "parameter_grid"
+        args: ["dimensions"]
+  - name: "gunz_utils.provenance_graph"
+    classes:
+      - name: "ProvenanceGraph"
+        methods:
+          - name: "add_node"
+            args: ["node_id", "inputs", "metadata"]
+          - name: "ancestry"
+            args: ["node_id"]
+  - name: "gunz_utils.dag"
+    classes:
+      - name: "WorkflowDAG"
+        methods:
+          - name: "add_step"
+            args: ["step_id", "fn", "dependencies"]
+          - name: "execute"
+            args: ["context"]
+  - name: "gunz_utils.sync"
+    functions:
+      - name: "rsync_mirror"
+        args: ["source", "destination", "lock_path", "marker_name"]
+  - name: "gunz_utils.retry"
+    classes:
+      - name: "RetryPolicy"
+        fields: ["max_attempts", "initial_delay", "max_delay", "jitter", "delay_override"]
+    functions:
+      - name: "async_run_with_retry"
+        args: ["policy", "fn", "*args", "**kwargs"]
+      - name: "run_with_retry"
+        args: ["policy", "fn", "*args", "**kwargs"]
+  - name: "gunz_utils.stats"
+    functions:
+      - name: "bootstrap_mean_ci"
+        args: ["data", "confidence", "n_bootstrap", "seed"]
+      - name: "paired_within_subject_effects"
+        args: ["baseline", "experimental"]
+  - name: "gunz_utils.partitions"
+    classes:
+      - name: "PartitionManifest"
+        fields: ["partitions", "fingerprint"]
+    functions:
+      - name: "partition_overlaps"
+        args: ["partitions"]
+  - name: "gunz_utils.signals"
+    functions:
+      - name: "install_termination_handler"
+        args: ["callback", "exit_code"]
+  - name: "gunz_utils.faults"
+    classes:
+      - name: "NamedFaultInjector"
+        methods:
+          - name: "register_fault"
+            args: ["checkpoint_name", "action"]
+          - name: "checkpoint"
+            args: ["checkpoint_name"]
+  - name: "gunz_utils.structures"
+    functions:
+      - name: "retain_priority_and_recent"
+        args: ["items", "max_items", "priority_fn", "timestamp_fn"]
+      - name: "deep_diff"
+        args: ["left", "right"]
+constraints:
+  - "Zero mandatory third-party runtime dependencies."
+  - "Python 3.11+ standard library only."
+  - "PEP 561 typed with py.typed marker."
+  - "Namespace-first import policy."
+consumed_by:
+  - "Hyperion (crawler CAS, provenance, lease heartbeats, rsync mirroring)"
+  - "Hermes / My-Hermes (dynamic retries, rate limits, structured hashes)"
+  - "gunz-ml (deterministic sampling, variant matrices, statistics, partition checks)"
+  - "Autonomous agents & background daemons (preemption, leases, DAGs, budgets)"
