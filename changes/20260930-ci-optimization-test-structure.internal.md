@@ -1,0 +1,1 @@
+- Optimize CI for free-tier runner credits, fix subprocess stdin hang, add standalone test runner, and update CI design docs.

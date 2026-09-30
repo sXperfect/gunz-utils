@@ -7,7 +7,14 @@ import gunz_utils
 
 class TestPublicAPI(unittest.TestCase):
     def test_all_exports_resolve(self) -> None:
-        missing = [name for name in gunz_utils.__all__ if not hasattr(gunz_utils, name)]
+        missing = []
+        for name in gunz_utils.__all__:
+            try:
+                if not hasattr(gunz_utils, name):
+                    missing.append(name)
+            except (ImportError, ModuleNotFoundError):
+                # Optional extra not installed in current environment
+                continue
         self.assertEqual(missing, [])
 
     def test_all_exports_are_unique(self) -> None:

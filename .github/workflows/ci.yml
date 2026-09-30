@@ -19,7 +19,7 @@ jobs:
     name: verify
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,6 +74,10 @@ jobs:
               echo "Packaging files unchanged in PR; skipping heavy venv packaging isolation matrix."
               extra_args+=(--skip-packaging)
             fi
+            if ! git diff --name-only "$base_ref"...HEAD | grep -qvE "^(docs/|changes/|\.md$)"; then
+              echo "Docs-only PR; skipping Python 3.12 compatibility runner."
+              extra_args+=(--skip-compat)
+            fi
           fi
 
           python scripts/audit_ci.py \
@@ -89,4 +93,4 @@ jobs:
           name: ci-verification-summary
           path: tmp/ci-summary.json
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 1

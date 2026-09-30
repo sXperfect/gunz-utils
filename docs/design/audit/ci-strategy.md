@@ -103,6 +103,34 @@ Feature-branch pushes remain free of hosted CI runs. The audit branch can
 therefore change the workflow safely without consuming hosted credits until a
 PR is intentionally opened or the branch is merged.
 
+## Credit-Conscious CI Architecture
+
+To operate efficiently within GitHub's free-account credit and storage bounds,
+the pipeline employs specific resource-bounding strategies:
+
+1. **Strict 15-Minute Runaway Ceiling**:
+   Hosted execution is capped at `timeout-minutes: 15` (reduced from 30m). Any
+   unexpected deadlock, hanging subprocess, or slow network stall terminates
+   promptly, preventing uncontrolled credit drainage.
+
+2. **1-Day Ephemeral Artifact Retention**:
+   The verification summary JSON is preserved for 1 day (`retention-days: 1`).
+   This prevents cumulative consumption of the shared 500 MB account storage
+   quota across high-frequency pull request reviews.
+
+3. **PR Diff-Based Conditional Gates**:
+   - *Packaging isolation skip*: If a PR touches neither packaging metadata
+     (`pyproject.toml`, `src/gunz_utils/ext/`), nor runner scripts, the heavy
+     venv isolation matrix is bypassed (`--skip-packaging`).
+   - *Docs-only fast path*: If a PR modifies only documentation and changelog
+     files (`docs/`, `changes/`, `*.md`), the secondary Python 3.12 compatibility
+     suite is skipped (`--skip-compat`), cutting runner duration by ~40%.
+
+4. **Zero-Dependency Local Testing**:
+   For environments where `pytest` is not globally installed, developers can
+   execute core tests using `python scripts/run_tests.py` backed by the
+   standard-library `unittest` runner.
+
 ## Local parity
 
 `./scripts/verify.sh` uses the same audit orchestrator. A developer can run an

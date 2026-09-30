@@ -195,6 +195,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip the packaging gate when packaging files are unchanged",
     )
+    parser.add_argument(
+        "--skip-compat",
+        action="store_true",
+        help="skip the compatibility python runner even if --compat-python is supplied",
+    )
     return parser
 
 
@@ -209,9 +214,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             or (args.skip_packaging and g == "packaging")
         )
     ]
+    compat_python = None if args.skip_compat else args.compat_python
     results = collect_results(
         gates=gates,
-        compatibility_python=args.compat_python,
+        compatibility_python=compat_python,
         fail_fast=args.fail_fast,
     )
     print_summary(results)

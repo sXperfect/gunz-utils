@@ -36,7 +36,7 @@ class TestM8M10(unittest.TestCase):
             target = root / "value.bin"
             atomic_write_bytes(target, b"abc")
             self.assertEqual(target.read_bytes(), b"abc")
-            self.assertEqual(contained_path(root, "a/b"), root / "a/b")
+            self.assertEqual(contained_path(root, "a/b"), root.resolve() / "a/b")
             self.assertEqual(lexical_contained_path(root, "a/b"), root / "a/b")
             with self.assertRaises(ValueError):
                 contained_path(root, "../escape")

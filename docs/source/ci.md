@@ -30,6 +30,16 @@ verifier.
 It does not run for ordinary feature-branch pushes. Superseded runs for the
 same pull request or ref are cancelled.
 
+Hosted executions are bounded to preserve free-tier runner credits and storage:
+- **15-Minute Timeout**: Jobs are capped at 15 minutes to prevent hanging tasks
+  from draining runner minutes.
+- **1-Day Ephemeral Retention**: Verification summary artifacts are stored for
+  1 day (`retention-days: 1`), protecting the 500 MB account storage quota.
+- **Packaging Isolation Skip**: Bypasses heavy multi-venv packaging checks on
+  PRs where packaging files and extras are untouched (`--skip-packaging`).
+- **Docs-Only Fast Path**: Skips the secondary Python 3.12 compatibility suite
+  when a PR touches only documentation and changelogs (`--skip-compat`).
+
 ## One hosted verification job
 
 The workflow exposes one stable required check: `CI / verify`. Checkout,
@@ -144,6 +154,21 @@ python -m pytest
 
 Pytest runs the full collection without an artificial `maxfail` cap so one
 run can report multiple failing tests.
+
+To run focused or fast subset tests:
+
+```bash
+python -m pytest -m "not slow"           # Skip stress and heavy concurrency tests
+python -m pytest -m "policy"             # Contract and CI governance tests only
+```
+
+For environments without `pytest` installed globally, run tests using the
+pure-Python zero-dependency runner:
+
+```bash
+python scripts/run_tests.py
+python scripts/run_tests.py -v -f        # Verbose, fail-fast
+```
 
 ### Documentation gate
 

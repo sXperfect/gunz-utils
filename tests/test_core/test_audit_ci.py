@@ -208,3 +208,19 @@ def test_audit_ci_skips_packaging_when_requested(monkeypatch) -> None:
     assert "packaging" not in captured_gates
     assert captured_gates == ["lint", "test", "docs"]
 
+
+def test_audit_ci_skips_compat_when_requested(monkeypatch) -> None:
+    captured_kwargs: dict = {}
+
+    def fake_collect(gates, **kwargs):
+        captured_kwargs.update(kwargs)
+        return []
+
+    monkeypatch.setattr(audit_ci, "collect_results", fake_collect)
+    monkeypatch.setattr(audit_ci, "print_summary", lambda _res: None)
+    monkeypatch.setattr(audit_ci, "write_github_summary", lambda _res: None)
+
+    exit_code = audit_ci.main(["--compat-python", "python3.12", "--skip-compat"])
+    assert exit_code == 0
+    assert captured_kwargs.get("compatibility_python") is None
+

@@ -139,6 +139,7 @@ def _run_command_bounded(
     """Run a command while streaming stdout/stderr into bounded buffers."""
     process = subprocess.Popen(
         list(args),
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=False,
@@ -228,6 +229,7 @@ def run_command(
     if max_output_bytes is None:
         completed = subprocess.run(
             list(args),
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=False,
             timeout=timeout,
@@ -402,6 +404,7 @@ async def run_command_async(
     started = time.perf_counter()
     process = await asyncio.create_subprocess_exec(
         *args,
+        stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=cwd,

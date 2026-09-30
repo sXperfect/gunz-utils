@@ -6,5 +6,4 @@ in [`docs/tasks/README.md`](tasks/README.md); completed work is indexed in
 
 | Task ID | Date | Description | Status |
 |:---|:---:|:---|:---:|
-
-There are currently no active or pending tasks.
+| *(None)* | — | No active tasks | — |

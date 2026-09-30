@@ -54,7 +54,8 @@ def test_ci_is_read_only_and_cancels_superseded_runs() -> None:
     text = _workflow_text()
     assert "permissions:\n  contents: read" in text
     assert "cancel-in-progress: true" in text
-    assert "timeout-minutes: 30" in text
+    assert "timeout-minutes: 15" in text
+    assert "retention-days: 1" in text
 
 
 def test_ci_release_preflight_precedes_install_then_uses_aggregate_verifier() -> None:
@@ -80,6 +81,7 @@ def test_ci_release_preflight_precedes_install_then_uses_aggregate_verifier() ->
     )
     assert "--skip-release" in text
     assert "--compat-python" in text
+    assert "--skip-compat" in text
     assert "--summary-json tmp/ci-summary.json" in text
     assert "if: ${{ always() }}" in text
 

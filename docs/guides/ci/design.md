@@ -152,6 +152,21 @@ Do not require internal implementation steps independently. Keeping one stable
 check name makes the workflow easier to refactor without continuously changing
 branch-protection settings.
 
+## Credit and resource bounds
+
+To operate reliably under GitHub's free-tier resource limits:
+
+1. **15-Minute Timeout Ceiling**: Caps the runner duration so unexpected hangs,
+   network timeouts, or deadlocks do not deplete account runner minutes.
+2. **1-Day Ephemeral Artifact Retention**: Verification summaries are retained
+   for 1 day, preventing the shared 500 MB account storage quota from filling up.
+3. **PR Diff Filtering**:
+   - Skips the multi-venv packaging isolation matrix if packaging files are unchanged.
+   - Skips the secondary Python 3.12 compatibility suite (`--skip-compat`) when
+     changes are strictly documentation and changelog files.
+4. **Standalone Local Testing**: Developers without global `pytest` can execute
+   core unit and contract tests via `python scripts/run_tests.py`.
+
 ## Changes to this design
 
 Before changing the trigger policy or splitting the single runner into multiple
