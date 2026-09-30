@@ -1,0 +1,1 @@
+- Document architectural handoff and stage 30 benchmark modules to gunz-bench/tmp/handsoff/.
