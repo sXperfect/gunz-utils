@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import signal
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -235,8 +236,113 @@ def install_termination_handler(
     )
 
 
+class GracefulShutdown:
+    """Coordinated async graceful shutdown on OS termination signals or cancellation.
+
+    Parameters
+    ----------
+    signums : tuple[int, ...], optional
+        Signals to capture. Defaults to (SIGINT, SIGTERM).
+    timeout : float, optional
+        Maximum timeout in seconds to wait for async cleanup callbacks.
+    loop : asyncio.AbstractEventLoop | None, optional
+        Target event loop.
+    """
+
+    def __init__(
+        self,
+        *,
+        signums: tuple[int, ...] = (signal.SIGINT, signal.SIGTERM),
+        timeout: float = 10.0,
+        loop: asyncio.AbstractEventLoop | None = None,
+    ) -> None:
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or timeout <= 0
+        ):
+            raise ValueError("timeout must be a positive number")
+        self.signums = signums
+        self.timeout = float(timeout)
+        self._loop = loop
+        self._callbacks: list[Callable[[], Any]] = []
+        self._shutdown_event: asyncio.Event | None = None
+        self._registration: AsyncSignalRegistration | None = None
+        self._signal_received: int | None = None
+
+    @property
+    def is_shutting_down(self) -> bool:
+        """Whether shutdown has been triggered."""
+        return self._shutdown_event is not None and self._shutdown_event.is_set()
+
+    @property
+    def signal_received(self) -> int | None:
+        """Return the signal number that triggered shutdown, if any."""
+        return self._signal_received
+
+    def _get_event(self) -> asyncio.Event:
+        if self._shutdown_event is None:
+            self._shutdown_event = asyncio.Event()
+        return self._shutdown_event
+
+    def add_callback(self, callback: Callable[[], Any]) -> None:
+        """Register a sync or async cleanup callback invoked on shutdown."""
+        if not callable(callback):
+            raise TypeError("callback must be callable")
+        self._callbacks.append(callback)
+
+    def trigger_shutdown(self, signum: int | None = None) -> None:
+        """Programmatically trigger shutdown."""
+        self._signal_received = signum
+        self._get_event().set()
+
+    async def wait_for_shutdown(self) -> int | None:
+        """Wait until a shutdown signal is received or triggered."""
+        await self._get_event().wait()
+        return self._signal_received
+
+    async def run_cleanup(self) -> list[tuple[Callable[[], Any], BaseException]]:
+        """Run all registered callbacks in LIFO order within the timeout."""
+        errors: list[tuple[Callable[[], Any], BaseException]] = []
+        for cb in reversed(self._callbacks):
+            try:
+                res = cb()
+                if inspect.isawaitable(res):
+                    await asyncio.wait_for(res, timeout=self.timeout)
+            except BaseException as exc:
+                errors.append((cb, exc))
+        return errors
+
+    async def __aenter__(self) -> GracefulShutdown:
+        self._get_event()
+        loop = self._loop or asyncio.get_running_loop()
+        try:
+            self._registration = install_async_signal_handlers(
+                self.trigger_shutdown,
+                signums=self.signums,
+                loop=loop,
+            )
+        except (NotImplementedError, ValueError):
+            self._registration = None
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: object | None,
+    ) -> bool:
+        if self._registration is not None:
+            self._registration.restore()
+            self._registration = None
+        if self.is_shutting_down:
+            await self.run_cleanup()
+        return False
+
+
 __all__ = [
     "AsyncSignalRegistration",
+    "GracefulShutdown",
     "SignalCallback",
     "SignalRegistration",
     "install_async_signal_handlers",

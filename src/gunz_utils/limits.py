@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import math
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 
@@ -20,9 +21,10 @@ class Limits:
     max_items: int | None = None
     max_depth: int | None = None
     timeout: float | None = None
+    max_steps: int | None = None
 
     def __post_init__(self) -> None:
-        for name in ("max_bytes", "max_items", "max_depth"):
+        for name in ("max_bytes", "max_items", "max_depth", "max_steps"):
             value = getattr(self, name)
             if value is not None and (
                 isinstance(value, bool)
@@ -50,17 +52,25 @@ class Limits:
         if self.max_items is not None and count > self.max_items:
             raise ValueError("item limit exceeded")
 
+    def check_steps(self, count: int) -> None:
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise ValueError("count must be a non-negative integer")
+        if self.max_steps is not None and count > self.max_steps:
+            raise ValueError("step limit exceeded")
+
 
 class ResourceBudget:
-    """Track cumulative bytes/items, nesting depth, and a monotonic deadline."""
+    """Track cumulative bytes/items, nesting depth, execution steps, and a deadline."""
 
     __slots__ = (
         "max_bytes",
         "max_items",
         "max_depth",
         "timeout",
+        "max_steps",
         "bytes_used",
         "items_used",
+        "steps_used",
         "_clock",
         "_deadline",
     )
@@ -72,15 +82,18 @@ class ResourceBudget:
         max_items: int | None = None,
         max_depth: int | None = None,
         timeout: float | None = None,
+        max_steps: int | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        limits = Limits(max_bytes, max_items, max_depth, timeout)
+        limits = Limits(max_bytes, max_items, max_depth, timeout, max_steps)
         self.max_bytes = limits.max_bytes
         self.max_items = limits.max_items
         self.max_depth = limits.max_depth
         self.timeout = limits.timeout
+        self.max_steps = limits.max_steps
         self.bytes_used = 0
         self.items_used = 0
+        self.steps_used = 0
         self._clock = clock
         if timeout is None:
             self._deadline = None
@@ -106,6 +119,7 @@ class ResourceBudget:
             max_items=limits.max_items,
             max_depth=limits.max_depth,
             timeout=limits.timeout,
+            max_steps=limits.max_steps,
             clock=clock,
         )
 
@@ -128,6 +142,24 @@ class ResourceBudget:
             raise BudgetExceededError("item budget exceeded")
         self.items_used = candidate
         return candidate
+
+    def consume_steps(self, amount: int = 1) -> int:
+        """Consume execution steps and return the new cumulative count."""
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
+            raise ValueError("amount must be a non-negative integer")
+        candidate = self.steps_used + amount
+        if self.max_steps is not None and candidate > self.max_steps:
+            raise BudgetExceededError("step budget exceeded")
+        self.steps_used = candidate
+        return candidate
+
+    @contextmanager
+    def step(self, amount: int = 1) -> Generator[None, None, None]:
+        """Context manager validating deadline and consuming steps on entry."""
+        self.check_deadline()
+        self.consume_steps(amount)
+        yield
+        self.check_deadline()
 
     def check_depth(self, depth: int) -> None:
         """Reject a nesting depth beyond the configured maximum."""
@@ -167,6 +199,13 @@ class ResourceBudget:
         if self.max_items is None:
             return None
         return self.max_items - self.items_used
+
+    @property
+    def remaining_steps(self) -> int | None:
+        """Return remaining steps or None when unbounded."""
+        if self.max_steps is None:
+            return None
+        return self.max_steps - self.steps_used
 
     @property
     def remaining_seconds(self) -> float | None:

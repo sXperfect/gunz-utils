@@ -2,11 +2,31 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, MutableMapping
+import asyncio
+import inspect
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any
 
 from .hashing import structured_hash
+
+
+class WorkflowExecutionError(RuntimeError):
+    """Raised when a workflow stage execution fails."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        stage_name: str,
+        cause: BaseException,
+        compensation_errors: Sequence[tuple[str, BaseException]] = (),
+    ) -> None:
+        super().__init__(message)
+        self.stage_name = stage_name
+        self.cause = cause
+        self.compensation_errors = tuple(compensation_errors)
 
 
 @dataclass(frozen=True)
@@ -18,19 +38,24 @@ class WorkflowStage:
     name : str
         Unique stage name.
     run : Callable[[Mapping[str, Any]], Any]
-        Stage function receiving completed direct-dependency outputs.
+        Stage function receiving completed direct-dependency outputs. May be
+        synchronous or an async coroutine function.
     dependencies : tuple[str, ...], optional
         Names of prerequisite stages.
     fingerprint : str | None, optional
         Caller-defined fingerprint for the stage's own configuration/input.
         A stage is cacheable only when it and every transitive dependency have
         fingerprints.
+    compensate : Callable[[Any], Any] | None, optional
+        Rollback function receiving the stage's own output if a subsequent
+        downstream stage fails. May be synchronous or asynchronous.
     """
 
     name: str
     run: Callable[[Mapping[str, Any]], Any]
     dependencies: tuple[str, ...] = ()
     fingerprint: str | None = None
+    compensate: Callable[[Any], Any] | None = None
 
     def __post_init__(self) -> None:
         """Validate stage identity, callable and dependency declaration."""
@@ -38,6 +63,8 @@ class WorkflowStage:
             raise ValueError("stage name must be a non-empty string")
         if not callable(self.run):
             raise TypeError("stage run must be callable")
+        if self.compensate is not None and not callable(self.compensate):
+            raise TypeError("compensate must be callable or None")
 
         dependencies = tuple(self.dependencies)
         if any(
@@ -161,6 +188,42 @@ class WorkflowDAG:
 
         return resolve(name)
 
+    def _rollback_sync(
+        self,
+        completed_order: list[str],
+        outputs: Mapping[str, Any],
+    ) -> list[tuple[str, BaseException]]:
+        """Roll back completed stages in reverse execution order synchronously."""
+        errors: list[tuple[str, BaseException]] = []
+        for name in reversed(completed_order):
+            stage = self.stages[name]
+            if stage.compensate is not None:
+                try:
+                    res = stage.compensate(outputs.get(name))
+                    if inspect.iscoroutine(res):
+                        res.close()
+                except BaseException as exc:
+                    errors.append((name, exc))
+        return errors
+
+    async def _rollback_async(
+        self,
+        completed_order: list[str],
+        outputs: Mapping[str, Any],
+    ) -> list[tuple[str, BaseException]]:
+        """Roll back completed stages in reverse execution order asynchronously."""
+        errors: list[tuple[str, BaseException]] = []
+        for name in reversed(completed_order):
+            stage = self.stages[name]
+            if stage.compensate is not None:
+                try:
+                    res = stage.compensate(outputs.get(name))
+                    if inspect.isawaitable(res):
+                        await res
+                except BaseException as exc:
+                    errors.append((name, exc))
+        return errors
+
     def execute(
         self,
         *,
@@ -177,15 +240,10 @@ class WorkflowDAG:
         -------
         dict[str, Any]
             Stage outputs in completion/topological order.
-
-        Notes
-        -----
-        Only stages with complete transitive fingerprint coverage are cached.
-        This prevents a downstream stage from reusing stale output when an
-        un-fingerprinted dependency may have changed.
         """
         store = cache if cache is not None else {}
         outputs: dict[str, Any] = {}
+        completed_order: list[str] = []
 
         for name in self._order:
             stage = self.stages[name]
@@ -198,19 +256,146 @@ class WorkflowDAG:
 
             if key is not None and key in store:
                 outputs[name] = store[key]
+                completed_order.append(name)
                 continue
 
             dependency_outputs = {
                 dependency: outputs[dependency]
                 for dependency in stage.dependencies
             }
-            output = stage.run(dependency_outputs)
+            try:
+                output = stage.run(dependency_outputs)
+            except BaseException as exc:
+                compensation_errors = self._rollback_sync(completed_order, outputs)
+                raise WorkflowExecutionError(
+                    f"workflow failed at stage {name!r}: {exc}",
+                    stage_name=name,
+                    cause=exc,
+                    compensation_errors=tuple(compensation_errors),
+                ) from exc
+
             outputs[name] = output
+            completed_order.append(name)
 
             if key is not None:
                 store[key] = output
 
         return outputs
 
+    async def async_execute(
+        self,
+        *,
+        cache: MutableMapping[tuple[str, str], Any] | None = None,
+        concurrency_limit: int | None = None,
+        budget: Any = None,
+    ) -> dict[str, Any]:
+        """Execute stages asynchronously with concurrency, budget tracking, and rollback."""
+        if concurrency_limit is not None:
+            if (
+                isinstance(concurrency_limit, bool)
+                or not isinstance(concurrency_limit, int)
+                or concurrency_limit <= 0
+            ):
+                raise ValueError("concurrency_limit must be a positive integer or None")
 
-__all__ = ["WorkflowDAG", "WorkflowStage"]
+        sem = (
+            asyncio.Semaphore(concurrency_limit)
+            if concurrency_limit is not None
+            else None
+        )
+        store = cache if cache is not None else {}
+        outputs: dict[str, Any] = {}
+        completed_order: list[str] = []
+        events: dict[str, asyncio.Event] = {
+            name: asyncio.Event() for name in self.stages
+        }
+        cancel_event = asyncio.Event()
+        failure_box: list[tuple[str, BaseException]] = []
+
+        async def run_stage(name: str) -> None:
+            stage = self.stages[name]
+            try:
+                for dep in stage.dependencies:
+                    await events[dep].wait()
+                    if cancel_event.is_set():
+                        return
+
+                if cancel_event.is_set():
+                    return
+
+                if budget is not None:
+                    if hasattr(budget, "check_deadline"):
+                        budget.check_deadline()
+                    if hasattr(budget, "consume_steps"):
+                        budget.consume_steps(1)
+
+                async with (sem if sem is not None else nullcontext()):
+                    if cancel_event.is_set():
+                        return
+
+                    key = (
+                        (name, self.effective_fingerprint(name))
+                        if self.effective_fingerprint(name) is not None
+                        else None
+                    )
+
+                    if key is not None and key in store:
+                        outputs[name] = store[key]
+                        completed_order.append(name)
+                        events[name].set()
+                        return
+
+                    dependency_outputs = {
+                        dep: outputs[dep] for dep in stage.dependencies
+                    }
+                    res = stage.run(dependency_outputs)
+                    if inspect.isawaitable(res):
+                        output = await res
+                    else:
+                        output = res
+
+                    outputs[name] = output
+                    completed_order.append(name)
+                    if key is not None:
+                        store[key] = output
+                    events[name].set()
+            except BaseException as exc:
+                if not cancel_event.is_set():
+                    cancel_event.set()
+                    failure_box.append((name, exc))
+                events[name].set()
+                raise
+
+        tasks = [asyncio.create_task(run_stage(name)) for name in self.stages]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        if failure_box:
+            failed_stage, exc = failure_box[0]
+            compensation_errors = await self._rollback_async(
+                completed_order, outputs
+            )
+            raise WorkflowExecutionError(
+                f"async workflow failed at stage {failed_stage!r}: {exc}",
+                stage_name=failed_stage,
+                cause=exc,
+                compensation_errors=tuple(compensation_errors),
+            ) from exc
+
+        for res in results:
+            if isinstance(res, BaseException) and not isinstance(
+                res, asyncio.CancelledError
+            ):
+                compensation_errors = await self._rollback_async(
+                    completed_order, outputs
+                )
+                raise WorkflowExecutionError(
+                    f"async workflow failed: {res}",
+                    stage_name="unknown",
+                    cause=res,
+                    compensation_errors=tuple(compensation_errors),
+                ) from res
+
+        return outputs
+
+
+__all__ = ["WorkflowDAG", "WorkflowExecutionError", "WorkflowStage"]

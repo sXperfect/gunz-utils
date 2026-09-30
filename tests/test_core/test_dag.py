@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
-import pytest
+try:
+    import pytest
+except ImportError:
+    import unittest
+
+    class _PytestShim:
+        @staticmethod
+        def raises(expected_exception: type[BaseException], match: str | None = None):
+            return unittest.TestCase().assertRaises(expected_exception)
+
+    pytest = _PytestShim()  # type: ignore[assignment]
 
 from gunz_utils.dag import WorkflowDAG, WorkflowStage
 
