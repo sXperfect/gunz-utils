@@ -1,0 +1,59 @@
+component: "NativeAcceleration"
+type: "SubsystemArchitecture"
+purpose: |
+  Defines the optional C/C++ native acceleration and system-level telemetry
+  architecture for gunz-utils. Ensures that reference implementations remain
+  pure Python while unlocking orders-of-magnitude reduction in telemetry observer
+  overhead, microsecond-level hardware cycle timing, and vectorized statistical
+  bootstrap resampling.
+modules:
+  - name: "gunz_utils._accel"
+    type: "NativeExtension"
+    status: "Optional"
+    functions:
+      - name: "darwin_task_info"
+        args: ["pid"]
+        returns: "Tuple[int, int, float, float, int]"
+        description: "Direct libproc proc_pidinfo C binding returning (pid, ppid, user_cpu, sys_cpu, rss_bytes, threads)."
+      - name: "linux_proc_snapshot"
+        args: ["pid", "page_size"]
+        returns: "Tuple[int, int, float, float, int, int]"
+        description: "Zero-allocation POSIX read of /proc/[pid]/stat into stack buffer."
+      - name: "bootstrap_mean_resamples"
+        args: ["data", "num_resamples", "seed"]
+        returns: "List[float]"
+        description: "Vectorized SIMD resample mean calculation using PCG32 random generator."
+      - name: "hardware_cycle_counter"
+        args: []
+        returns: "int"
+        description: "Direct CPU cycle counter (CNTVCT_EL0 on ARM64, RDTSC on x86_64)."
+
+  - name: "gunz_utils.telemetry"
+    type: "PythonModule"
+    classes:
+      - name: "ProcessSampler"
+        methods:
+          - name: "sample"
+            args: ["root_pid"]
+            returns: "ProcessSample"
+          - name: "sample_tree"
+            args: ["root_pid"]
+            returns: "ProcessSample"
+      - name: "DarwinMachSampler"
+        methods:
+          - name: "sample_pid"
+            args: ["pid"]
+            returns: "ProcessDetail"
+      - name: "LinuxProcfsSampler"
+        methods:
+          - name: "sample_pid"
+            args: ["pid"]
+            returns: "ProcessDetail"
+
+  - name: "gunz_utils.stats"
+    type: "PythonModule"
+    functions:
+      - name: "bootstrap_mean_ci"
+        args: ["data", "confidence_level", "num_resamples", "seed"]
+        returns: "Tuple[float, float, float]"
+        description: "Calculates (point_estimate, ci_low, ci_high) with optional native acceleration dispatch."
