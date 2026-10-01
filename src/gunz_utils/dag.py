@@ -289,7 +289,10 @@ class WorkflowDAG:
         concurrency_limit: int | None = None,
         budget: Any = None,
     ) -> dict[str, Any]:
-        """Execute stages asynchronously with concurrency, budget tracking, and rollback."""
+        """Execute stages asynchronously.
+
+        Supports concurrency, budget tracking, and rollback.
+        """
         if concurrency_limit is not None:
             if (
                 isinstance(concurrency_limit, bool)
