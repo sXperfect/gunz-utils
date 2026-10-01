@@ -1,0 +1,1 @@
+- Add a repository-level CI runner policy and regression test establishing that any future self-hosted GitHub Actions job must never use `sudo` or `apt-get`, while keeping the current public `gunz-utils` workflow hosted-only.
