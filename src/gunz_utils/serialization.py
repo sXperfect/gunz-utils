@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import dataclasses
+import importlib
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
+
+try:
+    _accel = importlib.import_module("._accel", package=__package__)
+    _accel_is_json_clean: Callable[[Any, int], bool] | None = getattr(
+        _accel, "is_json_clean", None
+    )
+except (ImportError, AttributeError):  # pragma: no cover
+    _accel_is_json_clean = None
 
 
 def to_jsonable(
@@ -16,6 +25,10 @@ def to_jsonable(
     _max_depth: int = 100,
 ) -> Any:
     """Convert common Python objects into JSON-compatible values."""
+    if _depth == 0 and _accel_is_json_clean is not None:
+        if _accel_is_json_clean(value, _max_depth):
+            return value
+
     # Security (VULN-2026-008): bound recursive traversal of attacker-shaped
     # objects before Python's own recursion limit can be exhausted.
     if _depth > _max_depth:

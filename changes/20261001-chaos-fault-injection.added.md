@@ -1,0 +1,2 @@
+- Add `VirtualClock`, `FaultyStream`, and `AwaitBoundaryChaos` testing primitives to `gunz_utils.faults` for testing adversarial I/O errors and cooperative cancellation.
+- Accelerate canonical JSON serialization and fingerprinting in `gunz_utils.serialization` and batch streaming in `gunz_utils.streaming`.

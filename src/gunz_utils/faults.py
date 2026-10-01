@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import BinaryIO, TypeVar
 
 T = TypeVar("T")
+
 
 
 class InjectedFault(RuntimeError):
@@ -153,9 +155,134 @@ class NamedFaultInjector:
             raise error
 
 
+class VirtualClock:
+    """Deterministic controllable monotonic clock for resilience testing."""
+
+    def __init__(self, start_time: float = 1000.0) -> None:
+        if (
+            isinstance(start_time, bool)
+            or not isinstance(start_time, (int, float))
+            or start_time < 0
+        ):
+            raise ValueError("start_time must be a non-negative number")
+        self._current: float = float(start_time)
+
+    def now(self) -> float:
+        """Return current virtual time in seconds."""
+        return self._current
+
+    def now_ns(self) -> int:
+        """Return current virtual time in nanoseconds."""
+        return int(self._current * 1e9)
+
+    def advance(self, seconds: float) -> float:
+        """Advance the virtual clock by seconds."""
+        if (
+            isinstance(seconds, bool)
+            or not isinstance(seconds, (int, float))
+            or seconds < 0
+        ):
+            raise ValueError("seconds must be a non-negative number")
+        self._current += float(seconds)
+        return self._current
+
+
+class FaultyStream:
+    """Binary stream wrapper that injects short writes or I/O faults."""
+
+    def __init__(
+        self,
+        wrapped: BinaryIO,
+        *,
+        max_read_bytes: int | None = None,
+        max_write_bytes: int | None = None,
+        fail_read_after: int | None = None,
+        fail_write_after: int | None = None,
+        read_error: Callable[[], BaseException] | None = None,
+        write_error: Callable[[], BaseException] | None = None,
+    ) -> None:
+        self.wrapped = wrapped
+        self.max_read_bytes = max_read_bytes
+        self.max_write_bytes = max_write_bytes
+        self.fail_read_after = fail_read_after
+        self.fail_write_after = fail_write_after
+        self.read_error = read_error or (
+            lambda: OSError("Injected stream read error")
+        )
+        self.write_error = write_error or (
+            lambda: OSError("Injected stream write error")
+        )
+        self.read_calls = 0
+        self.write_calls = 0
+
+    def read(self, size: int = -1) -> bytes:
+        self.read_calls += 1
+        if self.fail_read_after is not None and self.read_calls > self.fail_read_after:
+            raise self.read_error()
+        if self.max_read_bytes is not None and (size < 0 or size > self.max_read_bytes):
+            size = self.max_read_bytes
+        return self.wrapped.read(size)
+
+    def write(self, data: bytes) -> int:
+        self.write_calls += 1
+        if (
+            self.fail_write_after is not None
+            and self.write_calls > self.fail_write_after
+        ):
+            raise self.write_error()
+        to_write = data
+        if self.max_write_bytes is not None and len(to_write) > self.max_write_bytes:
+            to_write = to_write[: self.max_write_bytes]
+        return self.wrapped.write(to_write)
+
+    def flush(self) -> None:
+        self.wrapped.flush()
+
+    def close(self) -> None:
+        self.wrapped.close()
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        return self.wrapped.seek(offset, whence)
+
+    def tell(self) -> int:
+        return self.wrapped.tell()
+
+
+class AwaitBoundaryChaos:
+    """Cooperative await interceptor injecting cancellation or errors."""
+
+    def __init__(
+        self,
+        *,
+        cancel_at_step: int | None = None,
+        fail_at_step: int | None = None,
+        exception_factory: Callable[[], BaseException] | None = None,
+    ) -> None:
+
+        self.cancel_at_step = cancel_at_step
+        self.fail_at_step = fail_at_step
+        self.exception_factory = exception_factory or (
+            lambda: InjectedFault("Injected await boundary fault")
+        )
+        self.step_count = 0
+
+    async def step(self) -> None:
+        """Cooperative checkpoint simulating an await boundary."""
+        self.step_count += 1
+        if self.cancel_at_step is not None and self.step_count == self.cancel_at_step:
+            raise asyncio.CancelledError("Injected await cancellation")
+        if self.fail_at_step is not None and self.step_count == self.fail_at_step:
+            raise self.exception_factory()
+        await asyncio.sleep(0)
+
+
 __all__ = [
+    "AwaitBoundaryChaos",
     "FailAfter",
     "FaultSequence",
+    "FaultyStream",
     "InjectedFault",
     "NamedFaultInjector",
+    "VirtualClock",
 ]
+

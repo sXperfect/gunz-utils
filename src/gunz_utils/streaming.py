@@ -25,8 +25,9 @@ def iter_jsonl(handle: TextIO) -> Iterator[Any]:
 def write_jsonl(handle: TextIO, records: Iterable[Any]) -> int:
     """Write compact JSON Lines records and return the record count."""
     count = 0
+    buffer: list[str] = []
     for record in records:
-        handle.write(
+        buffer.append(
             json.dumps(
                 record,
                 separators=(",", ":"),
@@ -35,7 +36,13 @@ def write_jsonl(handle: TextIO, records: Iterable[Any]) -> int:
             + "\n"
         )
         count += 1
+        if len(buffer) >= 256:
+            handle.write("".join(buffer))
+            buffer.clear()
+    if buffer:
+        handle.write("".join(buffer))
     return count
+
 
 
 def fingerprint(value: Any, algorithm: str = "sha256") -> str:

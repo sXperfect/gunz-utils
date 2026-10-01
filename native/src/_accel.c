@@ -2,6 +2,7 @@
 #include <Python.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <math.h>
 #include "../include/gunz_utils_native.h"
 
 /*
@@ -57,6 +58,82 @@ int gunz_native_decode_uvarint(
         shift += 7;
     }
     return -3; /* varint is too long */
+}
+
+/*
+ * Recursive validation of pure JSON objects (no custom classes or byte objects).
+ */
+static int check_json_clean(PyObject *obj, int depth, int max_depth) {
+    if (depth > max_depth) {
+        PyErr_Format(
+            PyExc_ValueError,
+            "object hierarchy exceeds maximum nesting depth (%d)",
+            max_depth
+        );
+        return -1;
+    }
+    if (PyBytes_Check(obj)) {
+        PyErr_SetString(
+            PyExc_TypeError,
+            "bytes are not implicitly JSON serializable"
+        );
+        return -1;
+    }
+    if (obj == Py_None || PyBool_Check(obj) || PyUnicode_CheckExact(obj) || PyLong_CheckExact(obj)) {
+        return 1;
+    }
+    if (PyFloat_CheckExact(obj)) {
+        double d = PyFloat_AS_DOUBLE(obj);
+        if (isnan(d) || isinf(d)) {
+            PyErr_SetString(
+                PyExc_ValueError,
+                "Out of range float values are not JSON compliant"
+            );
+            return -1;
+        }
+        return 1;
+    }
+    if (PyList_CheckExact(obj)) {
+        Py_ssize_t len = PyList_GET_SIZE(obj);
+        for (Py_ssize_t i = 0; i < len; i++) {
+            PyObject *item = PyList_GET_ITEM(obj, i);
+            int rc = check_json_clean(item, depth + 1, max_depth);
+            if (rc <= 0) return rc;
+        }
+        return 1;
+    }
+    if (PyDict_CheckExact(obj)) {
+        PyObject *key, *val;
+        Py_ssize_t pos = 0;
+        while (PyDict_Next(obj, &pos, &key, &val)) {
+            if (!PyUnicode_CheckExact(key)) {
+                return 0; /* non-string key requires normalization */
+            }
+            int rc = check_json_clean(val, depth + 1, max_depth);
+            if (rc <= 0) return rc;
+        }
+        return 1;
+    }
+    return 0; /* custom type or non-exact container */
+}
+
+/*
+ * Python C API wrapper for is_json_clean.
+ */
+static PyObject *py_is_json_clean(PyObject *self, PyObject *args) {
+    PyObject *obj;
+    int max_depth = 100;
+    if (!PyArg_ParseTuple(args, "O|i", &obj, &max_depth)) {
+        return NULL;
+    }
+    int rc = check_json_clean(obj, 0, max_depth);
+    if (rc < 0) {
+        return NULL;
+    }
+    if (rc == 1) {
+        Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
 }
 
 /*
@@ -168,6 +245,7 @@ static PyObject *py_has_accel(PyObject *self, PyObject *Py_UNUSED(ignored)) {
 static PyMethodDef AccelMethods[] = {
     {"encode_uvarint", py_encode_uvarint, METH_VARARGS, "Encode uint64 into canonical varint bytes in C."},
     {"decode_uvarint", py_decode_uvarint, METH_VARARGS, "Zero-copy decode uint64 varint from buffer at offset."},
+    {"is_json_clean", py_is_json_clean, METH_VARARGS, "Check if object graph consists solely of pure JSON primitives."},
     {"has_accel", py_has_accel, METH_NOARGS, "Return True indicating native C acceleration is active."},
     {NULL, NULL, 0, NULL}
 };
