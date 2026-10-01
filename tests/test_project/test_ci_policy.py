@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import pathlib
+from pathlib import Path
 
-
-ROOT = pathlib.Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 
 
@@ -23,7 +22,11 @@ def _job_blocks(text: str) -> list[str]:
             continue
         if line and not line.startswith(" "):
             break
-        if line.startswith("  ") and not line.startswith("    ") and line.rstrip().endswith(":"):
+        if (
+            line.startswith("  ")
+            and not line.startswith("    ")
+            and line.rstrip().endswith(":")
+        ):
             if current is not None:
                 blocks.append(current)
             current = [line]
@@ -34,8 +37,8 @@ def _job_blocks(text: str) -> list[str]:
     return ["\n".join(block) for block in blocks]
 
 
-def _self_hosted_jobs() -> list[tuple[pathlib.Path, str]]:
-    jobs: list[tuple[pathlib.Path, str]] = []
+def _self_hosted_jobs() -> list[tuple[Path, str]]:
+    jobs: list[tuple[Path, str]] = []
     for workflow in sorted(WORKFLOWS.glob("*.y*ml")):
         text = workflow.read_text(encoding="utf-8")
         for block in _job_blocks(text):
