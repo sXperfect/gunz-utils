@@ -54,3 +54,14 @@ def test_self_hosted_jobs_never_use_privileged_package_install() -> None:
 def test_current_public_ci_remains_hosted_only() -> None:
     """gunz-utils currently intentionally has no self-hosted CI jobs."""
     assert _self_hosted_jobs() == []
+
+
+def test_self_hosted_jobs_exclude_main_and_develop() -> None:
+    """Future self-hosted push jobs must not run on main/develop."""
+    for workflow, job in _self_hosted_jobs():
+        assert "github.ref_name != 'main'" in job, (
+            f"{workflow}: self-hosted job must exclude main"
+        )
+        assert "github.ref_name != 'develop'" in job, (
+            f"{workflow}: self-hosted job must exclude develop"
+        )
