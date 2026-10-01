@@ -1,4 +1,13 @@
-"""Cross-project benchmarking and profiling primitives."""
+"""Cross-project benchmarking and profiling primitives (Deprecated: migrate to gunz-bench)."""
+
+import warnings
+
+warnings.warn(
+    "gunz_utils.benchmark is deprecated and will be removed in gunz-utils 2.0.0. "
+    "Please migrate to the dedicated 'gunz-bench' package.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from .artifacts import register_artifact, verify_artifact
 from .backends import (
