@@ -1,10 +1,14 @@
 """Shared test configuration, fixtures, and marker taxonomy for gunz-utils.
 
 Marker Taxonomy:
-- ``@pytest.mark.slow``: Tests taking >0.5s or running stress loops/concurrency/large matrices.
-- ``@pytest.mark.integration``: Tests verifying end-to-end interactions across multiple modules.
-- ``@pytest.mark.policy``: Tests validating repository contracts, AGENTS.md, or CI/release workflows.
-- ``@pytest.mark.isolation``: Packaging and clean-venv dependency-isolation matrix tests.
+- ``@pytest.mark.slow``: Tests taking >0.5s or running stress loops,
+  concurrency, or large matrices.
+- ``@pytest.mark.integration``: Tests verifying end-to-end interactions
+  across multiple modules.
+- ``@pytest.mark.policy``: Tests validating repository contracts, AGENTS.md,
+  or CI/release workflows.
+- ``@pytest.mark.isolation``: Packaging and clean-venv dependency-isolation
+  matrix tests.
 """
 
 from __future__ import annotations
