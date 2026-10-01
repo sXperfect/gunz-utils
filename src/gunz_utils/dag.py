@@ -289,7 +289,10 @@ class WorkflowDAG:
         concurrency_limit: int | None = None,
         budget: Any = None,
     ) -> dict[str, Any]:
-        """Execute stages asynchronously with concurrency, budget tracking, and rollback."""
+        """Execute stages asynchronously.
+
+        Supports concurrency, budget tracking, and rollback.
+        """
         if concurrency_limit is not None:
             if (
                 isinstance(concurrency_limit, bool)
@@ -333,9 +336,10 @@ class WorkflowDAG:
                     if cancel_event.is_set():
                         return
 
+                    fingerprint = self.effective_fingerprint(name)
                     key = (
-                        (name, self.effective_fingerprint(name))
-                        if self.effective_fingerprint(name) is not None
+                        (name, fingerprint)
+                        if fingerprint is not None
                         else None
                     )
 

@@ -211,8 +211,6 @@ class TestGracefulShutdown(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cleanup_log, ["async", "sync"])
 
     async def test_context_manager(self) -> None:
-        cleanup_called = False
-
         async with GracefulShutdown() as shutdown:
             shutdown.add_callback(lambda: setattr(self, "_cleaned", True))
             shutdown.trigger_shutdown(signum=2)

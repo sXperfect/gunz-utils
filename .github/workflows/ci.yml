@@ -69,12 +69,37 @@ jobs:
         run: |
           extra_args=()
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            base_ref="origin/${{ github.base_ref }}"
-            if ! git diff --name-only "$base_ref"...HEAD | grep -qE "^(pyproject\.toml|src/gunz_utils/ext/|scripts/ci\.py|\.github/)"; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+            git fetch origin "$base_sha" --depth=1
+            changed_files="$(git diff --name-only "$base_sha" HEAD)"
+
+            if [[ -z "$changed_files" ]]; then
+              echo "::error::Could not determine changed files for pull request."
+              exit 1
+            fi
+
+            packaging_changed=false
+            non_docs_changed=false
+            while IFS= read -r path; do
+              case "$path" in
+                pyproject.toml|src/gunz_utils/ext/*|scripts/ci.py|.github/*)
+                  packaging_changed=true
+                  ;;
+              esac
+              case "$path" in
+                docs/*|changes/*|*.md)
+                  ;;
+                *)
+                  non_docs_changed=true
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            if [[ "$packaging_changed" == false ]]; then
               echo "Packaging files unchanged in PR; skipping heavy venv packaging isolation matrix."
               extra_args+=(--skip-packaging)
             fi
-            if ! git diff --name-only "$base_ref"...HEAD | grep -qvE "^(docs/|changes/|\.md$)"; then
+            if [[ "$non_docs_changed" == false ]]; then
               echo "Docs-only PR; skipping Python 3.12 compatibility runner."
               extra_args+=(--skip-compat)
             fi

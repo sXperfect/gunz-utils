@@ -218,7 +218,10 @@ def test_new_fragment_creates_properly_formatted_file(tmp_path: Path) -> None:
 def test_check_rejects_unresolved_conflict_markers(tmp_path: Path) -> None:
     repo = _fixture_repo(tmp_path)
     fragment = tmp_path / "changes" / "conflict.fixed.md"
-    fragment.write_text("<<<<<<< HEAD\nFix a bug.\n=======\nFix bug differently.\n>>>>>>> branch\n", encoding="utf-8")
+    fragment.write_text(
+        "<<<<<<< HEAD\nFix a bug.\n=======\nFix bug differently.\n>>>>>>> branch\n",
+        encoding="utf-8",
+    )
 
     result = repo.check()
     assert not result.ok

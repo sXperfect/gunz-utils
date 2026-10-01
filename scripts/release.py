@@ -253,11 +253,13 @@ class ReleaseRepo:
             for marker in ("<<<<<<<", "=======", ">>>>>>>"):
                 if marker in frag.text:
                     errors.append(
-                        f"changelog fragment {frag.path.name} contains unresolved git conflict marker {marker!r}"
+                        f"changelog fragment {frag.path.name} contains unresolved "
+                        f"git conflict marker {marker!r}"
                     )
             if frag.text.startswith("* "):
                 warnings.append(
-                    f"changelog fragment {frag.path.name} uses '*' bullet; standard format prefers '- '"
+                    f"changelog fragment {frag.path.name} uses '*' bullet; "
+                    "standard format prefers '- '"
                 )
 
         if not self.changelog.is_file():
@@ -527,7 +529,7 @@ class ReleaseRepo:
             release_body = self._render_release_sections(fragments)
             print(f"## [{target}] — {dt.date.today().isoformat()}\n\n{release_body}")
             print("-" * 60)
-            print(f"[DRY-RUN] No files modified and no fragments deleted.")
+            print("[DRY-RUN] No files modified and no fragments deleted.")
             return 0
 
         self._atomic_write(self.pyproject, pyproject_text)
@@ -691,7 +693,8 @@ class ReleaseRepo:
         branch = branch_proc.stdout.strip()
         if branch != "main":
             print(
-                f"WARNING: current branch is {branch!r}; releases should normally be tagged on 'main'",
+                f"WARNING: current branch is {branch!r}; releases should normally "
+                "be tagged on 'main'",
                 file=sys.stderr,
             )
 
@@ -705,7 +708,8 @@ class ReleaseRepo:
         expected_commit = f"chore(release): {tag_name}"
         if head_commit != expected_commit:
             print(
-                f"ERROR: HEAD commit message is {head_commit!r}; expected {expected_commit!r}",
+                f"ERROR: HEAD commit message is {head_commit!r}; "
+                f"expected {expected_commit!r}",
                 file=sys.stderr,
             )
             return 1
@@ -737,7 +741,7 @@ class ReleaseRepo:
         else:
             print(f"Tag {tag_name} is valid and ready to be created.")
             print(f"Run: git tag -a {tag_name} -m \"{tag_name}\"")
-            print(f"Or rerun with --create: python scripts/release.py tag --create")
+            print("Or rerun with --create: python scripts/release.py tag --create")
             return 0
 
 

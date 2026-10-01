@@ -1,13 +1,6 @@
-"""Cross-project benchmarking and profiling primitives (Deprecated: migrate to gunz-bench)."""
+"""Deprecated benchmarking and profiling compatibility API."""
 
 import warnings
-
-warnings.warn(
-    "gunz_utils.benchmark is deprecated and will be removed in gunz-utils 2.0.0. "
-    "Please migrate to the dedicated 'gunz-bench' package.",
-    DeprecationWarning,
-    stacklevel=2,
-)
 
 from .artifacts import register_artifact, verify_artifact
 from .backends import (
@@ -54,6 +47,13 @@ from .schema import migrate_performance_run, validate_performance_run
 from .suite import BenchmarkCase, BenchmarkSuite
 from .trends import HistorySummary, summarize_history
 from .worker import WorkerResult, run_python_worker, worker_json
+
+warnings.warn(
+    "gunz_utils.benchmark is deprecated and will be removed in gunz-utils 2.0.0. "
+    "Please migrate to the dedicated 'gunz-bench' package.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "BenchmarkCase", "BenchmarkComparison", "BenchmarkHistory", "ExperimentResult",
