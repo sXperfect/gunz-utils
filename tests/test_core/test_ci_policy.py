@@ -84,6 +84,9 @@ def test_ci_release_preflight_precedes_install_then_uses_aggregate_verifier() ->
     assert "--skip-compat" in text
     assert "--summary-json tmp/ci-summary.json" in text
     assert "if: ${{ always() }}" in text
+    assert 'base_sha="${{ github.event.pull_request.base.sha }}"' in text
+    assert 'changed_files="$(git diff --name-only "$base_sha" HEAD)"' in text
+    assert "git diff --name-only \"$base_ref\"...HEAD | grep -q" not in text
 
 
 
