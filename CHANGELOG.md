@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Unreleased changes are collected as conflict-free fragments in `changes/`. Run `python scripts/release.py status` to inspect them.
 
+## [1.13.0] — 2026-10-01
+
+### Added
+
+- Add clean-room property test generators (fuzz_floats, fuzz_strings, fuzz_bytes, fuzz_primitives, fuzz_json_objects) and check_property assertion runner in gunz_utils.testkit.
+
+- Add agent and worker orchestration primitives: ResourceBudget step tracking, concurrent async WorkflowDAG execution with transactional rollback, and GracefulShutdown coordinator.
+
+### Deprecated
+
+- Deprecate gunz_utils.benchmark in favor of standalone gunz-bench package.
+
+### Documentation
+
+- Document cross-project reusable runtime adoption blueprints, architectural definitions, and behavioural specifications.
+
+- Document architectural handoff and stage 30 benchmark modules to gunz-bench/tmp/handsoff/.
+
+- Add native acceleration architecture design, definition, and specification for low-overhead telemetry and vectorized statistics.
+
 ## [1.12.0] — 2026-09-29
 
 ### Security
