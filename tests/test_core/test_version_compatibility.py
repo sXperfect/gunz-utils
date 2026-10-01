@@ -38,7 +38,7 @@ def test_package_version_matches_installed_distribution() -> None:
 
         raise unittest.SkipTest(
             "gunz-utils distribution metadata not installed in ambient environment"
-        )
+        ) from None
     assert gunz_utils.__version__ == installed_version
 
 
