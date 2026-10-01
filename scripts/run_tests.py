@@ -9,7 +9,6 @@ Supports both unittest.TestCase subclasses and standalone test_* functions.
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import importlib.util
 import inspect
 import sys
@@ -111,7 +110,8 @@ def load_test_suite(
                 try:
                     sig = inspect.signature(obj)
                     if len(sig.parameters) > 0:
-                        # Skip functions requiring pytest fixtures (monkeypatch, capsys, etc.)
+                        # Skip functions requiring pytest fixtures
+                        # (monkeypatch, capsys, etc.)
                         continue
                 except Exception:
                     continue
