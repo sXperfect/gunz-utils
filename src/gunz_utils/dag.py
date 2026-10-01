@@ -336,9 +336,10 @@ class WorkflowDAG:
                     if cancel_event.is_set():
                         return
 
+                    fingerprint = self.effective_fingerprint(name)
                     key = (
-                        (name, self.effective_fingerprint(name))
-                        if self.effective_fingerprint(name) is not None
+                        (name, fingerprint)
+                        if fingerprint is not None
                         else None
                     )
 
