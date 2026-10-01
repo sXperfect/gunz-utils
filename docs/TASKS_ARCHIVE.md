@@ -10,6 +10,7 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [`2026.10.01-arch-native_binary_acceleration`](tasks/done/2026.10.01-arch-native_binary_acceleration.md)
 - [`2026.10.01-arch-gunz_bench_subsystem_handoff`](tasks/done/2026.10.01-arch-gunz_bench_subsystem_handoff.md)
 - [`2026.10.01-design-native_acceleration_architecture`](tasks/done/2026.10.01-design-native_acceleration_architecture.md)
 - [`2026.10.01-orchestration-agent_worker_primitives`](tasks/done/2026.10.01-orchestration-agent_worker_primitives.md)

@@ -2,7 +2,25 @@
 
 from __future__ import annotations
 
+import importlib
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
+
+from .buffers import dispatch
+
+try:
+    _accel = importlib.import_module("._accel", package=__package__)
+    _accel_encode: Callable[[int], bytes] | None = getattr(
+        _accel, "encode_uvarint", None
+    )
+    _accel_decode: Callable[[Any, int], tuple[int, int]] | None = getattr(
+        _accel, "decode_uvarint", None
+    )
+except (ImportError, AttributeError):  # pragma: no cover
+    _accel_encode = None
+    _accel_decode = None
+
 
 
 @dataclass
@@ -27,6 +45,11 @@ class ByteReader:
 
     def read_uvarint(self) -> int:
         """Read a canonical unsigned 64-bit varint transactionally."""
+        if _accel_decode is not None:
+            value, new_offset = _accel_decode(self.data, self.offset)
+            self.offset = new_offset
+            return value
+
         start = self.offset
         value = shift = 0
         try:
@@ -46,7 +69,7 @@ class ByteReader:
             raise
 
 
-def encode_uvarint(value: int) -> bytes:
+def _py_encode_uvarint(value: int) -> bytes:
     if value < 0 or value > 2**64 - 1:
         raise ValueError("unsigned varint requires a 64-bit unsigned integer")
     output = bytearray()
@@ -58,4 +81,10 @@ def encode_uvarint(value: int) -> bytes:
             return bytes(output)
 
 
+encode_uvarint: Callable[[int], bytes] = dispatch(
+    _py_encode_uvarint, _accel_encode
+)
+
+
 __all__ = ["ByteReader", "encode_uvarint"]
+
