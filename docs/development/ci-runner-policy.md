@@ -18,9 +18,9 @@ If a self-hosted job is added later, it must follow these rules:
 - prefer non-root environment provisioning such as Conda/Mamba when a job needs
   an additional executable;
 - keep privileged host configuration outside repository CI execution;
-- make runner routing explicit so protected/default branches do not
-  accidentally depend on a private runner unless that is an intentional
-  repository policy.
+- for branch-push self-hosted jobs, explicitly exclude both `main` and `develop`;
+- keep `main`/protected-branch verification on hosted runners unless repository policy is deliberately changed;
+- make runner routing explicit so protected/default branches do not accidentally depend on a private runner.
 
 Python packages remain normal project dependencies and should be installed via
 `pip`/project extras. Wrappers around external executables do not make those
@@ -29,8 +29,7 @@ executables pip-managed system dependencies.
 ## Enforcement
 
 `tests/test_project/test_ci_policy.py` scans every GitHub Actions workflow.
-Whenever it finds a job whose `runs-on` contains `self-hosted`, that job must
-contain neither `sudo` nor `apt-get`.
+Whenever it finds a job whose `runs-on` contains `self-hosted`, that job must contain neither `sudo` nor `apt-get`, and its branch condition must explicitly exclude `main` and `develop`.
 
 The test also pins the current `gunz-utils` policy: no self-hosted CI jobs are
 present today. If the repository intentionally adopts self-hosted CI later,
