@@ -238,7 +238,15 @@ def deep_merge(
             f"got {list_strategy!r}"
         )
 
-    def _safe_copy(val: Any) -> Any:
+    def _isolate(val: Any) -> Any:
+        if isinstance(val, Mapping):
+            return {k: _isolate(v) for k, v in val.items()}
+        if isinstance(val, list):
+            return [_isolate(v) for v in val]
+        if isinstance(val, set):
+            return {_isolate(v) for v in val}
+        if isinstance(val, tuple):
+            return tuple(_isolate(v) for v in val)
         try:
             return copy.deepcopy(val)
         except Exception:
@@ -249,16 +257,16 @@ def deep_merge(
             #? Build a new dict so neither input is mutated; recurse on each key.
             out: dict[str, Any] = {}
             for key in a:
-                out[key] = _merge(a[key], b[key]) if key in b else _safe_copy(a[key])
+                out[key] = _merge(a[key], b[key]) if key in b else _isolate(a[key])
             for key in b:
                 if key not in a:
-                    out[key] = _safe_copy(b[key])
+                    out[key] = _isolate(b[key])
             return out
         if isinstance(a, list) and isinstance(b, list):
             if list_strategy == "replace":
-                return _safe_copy(b)
+                return _isolate(b)
             if list_strategy == "concat":
-                return _safe_copy(a) + _safe_copy(b)
+                return _isolate(a) + _isolate(b)
             #? dedup: first occurrence wins, order = base then override.
             #? Unhashable items (e.g. dicts) fall through without being
             #? tracked; that mirrors common stdlib semantics and avoids
@@ -275,10 +283,10 @@ def deep_merge(
                     if any(item == previous for previous in seen_unhashable):
                         continue
                     seen_unhashable.append(item)
-                result.append(_safe_copy(item))
+                result.append(_isolate(item))
             return result
         #? Non-dict / non-list: override wins. Plain scalars and mixed
         #? type pairs all fall through here.
-        return _safe_copy(b)
+        return _isolate(b)
 
     return cast(dict[str, Any], _merge(base, override))

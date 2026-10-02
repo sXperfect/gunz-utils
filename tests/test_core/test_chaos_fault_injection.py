@@ -55,6 +55,11 @@ def test_virtual_clock_advance_and_bounds() -> None:
         clock.advance(1e308)
         clock.advance(1e308)
 
+    large_clock = VirtualClock(1e308)
+    large_ns = large_clock.now_ns()
+    assert isinstance(large_ns, int)
+    assert large_ns > 0
+
 
 def test_faulty_stream_bounds_validation() -> None:
     buf = io.BytesIO()

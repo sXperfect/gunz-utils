@@ -175,7 +175,9 @@ class VirtualClock:
 
     def now_ns(self) -> int:
         """Return current virtual time in nanoseconds."""
-        return int(self._current * 1e9)
+        whole = int(self._current)
+        fraction = self._current - whole
+        return whole * 1_000_000_000 + int(round(fraction * 1_000_000_000))
 
     def advance(self, seconds: float) -> float:
         """Advance the virtual clock by seconds."""

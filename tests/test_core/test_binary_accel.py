@@ -52,6 +52,9 @@ def test_varint_encode_keyword_argument_parity() -> None:
 )
 def test_varint_encode_decode_roundtrip_equivalence(val: int) -> None:
     """Test roundtrip equivalence across canonical boundary values."""
+    if binary._accel_encode is None:
+        pytest.skip("Native C extension is required for native differential test")
+
     # Pure Python
     py_encoded = binary._py_encode_uvarint(val)
     # Native / Dispatched
@@ -63,6 +66,18 @@ def test_varint_encode_decode_roundtrip_equivalence(val: int) -> None:
     decoded = reader.read_uvarint()
     assert decoded == val
     assert reader.remaining == 0
+
+
+@pytest.mark.parametrize(
+    "val",
+    [0, 1, 127, 128, 255, 256, (1 << 32) - 1, (1 << 64) - 1],
+)
+def test_pure_python_varint_roundtrip(val: int) -> None:
+    """Test reference Python encoder and decoder roundtrip independently."""
+    encoded = binary._py_encode_uvarint(val)
+    # Read using python fallback ByteReader logic
+    reader = ByteReader(encoded)
+    assert reader.read_uvarint() == val
 
 
 def test_varint_encode_negative_raises_value_error() -> None:

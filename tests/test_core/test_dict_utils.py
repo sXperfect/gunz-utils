@@ -263,6 +263,32 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(result["logging"]["handlers"][1]["type"], "file")
         self.assertEqual(result["version"], 1)
 
+    def test_merge_isolation_with_uncopyable_leaf_object(self) -> None:
+        class Uncopyable:
+            def __deepcopy__(self, memo: object) -> object:
+                raise TypeError("cannot deepcopy Uncopyable")
+
+        uncopyable = Uncopyable()
+        base = {
+            "subtree": {
+                "list": [1, 2, 3],
+                "nested_dict": {"k": "v"},
+                "leaf": uncopyable,
+            }
+        }
+        merged = deep_merge(base, {"other": 1})
+
+        self.assertIs(merged["subtree"]["leaf"], uncopyable)
+        self.assertIsNot(merged["subtree"], base["subtree"])
+        self.assertIsNot(merged["subtree"]["list"], base["subtree"]["list"])
+        self.assertIsNot(
+            merged["subtree"]["nested_dict"], base["subtree"]["nested_dict"]
+        )
+
+        merged["subtree"]["list"].append(99)
+        self.assertEqual(base["subtree"]["list"], [1, 2, 3])
+
+
 
 if __name__ == "__main__":
     unittest.main()

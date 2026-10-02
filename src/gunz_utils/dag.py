@@ -243,7 +243,8 @@ class WorkflowDAG:
         """
         store = cache if cache is not None else {}
         outputs: dict[str, Any] = {}
-        completed_order: list[str] = []
+        executed_order: list[str] = []
+        newly_cached: dict[tuple[str, str], Any] = {}
 
         for name in self._order:
             stage = self.stages[name]
@@ -256,7 +257,6 @@ class WorkflowDAG:
 
             if key is not None and key in store:
                 outputs[name] = store[key]
-                completed_order.append(name)
                 continue
 
             dependency_outputs = {
@@ -266,7 +266,7 @@ class WorkflowDAG:
             try:
                 output = stage.run(dependency_outputs)
             except BaseException as exc:
-                compensation_errors = self._rollback_sync(completed_order, outputs)
+                compensation_errors = self._rollback_sync(executed_order, outputs)
                 raise WorkflowExecutionError(
                     f"workflow failed at stage {name!r}: {exc}",
                     stage_name=name,
@@ -275,11 +275,12 @@ class WorkflowDAG:
                 ) from exc
 
             outputs[name] = output
-            completed_order.append(name)
+            executed_order.append(name)
 
             if key is not None:
-                store[key] = output
+                newly_cached[key] = output
 
+        store.update(newly_cached)
         return outputs
 
     async def async_execute(
@@ -308,7 +309,8 @@ class WorkflowDAG:
         )
         store = cache if cache is not None else {}
         outputs: dict[str, Any] = {}
-        completed_order: list[str] = []
+        executed_order: list[str] = []
+        newly_cached: dict[tuple[str, str], Any] = {}
         events: dict[str, asyncio.Event] = {
             name: asyncio.Event() for name in self.stages
         }
@@ -346,7 +348,6 @@ class WorkflowDAG:
 
                     if key is not None and key in store:
                         outputs[name] = store[key]
-                        completed_order.append(name)
                         events[name].set()
                         return
 
@@ -360,9 +361,9 @@ class WorkflowDAG:
                         output = res
 
                     outputs[name] = output
-                    completed_order.append(name)
+                    executed_order.append(name)
                     if key is not None:
-                        store[key] = output
+                        newly_cached[key] = output
                     events[name].set()
             except BaseException as exc:
                 if not cancel_event.is_set():
@@ -376,12 +377,22 @@ class WorkflowDAG:
                 raise
 
         tasks.extend([asyncio.create_task(run_stage(name)) for name in self.stages])
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        caller_cancelled = False
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+        except asyncio.CancelledError:
+            caller_cancelled = True
+            if not cancel_event.is_set():
+                cancel_event.set()
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
         if failure_box:
             failed_stage, exc = failure_box[0]
-            compensation_errors = await self._rollback_async(
-                completed_order, outputs
+            compensation_errors = await asyncio.shield(
+                self._rollback_async(executed_order, outputs)
             )
             raise WorkflowExecutionError(
                 f"async workflow failed at stage {failed_stage!r}: {exc}",
@@ -394,8 +405,8 @@ class WorkflowDAG:
             if isinstance(res, BaseException) and not isinstance(
                 res, asyncio.CancelledError
             ):
-                compensation_errors = await self._rollback_async(
-                    completed_order, outputs
+                compensation_errors = await asyncio.shield(
+                    self._rollback_async(executed_order, outputs)
                 )
                 raise WorkflowExecutionError(
                     f"async workflow failed: {res}",
@@ -404,9 +415,14 @@ class WorkflowDAG:
                     compensation_errors=tuple(compensation_errors),
                 ) from res
 
-        if any(isinstance(res, asyncio.CancelledError) for res in results):
+        cancelled = caller_cancelled or any(
+            isinstance(res, asyncio.CancelledError) for res in results
+        )
+        if cancelled:
+            await asyncio.shield(self._rollback_async(executed_order, outputs))
             raise asyncio.CancelledError()
 
+        store.update(newly_cached)
         return outputs
 
 

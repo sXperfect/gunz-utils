@@ -211,6 +211,177 @@ class TestWorkflowDAGAsyncAndCompensation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cm.exception.stage_name, "s2")
         self.assertEqual(compensated, ["comp_1:10"])
 
+    async def test_async_execute_stage_cancellation_triggers_compensation(self) -> None:
+        compensated: list[str] = []
+
+        async def stage_1(_deps: dict[str, object]) -> str:
+            return "res_1"
+
+        def comp_1(out: object) -> None:
+            compensated.append(f"comp_1:{out}")
+
+        async def stage_2(_deps: dict[str, object]) -> str:
+            raise asyncio.CancelledError()
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, compensate=comp_1),
+                WorkflowStage("s2", stage_2, dependencies=("s1",)),
+            ]
+        )
+
+        with self.assertRaises(asyncio.CancelledError):
+            await dag.async_execute()
+
+        self.assertEqual(compensated, ["comp_1:res_1"])
+
+    async def test_async_execute_caller_cancel_triggers_compensation(
+        self,
+    ) -> None:
+        compensated: list[str] = []
+        stage1_done = asyncio.Event()
+
+        async def stage_1(_deps: dict[str, object]) -> str:
+            stage1_done.set()
+            return "res_1"
+
+        def comp_1(out: object) -> None:
+            compensated.append(f"comp_1:{out}")
+
+        async def stage_2(_deps: dict[str, object]) -> str:
+            await asyncio.sleep(5.0)
+            return "res_2"
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, compensate=comp_1),
+                WorkflowStage("s2", stage_2, dependencies=("s1",)),
+            ]
+        )
+
+        task = asyncio.create_task(dag.async_execute())
+        await stage1_done.wait()
+        task.cancel()
+
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+
+        self.assertEqual(compensated, ["comp_1:res_1"])
+
+    def test_cache_entries_not_published_on_sync_failure_and_clean_retry(self) -> None:
+        cache: dict[tuple[str, str], object] = {}
+        created: list[str] = []
+        compensated: list[str] = []
+        fail_stage_2 = True
+
+        def stage_1(_deps: dict[str, object]) -> str:
+            created.append("res_1")
+            return "res_1"
+
+        def comp_1(out: object) -> None:
+            compensated.append(str(out))
+
+        def stage_2(_deps: dict[str, object]) -> str:
+            if fail_stage_2:
+                raise RuntimeError("stage 2 error")
+            return "res_2"
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, fingerprint="f1", compensate=comp_1),
+                WorkflowStage("s2", stage_2, dependencies=("s1",)),
+            ]
+        )
+
+        with self.assertRaises(WorkflowExecutionError):
+            dag.execute(cache=cache)
+
+        self.assertEqual(created, ["res_1"])
+        self.assertEqual(compensated, ["res_1"])
+        self.assertEqual(cache, {}, "Compensated outputs must not remain cached")
+
+        # Retry after fix
+        fail_stage_2 = False
+        outputs = dag.execute(cache=cache)
+        self.assertEqual(outputs, {"s1": "res_1", "s2": "res_2"})
+        self.assertEqual(
+            created, ["res_1", "res_1"], "Stage 1 must re-execute on retry"
+        )
+        fp = dag.effective_fingerprint("s1")
+        self.assertIn(("s1", fp), cache, "Successful run commits cache")
+
+    async def test_cache_entries_not_published_on_async_failure_retry(
+        self,
+    ) -> None:
+        cache: dict[tuple[str, str], object] = {}
+        created: list[str] = []
+        compensated: list[str] = []
+        fail_stage_2 = True
+
+        async def stage_1(_deps: dict[str, object]) -> str:
+            created.append("res_1")
+            return "res_1"
+
+        async def comp_1(out: object) -> None:
+            compensated.append(str(out))
+
+        async def stage_2(_deps: dict[str, object]) -> str:
+            if fail_stage_2:
+                raise RuntimeError("async stage 2 error")
+            return "res_2"
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, fingerprint="f1", compensate=comp_1),
+                WorkflowStage("s2", stage_2, dependencies=("s1",)),
+            ]
+        )
+
+        with self.assertRaises(WorkflowExecutionError):
+            await dag.async_execute(cache=cache)
+
+        self.assertEqual(created, ["res_1"])
+        self.assertEqual(compensated, ["res_1"])
+        self.assertEqual(cache, {}, "Compensated outputs must not remain cached")
+
+        # Retry after fix
+        fail_stage_2 = False
+        outputs = await dag.async_execute(cache=cache)
+        self.assertEqual(outputs, {"s1": "res_1", "s2": "res_2"})
+        self.assertEqual(
+            created, ["res_1", "res_1"], "Stage 1 must re-execute on retry"
+        )
+        fp = dag.effective_fingerprint("s1")
+        self.assertIn(("s1", fp), cache, "Successful run commits cache")
+
+    async def test_cache_hits_are_not_compensated_on_downstream_failure(self) -> None:
+        compensated: list[str] = []
+
+        async def stage_1(_deps: dict[str, object]) -> str:
+            return "res_1"
+
+        def comp_1(out: object) -> None:
+            compensated.append(str(out))
+
+        async def stage_2(_deps: dict[str, object]) -> str:
+            raise RuntimeError("downstream failure")
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, fingerprint="f1", compensate=comp_1),
+                WorkflowStage("s2", stage_2, dependencies=("s1",)),
+            ]
+        )
+        fp = dag.effective_fingerprint("s1")
+        assert fp is not None
+        cache: dict[tuple[str, str], object] = {("s1", fp): "cached_res_1"}
+
+        with self.assertRaises(WorkflowExecutionError):
+            await dag.async_execute(cache=cache)
+
+        self.assertEqual(compensated, [], "Cache hits must not be compensated")
+
+
 
 class TestGracefulShutdown(unittest.IsolatedAsyncioTestCase):
     async def test_programmatic_shutdown_and_lifo_cleanup(self) -> None:

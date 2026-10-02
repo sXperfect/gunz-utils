@@ -48,16 +48,19 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
             await gather_limited([], limit=0)
 
     async def test_map_unordered_yields_as_tasks_complete(self) -> None:
-        async def work(item: tuple[int, float]) -> int:
-            val, delay = item
-            await asyncio.sleep(delay)
-            return val
+        first_yielded = asyncio.Event()
 
-        # Item 0 finishes after item 1
-        items = [(0, 0.05), (1, 0.005)]
+        async def work(item_id: int) -> int:
+            if item_id == 0:
+                await first_yielded.wait()
+                return 0
+            return 1
+
         results: list[int] = []
-        async for res in map_unordered(work, items, limit=2):
+        async for res in map_unordered(work, [0, 1], limit=2):
             results.append(res)
+            if res == 1:
+                first_yielded.set()
 
         self.assertEqual(results, [1, 0])
 
