@@ -54,9 +54,13 @@ not a one-time review.
       structures;
 - [x] enforce redaction reveal-count bounds;
 - [x] preserve existing varint transactionality/canonical-overflow evidence;
-- [x] review bounded/digest streaming semantics and record remaining proof gaps.
+- [x] review bounded/digest streaming semantics and record remaining proof gaps;
+- [x] add native C 64-bit unsigned varint encoding/zero-copy decoding with parity fallback (ALG-076);
+- [x] add fast C JSON-clean validator to bypass duplicate heap allocations (ALG-077);
+- [x] add deterministic virtual clock, faulty streams, and await boundary chaos (ALG-078).
 
 ### Parsing, process and project algorithms
+
 
 - [x] fix `safe_int` so documented ordinary integer inputs are accepted;
 - [x] validate async/subprocess/upstream timeout and concurrency domains;

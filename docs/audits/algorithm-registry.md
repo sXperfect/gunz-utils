@@ -129,6 +129,10 @@ top.
 | ALG-073 | Benchmark reporting/export/plot transforms | `benchmark.report/export/plot` | A4 | profile representation, CSV export, CPU-core transform, invalid metric rejection, real plot smoke | proof and isolated matplotlib smoke executed |
 | ALG-074 | Benchmark overhead probe | `benchmark.overhead.measure_runner_overhead` | A4 | positive integer iterations, bool rejection, zero timer-resolution semantics | focused proof executed |
 | ALG-075 | Optional Pydantic validation adapter | `ext.validation_pydantic.type_checked` | A4 | valid scalar behavior, strict-int differential parity, redacted validation errors | strict-mode differential proof executed; default Pydantic coercion remains intentional backend behavior |
+| ALG-076 | Native 64-bit varint codec & zero-copy parsing | `binary.encode_uvarint`, `binary.ByteReader.read_uvarint`, `_accel.*` | A4 | 64-bit uint range `[0, 2^64-1]`, canonical MSB continuation, rejection of non-canonical redundant zero bytes and overflow, zero-copy buffer view, pure-Python fallback parity | 28 dedicated boundary, equivalence and fallback tests executed |
+| ALG-077 | Fast JSON-clean validation & allocation bypass | `serialization.to_jsonable`, `streaming.write_jsonl`, `_accel.is_json_clean` | A4 | depth bounding (`max_depth=100`), strict byte rejection, finite float bounds, chunked streaming I/O batching, pure-Python fallback | unit/regression and roundtrip tests executed |
+| ALG-078 | Adversarial chaos and stream/await fault injection | `faults.VirtualClock`, `faults.FaultyStream`, `faults.AwaitBoundaryChaos` | A4 | deterministic monotonic clock progression, partial read/write truncation, EIO/ENOSPC injection, cooperative await cancellation | 5 focused unit and contract tests executed |
+
 
 ## A0 sweep result
 
