@@ -87,3 +87,25 @@ def test_retain_priority_and_recent_rejects_boolean_limit() -> None:
             is_priority=lambda _value: False,
             max_recent=True,
         )
+
+
+def test_top_k_returns_largest_values_and_validates_k() -> None:
+    from gunz_utils.structures import top_k
+
+    assert top_k([5, 1, 9, 3, 7], 3) == [9, 7, 5]
+    assert top_k([], 5) == []
+    assert top_k([1, 2, 3], 0) == []
+
+    with pytest.raises(ValueError, match="non-negative integer"):
+        top_k([1, 2, 3], -1)
+
+    with pytest.raises(ValueError, match="non-negative integer"):
+        top_k([1, 2, 3], True)  # type: ignore[arg-type]
+
+
+def test_stable_unique_preserves_first_seen_order() -> None:
+    from gunz_utils.structures import stable_unique
+
+    assert list(stable_unique([3, 1, 3, 2, 1, 4])) == [3, 1, 2, 4]
+    assert list(stable_unique([])) == []
+
