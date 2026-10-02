@@ -224,6 +224,22 @@ class WorkflowDAG:
                     errors.append((name, exc))
         return errors
 
+    async def _safe_rollback_async(
+        self,
+        completed_order: list[str],
+        outputs: Mapping[str, Any],
+    ) -> list[tuple[str, BaseException]]:
+        """Roll back asynchronously without being detached by outer cancellations."""
+        rollback_task = asyncio.create_task(
+            self._rollback_async(completed_order, outputs)
+        )
+        while not rollback_task.done():
+            try:
+                await asyncio.shield(rollback_task)
+            except asyncio.CancelledError:
+                pass
+        return rollback_task.result()
+
     def execute(
         self,
         *,
@@ -280,7 +296,25 @@ class WorkflowDAG:
             if key is not None:
                 newly_cached[key] = output
 
-        store.update(newly_cached)
+        published_keys: list[tuple[str, str]] = []
+        try:
+            for k, v in newly_cached.items():
+                store[k] = v
+                published_keys.append(k)
+        except BaseException as exc:
+            for k in published_keys:
+                try:
+                    del store[k]
+                except Exception:
+                    pass
+            compensation_errors = self._rollback_sync(executed_order, outputs)
+            raise WorkflowExecutionError(
+                f"workflow cache publication failed: {exc}",
+                stage_name="cache_publication",
+                cause=exc,
+                compensation_errors=tuple(compensation_errors),
+            ) from exc
+
         return outputs
 
     async def async_execute(
@@ -315,12 +349,17 @@ class WorkflowDAG:
             name: asyncio.Event() for name in self.stages
         }
         cancel_event = asyncio.Event()
+        start_barrier = asyncio.Event()
         failure_box: list[tuple[str, BaseException]] = []
         tasks: list[asyncio.Task[None]] = []
 
         async def run_stage(name: str) -> None:
             stage = self.stages[name]
             try:
+                await start_barrier.wait()
+                if cancel_event.is_set():
+                    return
+
                 for dep in stage.dependencies:
                     await events[dep].wait()
                     if cancel_event.is_set():
@@ -376,7 +415,12 @@ class WorkflowDAG:
                 events[name].set()
                 raise
 
-        tasks.extend([asyncio.create_task(run_stage(name)) for name in self.stages])
+        try:
+            for name in self.stages:
+                tasks.append(asyncio.create_task(run_stage(name)))
+        finally:
+            start_barrier.set()
+
         caller_cancelled = False
         try:
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -387,12 +431,22 @@ class WorkflowDAG:
             for t in tasks:
                 if not t.done():
                     t.cancel()
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            async def _drain() -> list[Any]:
+                return await asyncio.gather(*tasks, return_exceptions=True)
+
+            drain_task = asyncio.create_task(_drain())
+            while not drain_task.done():
+                try:
+                    await asyncio.shield(drain_task)
+                except asyncio.CancelledError:
+                    caller_cancelled = True
+            results = drain_task.result()
 
         if failure_box:
             failed_stage, exc = failure_box[0]
-            compensation_errors = await asyncio.shield(
-                self._rollback_async(executed_order, outputs)
+            compensation_errors = await self._safe_rollback_async(
+                executed_order, outputs
             )
             raise WorkflowExecutionError(
                 f"async workflow failed at stage {failed_stage!r}: {exc}",
@@ -405,8 +459,8 @@ class WorkflowDAG:
             if isinstance(res, BaseException) and not isinstance(
                 res, asyncio.CancelledError
             ):
-                compensation_errors = await asyncio.shield(
-                    self._rollback_async(executed_order, outputs)
+                compensation_errors = await self._safe_rollback_async(
+                    executed_order, outputs
                 )
                 raise WorkflowExecutionError(
                     f"async workflow failed: {res}",
@@ -419,10 +473,30 @@ class WorkflowDAG:
             isinstance(res, asyncio.CancelledError) for res in results
         )
         if cancelled:
-            await asyncio.shield(self._rollback_async(executed_order, outputs))
+            await self._safe_rollback_async(executed_order, outputs)
             raise asyncio.CancelledError()
 
-        store.update(newly_cached)
+        published_keys: list[tuple[str, str]] = []
+        try:
+            for k, v in newly_cached.items():
+                store[k] = v
+                published_keys.append(k)
+        except BaseException as exc:
+            for k in published_keys:
+                try:
+                    del store[k]
+                except Exception:
+                    pass
+            compensation_errors = await self._safe_rollback_async(
+                executed_order, outputs
+            )
+            raise WorkflowExecutionError(
+                f"async workflow cache publication failed: {exc}",
+                stage_name="cache_publication",
+                cause=exc,
+                compensation_errors=tuple(compensation_errors),
+            ) from exc
+
         return outputs
 
 

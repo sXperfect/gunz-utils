@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from typing import Any
 
 from gunz_utils.dict_utils import deep_get, deep_merge, deep_set
 
@@ -287,6 +288,26 @@ class TestIntegration(unittest.TestCase):
 
         merged["subtree"]["list"].append(99)
         self.assertEqual(base["subtree"]["list"], [1, 2, 3])
+
+    def test_merge_isolation_cycle_preservation(self) -> None:
+        cyclic_list: list[Any] = []
+        cyclic_list.append(cyclic_list)
+        base = {"cycle": cyclic_list}
+
+        merged = deep_merge(base, {"extra": 42})
+        self.assertIsNot(merged["cycle"], cyclic_list)
+        self.assertIs(merged["cycle"][0], merged["cycle"])
+
+    def test_merge_isolation_dag_no_exponential_expansion(self) -> None:
+        node: list[Any] = []
+        for _ in range(12):
+            node = [node, node]
+        base = {"graph": node}
+
+        # Should finish instantaneously without expanding 2^13 lists
+        merged = deep_merge(base, {"flag": True})
+        self.assertIsNot(merged["graph"], base["graph"])
+        self.assertIs(merged["graph"][0], merged["graph"][1])
 
 
 

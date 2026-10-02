@@ -381,6 +381,173 @@ class TestWorkflowDAGAsyncAndCompensation(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(compensated, [], "Cache hits must not be compensated")
 
+    async def test_async_execute_eager_factory_sibling_cancellation(self) -> None:
+        loop = asyncio.get_running_loop()
+        eager_factory = getattr(asyncio, "eager_task_factory", None)
+        old_factory = loop.get_task_factory()
+        if eager_factory is not None:
+            loop.set_task_factory(eager_factory)
+        try:
+            sibling_cancelled = False
+
+            async def stage_1(_deps: dict[str, object]) -> str:
+                nonlocal sibling_cancelled
+                try:
+                    await asyncio.sleep(10.0)
+                    return "res_1"
+                except asyncio.CancelledError:
+                    sibling_cancelled = True
+                    raise
+
+            async def stage_2(_deps: dict[str, object]) -> str:
+                raise RuntimeError("immediate failure")
+
+            dag = WorkflowDAG(
+                [
+                    WorkflowStage("s1", stage_1),
+                    WorkflowStage("s2", stage_2),
+                ]
+            )
+
+            with self.assertRaises(WorkflowExecutionError):
+                await dag.async_execute()
+
+            self.assertTrue(sibling_cancelled)
+        finally:
+            loop.set_task_factory(old_factory)
+
+    async def test_async_execute_repeated_cancellation_waits_for_compensation(
+        self,
+    ) -> None:
+        comp_done = False
+        comp_started = asyncio.Event()
+        release_comp = asyncio.Event()
+
+        async def stage_1(_deps: dict[str, object]) -> str:
+            return "res_1"
+
+        async def comp_1(_out: object) -> None:
+            nonlocal comp_done
+            comp_started.set()
+            await release_comp.wait()
+            comp_done = True
+
+        async def stage_2(_deps: dict[str, object]) -> str:
+            raise asyncio.CancelledError()
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, compensate=comp_1),
+                WorkflowStage("s2", stage_2, dependencies=("s1",)),
+            ]
+        )
+
+        task = asyncio.create_task(dag.async_execute())
+        await comp_started.wait()
+
+        # Cancellation while compensation is running in background
+        task.cancel()
+        await asyncio.sleep(0.01)
+        self.assertFalse(
+            task.done(), "Task must not return before compensation finishes"
+        )
+        self.assertFalse(comp_done)
+
+        # Release compensation
+        release_comp.set()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+
+        self.assertTrue(
+            comp_done, "Compensation must be completed when task returns"
+        )
+
+    def test_cache_publication_failure_sync(self) -> None:
+        compensated: list[str] = []
+
+        class FailingCache(dict[tuple[str, str], object]):
+            def __setitem__(self, key: tuple[str, str], val: object) -> None:
+                if key[0] == "s2":
+                    raise OSError("disk full")
+                super().__setitem__(key, val)
+
+        def stage_1(_deps: dict[str, object]) -> str:
+            return "res_1"
+
+        def comp_1(out: object) -> None:
+            compensated.append(str(out))
+
+        def stage_2(_deps: dict[str, object]) -> str:
+            return "res_2"
+
+        def comp_2(out: object) -> None:
+            compensated.append(str(out))
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, fingerprint="f1", compensate=comp_1),
+                WorkflowStage(
+                    "s2",
+                    stage_2,
+                    fingerprint="f2",
+                    dependencies=("s1",),
+                    compensate=comp_2,
+                ),
+            ]
+        )
+        cache = FailingCache()
+
+        with self.assertRaises(WorkflowExecutionError) as cm:
+            dag.execute(cache=cache)
+
+        self.assertEqual(cm.exception.stage_name, "cache_publication")
+        self.assertIn("res_1", compensated)
+        self.assertIn("res_2", compensated)
+        self.assertEqual(cache, {}, "Partial cache entries must be purged")
+
+    async def test_cache_publication_failure_async(self) -> None:
+        compensated: list[str] = []
+
+        class FailingCache(dict[tuple[str, str], object]):
+            def __setitem__(self, key: tuple[str, str], val: object) -> None:
+                if key[0] == "s2":
+                    raise OSError("disk full")
+                super().__setitem__(key, val)
+
+        async def stage_1(_deps: dict[str, object]) -> str:
+            return "res_1"
+
+        async def comp_1(out: object) -> None:
+            compensated.append(str(out))
+
+        async def stage_2(_deps: dict[str, object]) -> str:
+            return "res_2"
+
+        async def comp_2(out: object) -> None:
+            compensated.append(str(out))
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, fingerprint="f1", compensate=comp_1),
+                WorkflowStage(
+                    "s2",
+                    stage_2,
+                    fingerprint="f2",
+                    dependencies=("s1",),
+                    compensate=comp_2,
+                ),
+            ]
+        )
+        cache = FailingCache()
+
+        with self.assertRaises(WorkflowExecutionError) as cm:
+            await dag.async_execute(cache=cache)
+
+        self.assertEqual(cm.exception.stage_name, "cache_publication")
+        self.assertIn("res_1", compensated)
+        self.assertIn("res_2", compensated)
+        self.assertEqual(cache, {}, "Partial cache entries must be purged")
+
 
 
 class TestGracefulShutdown(unittest.IsolatedAsyncioTestCase):

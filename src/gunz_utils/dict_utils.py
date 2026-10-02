@@ -238,18 +238,41 @@ def deep_merge(
             f"got {list_strategy!r}"
         )
 
+    memo: dict[int, Any] = {}
+
     def _isolate(val: Any) -> Any:
+        val_id = id(val)
+        if val_id in memo:
+            return memo[val_id]
+
         if isinstance(val, Mapping):
-            return {k: _isolate(v) for k, v in val.items()}
+            res_dict: dict[Any, Any] = {}
+            memo[val_id] = res_dict
+            for k, v in val.items():
+                res_dict[k] = _isolate(v)
+            return res_dict
         if isinstance(val, list):
-            return [_isolate(v) for v in val]
+            res_list: list[Any] = []
+            memo[val_id] = res_list
+            for v in val:
+                res_list.append(_isolate(v))
+            return res_list
         if isinstance(val, set):
-            return {_isolate(v) for v in val}
+            res_set: set[Any] = set()
+            memo[val_id] = res_set
+            for v in val:
+                res_set.add(_isolate(v))
+            return res_set
         if isinstance(val, tuple):
-            return tuple(_isolate(v) for v in val)
+            res_tuple = tuple(_isolate(v) for v in val)
+            memo[val_id] = res_tuple
+            return res_tuple
         try:
-            return copy.deepcopy(val)
+            copied = copy.deepcopy(val, memo)
+            memo[val_id] = copied
+            return copied
         except Exception:
+            memo[val_id] = val
             return val
 
     def _merge(a: Any, b: Any) -> Any:

@@ -72,8 +72,11 @@ def test_varint_encode_decode_roundtrip_equivalence(val: int) -> None:
     "val",
     [0, 1, 127, 128, 255, 256, (1 << 32) - 1, (1 << 64) - 1],
 )
-def test_pure_python_varint_roundtrip(val: int) -> None:
+def test_pure_python_varint_roundtrip(
+    val: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test reference Python encoder and decoder roundtrip independently."""
+    monkeypatch.setattr(binary, "_accel_decode", None)
     encoded = binary._py_encode_uvarint(val)
     # Read using python fallback ByteReader logic
     reader = ByteReader(encoded)
