@@ -28,16 +28,15 @@ accompanied by a comprehensive integration design document in `../gunz-bench/doc
 
 ## 3. Migration Roadmap and Deprecation Strategy
 
-### Phase 1: Staging & Handshake (Current)
+### Phase 1: Staging & Handshake (Completed)
 - Source code, tests, and documentation staged in `../gunz-bench/tmp/handsoff/`.
 - `gunz-bench` design documented in `../gunz-bench/docs/design/gunz-utils-subsystem-transfer.md`.
-- `gunz-utils` retains existing implementations with deprecation notices pointing to `gunz-bench`.
 
-### Phase 2: Integration in `gunz-bench`
-- `gunz-bench` merges staged modules into `src/gunz_bench/isolation/`, `src/gunz_bench/adapters/`, and `src/gunz_bench/reporting/`.
-- `gunz-bench` configures `gunz-utils` as an optional upstream dependency for core primitives (`atomic_write`, `ResourceBudget`, `GracefulShutdown`, `bootstrap_mean_ci`).
+### Phase 2: Integration in `gunz-bench` (Completed)
+- `gunz-bench` merged isolation, reporting, adapters, process trees, and native acceleration.
+- `gunz-bench` 0.2.0 released, depending on `gunz-utils>=1.14.0` for core primitives (`atomic_write`, `ResourceBudget`, `GracefulShutdown`, `bootstrap_mean_ci`, `gunz_utils.faults`).
+- Downstream performance regression harness wired into `gunz-utils` via `benchmarks/workloads.py` and `scripts/bench.py`.
 
-### Phase 3: Extraction from `gunz-utils` (Upcoming Major/Minor Release)
-- Deprecate `gunz_utils.benchmark.*` with `GunzDeprecationWarning` pointing users to `gunz-bench`.
-- Remove `[project.optional-dependencies] plot = ["matplotlib"]` from `pyproject.toml`.
-- Archive historical benchmark tests in `docs/tasks/done/`.
+### Phase 3: Extraction from `gunz-utils` (Current: Deprecated; Complete Removal in Gunz 2.0)
+- `gunz_utils.benchmark.*` emits `DeprecationWarning` pointing users to `gunz-bench`.
+- `gunz-utils` 2.0.0 will permanently remove `src/gunz_utils/benchmark/` and the optional `plot = ["matplotlib"]` extra.
