@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Unreleased changes are collected as conflict-free fragments in `changes/`. Run `python scripts/release.py status` to inspect them.
 
+## [1.14.0] — 2026-10-02
+
+### Added
+
+- Add `VirtualClock`, `FaultyStream`, and `AwaitBoundaryChaos` testing primitives to `gunz_utils.faults` for testing adversarial I/O errors and cooperative cancellation.
+- Accelerate canonical JSON serialization and fingerprinting in `gunz_utils.serialization` and batch streaming in `gunz_utils.streaming`.
+
+### Performance
+
+- Add optional C native extension (`gunz_utils._accel`) for 64-bit unsigned varint encoding and zero-copy decoding in `gunz_utils.binary`, unlocking a ~5x speedup with transparent pure-Python reference fallback.
+
 ## [1.13.0] — 2026-10-01
 
 ### Added

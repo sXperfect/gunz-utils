@@ -1,1 +1,0 @@
-- Add optional C native extension (`gunz_utils._accel`) for 64-bit unsigned varint encoding and zero-copy decoding in `gunz_utils.binary`, unlocking a ~5x speedup with transparent pure-Python reference fallback.
