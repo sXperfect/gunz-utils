@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from collections.abc import Callable
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
@@ -162,9 +163,10 @@ class VirtualClock:
         if (
             isinstance(start_time, bool)
             or not isinstance(start_time, (int, float))
+            or not math.isfinite(start_time)
             or start_time < 0
         ):
-            raise ValueError("start_time must be a non-negative number")
+            raise ValueError("start_time must be a finite non-negative number")
         self._current: float = float(start_time)
 
     def now(self) -> float:
@@ -180,10 +182,14 @@ class VirtualClock:
         if (
             isinstance(seconds, bool)
             or not isinstance(seconds, (int, float))
+            or not math.isfinite(seconds)
             or seconds < 0
         ):
-            raise ValueError("seconds must be a non-negative number")
-        self._current += float(seconds)
+            raise ValueError("seconds must be a finite non-negative number")
+        new_time = self._current + float(seconds)
+        if not math.isfinite(new_time):
+            raise ValueError("advancing clock results in non-finite time")
+        self._current = new_time
         return self._current
 
 
@@ -201,6 +207,21 @@ class FaultyStream:
         read_error: Callable[[], BaseException] | None = None,
         write_error: Callable[[], BaseException] | None = None,
     ) -> None:
+        for name, val in [
+            ("max_read_bytes", max_read_bytes),
+            ("max_write_bytes", max_write_bytes),
+            ("fail_read_after", fail_read_after),
+            ("fail_write_after", fail_write_after),
+        ]:
+            if val is not None:
+                if isinstance(val, bool) or not isinstance(val, int) or val < 0:
+                    raise ValueError(f"{name} must be a non-negative integer or None")
+
+        if read_error is not None and not callable(read_error):
+            raise TypeError("read_error must be callable")
+        if write_error is not None and not callable(write_error):
+            raise TypeError("write_error must be callable")
+
         self.wrapped = wrapped
         self.max_read_bytes = max_read_bytes
         self.max_write_bytes = max_write_bytes
@@ -258,6 +279,16 @@ class AwaitBoundaryChaos:
         fail_at_step: int | None = None,
         exception_factory: Callable[[], BaseException] | None = None,
     ) -> None:
+        for name, val in [
+            ("cancel_at_step", cancel_at_step),
+            ("fail_at_step", fail_at_step),
+        ]:
+            if val is not None:
+                if isinstance(val, bool) or not isinstance(val, int) or val < 1:
+                    raise ValueError(f"{name} must be a positive integer or None")
+
+        if exception_factory is not None and not callable(exception_factory):
+            raise TypeError("exception_factory must be callable")
 
         self.cancel_at_step = cancel_at_step
         self.fail_at_step = fail_at_step

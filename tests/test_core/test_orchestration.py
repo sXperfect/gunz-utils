@@ -155,6 +155,37 @@ class TestWorkflowDAGAsyncAndCompensation(unittest.IsolatedAsyncioTestCase):
         # Compensation should occur in reverse completion order: s2 then s1
         self.assertEqual(compensated, ["comp_2:data_2", "comp_1:data_1"])
 
+    async def test_async_execute_cancels_running_siblings_on_failure(self) -> None:
+        cancelled = False
+        started = asyncio.Event()
+
+        async def slow_stage(_deps: dict[str, object]) -> str:
+            nonlocal cancelled
+            started.set()
+            try:
+                await asyncio.sleep(10.0)
+                return "slow_done"
+            except asyncio.CancelledError:
+                cancelled = True
+                raise
+
+        async def fail_stage(_deps: dict[str, object]) -> str:
+            await started.wait()
+            raise RuntimeError("fail_stage blew up")
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("slow", slow_stage),
+                WorkflowStage("fail", fail_stage),
+            ]
+        )
+
+        with self.assertRaises(WorkflowExecutionError) as cm:
+            await dag.async_execute()
+
+        self.assertEqual(cm.exception.stage_name, "fail")
+        self.assertTrue(cancelled)
+
     def test_sync_rollback_on_failure(self) -> None:
         compensated: list[str] = []
 

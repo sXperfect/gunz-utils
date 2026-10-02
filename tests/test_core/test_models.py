@@ -11,6 +11,10 @@ Covers the shared strictness defaults exposed by :class:`GunzBaseModel`:
 
 import unittest
 
+import pytest
+
+pytest.importorskip("pydantic")
+
 from pydantic import ConfigDict, ValidationError
 
 from gunz_utils import GunzBaseModel

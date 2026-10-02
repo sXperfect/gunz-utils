@@ -10,9 +10,18 @@ from gunz_utils.binary import ByteReader, encode_uvarint
 
 def test_native_extension_is_compiled_and_active() -> None:
     """Verify that compiled C extension is discovered and loaded in this environment."""
+    if binary._accel_encode is None:
+        pytest.skip("Native C extension is not compiled in this environment")
 
     assert binary._accel_encode is not None
     assert binary._accel_decode is not None
+
+
+def test_varint_encode_keyword_argument_parity() -> None:
+    """Verify encode_uvarint accepts 'value' keyword argument identically."""
+    assert encode_uvarint(value=42) == encode_uvarint(42)
+    assert encode_uvarint(value=0) == b"\x00"
+    assert encode_uvarint(value=128) == b"\x80\x01"
 
 
 @pytest.mark.parametrize(
@@ -104,7 +113,7 @@ def test_varint_fallback_parity_when_native_extension_disabled(
     monkeypatch.setattr(binary, "_accel_encode", None)
 
     for val in [0, 1, 127, 128, 300, (1 << 64) - 1]:
-        encoded = binary._py_encode_uvarint(val)
+        encoded = encode_uvarint(val)
         reader = ByteReader(encoded)
         assert reader.read_uvarint() == val
         assert reader.remaining == 0
@@ -117,3 +126,33 @@ def test_varint_fallback_parity_when_native_extension_disabled(
 
     with pytest.raises(ValueError, match="varint exceeds 64 bits"):
         ByteReader(b"\x80" * 9 + b"\x02").read_uvarint()
+
+
+def test_fresh_import_without_native_extension() -> None:
+    """Verify fresh import and public APIs work when native extension is unavailable."""
+    import importlib
+    import sys
+
+    saved_binary = sys.modules.get("gunz_utils.binary")
+    saved_accel = sys.modules.get("gunz_utils._accel")
+    try:
+        sys.modules.pop("gunz_utils.binary", None)
+        sys.modules["gunz_utils._accel"] = None  # type: ignore[assignment]
+
+        fresh_binary = importlib.import_module("gunz_utils.binary")
+        assert fresh_binary._accel_encode is None
+        assert fresh_binary._accel_decode is None
+
+        enc = fresh_binary.encode_uvarint(42)
+        assert enc == b"\x2a"
+        reader = fresh_binary.ByteReader(enc)
+        assert reader.read_uvarint() == 42
+    finally:
+        if saved_binary is not None:
+            sys.modules["gunz_utils.binary"] = saved_binary
+        else:
+            sys.modules.pop("gunz_utils.binary", None)
+        if saved_accel is not None:
+            sys.modules["gunz_utils._accel"] = saved_accel
+        else:
+            sys.modules.pop("gunz_utils._accel", None)

@@ -96,6 +96,7 @@ def run_benchmarks(
             flag = " "
             if rel is not None and rel > threshold:
                 flag = "!"
+                regressions += 1
             b_val = comp.baseline_value
             c_val = comp.current_value
             bv = f"{b_val:.6f}" if b_val is not None else "N/A"

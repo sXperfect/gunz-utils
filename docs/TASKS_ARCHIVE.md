@@ -10,6 +10,8 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [`2026.10.02-fix-concurrency_dag_and_dict_isolation`](tasks/done/2026.10.02-fix-concurrency_dag_and_dict_isolation.md)
+- [`2026.10.02-fix-audit_bugs_and_disparities`](tasks/done/2026.10.02-fix-audit_bugs_and_disparities.md)
 - [`2026.10.01-testing-chaos_fault_injection`](tasks/done/2026.10.01-testing-chaos_fault_injection.md)
 - [`2026.10.01-benchmark-performance_run_protocol`](tasks/done/2026.10.01-benchmark-performance_run_protocol.md)
 - [`2026.10.01-telemetry-process_tree_samplers`](tasks/done/2026.10.01-telemetry-process_tree_samplers.md)

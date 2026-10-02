@@ -188,6 +188,26 @@ class TestDeepMerge(unittest.TestCase):
     def test_empty_both_inputs_returns_empty(self) -> None:
         self.assertEqual(deep_merge({}, {}), {})
 
+    def test_merge_isolates_nested_subtrees_from_caller_mutation(self) -> None:
+        base = {"a": {"nested": 1, "items": [10, 20]}, "base_only": {"secret": "x"}}
+        override = {
+            "b": {"other": 2, "tags": ["a", "b"]},
+            "override_only": {"flag": True},
+        }
+        merged = deep_merge(base, override)
+
+        # Mutate merged dict subtrees
+        merged["base_only"]["secret"] = "mutated"
+        merged["override_only"]["flag"] = False
+        merged["a"]["items"].append(30)
+        merged["b"]["tags"].append("c")
+
+        # Caller input structures must remain untouched
+        self.assertEqual(base["base_only"]["secret"], "x")
+        self.assertEqual(override["override_only"]["flag"], True)
+        self.assertEqual(base["a"]["items"], [10, 20])
+        self.assertEqual(override["b"]["tags"], ["a", "b"])
+
 
 class TestIntegration(unittest.TestCase):
     """Cross-function integration tests."""

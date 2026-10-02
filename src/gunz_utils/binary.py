@@ -7,8 +7,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from .buffers import dispatch
-
 try:
     _accel = importlib.import_module("._accel", package=__package__)
     _accel_encode: Callable[[int], bytes] | None = getattr(
@@ -81,9 +79,11 @@ def _py_encode_uvarint(value: int) -> bytes:
             return bytes(output)
 
 
-encode_uvarint: Callable[[int], bytes] = dispatch(
-    _py_encode_uvarint, _accel_encode
-)
+def encode_uvarint(value: int) -> bytes:
+    """Encode an unsigned 64-bit integer into a canonical varint."""
+    if _accel_encode is not None:
+        return _accel_encode(value)
+    return _py_encode_uvarint(value)
 
 
 __all__ = ["ByteReader", "encode_uvarint"]

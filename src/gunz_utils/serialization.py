@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import importlib
 import json
+import math
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -24,7 +25,13 @@ def to_jsonable(
     _depth: int = 0,
     _max_depth: int = 100,
 ) -> Any:
-    """Convert common Python objects into JSON-compatible values."""
+    """Convert common Python objects into JSON-compatible values.
+
+    When native acceleration is active and the input is already clean and
+    JSON-compatible, the input object itself may be returned directly to avoid
+    costly recursive re-allocation. Callers that require mutation isolation
+    must explicitly deep-copy the object.
+    """
     if _depth == 0 and _accel_is_json_clean is not None:
         if _accel_is_json_clean(value, _max_depth):
             return value
@@ -84,6 +91,8 @@ def to_jsonable(
         return sorted(items, key=lambda item: repr(item))
     if isinstance(value, bytes):
         raise TypeError("bytes are not implicitly JSON serializable")
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        raise ValueError("Out of range float values are not JSON compliant")
     return value
 
 

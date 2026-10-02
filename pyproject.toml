@@ -117,10 +117,23 @@ warn_return_any = true
 # Ext backends depend on heavy third-party libs; allow implicit Any from them.
 module = [
     "git",
+    "git.*",
     "gitpython",
+    "gitpython.*",
     "loguru",
+    "loguru.*",
     "pydantic",
+    "pydantic.*",
     "pydantic_core",
+    "pydantic_core.*",
     "cryptography",
+    "cryptography.*",
+    "matplotlib",
+    "matplotlib.*",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Optional third-party backend adapters naturally receive Any from external libraries.
+module = "gunz_utils.ext.*"
+warn_return_any = false

@@ -53,7 +53,18 @@ def build() -> int:
             cmd.extend(["-undefined", "dynamic_lookup"])
 
     print(f"Compiling native extension: {' '.join(cmd)}")
-    res = subprocess.run(cmd, check=False)
+    try:
+        res = subprocess.run(cmd, check=False)
+    except FileNotFoundError as err:
+        print(
+            f"Compilation failed: compiler executable not found: {cmd[0]} ({err})",
+            file=sys.stderr,
+        )
+        return 1
+    except OSError as err:
+        print(f"Compilation failed: launch error: {err}", file=sys.stderr)
+        return 1
+
     if res.returncode == 0:
         print(f"Successfully compiled native extension: {out_so}")
         return 0

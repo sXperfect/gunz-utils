@@ -314,6 +314,7 @@ class WorkflowDAG:
         }
         cancel_event = asyncio.Event()
         failure_box: list[tuple[str, BaseException]] = []
+        tasks: list[asyncio.Task[None]] = []
 
         async def run_stage(name: str) -> None:
             stage = self.stages[name]
@@ -366,11 +367,15 @@ class WorkflowDAG:
             except BaseException as exc:
                 if not cancel_event.is_set():
                     cancel_event.set()
-                    failure_box.append((name, exc))
+                    if not isinstance(exc, asyncio.CancelledError):
+                        failure_box.append((name, exc))
+                    for t in tasks:
+                        if not t.done():
+                            t.cancel()
                 events[name].set()
                 raise
 
-        tasks = [asyncio.create_task(run_stage(name)) for name in self.stages]
+        tasks.extend([asyncio.create_task(run_stage(name)) for name in self.stages])
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         if failure_box:
@@ -398,6 +403,9 @@ class WorkflowDAG:
                     cause=res,
                     compensation_errors=tuple(compensation_errors),
                 ) from res
+
+        if any(isinstance(res, asyncio.CancelledError) for res in results):
+            raise asyncio.CancelledError()
 
         return outputs
 

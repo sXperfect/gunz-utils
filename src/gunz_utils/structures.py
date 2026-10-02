@@ -39,7 +39,7 @@ def top_k(items: Iterable[T], k: int) -> list[T]:
     """Return the largest k values without sorting the complete input."""
     if isinstance(k, bool) or not isinstance(k, int) or k < 0:
         raise ValueError("k must be a non-negative integer")
-    return heapq.nlargest(k, items)
+    return heapq.nlargest(k, items)  # type: ignore[type-var]
 
 
 def stable_unique(items: Iterable[T]) -> Iterator[T]:

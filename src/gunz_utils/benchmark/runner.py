@@ -40,16 +40,20 @@ def benchmark_environment(
         if disable_gc and gc_enabled:
             gc.disable()
         if cpu_affinity is not None:
-            if not hasattr(os, "sched_getaffinity"):
+            sched_get = getattr(os, "sched_getaffinity", None)
+            sched_set = getattr(os, "sched_setaffinity", None)
+            if sched_get is None or sched_set is None:
                 raise NotImplementedError(
                     "CPU affinity is unavailable on this platform"
                 )
-            previous_affinity = os.sched_getaffinity(0)
-            os.sched_setaffinity(0, cpu_affinity)
+            previous_affinity = sched_get(0)
+            sched_set(0, cpu_affinity)
         yield
     finally:
         if previous_affinity is not None:
-            os.sched_setaffinity(0, previous_affinity)
+            sched_set = getattr(os, "sched_setaffinity", None)
+            if sched_set is not None:
+                sched_set(0, previous_affinity)
         if disable_gc and gc_enabled:
             gc.enable()
 

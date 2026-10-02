@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping, MutableMapping, Sequence
 from typing import Any, Literal, cast
 
@@ -237,21 +238,27 @@ def deep_merge(
             f"got {list_strategy!r}"
         )
 
+    def _safe_copy(val: Any) -> Any:
+        try:
+            return copy.deepcopy(val)
+        except Exception:
+            return val
+
     def _merge(a: Any, b: Any) -> Any:
         if isinstance(a, Mapping) and isinstance(b, Mapping):
             #? Build a new dict so neither input is mutated; recurse on each key.
             out: dict[str, Any] = {}
             for key in a:
-                out[key] = _merge(a[key], b[key]) if key in b else a[key]
+                out[key] = _merge(a[key], b[key]) if key in b else _safe_copy(a[key])
             for key in b:
                 if key not in a:
-                    out[key] = b[key]
+                    out[key] = _safe_copy(b[key])
             return out
         if isinstance(a, list) and isinstance(b, list):
             if list_strategy == "replace":
-                return list(b)
+                return _safe_copy(b)
             if list_strategy == "concat":
-                return list(a) + list(b)
+                return _safe_copy(a) + _safe_copy(b)
             #? dedup: first occurrence wins, order = base then override.
             #? Unhashable items (e.g. dicts) fall through without being
             #? tracked; that mirrors common stdlib semantics and avoids
@@ -268,10 +275,10 @@ def deep_merge(
                     if any(item == previous for previous in seen_unhashable):
                         continue
                     seen_unhashable.append(item)
-                result.append(item)
+                result.append(_safe_copy(item))
             return result
         #? Non-dict / non-list: override wins. Plain scalars and mixed
         #? type pairs all fall through here.
-        return b
+        return _safe_copy(b)
 
     return cast(dict[str, Any], _merge(base, override))
