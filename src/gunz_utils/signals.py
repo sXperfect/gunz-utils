@@ -335,8 +335,18 @@ class GracefulShutdown:
         if self._registration is not None:
             self._registration.restore()
             self._registration = None
-        if self.is_shutting_down:
-            await self.run_cleanup()
+        is_cancelled = (
+            exc_type is not None and issubclass(exc_type, asyncio.CancelledError)
+        )
+        if self.is_shutting_down or is_cancelled:
+            if not self.is_shutting_down:
+                self.trigger_shutdown()
+            cleanup_task = asyncio.create_task(self.run_cleanup())
+            while not cleanup_task.done():
+                try:
+                    await asyncio.shield(cleanup_task)
+                except asyncio.CancelledError:
+                    pass
         return False
 
 

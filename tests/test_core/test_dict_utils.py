@@ -309,6 +309,31 @@ class TestIntegration(unittest.TestCase):
         self.assertIsNot(merged["graph"], base["graph"])
         self.assertIs(merged["graph"][0], merged["graph"][1])
 
+    def test_merge_overlapping_self_referential_mappings(self) -> None:
+        a: dict[str, Any] = {}
+        b: dict[str, Any] = {}
+        a["self"] = a
+        b["self"] = b
+        a["x"] = 1
+        b["x"] = 2
+        b["y"] = 3
+
+        merged = deep_merge(a, b)
+        self.assertEqual(merged["x"], 2)
+        self.assertEqual(merged["y"], 3)
+        self.assertIs(merged["self"], merged)
+
+    def test_merge_tuple_cycle_backreference(self) -> None:
+        lst: list[Any] = []
+        tup = (lst,)
+        lst.append(tup)
+        base = {"t": tup}
+
+        merged = deep_merge(base, {"flag": True})
+        merged_t = merged["t"]
+        self.assertIsNot(merged_t, tup)
+        self.assertIs(merged_t[0][0], merged_t)
+
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import functools
 import math
 import threading
 import time
+import types
 from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Hashable
 from dataclasses import dataclass
@@ -79,10 +80,23 @@ class _TTLCache(Generic[P, T]):
         self._hits = 0
         self._misses = 0
 
+    def __get__(self, instance: Any, owner: Any = None) -> Any:
+        if isinstance(self._func, staticmethod):
+            return self
+        if isinstance(self._func, classmethod):
+            target = owner if owner is not None else type(instance)
+            return types.MethodType(self, target)
+        if instance is None:
+            return self
+        return types.MethodType(self, instance)
+
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
+        func = self._func
+        if isinstance(func, (staticmethod, classmethod)):
+            func = func.__func__
         key = _cache_key(args, kwargs)
         if key is None:
-            return self._func(*args, **kwargs)
+            return func(*args, **kwargs)
         now = time.monotonic()
         with self._lock:
             entry = self._cache.get(key)
@@ -93,7 +107,7 @@ class _TTLCache(Generic[P, T]):
             if entry is not None:
                 self._cache.pop(key, None)
             self._misses += 1
-        value = self._func(*args, **kwargs)
+        value = func(*args, **kwargs)
         with self._lock:
             self._cache[key] = (time.monotonic(), value)
             self._cache.move_to_end(key)
@@ -157,10 +171,23 @@ class _AsyncTTLCache(Generic[P, T]):
         self._in_flight: dict[Hashable, asyncio.Task[T]] = {}
         self._lock = asyncio.Lock()
 
+    def __get__(self, instance: Any, owner: Any = None) -> Any:
+        if isinstance(self._func, staticmethod):
+            return self
+        if isinstance(self._func, classmethod):
+            target = owner if owner is not None else type(instance)
+            return types.MethodType(self, target)
+        if instance is None:
+            return self
+        return types.MethodType(self, instance)
+
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
+        func = self._func
+        if isinstance(func, (staticmethod, classmethod)):
+            func = func.__func__
         key = _cache_key(args, kwargs)
         if key is None:
-            return await self._func(*args, **kwargs)
+            return await func(*args, **kwargs)
         async with self._lock:
             now = time.monotonic()
             entry = self._cache.get(key)
@@ -171,26 +198,38 @@ class _AsyncTTLCache(Generic[P, T]):
                 self._cache.pop(key, None)
             task = self._in_flight.get(key)
             if task is None:
-                task = asyncio.create_task(self._func(*args, **kwargs))
-                self._in_flight[key] = task
-        try:
-            value = await asyncio.shield(task)
-        finally:
-            if task.done():
-                async with self._lock:
-                    if self._in_flight.get(key) is task:
-                        self._in_flight.pop(key, None)
-        async with self._lock:
-            self._cache[key] = (time.monotonic(), value)
-            self._cache.move_to_end(key)
-            while len(self._cache) > self._maxsize:
-                self._cache.popitem(last=False)
-        return value
+                async def _producer() -> T:
+                    try:
+                        val = await func(*args, **kwargs)
+                        async with self._lock:
+                            self._cache[key] = (time.monotonic(), val)
+                            self._cache.move_to_end(key)
+                            while len(self._cache) > self._maxsize:
+                                self._cache.popitem(last=False)
+                        return val
+                    finally:
+                        async with self._lock:
+                            if self._in_flight.get(key) is current_task:
+                                self._in_flight.pop(key, None)
+
+                current_task = asyncio.create_task(_producer())
+
+                def _silence_unretrieved(t: asyncio.Task[Any]) -> None:
+                    if not t.cancelled():
+                        t.exception()
+
+                current_task.add_done_callback(_silence_unretrieved)
+                self._in_flight[key] = current_task
+                task = current_task
+
+        return await asyncio.shield(task)
 
     async def cache_clear(self) -> None:
         """Drop all cached entries (awaitable, matching the async API)."""
         async with self._lock:
             self._cache.clear()
+            for k in [k for k, t in self._in_flight.items() if t.done()]:
+                self._in_flight.pop(k, None)
 
 
 def async_ttl_cache(
@@ -227,15 +266,25 @@ class SingleFlight:
         async with self._lock:
             task = self._tasks.get(key)
             if task is None:
-                task = asyncio.create_task(factory())
-                self._tasks[key] = task
-        try:
-            return await asyncio.shield(task)
-        finally:
-            if task.done():
-                async with self._lock:
-                    if self._tasks.get(key) is task:
-                        self._tasks.pop(key, None)
+                async def _worker() -> T:
+                    try:
+                        return await factory()
+                    finally:
+                        async with self._lock:
+                            if self._tasks.get(key) is current_task:
+                                self._tasks.pop(key, None)
+
+                current_task = asyncio.create_task(_worker())
+
+                def _silence(t: asyncio.Task[Any]) -> None:
+                    if not t.cancelled():
+                        t.exception()
+
+                current_task.add_done_callback(_silence)
+                self._tasks[key] = current_task
+                task = current_task
+
+        return await asyncio.shield(task)
 
 
 __all__ = [

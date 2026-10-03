@@ -239,6 +239,7 @@ def deep_merge(
         )
 
     memo: dict[int, Any] = {}
+    merge_memo: dict[tuple[int, int], Any] = {}
 
     def _isolate(val: Any) -> Any:
         val_id = id(val)
@@ -264,7 +265,15 @@ def deep_merge(
                 res_set.add(_isolate(v))
             return res_set
         if isinstance(val, tuple):
-            res_tuple = tuple(_isolate(v) for v in val)
+            y = [_isolate(v) for v in val]
+            if val_id in memo:
+                return memo[val_id]
+            for k, j in zip(val, y, strict=True):
+                if k is not j:
+                    res_tuple = tuple(y)
+                    break
+            else:
+                res_tuple = val
             memo[val_id] = res_tuple
             return res_tuple
         try:
@@ -277,8 +286,12 @@ def deep_merge(
 
     def _merge(a: Any, b: Any) -> Any:
         if isinstance(a, Mapping) and isinstance(b, Mapping):
+            pair_key = (id(a), id(b))
+            if pair_key in merge_memo:
+                return merge_memo[pair_key]
             #? Build a new dict so neither input is mutated; recurse on each key.
             out: dict[str, Any] = {}
+            merge_memo[pair_key] = out
             for key in a:
                 out[key] = _merge(a[key], b[key]) if key in b else _isolate(a[key])
             for key in b:

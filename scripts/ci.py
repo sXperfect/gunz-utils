@@ -379,7 +379,11 @@ def run_docs() -> int:
     if not BUILD_DOCS_SCRIPT.is_file():
         print(f"!! missing docs script: {BUILD_DOCS_SCRIPT}", file=sys.stderr)
         return 2
-    return _run(["bash", str(BUILD_DOCS_SCRIPT)])
+    env = _env()
+    env["PYTHON"] = sys.executable
+    venv_bin = str(Path(sys.executable).parent)
+    env["PATH"] = f"{venv_bin}:{env.get('PATH', '')}"
+    return _run(["bash", str(BUILD_DOCS_SCRIPT)], env=env)
 
 
 def run_packaging() -> int:

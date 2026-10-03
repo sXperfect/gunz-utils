@@ -21,7 +21,13 @@ rm -rf "$DOCS_DIR/_build"
 # 2. Build HTML
 echo "-> Building HTML..."
 cd "$SOURCE_DIR"
-sphinx-build -b html -W . "$DOCS_DIR/_build/html"
+if command -v sphinx-build >/dev/null 2>&1; then
+    sphinx-build -b html -W . "$DOCS_DIR/_build/html"
+elif [ -n "${PYTHON:-}" ] && "$PYTHON" -m sphinx.cmd.build --version >/dev/null 2>&1; then
+    "$PYTHON" -m sphinx.cmd.build -b html -W . "$DOCS_DIR/_build/html"
+else
+    python3 -m sphinx.cmd.build -b html -W . "$DOCS_DIR/_build/html"
+fi
 
 echo "========================================"
 echo "Build Complete!"
