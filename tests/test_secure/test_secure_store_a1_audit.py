@@ -84,7 +84,9 @@ def test_rotation_file_key_to_passphrase_and_back(tmp_path: Path) -> None:
     store.unlock()
     store.set("secret", "value")
 
-    store.rotate_master_key(new_passphrase="new-passphrase")
+    store.rotate_master_key(
+        new_passphrase="new-passphrase", allow_mode_switch=True
+    )
     assert store._salt_path.is_file()
     assert not store._master_key_path.exists()
     store.close()
@@ -93,7 +95,7 @@ def test_rotation_file_key_to_passphrase_and_back(tmp_path: Path) -> None:
     passphrase_store.unlock(passphrase="new-passphrase")
     assert passphrase_store.get("secret") == "value"
 
-    passphrase_store.rotate_master_key()
+    passphrase_store.rotate_master_key(allow_mode_switch=True)
     assert passphrase_store._master_key_path.is_file()
     assert not passphrase_store._salt_path.exists()
     passphrase_store.close()
@@ -238,7 +240,9 @@ def test_passphrase_rotation_publication_failure_recovers_pending_salt(
         side_effect=OSError("publish failed"),
     ):
         with pytest.raises(OSError, match="publish failed"):
-            store.rotate_master_key(new_passphrase="new-passphrase")
+            store.rotate_master_key(
+                new_passphrase="new-passphrase", allow_mode_switch=True
+            )
 
     assert store._pending_salt_path.is_file()
     store.close()
@@ -252,3 +256,124 @@ def test_passphrase_rotation_publication_failure_recovers_pending_salt(
         assert not reopened._pending_salt_path.exists()
     finally:
         reopened.close()
+
+
+def test_stale_instance_fails_closed_after_rotation(tmp_path: Path) -> None:
+    store1 = SecureStore(base_dir=tmp_path)
+    store2 = SecureStore(base_dir=tmp_path)
+    try:
+        store1.unlock()
+        store2.unlock()
+        store1.set("secret", "original_value")
+        assert store2.get("secret") == "original_value"
+
+        # Rotate key using store1
+        store1.rotate_master_key()
+        store1.set("secret", "updated_after_rotation")
+
+        # Stale store2 write must fail closed
+        with pytest.raises(RuntimeError, match="stale"):
+            store2.set("secret", "stale_write")
+
+        # Stale store2 read must fail closed
+        with pytest.raises(RuntimeError, match="stale"):
+            store2.get("secret")
+
+        # Value in store1 remains unchanged and uncorrupted
+        assert store1.get("secret") == "updated_after_rotation"
+
+        # After re-unlocking, store2 functions normally
+        store2.unlock()
+        assert store2.get("secret") == "updated_after_rotation"
+    finally:
+        store1.close()
+        store2.close()
+
+
+def test_rotation_prevents_unintended_mode_switch(tmp_path: Path) -> None:
+    store = SecureStore(base_dir=tmp_path)
+    try:
+        store.unlock()
+        store.set("key1", "val1")
+
+        # File-key store rotating to passphrase without allow_mode_switch must fail
+        with pytest.raises(ValueError, match="allow_mode_switch"):
+            store.rotate_master_key(new_passphrase="passphrase-1")
+
+        # With allow_mode_switch=True, it succeeds
+        store.rotate_master_key(
+            new_passphrase="passphrase-1", allow_mode_switch=True
+        )
+
+        # Passphrase store rotating without passphrase and allow_mode_switch fails
+        with pytest.raises(ValueError, match="allow_mode_switch"):
+            store.rotate_master_key()
+
+        # With allow_mode_switch=True, it converts back to file-key
+        store.rotate_master_key(allow_mode_switch=True)
+        assert store.get("key1") == "val1"
+    finally:
+        store.close()
+
+
+def test_tampered_acl_or_ciphertext_substitution_rejected(
+    tmp_path: Path,
+) -> None:
+    store = SecureStore(base_dir=tmp_path)
+    try:
+        store.unlock()
+        store.set("secret_a", "val_a", acl=["admin"])
+        store.set("secret_b", "val_b", acl=["guest"])
+
+        assert store.get("secret_a", caller="admin") == "val_a"
+        assert store.get("secret_b", caller="guest") == "val_b"
+
+        # 1. Tamper ACL in database: change secret_a ACL to guest directly in SQLite
+        store._conn.execute(
+            "UPDATE secrets SET acl = 'guest' WHERE name = 'secret_a'"
+        )
+        with pytest.raises(InvalidToken):
+            store.get("secret_a", caller="guest")
+
+        # Restore secret_a ACL
+        store._conn.execute(
+            "UPDATE secrets SET acl = 'admin' WHERE name = 'secret_a'"
+        )
+        assert store.get("secret_a", caller="admin") == "val_a"
+
+        # 2. Swap ciphertexts between secret_a and secret_b
+        row_b = store._conn.execute(
+            "SELECT ciphertext FROM secrets WHERE name = 'secret_b'"
+        ).fetchone()
+        store._conn.execute(
+            "UPDATE secrets SET ciphertext = ? WHERE name = 'secret_a'",
+            (row_b["ciphertext"],),
+        )
+
+        # secret_a now contains secret_b's ciphertext. Must fail envelope check!
+        with pytest.raises(InvalidToken):
+            store.get("secret_a", caller="admin")
+    finally:
+        store.close()
+
+
+def test_verify_integrity(tmp_path: Path) -> None:
+    store = SecureStore(base_dir=tmp_path)
+    try:
+        store.unlock()
+        store.set("k1", "v1")
+        store.set("k2", "v2", acl=["worker"])
+
+        # Intact store verifies successfully
+        assert store.verify_integrity() is True
+
+        # Tampering with key_check causes verify_integrity to raise InvalidToken
+        store._conn.execute(
+            "UPDATE store_meta SET value = ? WHERE key = 'key_check'",
+            (b"corrupted_marker",),
+        )
+        with pytest.raises(InvalidToken):
+            store.verify_integrity()
+    finally:
+        store.close()
+

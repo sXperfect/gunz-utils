@@ -11,6 +11,7 @@ Layout (per consumer)::
         master.key          Fernet key (mode 0600). File-mode only.
         master.salt         PBKDF2 salt (mode 0600). Passphrase-mode only.
         config.db           SQLite: encrypted secret rows + audit log.
+        .lock               Inter-process coordination lock (mode 0600).
 
 Two unlock modes::
 
@@ -21,6 +22,23 @@ Two unlock modes::
 Secrets are Fernet-encrypted (AES-128-CBC + HMAC-SHA256) at rest.
 Each secret has an optional ACL list of caller IDs permitted to
 read it (e.g. ``["mcp", "cli", "library"]``). Empty ACL = open access.
+
+Threat-model boundaries and assumptions:
+    - Caller identity (``caller`` parameter) is an application-level label,
+      not an authenticated cryptographic principal. In single-process or
+      untrusted caller environments, enforcement is cooperative.
+    - File-key mode assumes the storage directory and filesystem are trusted
+      up to OS user boundaries. Attackers with raw disk read access can
+      read ``master.key``. Passphrase mode derives keys via PBKDF2 with 600,000
+      iterations.
+    - In-process memory: Fernet key material and decrypted secrets reside in
+      process memory while unlocked. Memory scrubbing is bounded by Python's
+      runtime string/bytes lifecycle.
+    - Audit log entries record operations within SQLite but do not defend
+      against malicious local database truncation or deletion if an attacker
+      possesses write access to the SQLite file.
+    - Inter-process write coordination is enforced via kernel file locks
+      (``flock``) and transactional key-generation checks.
 
 Example (file mode)::
     >>> store = SecureStore()  # uses default ~/.config/<library>/
@@ -45,6 +63,8 @@ __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import base64
+import fcntl
+import json
 import os
 import re
 import sqlite3
@@ -67,6 +87,99 @@ _PBKDF2_ITERATIONS = 600_000  # OWASP 2023 recommendation for SHA-256
 _KEY_FILE_MODE = 0o600  # owner read/write only
 _DIR_MODE = 0o700
 _LIBRARY_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_RECORD_ENVELOPE_MAGIC = b"\x00GZENV1\x00"
+
+
+class _ReentrantFileLock:
+    """Inter-process and inter-thread file lock protecting store mutations."""
+
+    def __init__(self, lock_path: Path) -> None:
+        self._path = lock_path
+        self._thread_lock = threading.RLock()
+        self._depth = 0
+        self._fd: int = -1
+
+    def acquire(self) -> None:
+        self._thread_lock.acquire()
+        if self._depth == 0:
+            flags = os.O_RDWR | os.O_CREAT
+            if hasattr(os, "O_CLOEXEC"):
+                flags |= os.O_CLOEXEC
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            self._fd = os.open(self._path, flags, _KEY_FILE_MODE)
+            try:
+                if os.name == "posix":
+                    os.fchmod(self._fd, _KEY_FILE_MODE)
+                fcntl.flock(self._fd, fcntl.LOCK_EX)
+            except BaseException:
+                os.close(self._fd)
+                self._fd = -1
+                self._thread_lock.release()
+                raise
+        self._depth += 1
+
+    def release(self) -> None:
+        if self._depth == 0:
+            raise RuntimeError("Cannot release un-acquired file lock")
+        self._depth -= 1
+        if self._depth == 0:
+            fd = self._fd
+            self._fd = -1
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        self._thread_lock.release()
+
+    def __enter__(self) -> _ReentrantFileLock:
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.release()
+
+
+def _pack_envelope(name: str, acl_str: str, payload: bytes) -> bytes:
+    """Wrap raw secret payload with authenticated record binding metadata."""
+    envelope = {
+        "name": name,
+        "acl": acl_str,
+        "payload": base64.b64encode(payload).decode("ascii"),
+    }
+    encoded = json.dumps(envelope, separators=(",", ":"), sort_keys=True).encode(
+        "utf-8"
+    )
+    return _RECORD_ENVELOPE_MAGIC + encoded
+
+
+def _unpack_envelope(
+    raw: bytes, *, expected_name: str, expected_acl: str
+) -> bytes:
+    """Unpack payload and verify integrity binding against expected metadata."""
+    if not raw.startswith(_RECORD_ENVELOPE_MAGIC):
+        # Backward-compatible handling of legacy un-enveloped secrets
+        return raw
+
+    envelope_bytes = raw[len(_RECORD_ENVELOPE_MAGIC) :]
+    try:
+        data = json.loads(envelope_bytes.decode("utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("Invalid envelope payload structure")
+        record_name = data.get("name")
+        record_acl = data.get("acl")
+        b64_payload = data.get("payload")
+        if not isinstance(record_name, str) or not isinstance(record_acl, str):
+            raise ValueError("Malformed envelope metadata types")
+        if record_name != expected_name or record_acl != expected_acl:
+            raise InvalidToken("record envelope binding mismatch")
+        if not isinstance(b64_payload, str):
+            raise ValueError("Malformed envelope payload type")
+        return base64.b64decode(b64_payload.encode("ascii"))
+    except InvalidToken:
+        raise
+    except Exception as exc:
+        raise InvalidToken("Malformed record envelope") from exc
 
 
 def default_base_dir(library_name: str) -> Path:
@@ -142,9 +255,13 @@ class SecureStore:
         self._pending_salt_path = self._base_dir / ".master.salt.pending"
         self._db_path = self._base_dir / "config.db"
         self._prepare_private_database(self._db_path)
+        self._lock_path = self._base_dir / ".lock"
+        self._coordination_lock = _ReentrantFileLock(self._lock_path)
         self._lock = threading.RLock()
         self._fernet_lock = self._lock
         self._fernet: Fernet | None = None
+        self._key_generation: int = 0
+        self._passphrase_mode: bool = False
         self._conn = sqlite3.connect(
             str(self._db_path),
             check_same_thread=False,
@@ -389,16 +506,48 @@ class SecureStore:
         if row is not None:
             if fernet.decrypt(row["value"]) != b"gunz-utils-secure-store-v1":
                 raise InvalidToken
-            return
-        secret = self._conn.execute(
-            "SELECT ciphertext FROM secrets LIMIT 1"
+        else:
+            secret = self._conn.execute(
+                "SELECT ciphertext FROM secrets LIMIT 1"
+            ).fetchone()
+            if secret is not None:
+                fernet.decrypt(secret["ciphertext"])
+            token = fernet.encrypt(b"gunz-utils-secure-store-v1")
+            self._conn.execute(
+                "INSERT INTO store_meta(key, value) VALUES ('key_check', ?)",
+                (token,),
+            )
+
+        gen_row = self._conn.execute(
+            "SELECT value FROM store_meta WHERE key = 'key_generation'"
         ).fetchone()
-        if secret is not None:
-            fernet.decrypt(secret["ciphertext"])
-        token = fernet.encrypt(b"gunz-utils-secure-store-v1")
-        self._conn.execute(
-            "INSERT INTO store_meta(key, value) VALUES ('key_check', ?)", (token,)
-        )
+        if gen_row is not None:
+            try:
+                self._key_generation = int(gen_row["value"].decode("ascii"))
+            except (ValueError, UnicodeDecodeError):
+                self._key_generation = 1
+        else:
+            self._key_generation = 1
+            self._conn.execute(
+                "INSERT OR REPLACE INTO store_meta(key, value) "
+                "VALUES ('key_generation', ?)",
+                (b"1",),
+            )
+
+    def _verify_key_generation(self) -> None:
+        """Verify this store instance's key matches current database key generation."""
+        gen_row = self._conn.execute(
+            "SELECT value FROM store_meta WHERE key = 'key_generation'"
+        ).fetchone()
+        if gen_row is not None:
+            try:
+                persisted_gen = int(gen_row["value"].decode("ascii"))
+            except (ValueError, UnicodeDecodeError):
+                persisted_gen = 1
+            if persisted_gen != self._key_generation:
+                raise RuntimeError(
+                    "Store key is stale; master key was rotated. Call unlock() again."
+                )
 
     def unlock(self, passphrase: str | None = None) -> None:
         """Unlock the store, recovering interrupted key publication if needed."""
@@ -471,6 +620,7 @@ class SecureStore:
                     continue
 
                 self._fernet = candidate
+                self._passphrase_mode = passphrase is not None
                 if pending:
                     self._promote_pending_key_material(
                         passphrase_mode=passphrase is not None,
@@ -511,18 +661,20 @@ class SecureStore:
     @contextmanager
     def _transaction_locked(self) -> Iterator[None]:
         """Join an active transaction or own one for this mutation."""
-        started = not self._conn.in_transaction
-        if started:
-            self._conn.execute("BEGIN IMMEDIATE")
-        try:
-            yield
-        except BaseException:
-            if started and self._conn.in_transaction:
-                self._conn.execute("ROLLBACK")
-            raise
-        else:
+        with self._coordination_lock:
+            self._verify_key_generation()
+            started = not self._conn.in_transaction
             if started:
-                self._conn.execute("COMMIT")
+                self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                yield
+            except BaseException:
+                if started and self._conn.in_transaction:
+                    self._conn.execute("ROLLBACK")
+                raise
+            else:
+                if started:
+                    self._conn.execute("COMMIT")
 
     def set(
         self,
@@ -568,7 +720,8 @@ class SecureStore:
                         acl_str = ",".join(acl) if acl else ""
 
                     payload = value.encode() if isinstance(value, str) else value
-                    ciphertext = self._fernet.encrypt(payload)
+                    enveloped = _pack_envelope(name, acl_str, payload)
+                    ciphertext = self._fernet.encrypt(enveloped)
                     now = time.time()
                     self._conn.execute(
                         """
@@ -596,20 +749,25 @@ class SecureStore:
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
+            self._verify_key_generation()
             row = self._conn.execute(
                 "SELECT ciphertext, acl FROM secrets WHERE name = ?", (name,)
             ).fetchone()
             if row is None:
                 self._audit(caller, "get", name, False)
                 return None
-            acl = [s for s in (row["acl"] or "").split(",") if s]
+            acl_str = row["acl"] or ""
+            acl = [s for s in acl_str.split(",") if s]
             if acl and caller not in acl:
                 self._audit(caller, "get", name, False)
                 raise PermissionError(
                     f"Caller {caller!r} not in ACL {acl} for secret {name!r}"
                 )
             try:
-                plaintext = self._fernet.decrypt(row["ciphertext"])
+                raw_payload = self._fernet.decrypt(row["ciphertext"])
+                plaintext = _unpack_envelope(
+                    raw_payload, expected_name=name, expected_acl=acl_str
+                )
             except InvalidToken:
                 self._audit(caller, "get", name, False)
                 raise
@@ -737,64 +895,153 @@ class SecureStore:
             )
         return out
 
-    def rotate_master_key(self, new_passphrase: str | None = None) -> None:
-        """Re-encrypt secrets with crash-recoverable key publication."""
+    def rotate_master_key(
+        self,
+        new_passphrase: str | None = None,
+        *,
+        allow_mode_switch: bool = False,
+    ) -> None:
+        """Re-encrypt secrets with crash-recoverable key publication.
+
+        Parameters
+        ----------
+        new_passphrase : str | None
+            New master passphrase if using passphrase mode, or None for file-key mode.
+        allow_mode_switch : bool
+            Must be explicitly set to True when transitioning between file-key mode
+            and passphrase mode, preventing accidental protection-mode downgrades.
+        """
         if new_passphrase is not None and (
             not isinstance(new_passphrase, str) or not new_passphrase
         ):
             raise ValueError("new_passphrase must be a non-empty string or None")
+        if not isinstance(allow_mode_switch, bool):
+            raise ValueError("allow_mode_switch must be a bool")
 
         with self._lock:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
 
-            self._cleanup_pending_key_material()
-            old_fernet = self._fernet
-            if new_passphrase is None:
-                new_key = Fernet.generate_key()
-                self._write_private(self._pending_key_path, new_key)
-            else:
-                new_salt = os.urandom(16)
-                new_key = self._derive_key(new_passphrase, new_salt)
-                self._write_private(self._pending_salt_path, new_salt)
-
-            new_fernet = Fernet(new_key)
-            rows = self._conn.execute(
-                "SELECT name, ciphertext FROM secrets"
-            ).fetchall()
-            rewritten = [
-                (
-                    new_fernet.encrypt(
-                        old_fernet.decrypt(row["ciphertext"])
-                    ),
-                    row["name"],
-                )
-                for row in rows
-            ]
-            check = new_fernet.encrypt(b"gunz-utils-secure-store-v1")
-
-            try:
-                self._conn.execute("BEGIN IMMEDIATE")
-                self._conn.executemany(
-                    "UPDATE secrets SET ciphertext = ? WHERE name = ?",
-                    rewritten,
-                )
-                self._conn.execute(
-                    "INSERT OR REPLACE INTO store_meta(key, value) "
-                    "VALUES ('key_check', ?)",
-                    (check,),
-                )
-                self._conn.execute("COMMIT")
-            except BaseException:
-                if self._conn.in_transaction:
-                    self._conn.execute("ROLLBACK")
-                self._cleanup_pending_key_material()
-                raise
-
-            self._fernet = new_fernet
-            self._promote_pending_key_material(
-                passphrase_mode=new_passphrase is not None,
+            current_is_passphrase = (
+                self._salt_path.exists()
+                or self._pending_salt_path.exists()
+                or self._passphrase_mode
             )
+            target_is_passphrase = new_passphrase is not None
+
+            if (
+                current_is_passphrase
+                and not target_is_passphrase
+                and not allow_mode_switch
+            ):
+                raise ValueError(
+                    "Cannot downgrade passphrase-protected store to file-key mode "
+                    "without allow_mode_switch=True"
+                )
+            if (
+                not current_is_passphrase
+                and target_is_passphrase
+                and not allow_mode_switch
+            ):
+                raise ValueError(
+                    "Cannot convert file-key store to passphrase-protected mode "
+                    "without allow_mode_switch=True"
+                )
+
+            with self._coordination_lock:
+                self._verify_key_generation()
+                self._cleanup_pending_key_material()
+                old_fernet = self._fernet
+                if new_passphrase is None:
+                    new_key = Fernet.generate_key()
+                    self._write_private(self._pending_key_path, new_key)
+                else:
+                    new_salt = os.urandom(16)
+                    new_key = self._derive_key(new_passphrase, new_salt)
+                    self._write_private(self._pending_salt_path, new_salt)
+
+                new_fernet = Fernet(new_key)
+
+                try:
+                    self._conn.execute("BEGIN IMMEDIATE")
+                    self._verify_key_generation()
+                    rows = self._conn.execute(
+                        "SELECT name, ciphertext, acl FROM secrets"
+                    ).fetchall()
+
+                    rewritten: list[tuple[bytes, str]] = []
+                    for row in rows:
+                        name = row["name"]
+                        acl_str = row["acl"] or ""
+                        raw_payload = old_fernet.decrypt(row["ciphertext"])
+                        plaintext = _unpack_envelope(
+                            raw_payload, expected_name=name, expected_acl=acl_str
+                        )
+                        new_enveloped = _pack_envelope(name, acl_str, plaintext)
+                        rewritten.append((new_fernet.encrypt(new_enveloped), name))
+
+                    check = new_fernet.encrypt(b"gunz-utils-secure-store-v1")
+                    new_gen = self._key_generation + 1
+                    new_gen_bytes = str(new_gen).encode("ascii")
+
+                    self._conn.executemany(
+                        "UPDATE secrets SET ciphertext = ? WHERE name = ?",
+                        rewritten,
+                    )
+                    self._conn.execute(
+                        "INSERT OR REPLACE INTO store_meta(key, value) "
+                        "VALUES ('key_check', ?)",
+                        (check,),
+                    )
+                    self._conn.execute(
+                        "INSERT OR REPLACE INTO store_meta(key, value) "
+                        "VALUES ('key_generation', ?)",
+                        (new_gen_bytes,),
+                    )
+                    self._conn.execute("COMMIT")
+                except BaseException:
+                    if self._conn.in_transaction:
+                        self._conn.execute("ROLLBACK")
+                    self._cleanup_pending_key_material()
+                    raise
+
+                self._fernet = new_fernet
+                self._key_generation = new_gen
+                self._passphrase_mode = target_is_passphrase
+                self._promote_pending_key_material(
+                    passphrase_mode=target_is_passphrase,
+                )
+
+    def verify_integrity(self) -> bool:
+        """Verify the store key and secret record envelope bindings.
+
+        Returns True if all record envelopes and the key-check marker are intact.
+        Raises InvalidToken if tampering or key mismatch is detected.
+        """
+        with self._lock:
+            if self._fernet is None:
+                raise RuntimeError("Store is locked. Call unlock() first.")
+            self._verify_key_generation()
+            row = self._conn.execute(
+                "SELECT value FROM store_meta WHERE key = 'key_check'"
+            ).fetchone()
+            if (
+                row is None
+                or self._fernet.decrypt(row["value"]) != b"gunz-utils-secure-store-v1"
+            ):
+                raise InvalidToken("Key check marker invalid or missing")
+
+            rows = self._conn.execute(
+                "SELECT name, ciphertext, acl FROM secrets"
+            ).fetchall()
+            for r in rows:
+                name = r["name"]
+                acl_str = r["acl"] or ""
+                raw_payload = self._fernet.decrypt(r["ciphertext"])
+                _unpack_envelope(
+                    raw_payload, expected_name=name, expected_acl=acl_str
+                )
+            return True
 
     def lock(self) -> None:
         """Atomically clear the Fernet instance. Thread-safe."""

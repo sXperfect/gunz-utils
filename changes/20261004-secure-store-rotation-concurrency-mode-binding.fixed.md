@@ -1,0 +1,3 @@
+- Coordinate `SecureStore` key rotation with inter-process file locks, immediate transactions, and key generation verification (`A12-SS-01`).
+- Require `allow_mode_switch=True` during `SecureStore.rotate_master_key()` to prevent unintended passphrase downgrade or conversion (`A12-SS-02`).
+- Bind record name and ACL to Fernet ciphertexts using authenticated record envelopes, preventing ciphertext substitution or ACL tampering (`A12-SS-03`).
