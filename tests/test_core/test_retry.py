@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import unittest
 
 from gunz_utils.retry import async_retry, retry
@@ -53,3 +54,51 @@ class TestAsyncRetry(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError):
             await work()
         self.assertEqual(calls, 1)
+
+    async def test_async_retry_aborts_when_timeout_expires_during_hook(self) -> None:
+        calls = 0
+
+        def slow_hook(exc: BaseException, attempt: int, delay: float) -> None:
+            time.sleep(0.02)
+
+        @async_retry(
+            attempts=3,
+            base_delay=0,
+            timeout=0.01,
+            jitter=False,
+            on_retry=slow_hook,
+        )
+        async def work() -> None:
+            nonlocal calls
+            calls += 1
+            raise ValueError("boom")
+
+        with self.assertRaises(ValueError):
+            await work()
+        self.assertEqual(calls, 1)
+
+
+def slow_hook_sync(exc: BaseException, attempt: int, delay: float) -> None:
+    time.sleep(0.02)
+
+
+class TestRetryTimeout(unittest.TestCase):
+    def test_sync_retry_aborts_when_timeout_expires_during_hook(self) -> None:
+        calls = 0
+
+        @retry(
+            attempts=3,
+            base_delay=0,
+            timeout=0.01,
+            jitter=False,
+            on_retry=slow_hook_sync,
+        )
+        def work() -> None:
+            nonlocal calls
+            calls += 1
+            raise ValueError("boom")
+
+        with self.assertRaises(ValueError):
+            work()
+        self.assertEqual(calls, 1)
+

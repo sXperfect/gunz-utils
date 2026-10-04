@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from typing import Any
@@ -65,6 +66,45 @@ class TestRetryPolicy(unittest.TestCase):
             )
         self.assertEqual(calls, 1)
 
+    def test_sync_retry_aborts_when_timeout_expires_during_hook(self) -> None:
+        calls = 0
+
+        def work() -> None:
+            nonlocal calls
+            calls += 1
+            raise ValueError("boom")
+
+        with self.assertRaises(ValueError):
+            run_with_retry(
+                work,
+                RetryPolicy(attempts=3, base_delay=0, timeout=0.01),
+                on_retry=lambda event: time.sleep(0.02),
+            )
+        self.assertEqual(calls, 1)
+
+    def test_sync_result_retry_returns_when_timeout_expires_during_hook(
+        self,
+    ) -> None:
+        calls = 0
+
+        def work() -> str:
+            nonlocal calls
+            calls += 1
+            return "retry_me"
+
+        result = run_with_retry(
+            work,
+            RetryPolicy(
+                attempts=3,
+                base_delay=0,
+                timeout=0.01,
+                retry_if_result=lambda val: val == "retry_me",
+            ),
+            on_retry=lambda event: time.sleep(0.02),
+        )
+        self.assertEqual(result, "retry_me")
+        self.assertEqual(calls, 1)
+
 
 class TestAsyncRetryPolicy(unittest.IsolatedAsyncioTestCase):
     async def test_async_result_retry(self) -> None:
@@ -93,6 +133,45 @@ class TestAsyncRetryPolicy(unittest.IsolatedAsyncioTestCase):
                 work,
                 RetryPolicy(attempts=3, base_delay=0),
             )
+
+    async def test_async_retry_aborts_when_timeout_expires_during_hook(self) -> None:
+        calls = 0
+
+        async def work() -> None:
+            nonlocal calls
+            calls += 1
+            raise ValueError("boom")
+
+        with self.assertRaises(ValueError):
+            await async_run_with_retry(
+                work,
+                RetryPolicy(attempts=3, base_delay=0, timeout=0.01),
+                on_retry=lambda event: time.sleep(0.02),
+            )
+        self.assertEqual(calls, 1)
+
+    async def test_async_result_retry_returns_when_timeout_expires_during_hook(
+        self,
+    ) -> None:
+        calls = 0
+
+        async def work() -> str:
+            nonlocal calls
+            calls += 1
+            return "retry_me"
+
+        result = await async_run_with_retry(
+            work,
+            RetryPolicy(
+                attempts=3,
+                base_delay=0,
+                timeout=0.01,
+                retry_if_result=lambda val: val == "retry_me",
+            ),
+            on_retry=lambda event: time.sleep(0.02),
+        )
+        self.assertEqual(result, "retry_me")
+        self.assertEqual(calls, 1)
 
 
 class TestStreamingWriters(unittest.TestCase):

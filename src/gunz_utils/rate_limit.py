@@ -12,7 +12,7 @@ class AsyncRateLimiter:
 
     def __init__(self, rate: float, *, capacity: float | None = None) -> None:
         self.rate = self._finite_positive(rate, name="rate")
-        raw_capacity = self.rate if capacity is None else capacity
+        raw_capacity = max(1.0, self.rate) if capacity is None else capacity
         self.capacity = self._finite_positive(raw_capacity, name="capacity")
         self._tokens = self.capacity
         self._updated = time.monotonic()
@@ -50,13 +50,21 @@ class AsyncRateLimiter:
         ):
             raise ValueError("timeout must be a finite non-negative number or None")
         deadline = None if timeout is None else time.monotonic() + timeout
+        first_attempt = True
         while True:
             async with self._lock:
                 self._refill()
                 if self._tokens >= tokens:
+                    if (
+                        not first_attempt
+                        and deadline is not None
+                        and time.monotonic() > deadline
+                    ):
+                        raise TimeoutError("rate-limit acquisition timed out")
                     self._tokens -= tokens
                     return
                 wait = (tokens - self._tokens) / self.rate
+            first_attempt = False
             if deadline is not None:
                 budget = deadline - time.monotonic()
                 if budget <= 0 or wait > budget:

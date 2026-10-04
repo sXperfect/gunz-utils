@@ -194,6 +194,8 @@ def run_with_retry(
                     )
                 )
             time.sleep(delay)
+            if deadline is not None and time.monotonic() > deadline:
+                raise
             continue
 
         should_retry = (
@@ -217,6 +219,8 @@ def run_with_retry(
                 )
             )
         time.sleep(delay)
+        if deadline is not None and time.monotonic() > deadline:
+            return result
     raise RuntimeError("unreachable")
 
 
@@ -256,6 +260,8 @@ async def async_run_with_retry(
                     )
                 )
             await asyncio.sleep(delay)
+            if deadline is not None and time.monotonic() > deadline:
+                raise
             continue
 
         should_retry = (
@@ -279,6 +285,8 @@ async def async_run_with_retry(
                 )
             )
         await asyncio.sleep(delay)
+        if deadline is not None and time.monotonic() > deadline:
+            return result
     raise RuntimeError("unreachable")
 
 
@@ -321,6 +329,8 @@ def retry(
                     if on_retry is not None:
                         on_retry(exc, attempt, delay)
                     time.sleep(delay)
+                    if deadline is not None and time.monotonic() > deadline:
+                        raise
             raise RuntimeError("unreachable")
 
         return wrapped
@@ -369,6 +379,8 @@ def async_retry(
                     if on_retry is not None:
                         on_retry(exc, attempt, delay)
                     await asyncio.sleep(delay)
+                    if deadline is not None and time.monotonic() > deadline:
+                        raise
             raise RuntimeError("unreachable")
 
         return wrapped

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 import unittest
+from unittest.mock import patch
 
 from gunz_utils.cache import CacheInfo, ttl_cache
 from gunz_utils.concurrency import map_unordered
@@ -154,3 +155,49 @@ class TestAsyncResilience(unittest.IsolatedAsyncioTestCase):
             with self.subTest(timeout=value):
                 with self.assertRaises(ValueError):
                     await limiter.acquire(timeout=value)
+
+    async def test_fractional_rate_defaults_capacity_to_at_least_one(self) -> None:
+        limiter = AsyncRateLimiter(0.5)
+        self.assertEqual(limiter.capacity, 1.0)
+        self.assertEqual(limiter.rate, 0.5)
+        # Verify default acquire() and context manager entry succeed
+        await limiter.acquire()
+        self.assertLess(limiter.available_tokens, 1.0)
+
+        async with AsyncRateLimiter(0.2) as ctx_limiter:
+            self.assertEqual(ctx_limiter.capacity, 1.0)
+
+    async def test_explicit_fractional_capacity_preserved(self) -> None:
+        limiter = AsyncRateLimiter(0.5, capacity=0.5)
+        self.assertEqual(limiter.capacity, 0.5)
+        with self.assertRaises(ValueError):
+            await limiter.try_acquire(1.0)
+        self.assertTrue(await limiter.try_acquire(0.5))
+
+    async def test_acquire_deadline_enforced_on_wakeup(self) -> None:
+        limiter = AsyncRateLimiter(10, capacity=1)
+        await limiter.acquire(1.0)
+        limiter._tokens = 0.0
+
+        current_time = [100.0]
+
+        def fake_monotonic() -> float:
+            return current_time[0]
+
+        async def fake_sleep(duration: float) -> None:
+            current_time[0] += 0.05
+
+        with (
+            patch("gunz_utils.rate_limit.time.monotonic", side_effect=fake_monotonic),
+            patch("gunz_utils.rate_limit.asyncio.sleep", side_effect=fake_sleep),
+        ):
+            with self.assertRaises(TimeoutError):
+                await limiter.acquire(0.2, timeout=0.03)
+
+    async def test_acquire_zero_timeout_non_blocking(self) -> None:
+        limiter = AsyncRateLimiter(10, capacity=1)
+        # Immediate success when tokens available
+        await limiter.acquire(1.0, timeout=0.0)
+        # Immediate TimeoutError when exhausted
+        with self.assertRaises(TimeoutError):
+            await limiter.acquire(1.0, timeout=0.0)
