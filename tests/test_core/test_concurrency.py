@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import unittest
-import warnings
+from typing import Any
 
 from gunz_utils.concurrency import gather_limited, map_concurrent, map_unordered
 
@@ -126,35 +127,42 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
     async def test_map_unordered_sibling_exceptions_observed_without_warning(
         self,
     ) -> None:
+        loop = asyncio.get_running_loop()
+        old_handler = loop.get_exception_handler()
+        captured_contexts: list[dict[str, Any]] = []
+
+        def custom_handler(
+            _loop: asyncio.AbstractEventLoop, context: dict[str, Any]
+        ) -> None:
+            captured_contexts.append(context)
+
+        loop.set_exception_handler(custom_handler)
         barrier = asyncio.Event()
 
         async def fail_together(val: int) -> int:
             await barrier.wait()
             raise RuntimeError(f"error_{val}")
 
-        async def run_collector() -> list[int]:
-            return [
-                res
-                async for res in map_unordered(
-                    fail_together, [1, 2], limit=2
-                )
-            ]
+        gen = map_unordered(fail_together, [1, 2], limit=2)
+        iter_task = asyncio.create_task(gen.__anext__())
+        await asyncio.sleep(0)
+        barrier.set()
 
-        with warnings.catch_warnings(record=True) as recorded_warnings:
-            warnings.simplefilter("always")
-            task = asyncio.create_task(run_collector())
-            await asyncio.sleep(0.01)
-            barrier.set()
+        try:
             with self.assertRaises(RuntimeError):
-                await task
-            await asyncio.sleep(0.05)
+                await iter_task
+        finally:
+            await gen.aclose()
+            gc.collect()
+            await asyncio.sleep(0)
+            loop.set_exception_handler(old_handler)
 
-        unretrieved_warnings = [
-            w
-            for w in recorded_warnings
-            if "was never retrieved" in str(w.message)
+        unretrieved = [
+            ctx
+            for ctx in captured_contexts
+            if "was never retrieved" in str(ctx.get("message", ""))
         ]
-        self.assertEqual(unretrieved_warnings, [])
+        self.assertEqual(unretrieved, [])
 
     async def test_map_unordered_early_break_cancels_active(self) -> None:
         cancelled = False

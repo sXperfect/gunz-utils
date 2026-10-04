@@ -6,7 +6,7 @@ import asyncio
 import inspect
 import math
 import time
-from collections.abc import Callable, Mapping, MutableMapping, Sequence
+from collections.abc import Callable, Coroutine, Mapping, MutableMapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any
@@ -326,9 +326,14 @@ class WorkflowDAG:
                 pass
 
         if timed_out:
+            join_timeout = (
+                min(0.05, max(0.005, effective_timeout * 0.5))
+                if effective_timeout is not None
+                else 0.05
+            )
             try:
-                await asyncio.wait_for(rollback_task, timeout=0.1)
-            except (TimeoutError, asyncio.CancelledError, Exception):
+                await asyncio.wait([rollback_task], timeout=join_timeout)
+            except asyncio.CancelledError:
                 pass
             errors: list[tuple[str, BaseException]] = [
                 (
@@ -345,6 +350,15 @@ class WorkflowDAG:
                         errors.extend(res)
                 except Exception:
                     pass
+            elif not rollback_task.done():
+                errors.append(
+                    (
+                        "rollback_unfinished",
+                        RuntimeError(
+                            "rollback task did not terminate within cleanup deadline"
+                        ),
+                    )
+                )
             return errors
 
         if rollback_task.cancelled():
@@ -549,11 +563,16 @@ class WorkflowDAG:
                 raise
 
         setup_ok = False
+        coro: Coroutine[Any, Any, None] | None = None
         try:
             for name in self.stages:
-                tasks.append(asyncio.create_task(run_stage(name)))
+                coro = run_stage(name)
+                tasks.append(asyncio.create_task(coro))
+                coro = None
             setup_ok = True
         except BaseException:
+            if coro is not None:
+                coro.close()
             cancel_event.set()
             for t in tasks:
                 if not t.done():

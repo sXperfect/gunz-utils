@@ -53,6 +53,47 @@ class TestCircuitBreaker(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(CircuitOpenError):
             await breaker.call(fail)
 
+    async def test_half_open_probe_failure_predicate_exception_releases_flag(
+        self,
+    ) -> None:
+        def predicate(exc: BaseException) -> bool:
+            if isinstance(exc, ValueError):
+                return True
+            raise RuntimeError("predicate raised unexpected error")
+
+        breaker = AsyncCircuitBreaker(
+            failure_threshold=1,
+            recovery_timeout=0.01,
+            failure_predicate=predicate,
+        )
+
+        async def initial_failure() -> None:
+            raise ValueError("first error")
+
+        with self.assertRaises(ValueError):
+            await breaker.call(initial_failure)
+
+        self.assertEqual(breaker.state, CircuitState.OPEN)
+        await asyncio.sleep(0.015)
+        self.assertEqual(breaker.state, CircuitState.HALF_OPEN)
+
+        async def probe_failure() -> None:
+            raise TypeError("unexpected probe error")
+
+        with self.assertRaises(RuntimeError) as cm:
+            await breaker.call(probe_failure)
+
+        self.assertIsInstance(cm.exception.__cause__, TypeError)
+
+        await asyncio.sleep(0.015)
+        self.assertEqual(breaker.state, CircuitState.HALF_OPEN)
+
+        async def healthy() -> str:
+            return "recovered"
+
+        self.assertEqual(await breaker.call(healthy), "recovered")
+        self.assertEqual(breaker.state, CircuitState.CLOSED)
+
 
 class TestBulkhead(unittest.IsolatedAsyncioTestCase):
     async def test_bounds_concurrency(self) -> None:

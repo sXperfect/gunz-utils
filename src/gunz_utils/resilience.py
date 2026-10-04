@@ -72,31 +72,46 @@ class AsyncCircuitBreaker:
                 if self._half_open_in_flight:
                     raise CircuitOpenError("half-open probe already in flight")
                 self._half_open_in_flight = True
+                is_half_open_probe = True
+            else:
+                is_half_open_probe = False
 
         try:
-            result = await operation()
-        except asyncio.CancelledError:
-            if state is CircuitState.HALF_OPEN:
-                async with self._lock:
-                    self._half_open_in_flight = False
-            raise
-        except Exception as exc:
-            if self.failure_predicate is not None and not self.failure_predicate(exc):
-                async with self._lock:
-                    self._half_open_in_flight = False
+            try:
+                result = await operation()
+            except asyncio.CancelledError:
                 raise
-            async with self._lock:
-                self._failures += 1
-                if self._failures >= self.failure_threshold:
-                    self._opened_at = time.monotonic()
-                self._half_open_in_flight = False
-            raise
-        else:
-            async with self._lock:
-                self._failures = 0
-                self._opened_at = None
-                self._half_open_in_flight = False
-            return result
+            except BaseException as exc:
+                predicate_exc: Exception | None = None
+                is_failure = True
+                if self.failure_predicate is not None:
+                    try:
+                        is_failure = bool(self.failure_predicate(exc))
+                    except Exception as p_exc:
+                        predicate_exc = p_exc
+                        is_failure = True
+
+                async with self._lock:
+                    if is_failure:
+                        self._failures += 1
+                        if (
+                            self._failures >= self.failure_threshold
+                            or is_half_open_probe
+                        ):
+                            self._opened_at = time.monotonic()
+
+                if predicate_exc is not None:
+                    raise predicate_exc from exc
+                raise
+            else:
+                async with self._lock:
+                    self._failures = 0
+                    self._opened_at = None
+                return result
+        finally:
+            if is_half_open_probe:
+                async with self._lock:
+                    self._half_open_in_flight = False
 
 
 class AsyncBulkhead:

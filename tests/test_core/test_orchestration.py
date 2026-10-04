@@ -6,6 +6,7 @@ import asyncio
 import math
 import time
 import unittest
+import warnings
 
 from gunz_utils.dag import WorkflowDAG, WorkflowExecutionError, WorkflowStage
 from gunz_utils.limits import BudgetExceededError, Limits, ResourceBudget
@@ -787,21 +788,70 @@ class TestWorkflowDAGAsyncAndCompensation(unittest.IsolatedAsyncioTestCase):
             nonlocal task_count
             task_count += 1
             if task_count == 2:
-                if hasattr(coro, "close"):
-                    coro.close()
+                # Deliberately does NOT close coro - production code must close it!
                 raise RuntimeError("simulated task creation failure")
             return original_create_task(coro, *args, **kwargs)  # type: ignore[arg-type]
 
-        asyncio.create_task = failing_create_task  # type: ignore[assignment]
-        try:
-            with self.assertRaises(RuntimeError) as cm:
-                await dag.async_execute()
-            self.assertEqual(str(cm.exception), "simulated task creation failure")
-        finally:
-            asyncio.create_task = original_create_task  # type: ignore[assignment]
+        with warnings.catch_warnings(record=True) as recorded_warnings:
+            warnings.simplefilter("always")
+            asyncio.create_task = failing_create_task  # type: ignore[assignment]
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    await dag.async_execute()
+                self.assertEqual(
+                    str(cm.exception), "simulated task creation failure"
+                )
+            finally:
+                asyncio.create_task = original_create_task  # type: ignore[assignment]
 
-        await asyncio.sleep(0.02)
-        self.assertFalse(stage1_ran)
+            await asyncio.sleep(0.02)
+            self.assertFalse(stage1_ran)
+            unawaited_warnings = [
+                w
+                for w in recorded_warnings
+                if "was never awaited" in str(w.message)
+            ]
+            self.assertEqual(unawaited_warnings, [])
+
+    async def test_async_execute_rollback_timeout_bounds_resistant_compensator(
+        self,
+    ) -> None:
+        released = asyncio.Event()
+
+        async def stage_1(_deps: dict[str, object]) -> str:
+            return "res_1"
+
+        async def stubborn_comp(_out: object) -> None:
+            while not released.is_set():
+                try:
+                    await released.wait()
+                except asyncio.CancelledError:
+                    pass  # suppress cancellation
+
+        async def stage_2(_deps: dict[str, object]) -> str:
+            raise RuntimeError("stage 2 failed")
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, compensate=stubborn_comp),
+                WorkflowStage("s2", stage_2, dependencies=("s1",)),
+            ],
+            rollback_timeout=0.02,
+        )
+
+        start = time.monotonic()
+        try:
+            with self.assertRaises(WorkflowExecutionError) as cm:
+                await dag.async_execute()
+            elapsed = time.monotonic() - start
+            self.assertLess(elapsed, 0.1)
+            errors = cm.exception.compensation_errors
+            error_names = [name for name, _ in errors]
+            self.assertIn("rollback_timeout", error_names)
+            self.assertIn("rollback_unfinished", error_names)
+        finally:
+            released.set()
+            await asyncio.sleep(0.01)
 
 
 
