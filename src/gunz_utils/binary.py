@@ -35,11 +35,15 @@ class ByteReader:
         return len(self.data) - self.offset
 
     def read(self, size: int) -> memoryview:
+        if isinstance(size, bool) or not isinstance(size, int):
+            raise TypeError("read size must be an integer")
         if size < 0 or size > self.remaining:
             raise EOFError("binary read exceeds available data")
         start = self.offset
-        self.offset += size
-        return self.data[start:self.offset]
+        end = start + size
+        chunk = self.data[start:end]
+        self.offset = end
+        return chunk
 
     def read_uvarint(self) -> int:
         """Read a canonical unsigned 64-bit varint transactionally."""

@@ -220,8 +220,18 @@ class WorkflowDAG:
             if stage.compensate is not None:
                 try:
                     res = stage.compensate(outputs.get(name))
-                    if inspect.iscoroutine(res):
-                        res.close()
+                    if inspect.isawaitable(res):
+                        if inspect.iscoroutine(res):
+                            res.close()
+                        errors.append(
+                            (
+                                name,
+                                TypeError(
+                                    f"asynchronous compensation for stage {name!r} "
+                                    "cannot be executed during synchronous rollback"
+                                ),
+                            )
+                        )
                 except BaseException as exc:
                     errors.append((name, exc))
         return errors

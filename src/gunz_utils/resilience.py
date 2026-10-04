@@ -51,6 +51,7 @@ class AsyncCircuitBreaker:
         self._failures = 0
         self._opened_at: float | None = None
         self._half_open_in_flight = False
+        self._generation = 0
         self._lock = asyncio.Lock()
 
     @property
@@ -75,6 +76,7 @@ class AsyncCircuitBreaker:
                 is_half_open_probe = True
             else:
                 is_half_open_probe = False
+            admitted_generation = self._generation
 
         try:
             try:
@@ -93,20 +95,32 @@ class AsyncCircuitBreaker:
 
                 async with self._lock:
                     if is_failure:
-                        self._failures += 1
-                        if (
-                            self._failures >= self.failure_threshold
-                            or is_half_open_probe
-                        ):
+                        if is_half_open_probe:
+                            self._failures += 1
                             self._opened_at = time.monotonic()
+                            self._generation += 1
+                        elif (
+                            self._generation == admitted_generation
+                            and self._opened_at is None
+                        ):
+                            self._failures += 1
+                            if self._failures >= self.failure_threshold:
+                                self._opened_at = time.monotonic()
+                                self._generation += 1
 
                 if predicate_exc is not None:
                     raise predicate_exc from exc
                 raise
             else:
                 async with self._lock:
-                    self._failures = 0
-                    self._opened_at = None
+                    if is_half_open_probe:
+                        self._failures = 0
+                        self._opened_at = None
+                    elif (
+                        self._generation == admitted_generation
+                        and self._opened_at is None
+                    ):
+                        self._failures = 0
                 return result
         finally:
             if is_half_open_probe:

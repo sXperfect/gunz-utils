@@ -213,6 +213,38 @@ class TestWorkflowDAGAsyncAndCompensation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cm.exception.stage_name, "s2")
         self.assertEqual(compensated, ["comp_1:10"])
 
+    def test_sync_rollback_records_error_for_async_compensator(self) -> None:
+        resource_cleaned = False
+
+        def s1(_deps: dict[str, object]) -> str:
+            return "res_1"
+
+        async def async_comp(_out: object) -> None:
+            nonlocal resource_cleaned
+            resource_cleaned = True
+
+        def s2(_deps: dict[str, object]) -> str:
+            raise RuntimeError("stage 2 failed")
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", s1, compensate=async_comp),
+                WorkflowStage("s2", s2, dependencies=("s1",)),
+            ]
+        )
+
+        with self.assertRaises(WorkflowExecutionError) as cm:
+            dag.execute()
+
+        self.assertEqual(cm.exception.stage_name, "s2")
+        errors = cm.exception.compensation_errors
+        self.assertEqual(len(errors), 1)
+        stage_name, exc = errors[0]
+        self.assertEqual(stage_name, "s1")
+        self.assertIsInstance(exc, TypeError)
+        self.assertIn("asynchronous compensation", str(exc))
+        self.assertFalse(resource_cleaned)
+
     async def test_async_execute_stage_cancellation_triggers_compensation(self) -> None:
         compensated: list[str] = []
 

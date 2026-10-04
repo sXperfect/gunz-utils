@@ -174,3 +174,29 @@ def test_fresh_import_without_native_extension() -> None:
             sys.modules["gunz_utils._accel"] = saved_accel
         else:
             sys.modules.pop("gunz_utils._accel", None)
+
+
+def test_byte_reader_invalid_size_leaves_state_unmutated() -> None:
+    reader = ByteReader(b"abcdef")
+    assert reader.offset == 0
+    assert reader.remaining == 6
+
+    # Fractional, boolean, non-int types must raise TypeError without mutating offset
+    for invalid in [0.5, 1.2, True, False, "1", None]:
+        with pytest.raises(TypeError, match="read size must be an integer"):
+            reader.read(invalid)  # type: ignore[arg-type]
+        assert reader.offset == 0
+        assert reader.remaining == 6
+
+    # Out of bounds must raise EOFError without mutating offset
+    for oob in [-1, -5, 7, 100]:
+        with pytest.raises(EOFError, match="binary read exceeds available data"):
+            reader.read(oob)
+        assert reader.offset == 0
+        assert reader.remaining == 6
+
+    # Valid read advances offset
+    chunk = reader.read(3)
+    assert bytes(chunk) == b"abc"
+    assert reader.offset == 3
+    assert reader.remaining == 3

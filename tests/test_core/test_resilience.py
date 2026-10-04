@@ -94,6 +94,40 @@ class TestCircuitBreaker(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await breaker.call(healthy), "recovered")
         self.assertEqual(breaker.state, CircuitState.CLOSED)
 
+    async def test_in_flight_success_does_not_close_open_circuit(self) -> None:
+        breaker = AsyncCircuitBreaker(failure_threshold=1, recovery_timeout=60.0)
+        b_entered = asyncio.Event()
+        b_can_finish = asyncio.Event()
+
+        async def op_a() -> None:
+            await b_entered.wait()
+            raise ValueError("A failed")
+
+        async def op_b() -> str:
+            b_entered.set()
+            await b_can_finish.wait()
+            return "B succeeded"
+
+        task_b = asyncio.create_task(breaker.call(op_b))
+        await b_entered.wait()
+
+        with self.assertRaises(ValueError):
+            await breaker.call(op_a)
+
+        self.assertEqual(breaker.state, CircuitState.OPEN)
+
+        b_can_finish.set()
+        res_b = await task_b
+        self.assertEqual(res_b, "B succeeded")
+
+        self.assertEqual(breaker.state, CircuitState.OPEN)
+
+        async def op_new() -> str:
+            return "new"
+
+        with self.assertRaises(CircuitOpenError):
+            await breaker.call(op_new)
+
 
 class TestBulkhead(unittest.IsolatedAsyncioTestCase):
     async def test_bounds_concurrency(self) -> None:
