@@ -89,33 +89,34 @@ async def map_unordered(
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
         raise ValueError("limit must be a positive integer")
     iterator = iter(items)
-    pending: set[asyncio.Task[R]] = set()
+    active: set[asyncio.Task[R]] = set()
 
     def schedule_one() -> bool:
         try:
             item = next(iterator)
         except StopIteration:
             return False
-        pending.add(asyncio.create_task(func(item)))
+        active.add(asyncio.create_task(func(item)))
         return True
 
     try:
         for _ in range(limit):
             if not schedule_one():
                 break
-        while pending:
-            done, pending = await asyncio.wait(
-                pending,
+        while active:
+            done, _ = await asyncio.wait(
+                active,
                 return_when=asyncio.FIRST_COMPLETED,
             )
             for task in done:
+                active.discard(task)
                 yield task.result()
                 schedule_one()
     finally:
-        for task in pending:
+        for task in active:
             task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
+        if active:
+            await asyncio.gather(*active, return_exceptions=True)
 
 
 __all__ = ["gather_limited", "map_concurrent", "map_unordered"]

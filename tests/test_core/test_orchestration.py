@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 import unittest
 
@@ -670,6 +671,137 @@ class TestWorkflowDAGAsyncAndCompensation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cm.exception.stage_name, "s2")
         errors = cm.exception.compensation_errors
         self.assertTrue(any(name == "rollback_timeout" for name, _ in errors))
+
+    def test_workflow_dag_rejects_non_finite_and_invalid_timeouts(self) -> None:
+        def dummy(_deps: dict[str, object]) -> int:
+            return 1
+
+        stage = WorkflowStage("s1", dummy)
+        for invalid in (
+            math.nan,
+            math.inf,
+            -math.inf,
+            0,
+            0.0,
+            -1,
+            -0.5,
+            True,
+            False,
+            "1.0",
+        ):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    WorkflowDAG([stage], rollback_timeout=invalid)  # type: ignore[arg-type]
+
+    async def test_async_execute_rejects_non_finite_and_invalid_timeouts(self) -> None:
+        def dummy(_deps: dict[str, object]) -> int:
+            return 1
+
+        dag = WorkflowDAG([WorkflowStage("s1", dummy)])
+        for invalid in (
+            math.nan,
+            math.inf,
+            -math.inf,
+            0,
+            0.0,
+            -1,
+            -0.5,
+            True,
+            False,
+            "1.0",
+        ):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    await dag.async_execute(rollback_timeout=invalid)  # type: ignore[arg-type]
+
+    async def test_async_execute_rollback_timeout_stops_subsequent_compensators(
+        self,
+    ) -> None:
+        c1_started = False
+        hung_event = asyncio.Event()
+
+        async def stage_1(_deps: dict[str, object]) -> str:
+            return "res_1"
+
+        async def comp_1(_out: object) -> None:
+            nonlocal c1_started
+            c1_started = True
+
+        async def stage_2(_deps: dict[str, object]) -> str:
+            return "res_2"
+
+        async def comp_2(_out: object) -> None:
+            await hung_event.wait()
+
+        async def stage_3(_deps: dict[str, object]) -> str:
+            raise RuntimeError("failure triggering compensation")
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1, compensate=comp_1),
+                WorkflowStage("s2", stage_2, dependencies=("s1",), compensate=comp_2),
+                WorkflowStage("s3", stage_3, dependencies=("s2",)),
+            ],
+            rollback_timeout=0.03,
+        )
+
+        with self.assertRaises(WorkflowExecutionError) as cm:
+            await dag.async_execute()
+
+        self.assertEqual(cm.exception.stage_name, "s3")
+        self.assertFalse(c1_started)
+        errors = cm.exception.compensation_errors
+        error_names = [name for name, _ in errors]
+        self.assertIn("rollback_timeout", error_names)
+        self.assertIn("s2", error_names)
+        self.assertIn("s1", error_names)
+        s1_err = next(err for name, err in errors if name == "s1")
+        self.assertIsInstance(s1_err, asyncio.CancelledError)
+
+    async def test_async_execute_setup_failure_cancels_and_drains_earlier_tasks(
+        self,
+    ) -> None:
+        stage1_ran = False
+
+        async def stage_1(_deps: dict[str, object]) -> str:
+            nonlocal stage1_ran
+            stage1_ran = True
+            return "res_1"
+
+        async def stage_2(_deps: dict[str, object]) -> str:
+            return "res_2"
+
+        dag = WorkflowDAG(
+            [
+                WorkflowStage("s1", stage_1),
+                WorkflowStage("s2", stage_2),
+            ]
+        )
+
+        original_create_task = asyncio.create_task
+        task_count = 0
+
+        def failing_create_task(
+            coro: object, *args: object, **kwargs: object
+        ) -> asyncio.Task[object]:
+            nonlocal task_count
+            task_count += 1
+            if task_count == 2:
+                if hasattr(coro, "close"):
+                    coro.close()
+                raise RuntimeError("simulated task creation failure")
+            return original_create_task(coro, *args, **kwargs)  # type: ignore[arg-type]
+
+        asyncio.create_task = failing_create_task  # type: ignore[assignment]
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                await dag.async_execute()
+            self.assertEqual(str(cm.exception), "simulated task creation failure")
+        finally:
+            asyncio.create_task = original_create_task  # type: ignore[assignment]
+
+        await asyncio.sleep(0.02)
+        self.assertFalse(stage1_ran)
 
 
 

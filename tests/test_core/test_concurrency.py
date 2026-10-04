@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+import warnings
 
 from gunz_utils.concurrency import gather_limited, map_concurrent, map_unordered
 
@@ -120,4 +121,58 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
             async for _ in map_unordered(dispatcher, ["slow", "fail"], limit=2):
                 pass
 
+        self.assertTrue(cancelled)
+
+    async def test_map_unordered_sibling_exceptions_observed_without_warning(
+        self,
+    ) -> None:
+        barrier = asyncio.Event()
+
+        async def fail_together(val: int) -> int:
+            await barrier.wait()
+            raise RuntimeError(f"error_{val}")
+
+        async def run_collector() -> list[int]:
+            return [
+                res
+                async for res in map_unordered(
+                    fail_together, [1, 2], limit=2
+                )
+            ]
+
+        with warnings.catch_warnings(record=True) as recorded_warnings:
+            warnings.simplefilter("always")
+            task = asyncio.create_task(run_collector())
+            await asyncio.sleep(0.01)
+            barrier.set()
+            with self.assertRaises(RuntimeError):
+                await task
+            await asyncio.sleep(0.05)
+
+        unretrieved_warnings = [
+            w
+            for w in recorded_warnings
+            if "was never retrieved" in str(w.message)
+        ]
+        self.assertEqual(unretrieved_warnings, [])
+
+    async def test_map_unordered_early_break_cancels_active(self) -> None:
+        cancelled = False
+
+        async def slow_work(val: int) -> int:
+            nonlocal cancelled
+            if val == 1:
+                return 1
+            try:
+                await asyncio.sleep(5.0)
+                return 2
+            except asyncio.CancelledError:
+                cancelled = True
+                raise
+
+        async for res in map_unordered(slow_work, [1, 2], limit=2):
+            if res == 1:
+                break
+
+        await asyncio.sleep(0.01)
         self.assertTrue(cancelled)

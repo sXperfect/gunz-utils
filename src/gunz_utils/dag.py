@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import math
 import time
 from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from contextlib import nullcontext
@@ -95,6 +96,21 @@ class WorkflowStage:
         )
 
 
+def _validate_rollback_timeout(timeout: Any) -> float | None:
+    if timeout is None:
+        return None
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(timeout)
+        or timeout <= 0
+    ):
+        raise ValueError(
+            "rollback_timeout must be a finite positive number or None"
+        )
+    return float(timeout)
+
+
 class WorkflowDAG:
     """Execute named stages in topological order with safe cache propagation."""
 
@@ -104,12 +120,7 @@ class WorkflowDAG:
         *,
         rollback_timeout: float | None = None,
     ) -> None:
-        if rollback_timeout is not None and (
-            isinstance(rollback_timeout, bool)
-            or not isinstance(rollback_timeout, (int, float))
-            or rollback_timeout <= 0
-        ):
-            raise ValueError("rollback_timeout must be a positive number or None")
+        self.rollback_timeout = _validate_rollback_timeout(rollback_timeout)
         stage_list = list(stages)
         self.stages = {
             stage.name: stage
@@ -119,9 +130,6 @@ class WorkflowDAG:
             raise ValueError("stage names must be unique")
         if any(not name for name in self.stages):
             raise ValueError("stage names must be non-empty")
-        self.rollback_timeout = (
-            float(rollback_timeout) if rollback_timeout is not None else None
-        )
         self._order = self._topological_order()
 
     def _topological_order(self) -> tuple[str, ...]:
@@ -225,13 +233,45 @@ class WorkflowDAG:
     ) -> list[tuple[str, BaseException]]:
         """Roll back completed stages in reverse execution order asynchronously."""
         errors: list[tuple[str, BaseException]] = []
-        for name in reversed(completed_order):
+        rev_order = list(reversed(completed_order))
+        for idx, name in enumerate(rev_order):
+            current_task = asyncio.current_task()
+            if current_task is not None and current_task.cancelling():
+                for rem_name in rev_order[idx:]:
+                    rem_stage = self.stages[rem_name]
+                    if rem_stage.compensate is not None:
+                        errors.append(
+                            (
+                                rem_name,
+                                asyncio.CancelledError(
+                                    f"compensation of stage {rem_name!r} "
+                                    "skipped due to cancellation"
+                                ),
+                            )
+                        )
+                return errors
+
             stage = self.stages[name]
             if stage.compensate is not None:
                 try:
                     res = stage.compensate(outputs.get(name))
                     if inspect.isawaitable(res):
                         await res
+                except asyncio.CancelledError as exc:
+                    errors.append((name, exc))
+                    for rem_name in rev_order[idx + 1:]:
+                        rem_stage = self.stages[rem_name]
+                        if rem_stage.compensate is not None:
+                            errors.append(
+                                (
+                                    rem_name,
+                                    asyncio.CancelledError(
+                                        f"compensation of stage {rem_name!r} "
+                                        "skipped due to cancellation"
+                                    ),
+                                )
+                            )
+                    return errors
                 except BaseException as exc:
                     errors.append((name, exc))
         return errors
@@ -287,10 +327,10 @@ class WorkflowDAG:
 
         if timed_out:
             try:
-                await rollback_task
-            except (asyncio.CancelledError, Exception):
+                await asyncio.wait_for(rollback_task, timeout=0.1)
+            except (TimeoutError, asyncio.CancelledError, Exception):
                 pass
-            return [
+            errors: list[tuple[str, BaseException]] = [
                 (
                     "rollback_timeout",
                     TimeoutError(
@@ -298,6 +338,14 @@ class WorkflowDAG:
                     ),
                 )
             ]
+            if rollback_task.done() and not rollback_task.cancelled():
+                try:
+                    res = rollback_task.result()
+                    if isinstance(res, list):
+                        errors.extend(res)
+                except Exception:
+                    pass
+            return errors
 
         if rollback_task.cancelled():
             return [
@@ -306,7 +354,12 @@ class WorkflowDAG:
                     asyncio.CancelledError("rollback was cancelled"),
                 )
             ]
-        return rollback_task.result()
+        try:
+            return rollback_task.result()
+        except asyncio.CancelledError as exc:
+            return [("rollback_cancelled", exc)]
+        except BaseException as exc:
+            return [("rollback_error", exc)]
 
     def execute(
         self,
@@ -403,12 +456,11 @@ class WorkflowDAG:
 
         Supports concurrency, budget tracking, and rollback.
         """
-        if rollback_timeout is not None and (
-            isinstance(rollback_timeout, bool)
-            or not isinstance(rollback_timeout, (int, float))
-            or rollback_timeout <= 0
-        ):
-            raise ValueError("rollback_timeout must be a positive number or None")
+        effective_rollback_timeout = (
+            _validate_rollback_timeout(rollback_timeout)
+            if rollback_timeout is not None
+            else self.rollback_timeout
+        )
         if concurrency_limit is not None:
             if (
                 isinstance(concurrency_limit, bool)
@@ -496,11 +548,29 @@ class WorkflowDAG:
                 events[name].set()
                 raise
 
+        setup_ok = False
         try:
             for name in self.stages:
                 tasks.append(asyncio.create_task(run_stage(name)))
+            setup_ok = True
+        except BaseException:
+            cancel_event.set()
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+            if tasks:
+                while True:
+                    try:
+                        await asyncio.shield(
+                            asyncio.gather(*tasks, return_exceptions=True)
+                        )
+                        break
+                    except asyncio.CancelledError:
+                        pass
+            raise
         finally:
-            start_barrier.set()
+            if setup_ok:
+                start_barrier.set()
 
         caller_cancelled = False
         try:
@@ -527,7 +597,7 @@ class WorkflowDAG:
         if failure_box:
             failed_stage, exc = failure_box[0]
             compensation_errors = await self._safe_rollback_async(
-                executed_order, outputs, timeout=rollback_timeout
+                executed_order, outputs, timeout=effective_rollback_timeout
             )
             raise WorkflowExecutionError(
                 f"async workflow failed at stage {failed_stage!r}: {exc}",
@@ -541,7 +611,7 @@ class WorkflowDAG:
                 res, asyncio.CancelledError
             ):
                 compensation_errors = await self._safe_rollback_async(
-                    executed_order, outputs, timeout=rollback_timeout
+                    executed_order, outputs, timeout=effective_rollback_timeout
                 )
                 raise WorkflowExecutionError(
                     f"async workflow failed: {res}",
@@ -555,7 +625,7 @@ class WorkflowDAG:
         )
         if cancelled:
             await self._safe_rollback_async(
-                executed_order, outputs, timeout=rollback_timeout
+                executed_order, outputs, timeout=effective_rollback_timeout
             )
             raise asyncio.CancelledError()
 
@@ -566,7 +636,6 @@ class WorkflowDAG:
                 current_key = k
                 store[k] = v
                 published_keys.append(k)
-                current_key = None
         except BaseException as exc:
             keys_to_clean = list(published_keys)
             if current_key is not None and current_key not in keys_to_clean:
@@ -577,7 +646,7 @@ class WorkflowDAG:
                 except Exception:
                     pass
             compensation_errors = await self._safe_rollback_async(
-                executed_order, outputs, timeout=rollback_timeout
+                executed_order, outputs, timeout=effective_rollback_timeout
             )
             raise WorkflowExecutionError(
                 f"async workflow cache publication failed: {exc}",
