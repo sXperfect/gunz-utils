@@ -377,3 +377,77 @@ def test_verify_integrity(tmp_path: Path) -> None:
     finally:
         store.close()
 
+
+def test_failed_commit_does_not_poison_subsequent_writes(
+    tmp_path: Path,
+) -> None:
+    store = SecureStore(base_dir=tmp_path)
+    try:
+        store.unlock()
+        store.set("init", "val0")
+
+        # Lower timeout for rapid test execution
+        store._conn.execute("PRAGMA busy_timeout = 50")
+
+        # Hold reader lock to induce commit failure
+        reader = sqlite3.connect(
+            str(tmp_path / "config.db"), isolation_level=None
+        )
+        try:
+            reader.execute("PRAGMA busy_timeout = 50")
+            reader.execute("BEGIN")
+            reader.execute("SELECT * FROM secrets")
+
+            with pytest.raises(sqlite3.OperationalError):
+                store.set("failed_key", "failed_val")
+
+            # Transaction must not remain poisoned/open
+            assert not store._conn.in_transaction
+        finally:
+            try:
+                reader.execute("ROLLBACK")
+            except Exception:
+                pass
+            reader.close()
+
+        # Subsequent write must succeed and persist
+        store.set("second_key", "second_val")
+    finally:
+        store.close()
+
+    # Verify through independent connection
+    reopened = SecureStore(base_dir=tmp_path)
+    try:
+        reopened.unlock()
+        assert reopened.get("second_key") == "second_val"
+    finally:
+        reopened.close()
+
+
+def test_mutations_reject_tampered_acls(tmp_path: Path) -> None:
+    store = SecureStore(base_dir=tmp_path)
+    try:
+        store.unlock()
+        store.set("secret", "secret_val", acl=["admin"])
+
+        # Tamper ACL column directly in database
+        store._conn.execute(
+            "UPDATE secrets SET acl = 'guest' WHERE name = 'secret'"
+        )
+
+        # Overwrite attempt by unauthorized caller must fail integrity check
+        with pytest.raises(InvalidToken):
+            store.set("secret", "new_val", caller="guest")
+
+        # Delete attempt by unauthorized caller must fail integrity check
+        with pytest.raises(InvalidToken):
+            store.delete("secret", caller="guest")
+
+        # Restore ACL and verify secret is uncorrupted and intact
+        store._conn.execute(
+            "UPDATE secrets SET acl = 'admin' WHERE name = 'secret'"
+        )
+        assert store.get("secret", caller="admin") == "secret_val"
+    finally:
+        store.close()
+

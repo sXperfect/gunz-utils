@@ -1,0 +1,1 @@
+Roll back or reconnect SQLite database on transaction commit failures in `SecureStore._transaction_locked()` to prevent uncommitted transaction state poisoning subsequent writes, and authenticate existing record envelopes in `set()` and `delete()` before trusting ACL metadata to prevent unauthorized mutations against tampered database records.

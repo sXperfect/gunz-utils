@@ -262,18 +262,30 @@ class SecureStore:
         self._fernet: Fernet | None = None
         self._key_generation: int = 0
         self._passphrase_mode: bool = False
-        self._conn = sqlite3.connect(
+        self._conn = self._open_connection()
+        self._init_schema()
+        self._ensure_private_file(self._db_path)
+
+    def _open_connection(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(
             str(self._db_path),
             check_same_thread=False,
             isolation_level=None,
         )
-        self._conn.row_factory = sqlite3.Row
+        conn.row_factory = sqlite3.Row
         # Security (VULN-2026-006): bound SQLite lock waiting so concurrent
         # processes cannot leave this connection waiting indefinitely.
-        self._conn.execute("PRAGMA busy_timeout = 10000")
-        self._conn.execute("PRAGMA foreign_keys = ON")
-        self._init_schema()
-        self._ensure_private_file(self._db_path)
+        conn.execute("PRAGMA busy_timeout = 10000")
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
+
+    def _reconnect_database(self) -> None:
+        """Close and reconnect database if transaction state is corrupted."""
+        try:
+            self._conn.close()
+        except Exception:
+            pass
+        self._conn = self._open_connection()
 
     def _init_schema(self) -> None:
         with self._lock:
@@ -670,11 +682,24 @@ class SecureStore:
                 yield
             except BaseException:
                 if started and self._conn.in_transaction:
-                    self._conn.execute("ROLLBACK")
+                    try:
+                        self._conn.execute("ROLLBACK")
+                    except Exception:
+                        self._reconnect_database()
                 raise
             else:
                 if started:
-                    self._conn.execute("COMMIT")
+                    try:
+                        self._conn.execute("COMMIT")
+                    except BaseException:
+                        try:
+                            if self._conn.in_transaction:
+                                self._conn.execute("ROLLBACK")
+                        except Exception:
+                            pass
+                        if self._conn.in_transaction:
+                            self._reconnect_database()
+                        raise
 
     def set(
         self,
@@ -697,13 +722,29 @@ class SecureStore:
             try:
                 with self._transaction_locked():
                     existing = self._conn.execute(
-                        "SELECT acl FROM secrets WHERE name = ?",
+                        "SELECT ciphertext, acl FROM secrets WHERE name = ?",
                         (name,),
                     ).fetchone()
                     if existing is not None:
+                        stored_acl_str = existing["acl"] or ""
+                        try:
+                            raw_payload = self._fernet.decrypt(
+                                existing["ciphertext"]
+                            )
+                            _unpack_envelope(
+                                raw_payload,
+                                expected_name=name,
+                                expected_acl=stored_acl_str,
+                            )
+                        except InvalidToken as exc:
+                            raise InvalidToken(
+                                f"Cannot overwrite {name!r}: existing record "
+                                "envelope integrity check failed"
+                            ) from exc
+
                         current_acl = [
                             item
-                            for item in (existing["acl"] or "").split(",")
+                            for item in stored_acl_str.split(",")
                             if item
                         ]
                         if current_acl and caller not in current_acl:
@@ -712,7 +753,7 @@ class SecureStore:
                                 f"{name!r}"
                             )
                         acl_str = (
-                            existing["acl"]
+                            stored_acl_str
                             if acl is None
                             else ",".join(acl)
                         )
@@ -737,7 +778,7 @@ class SecureStore:
                         (name, ciphertext, acl_str, now, now),
                     )
                     self._audit(caller, "set", name, True)
-            except PermissionError:
+            except (PermissionError, InvalidToken):
                 if not self._conn.in_transaction:
                     self._audit(caller, "set", name, False)
                 raise
@@ -788,16 +829,30 @@ class SecureStore:
             try:
                 with self._transaction_locked():
                     row = self._conn.execute(
-                        "SELECT acl FROM secrets WHERE name = ?",
+                        "SELECT ciphertext, acl FROM secrets WHERE name = ?",
                         (name,),
                     ).fetchone()
                     if row is None:
                         self._audit(caller, "delete", name, False)
                         return False
 
+                    stored_acl_str = row["acl"] or ""
+                    try:
+                        raw_payload = self._fernet.decrypt(row["ciphertext"])
+                        _unpack_envelope(
+                            raw_payload,
+                            expected_name=name,
+                            expected_acl=stored_acl_str,
+                        )
+                    except InvalidToken as exc:
+                        raise InvalidToken(
+                            f"Cannot delete {name!r}: existing record "
+                            "envelope integrity check failed"
+                        ) from exc
+
                     acl = [
                         item
-                        for item in (row["acl"] or "").split(",")
+                        for item in stored_acl_str.split(",")
                         if item
                     ]
                     if acl and caller not in acl:
@@ -812,7 +867,7 @@ class SecureStore:
                     )
                     self._audit(caller, "delete", name, True)
                     return True
-            except PermissionError:
+            except (PermissionError, InvalidToken):
                 if not self._conn.in_transaction:
                     self._audit(caller, "delete", name, False)
                 raise
