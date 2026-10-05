@@ -63,12 +63,12 @@ __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import base64
-import fcntl
 import json
 import os
 import re
 import sqlite3
 import stat
+import sys
 import tempfile
 import threading
 import time
@@ -83,11 +83,54 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from .._version import __version__ as __version__
 
+if sys.platform == "win32":
+    import msvcrt
+else:
+    import fcntl
+
 _PBKDF2_ITERATIONS = 600_000  # OWASP 2023 recommendation for SHA-256
 _KEY_FILE_MODE = 0o600  # owner read/write only
 _DIR_MODE = 0o700
 _LIBRARY_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _RECORD_ENVELOPE_MAGIC = b"\x00GZENV1\x00"
+_RECORD_FORMAT_STRICT = b"envelope-v1"
+_WINDOWS_LOCK_TIMEOUT = 60.0
+
+
+def _lock_fd(fd: int) -> None:
+    """Take an exclusive inter-process lock on ``fd`` (blocking)."""
+    if sys.platform == "win32":
+        deadline = time.monotonic() + _WINDOWS_LOCK_TIMEOUT
+        while True:
+            os.lseek(fd, 0, os.SEEK_SET)
+            try:
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                return
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        "timed out waiting for the secure-store lock"
+                    ) from None
+                time.sleep(0.05)
+    else:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+
+
+def _unlock_fd(fd: int) -> None:
+    """Release the inter-process lock held on ``fd``."""
+    if sys.platform == "win32":
+        os.lseek(fd, 0, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+def _close_quietly(fd: int) -> None:
+    """Close ``fd`` without masking an in-flight exception."""
+    try:
+        os.close(fd)
+    except OSError:
+        pass
 
 
 class _ReentrantFileLock:
@@ -101,36 +144,43 @@ class _ReentrantFileLock:
 
     def acquire(self) -> None:
         self._thread_lock.acquire()
-        if self._depth == 0:
-            flags = os.O_RDWR | os.O_CREAT
-            if hasattr(os, "O_CLOEXEC"):
-                flags |= os.O_CLOEXEC
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            self._fd = os.open(self._path, flags, _KEY_FILE_MODE)
-            try:
-                if os.name == "posix":
-                    os.fchmod(self._fd, _KEY_FILE_MODE)
-                fcntl.flock(self._fd, fcntl.LOCK_EX)
-            except BaseException:
-                os.close(self._fd)
-                self._fd = -1
-                self._thread_lock.release()
-                raise
-        self._depth += 1
+        try:
+            if self._depth == 0:
+                flags = os.O_RDWR | os.O_CREAT
+                if hasattr(os, "O_CLOEXEC"):
+                    flags |= os.O_CLOEXEC
+                if hasattr(os, "O_NOFOLLOW"):
+                    flags |= os.O_NOFOLLOW
+                fd = os.open(self._path, flags, _KEY_FILE_MODE)
+                try:
+                    if os.name == "posix":
+                        os.fchmod(fd, _KEY_FILE_MODE)
+                    _lock_fd(fd)
+                except BaseException:
+                    _close_quietly(fd)
+                    raise
+                self._fd = fd
+            self._depth += 1
+        except BaseException:
+            self._thread_lock.release()
+            raise
 
     def release(self) -> None:
         if self._depth == 0:
             raise RuntimeError("Cannot release un-acquired file lock")
-        self._depth -= 1
-        if self._depth == 0:
-            fd = self._fd
-            self._fd = -1
-            try:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-            finally:
-                os.close(fd)
-        self._thread_lock.release()
+        try:
+            self._depth -= 1
+            if self._depth == 0:
+                fd = self._fd
+                self._fd = -1
+                try:
+                    _unlock_fd(fd)
+                finally:
+                    # Closing the descriptor drops any remaining OS lock; a
+                    # close failure must not mask an unlock failure.
+                    _close_quietly(fd)
+        finally:
+            self._thread_lock.release()
 
     def __enter__(self) -> _ReentrantFileLock:
         self.acquire()
@@ -153,33 +203,45 @@ def _pack_envelope(name: str, acl_str: str, payload: bytes) -> bytes:
     return _RECORD_ENVELOPE_MAGIC + encoded
 
 
-def _unpack_envelope(
-    raw: bytes, *, expected_name: str, expected_acl: str
-) -> bytes:
-    """Unpack payload and verify integrity binding against expected metadata."""
-    if not raw.startswith(_RECORD_ENVELOPE_MAGIC):
-        # Backward-compatible handling of legacy un-enveloped secrets
-        return raw
+def _decode_record(
+    raw: bytes, *, expected_name: str, expected_acl: str, allow_legacy: bool
+) -> tuple[bytes, bool]:
+    """Decode a decrypted record, returning ``(payload, metadata_bound)``.
 
-    envelope_bytes = raw[len(_RECORD_ENVELOPE_MAGIC) :]
+    Records are only trusted as metadata-bound when they carry a valid
+    envelope whose name/ACL match the row. Legacy (pre-envelope) records are
+    accepted, and reported as unbound, only while ``allow_legacy`` is true;
+    once a store has been migrated, they are rejected. Decryption is already
+    authenticated by Fernet, so a decrypted payload that only *resembles* an
+    envelope (magic prefix, malformed body) can only be legacy data.
+    """
+    if not raw.startswith(_RECORD_ENVELOPE_MAGIC):
+        if allow_legacy:
+            return raw, False
+        raise InvalidToken("unbound legacy record rejected")
+
     try:
-        data = json.loads(envelope_bytes.decode("utf-8"))
+        data = json.loads(raw[len(_RECORD_ENVELOPE_MAGIC) :].decode("utf-8"))
         if not isinstance(data, dict):
-            raise ValueError("Invalid envelope payload structure")
+            raise ValueError("invalid envelope structure")
         record_name = data.get("name")
         record_acl = data.get("acl")
         b64_payload = data.get("payload")
-        if not isinstance(record_name, str) or not isinstance(record_acl, str):
-            raise ValueError("Malformed envelope metadata types")
-        if record_name != expected_name or record_acl != expected_acl:
-            raise InvalidToken("record envelope binding mismatch")
-        if not isinstance(b64_payload, str):
-            raise ValueError("Malformed envelope payload type")
-        return base64.b64decode(b64_payload.encode("ascii"))
-    except InvalidToken:
-        raise
-    except Exception as exc:
+        if (
+            not isinstance(record_name, str)
+            or not isinstance(record_acl, str)
+            or not isinstance(b64_payload, str)
+        ):
+            raise ValueError("malformed envelope fields")
+        payload = base64.b64decode(b64_payload.encode("ascii"), validate=True)
+    except ValueError as exc:  # JSON, Unicode and base64 errors subclass it
+        if allow_legacy:
+            return raw, False
         raise InvalidToken("Malformed record envelope") from exc
+
+    if record_name != expected_name or record_acl != expected_acl:
+        raise InvalidToken("record envelope binding mismatch")
+    return payload, True
 
 
 def default_base_dir(library_name: str) -> Path:
@@ -512,6 +574,7 @@ class SecureStore:
         self._fsync_base_dir()
 
     def _verify_or_initialize_key(self, fernet: Fernet) -> None:
+        """Verify ``fernet`` or initialize metadata. Caller holds both locks."""
         row = self._conn.execute(
             "SELECT value FROM store_meta WHERE key = 'key_check'"
         ).fetchone()
@@ -529,46 +592,76 @@ class SecureStore:
                 "INSERT INTO store_meta(key, value) VALUES ('key_check', ?)",
                 (token,),
             )
+            if secret is None:
+                # Brand-new store: never accept unbound legacy records.
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO store_meta(key, value) "
+                    "VALUES ('record_format', ?)",
+                    (_RECORD_FORMAT_STRICT,),
+                )
 
-        gen_row = self._conn.execute(
-            "SELECT value FROM store_meta WHERE key = 'key_generation'"
-        ).fetchone()
-        if gen_row is not None:
-            try:
-                self._key_generation = int(gen_row["value"].decode("ascii"))
-            except (ValueError, UnicodeDecodeError):
-                self._key_generation = 1
-        else:
-            self._key_generation = 1
+        generation = self._read_generation(missing_ok=True)
+        if generation is None:
+            # Controlled legacy initialization: only reachable from the
+            # coordinated unlock path, never from ordinary verification.
+            generation = 1
             self._conn.execute(
                 "INSERT OR REPLACE INTO store_meta(key, value) "
                 "VALUES ('key_generation', ?)",
                 (b"1",),
             )
+        self._key_generation = generation
+
+    def _read_generation(self, *, missing_ok: bool = False) -> int | None:
+        """Return the persisted key generation, rejecting malformed metadata."""
+        row = self._conn.execute(
+            "SELECT value FROM store_meta WHERE key = 'key_generation'"
+        ).fetchone()
+        if row is None:
+            if missing_ok:
+                return None
+            raise RuntimeError(
+                "Store generation metadata is missing; refusing to continue"
+            )
+        raw = row["value"]
+        if (
+            not isinstance(raw, bytes)
+            or not raw.isdigit()
+            or not raw.isascii()
+            or int(raw) < 1
+        ):
+            raise RuntimeError(
+                "Store generation metadata is invalid; refusing to continue"
+            )
+        return int(raw)
 
     def _verify_key_generation(self) -> None:
         """Verify this store instance's key matches current database key generation."""
-        gen_row = self._conn.execute(
-            "SELECT value FROM store_meta WHERE key = 'key_generation'"
+        if self._read_generation() != self._key_generation:
+            raise RuntimeError(
+                "Store key is stale; master key was rotated. Call unlock() again."
+            )
+
+    def _records_strict(self) -> bool:
+        """Return True once the store has been migrated to bound records."""
+        row = self._conn.execute(
+            "SELECT value FROM store_meta WHERE key = 'record_format'"
         ).fetchone()
-        if gen_row is not None:
-            try:
-                persisted_gen = int(gen_row["value"].decode("ascii"))
-            except (ValueError, UnicodeDecodeError):
-                persisted_gen = 1
-            if persisted_gen != self._key_generation:
-                raise RuntimeError(
-                    "Store key is stale; master key was rotated. Call unlock() again."
-                )
+        return row is not None and row["value"] == _RECORD_FORMAT_STRICT
 
     def unlock(self, passphrase: str | None = None) -> None:
-        """Unlock the store, recovering interrupted key publication if needed."""
+        """Unlock the store, recovering interrupted key publication if needed.
+
+        The whole candidate-selection, verification, initialization and
+        pending-key recovery sequence runs under the inter-process
+        coordination lock so it cannot interleave with a rotation.
+        """
         if passphrase is not None and (
             not isinstance(passphrase, str) or not passphrase
         ):
             raise ValueError("passphrase must be a non-empty string")
 
-        with self._lock:
+        with self._lock, self._coordination_lock:
             candidates: list[tuple[Fernet, bool]] = []
             if passphrase is None:
                 key_paths = (
@@ -731,10 +824,12 @@ class SecureStore:
                             raw_payload = self._fernet.decrypt(
                                 existing["ciphertext"]
                             )
-                            _unpack_envelope(
+                            allow_legacy = not self._records_strict()
+                            _decode_record(
                                 raw_payload,
                                 expected_name=name,
                                 expected_acl=stored_acl_str,
+                                allow_legacy=allow_legacy,
                             )
                         except InvalidToken as exc:
                             raise InvalidToken(
@@ -806,8 +901,12 @@ class SecureStore:
                 )
             try:
                 raw_payload = self._fernet.decrypt(row["ciphertext"])
-                plaintext = _unpack_envelope(
-                    raw_payload, expected_name=name, expected_acl=acl_str
+                allow_legacy = not self._records_strict()
+                plaintext, _ = _decode_record(
+                    raw_payload,
+                    expected_name=name,
+                    expected_acl=acl_str,
+                    allow_legacy=allow_legacy,
                 )
             except InvalidToken:
                 self._audit(caller, "get", name, False)
@@ -839,10 +938,12 @@ class SecureStore:
                     stored_acl_str = row["acl"] or ""
                     try:
                         raw_payload = self._fernet.decrypt(row["ciphertext"])
-                        _unpack_envelope(
+                        allow_legacy = not self._records_strict()
+                        _decode_record(
                             raw_payload,
                             expected_name=name,
                             expected_acl=stored_acl_str,
+                            allow_legacy=allow_legacy,
                         )
                     except InvalidToken as exc:
                         raise InvalidToken(
@@ -1024,13 +1125,17 @@ class SecureStore:
                         "SELECT name, ciphertext, acl FROM secrets"
                     ).fetchall()
 
+                    allow_legacy = not self._records_strict()
                     rewritten: list[tuple[bytes, str]] = []
                     for row in rows:
                         name = row["name"]
                         acl_str = row["acl"] or ""
                         raw_payload = old_fernet.decrypt(row["ciphertext"])
-                        plaintext = _unpack_envelope(
-                            raw_payload, expected_name=name, expected_acl=acl_str
+                        plaintext, _ = _decode_record(
+                            raw_payload,
+                            expected_name=name,
+                            expected_acl=acl_str,
+                            allow_legacy=allow_legacy,
                         )
                         new_enveloped = _pack_envelope(name, acl_str, plaintext)
                         rewritten.append((new_fernet.encrypt(new_enveloped), name))
@@ -1053,6 +1158,13 @@ class SecureStore:
                         "VALUES ('key_generation', ?)",
                         (new_gen_bytes,),
                     )
+                    # Once all rows have been rewritten into envelopes,
+                    # enforce strict envelope checking going forward.
+                    self._conn.execute(
+                        "INSERT OR REPLACE INTO store_meta(key, value) "
+                        "VALUES ('record_format', ?)",
+                        (_RECORD_FORMAT_STRICT,),
+                    )
                     self._conn.execute("COMMIT")
                 except BaseException:
                     if self._conn.in_transaction:
@@ -1066,6 +1178,53 @@ class SecureStore:
                 self._promote_pending_key_material(
                     passphrase_mode=target_is_passphrase,
                 )
+
+    def migrate_records(self) -> int:
+        """Migrate any legacy un-enveloped secrets to authenticated envelopes.
+
+        Returns the number of migrated records. Once migrated, the store
+        permanently enforces metadata binding on all future reads.
+        """
+        with self._lock, self._coordination_lock:
+            if self._fernet is None:
+                raise RuntimeError("Store is locked. Call unlock() first.")
+            self._verify_key_generation()
+
+            rows = self._conn.execute(
+                "SELECT name, ciphertext, acl FROM secrets"
+            ).fetchall()
+
+            allow_legacy = not self._records_strict()
+            rewritten: list[tuple[bytes, str]] = []
+            migrated_count = 0
+
+            for row in rows:
+                name = row["name"]
+                acl_str = row["acl"] or ""
+                raw_payload = self._fernet.decrypt(row["ciphertext"])
+                plaintext, is_bound = _decode_record(
+                    raw_payload,
+                    expected_name=name,
+                    expected_acl=acl_str,
+                    allow_legacy=allow_legacy,
+                )
+                if not is_bound:
+                    new_enveloped = _pack_envelope(name, acl_str, plaintext)
+                    rewritten.append((self._fernet.encrypt(new_enveloped), name))
+                    migrated_count += 1
+
+            with self._transaction_locked():
+                if rewritten:
+                    self._conn.executemany(
+                        "UPDATE secrets SET ciphertext = ? WHERE name = ?",
+                        rewritten,
+                    )
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO store_meta(key, value) "
+                    "VALUES ('record_format', ?)",
+                    (_RECORD_FORMAT_STRICT,),
+                )
+            return migrated_count
 
     def verify_integrity(self) -> bool:
         """Verify the store key and secret record envelope bindings.
@@ -1089,12 +1248,16 @@ class SecureStore:
             rows = self._conn.execute(
                 "SELECT name, ciphertext, acl FROM secrets"
             ).fetchall()
+            allow_legacy = not self._records_strict()
             for r in rows:
                 name = r["name"]
                 acl_str = r["acl"] or ""
                 raw_payload = self._fernet.decrypt(r["ciphertext"])
-                _unpack_envelope(
-                    raw_payload, expected_name=name, expected_acl=acl_str
+                _decode_record(
+                    raw_payload,
+                    expected_name=name,
+                    expected_acl=acl_str,
+                    allow_legacy=allow_legacy,
                 )
             return True
 

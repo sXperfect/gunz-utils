@@ -1,0 +1,5 @@
+- Coordinate `SecureStore.unlock()` candidate selection, verification, initialization, and recovery under `_coordination_lock` to eliminate rotation-recovery races (`A13-SS-01`).
+- Ensure exception-safe `_ReentrantFileLock.acquire()` and `release()` descriptor and thread-lock cleanup (`A13-LOCK-01`).
+- Add platform-conditional file locking on Windows via `msvcrt.locking` (`A13-PORT-01`).
+- Enforce strict envelope verification with explicit `migrate_records()` and `record_format` persistence (`A13-ENV-01`).
+- Reject missing or malformed key generation metadata with fail-closed behavior (`A13-GEN-01`).

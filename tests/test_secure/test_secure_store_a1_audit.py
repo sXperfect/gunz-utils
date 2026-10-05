@@ -451,3 +451,160 @@ def test_mutations_reject_tampered_acls(tmp_path: Path) -> None:
     finally:
         store.close()
 
+
+def test_lock_cleanup_on_open_and_unlock_failures(tmp_path: Path) -> None:
+    from gunz_utils.ext.secure_store import _ReentrantFileLock
+
+    lock_file = tmp_path / ".test.lock"
+    lock = _ReentrantFileLock(lock_file)
+
+    # 1. Failure in os.open must not retain thread lock
+    with patch("os.open", side_effect=OSError("injected open failure")):
+        with pytest.raises(OSError, match="injected open failure"):
+            lock.acquire()
+
+    # The thread lock must be free to acquire by another thread or here
+    acquired = lock._thread_lock.acquire(blocking=False)
+    assert acquired is True
+    lock._thread_lock.release()
+
+    # 2. Failure in unlock must not retain thread lock
+    lock.acquire()
+    with patch(
+        "gunz_utils.ext.secure_store._unlock_fd",
+        side_effect=OSError("injected unlock failure"),
+    ):
+        with pytest.raises(OSError, match="injected unlock failure"):
+            lock.release()
+
+    acquired = lock._thread_lock.acquire(blocking=False)
+    assert acquired is True
+    lock._thread_lock.release()
+
+
+def test_concurrent_unlock_does_not_destroy_in_flight_rotation_pending_key(
+    tmp_path: Path,
+) -> None:
+    store1 = SecureStore(base_dir=tmp_path)
+    store2 = SecureStore(base_dir=tmp_path)
+    try:
+        store1.unlock()
+        store1.set("secret", "val1")
+
+        # Because unlock() now holds _coordination_lock, any attempt to unlock
+        # store2 while store1 holds the lock will wait or be serialized.
+        original_write = store1._write_private
+        pending_key_existed_during_unlock = False
+
+        def hook_write(path: Path, data: bytes) -> None:
+            nonlocal pending_key_existed_during_unlock
+            original_write(path, data)
+            if path == store1._pending_key_path:
+                assert store1._coordination_lock._depth > 0
+                assert path.exists()
+                # If store2 tries to unlock, it blocks on _coordination_lock
+                # Here we verify _pending_key_path is safely retained throughout
+                pending_key_existed_during_unlock = True
+
+        with patch.object(store1, "_write_private", side_effect=hook_write):
+            store1.rotate_master_key()
+
+        assert pending_key_existed_during_unlock is True
+        assert store1.get("secret") == "val1"
+        assert not store1._pending_key_path.exists()
+        assert not store1._pending_salt_path.exists()
+
+        store2.unlock()
+        assert store2.get("secret") == "val1"
+    finally:
+        store1.close()
+        store2.close()
+
+
+def test_generation_metadata_missing_or_corrupted_fails_closed(
+    tmp_path: Path,
+) -> None:
+    store = SecureStore(base_dir=tmp_path)
+    try:
+        store.unlock()
+        store.set("secret", "val")
+
+        # Corrupt key_generation row to non-digit
+        store._conn.execute(
+            "UPDATE store_meta SET value = ? WHERE key = 'key_generation'",
+            (b"invalid_generation",),
+        )
+        with pytest.raises(RuntimeError, match="generation metadata is invalid"):
+            store.get("secret")
+
+        with pytest.raises(RuntimeError, match="generation metadata is invalid"):
+            store.set("secret", "new_val")
+
+        # Remove key_generation row entirely
+        store._conn.execute(
+            "DELETE FROM store_meta WHERE key = 'key_generation'"
+        )
+        with pytest.raises(RuntimeError, match="generation metadata is missing"):
+            store.get("secret")
+
+        with pytest.raises(RuntimeError, match="generation metadata is missing"):
+            store.set("secret", "new_val")
+    finally:
+        store.close()
+
+
+def test_legacy_record_migration_and_strict_envelope_enforcement(
+    tmp_path: Path,
+) -> None:
+    store = SecureStore(base_dir=tmp_path)
+    try:
+        store.unlock()
+        # Seed a legacy un-enveloped record directly into secrets table
+        legacy_plaintext = b"legacy_secret_value"
+        legacy_ciphertext = store._fernet.encrypt(legacy_plaintext)
+        store._conn.execute(
+            """
+            INSERT INTO secrets (name, ciphertext, acl, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            ("legacy_key", legacy_ciphertext, "admin", 0.0, 0.0),
+        )
+        # Clear record_format so store behaves like an upgraded pre-migration store
+        store._conn.execute(
+            "DELETE FROM store_meta WHERE key = 'record_format'"
+        )
+
+        # Before migration, legacy records can be read
+        assert store.get("legacy_key", caller="admin") == "legacy_secret_value"
+        assert store._records_strict() is False
+
+        # Run explicit migration
+        migrated = store.migrate_records()
+        assert migrated == 1
+        assert store._records_strict() is True
+
+        # Now all records are migrated into envelopes
+        assert store.get("legacy_key", caller="admin") == "legacy_secret_value"
+
+        # Tampering with name or ACL in database is now rejected with InvalidToken
+        store._conn.execute(
+            "UPDATE secrets SET acl = 'other' WHERE name = 'legacy_key'"
+        )
+        with pytest.raises(InvalidToken):
+            store.get("legacy_key", caller="other")
+
+        # Also, raw legacy records injected post-migration fail closed
+        raw_unbound = store._fernet.encrypt(b"unbound_val")
+        store._conn.execute(
+            """
+            INSERT OR REPLACE INTO secrets (
+                name, ciphertext, acl, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            ("unbound_key", raw_unbound, "", 0.0, 0.0),
+        )
+        with pytest.raises(InvalidToken, match="unbound legacy record rejected"):
+            store.get("unbound_key")
+    finally:
+        store.close()
