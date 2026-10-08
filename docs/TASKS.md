@@ -14,3 +14,5 @@ review/repair records are listed in the task archive.
 
 The repository-wide algorithm program remains active for documented deeper
 proof obligations; completed scoped repairs do not erase accepted limitations.
+
+The [cross-process storage proofs and approved mode-switch recovery repair](tasks/done/2026-10-08-storage-process-proofs.md) are also complete for the stated scope; all six canonical gates pass.

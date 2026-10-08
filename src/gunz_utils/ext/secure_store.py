@@ -573,6 +573,15 @@ class SecureStore:
             self._pending_salt_path.unlink(missing_ok=True)
         self._fsync_base_dir()
 
+    def _cleanup_opposite_mode_primary(self, *, passphrase_mode: bool) -> None:
+        """Complete interrupted publication after authenticated key verification."""
+        obsolete = self._master_key_path if passphrase_mode else self._salt_path
+        try:
+            obsolete.unlink()
+        except FileNotFoundError:
+            return
+        self._fsync_base_dir()
+
     def _read_record_policy(self, fernet: Fernet) -> bool:
         """Verify authenticated policy and its persisted format marker."""
         check = self._conn.execute(
@@ -785,6 +794,9 @@ class SecureStore:
                     )
                 else:
                     self._cleanup_pending_key_material()
+                    self._cleanup_opposite_mode_primary(
+                        passphrase_mode=passphrase is not None,
+                    )
                 return
 
             if last_error is not None:

@@ -10,6 +10,12 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [2026-10-08-storage-cas-process-proofs](tasks/done/2026-10-08-storage-cas-process-proofs.md)
+- [2026-10-08-storage-mode-switch-crash-repair](tasks/done/2026-10-08-storage-mode-switch-crash-repair.md)
+- [2026-10-08-storage-process-proofs](tasks/done/2026-10-08-storage-process-proofs.md)
+- [2026-10-08-storage-store-crash-recovery](tasks/done/2026-10-08-storage-store-crash-recovery.md)
+- [2026-10-08-storage-store-process-locks](tasks/done/2026-10-08-storage-store-process-locks.md)
+
 - [2026-10-08-audit-concurrency-cancellation](tasks/done/2026-10-08-audit-concurrency-cancellation.md)
 - [2026-10-08-audit-filesystem-publication](tasks/done/2026-10-08-audit-filesystem-publication.md)
 - [2026-10-08-audit-follow-up](tasks/done/2026-10-08-audit-follow-up.md)

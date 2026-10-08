@@ -52,6 +52,24 @@ top.
 
 ## Audited algorithm set
 
+### Cross-process follow-up on 3f474ad
+
+[The process proof program](../tasks/done/2026-10-08-storage-process-proofs.md)
+adds bounded acknowledged spawn-process schedules on Python 3.11/3.12. SP-01
+has 12 passing CAS cases; SP-02 has 10 passing real-flock/SQLite coordination
+cases. SP-03 now passes all 26 strict crash cases after the approved mode-switch
+recovery repair. SP-04 adds ten ordinary rejected-authentication and cleanup/fsync
+failure regressions. Full canonical verification passed all six gates on both
+interpreters; the completed parent records the actual source-input fingerprint.
+
+The confirmed SP-04 recovery defect leaves obsolete opposite-mode primary key/
+salt material after current-candidate unlock; the leftover salt blocks future
+file-mode rotation. After the user authorized the concrete patch, authenticated
+normal-candidate recovery now completes opposite-primary cleanup. Unchanged strict
+crash tests and the complete aggregate gate now pass on both Python versions. Wrong credentials
+and damaged policy preserve current/pending bytes in the executed proof packet.
+Historical A4 rows below do not certify these new schedules by themselves.
+
 ### 2026-10-08 follow-up status
 
 The [follow-up task hierarchy](../tasks/done/2026-10-08-audit-follow-up.md)
@@ -328,16 +346,23 @@ crash-durability and platform proofs remain distinct obligations.
 
 ### GAP-006 — content-store fallback publication
 
-The normal hard-link publication path is concurrency-friendly; the fallback
-replace path still needs an adversarial concurrent-publication/fault-injection
-proof.
+SP-01 now executes acknowledged independent cooperating publisher/reader
+schedules for ordinary and forced hard-link-unavailable publication, corrupt
+competitors, explicit syscall failures and actual publisher death. Both supported
+Python versions pass 12 cases on Linux. Same-digest fallback publication preserves
+correct bytes but may replace an inode; that is an explicit contract limitation.
+A reader spanning that replacement can reject identity and retry after publication
+settles. Abrupt death can leave private staging while publication remains absent
+or fully correct. Power-loss, hostile-root/final-name and broader platform proofs
+remain separate obligations; no new family-wide A4 promotion is made.
 
 ### GAP-008 — SecureStore backend completeness
 
 Current SecureStore transaction/policy/recovery regressions and existing AES
 malformed salt/hex cases are recorded in AU-02 and AR-04. Remaining proof work
-includes real multiprocess crash/rotation schedules, an independent AES
-known-answer/component-tamper matrix, and fixed key/salt read/decode budgets.
+now includes broader multiprocess/platform schedules beyond the passing
+SP-01 through SP-04 packets, an independent AES known-answer/
+component-tamper matrix, and fixed key/salt read/decode budgets.
 Do not describe malformed-format coverage as wholly absent. The optional
 Pydantic validation adapter itself is covered by ALG-075.
 

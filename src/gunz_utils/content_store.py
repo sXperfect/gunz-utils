@@ -665,7 +665,12 @@ class ContentAddressedStore:
         *,
         verify: bool = True,
     ) -> Path:
-        """Return a stored artifact path, optionally verifying its digest."""
+        """Return a stored artifact path, optionally verifying its digest.
+
+        A concurrent pathname replacement can raise ValueError even when the
+        replacement has the same content digest. Callers may retry after
+        cooperating publication settles. Returned paths remain snapshots.
+        """
         if not isinstance(verify, bool):
             raise ValueError("verify must be bool")
         normalized = self._validate_digest(digest)
