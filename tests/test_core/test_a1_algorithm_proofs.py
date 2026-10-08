@@ -273,7 +273,10 @@ def test_transactional_directory_replace_failure_cleans_staging(
     tmp_path: Path,
 ) -> None:
     target = tmp_path / "published"
-    with patch("gunz_utils.fs.os.replace", side_effect=OSError("publish failed")):
+    with patch(
+        "gunz_utils.fs._rename_directory_noreplace",
+        side_effect=OSError("publish failed"),
+    ):
         with pytest.raises(OSError, match="publish failed"):
             with transactional_directory(target) as staging:
                 (staging / "data.txt").write_text("complete", encoding="utf-8")

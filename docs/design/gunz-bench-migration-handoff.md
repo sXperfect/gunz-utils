@@ -2,16 +2,16 @@
 
 ## 1. Executive Summary
 
-To preserve the architectural integrity of `gunz-utils` as a lean, zero-dependency foundation for the Gunz ecosystem, all domain-specific benchmarking, profiling adapters, visual plotting, and regression gating implementations are being transferred to **`gunz-bench`** (located at `../gunz-bench`).
+To preserve the architectural integrity of `gunz-utils` as a lean, zero-dependency foundation for the Gunz ecosystem, all domain-specific benchmarking, profiling adapters, visual plotting, and regression gating implementations are being transferred to **`gunz-bench`** (located at `../bench`).
 
 The entire benchmark subsystem (`src/gunz_utils/benchmark/`, 30 modules) and its test suites have been staged in:
 ```text
-../gunz-bench/tmp/handsoff/
+../bench/tmp/handsoff/
 ├── MANIFEST.md
 ├── benchmark_subsystem/
 └── tests/
 ```
-accompanied by a comprehensive integration design document in `../gunz-bench/docs/design/gunz-utils-subsystem-transfer.md`.
+accompanied by a comprehensive integration design document in `../bench/docs/design/gunz-utils-subsystem-transfer.md`.
 
 ---
 
@@ -29,8 +29,8 @@ accompanied by a comprehensive integration design document in `../gunz-bench/doc
 ## 3. Migration Roadmap and Deprecation Strategy
 
 ### Phase 1: Staging & Handshake (Completed)
-- Source code, tests, and documentation staged in `../gunz-bench/tmp/handsoff/`.
-- `gunz-bench` design documented in `../gunz-bench/docs/design/gunz-utils-subsystem-transfer.md`.
+- Source code, tests, and documentation staged in `../bench/tmp/handsoff/`.
+- `gunz-bench` design documented in `../bench/docs/design/gunz-utils-subsystem-transfer.md`.
 
 ### Phase 2: Integration in `gunz-bench` (Completed)
 - `gunz-bench` merged isolation, reporting, adapters, process trees, and native acceleration.

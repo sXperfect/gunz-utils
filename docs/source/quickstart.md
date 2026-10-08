@@ -50,6 +50,15 @@ from gunz_utils import SecureStore, resolve_project_root, setup_logging, type_ch
 Install the corresponding extras before using these symbols. See
 [Installation](installation.md) for the extras matrix.
 
+For a trusted legacy SecureStore whose records predate authenticated metadata,
+use `store.unlock(passphrase, allow_legacy=True)` and then
+`store.migrate_records()` once. Omit `passphrase` for file-key stores. Ordinary
+unlock automatically upgrades older stores that already have strict envelope
+metadata. Missing or inconsistent modern policy metadata raises an integrity
+error, including when legacy migration is requested. Only opt in for a trusted
+legacy database; authenticated snapshot rollback requires external freshness
+state. Normal reads and key rotation preserve the authenticated format policy.
+
 ## Benchmarking
 
 ```python

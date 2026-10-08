@@ -7,6 +7,7 @@ Uses clang/gcc on POSIX and cl.exe on Windows with zero third-party dependencies
 
 from __future__ import annotations
 
+import argparse
 import os
 import subprocess
 import sys
@@ -14,11 +15,12 @@ import sysconfig
 from pathlib import Path
 
 
-def build() -> int:
+def build(output_dir: Path | None = None) -> int:
+    """Compile optional acceleration, optionally into an isolated package copy."""
     root = Path(__file__).resolve().parent.parent
     c_src = root / "native" / "src" / "_accel.c"
     inc_dir = root / "native" / "include"
-    out_dir = root / "src" / "gunz_utils"
+    out_dir = output_dir if output_dir is not None else root / "src" / "gunz_utils"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     ext_suffix = sysconfig.get_config_var("EXT_SUFFIX") or ".so"
@@ -74,4 +76,8 @@ def build() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(build())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-dir", type=Path, help="compile outside the source checkout"
+    )
+    sys.exit(build(parser.parse_args().output_dir))

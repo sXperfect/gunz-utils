@@ -72,7 +72,6 @@ def test_lease_setup_failure_cleans_created_operation(
             return future
 
         def fail_heartbeat(coroutine: Any) -> None:
-            coroutine.close()
             raise RuntimeError("heartbeat setup failed")
 
         monkeypatch.setattr(
@@ -412,12 +411,12 @@ def test_content_store_fallback_publication_is_verified(
     original_replace = content_store_module.os.replace
     replaced: list[tuple[object, object]] = []
 
-    def no_hardlinks(_source: object, _target: object) -> None:
+    def no_hardlinks(_source: object, _target: object, **kwargs: Any) -> None:
         raise OSError("hard links unavailable")
 
-    def record_replace(source: object, target: object) -> None:
+    def record_replace(source: object, target: object, **kwargs: Any) -> None:
         replaced.append((source, target))
-        original_replace(source, target)
+        original_replace(source, target, **kwargs)
 
     monkeypatch.setattr(content_store_module.os, "link", no_hardlinks)
     monkeypatch.setattr(content_store_module.os, "replace", record_replace)

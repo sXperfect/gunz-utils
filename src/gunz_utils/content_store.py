@@ -2,18 +2,31 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import io
 import os
+import secrets
 import shutil
 import stat
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, Literal
+from typing import BinaryIO, Literal, cast
 
-from .hashing import DEFAULT_ALGO, SUPPORTED_ALGOS, file_hash
+from .hashing import DEFAULT_ALGO, SUPPORTED_ALGOS
 from .streaming import copy_and_hash
+
+_ANCHORED_IO = (
+    os.name == "posix"
+    and hasattr(os, "O_NOFOLLOW")
+    and all(
+        function in os.supports_dir_fd
+        for function in (os.open, os.mkdir, os.stat, os.link, os.unlink, os.rename)
+    )
+)
 
 _CONTENT_ID_ALGOS = frozenset({"sha256", "sha512", "sha3_256", "blake2b", "blake2s"})
 
@@ -34,6 +47,12 @@ class ContentAddressedStore:
     Files are placed below the store root using a digest prefix directory and
     the complete digest as the filename. Existing content is verified before
     reuse so silent corruption is distinguishable from a legitimate cache hit.
+
+    POSIX systems with descriptor-relative operations anchor fanout traversal and
+    publication. The configured root and destination ancestors must be trusted; callers
+    must prevent concurrent mutation of stored file contents. Other platforms
+    require trusted store and destination directory trees. Returned paths are
+    snapshots and cannot guarantee identity after a subsequent filesystem change.
 
     Parameters
     ----------
@@ -114,10 +133,8 @@ class ContentAddressedStore:
             raise ValueError(
                 f"digest must contain {self.digest_chars} hexadecimal characters"
             )
-        try:
-            int(normalized, 16)
-        except ValueError:
-            raise ValueError("digest must be hexadecimal") from None
+        if any(character not in "0123456789abcdef" for character in normalized):
+            raise ValueError("digest must be hexadecimal")
         return normalized
 
     def path_for(
@@ -133,33 +150,155 @@ class ContentAddressedStore:
             target = target / normalized[start:stop]
         return target / normalized
 
-    def _verify_existing(
-        self,
-        target: Path,
-        digest: str,
-        size_bytes: int | None = None,
+    @contextmanager
+    def _parent_handle(self, target: Path, *, create: bool) -> Iterator[int | None]:
+        """Anchor fanout traversal; root ancestors must be trusted."""
+        if not _ANCHORED_IO:
+            self._check_prefix_path(target, create=create)
+            yield None
+            return
+        descriptor = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            for component in target.parent.relative_to(self.root).parts:
+                if create:
+                    try:
+                        os.mkdir(component, dir_fd=descriptor)
+                    except FileExistsError:
+                        pass
+                try:
+                    child = os.open(
+                        component,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                        dir_fd=descriptor,
+                    )
+                except OSError as exc:
+                    if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+                        raise ValueError(
+                            "content-addressed prefix directory must not be "
+                            "a symlink or non-directory"
+                        ) from exc
+                    raise
+                os.close(descriptor)
+                descriptor = child
+            yield descriptor
+        finally:
+            os.close(descriptor)
+
+    @staticmethod
+    def _check_directory_identity(path: Path, descriptor: int | None) -> None:
+        if descriptor is not None:
+            info = os.stat(path, follow_symlinks=False)
+            if not stat.S_ISDIR(info.st_mode) or not os.path.samestat(
+                info, os.fstat(descriptor)
+            ):
+                raise ValueError("publication directory changed during operation")
+
+    @staticmethod
+    def _check_file_identity(
+        path: Path, descriptor: int, parent_fd: int | None
     ) -> None:
-        """Require an existing content-addressed entry to match its identity."""
-        if target.is_symlink():
-            raise ValueError(
-                f"content-addressed artifact path is a symlink: {digest}"
+        info = os.stat(
+            path.name if parent_fd is not None else path,
+            dir_fd=parent_fd,
+            follow_symlinks=False,
+        )
+        if not stat.S_ISREG(info.st_mode) or not os.path.samestat(
+            info, os.fstat(descriptor)
+        ):
+            raise ValueError("artifact changed during operation")
+
+    @staticmethod
+    def _temporary_file(
+        parent: Path, parent_fd: int | None, prefix: str
+    ) -> tuple[int, Path]:
+        if parent_fd is None:
+            descriptor, name = tempfile.mkstemp(
+                dir=parent, prefix=prefix, suffix=".tmp"
             )
-        if not target.is_file():
-            raise ValueError(
-                "content-addressed target is not a regular file"
+            return descriptor, Path(name)
+        while True:
+            name = prefix + secrets.token_hex(16) + ".tmp"
+            try:
+                descriptor = os.open(
+                    name,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                    0o600,
+                    dir_fd=parent_fd,
+                )
+            except FileExistsError:
+                continue
+            return descriptor, parent / name
+
+    @staticmethod
+    def _unlink(path: Path, parent_fd: int | None) -> None:
+        try:
+            os.unlink(path.name if parent_fd is not None else path, dir_fd=parent_fd)
+        except FileNotFoundError:
+            pass
+
+    @staticmethod
+    @contextmanager
+    def _duplicate_handle(descriptor: int, mode: str) -> Iterator[BinaryIO]:
+        duplicate = os.dup(descriptor)
+        try:
+            handle = os.fdopen(duplicate, mode)
+        except BaseException:
+            os.close(duplicate)
+            raise
+        with handle:
+            yield cast(BinaryIO, handle)
+
+    def _verify_handle(
+        self, descriptor: int, digest: str, size_bytes: int | None = None
+    ) -> None:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError("content-addressed target is not a regular file")
+        if size_bytes is not None and info.st_size != size_bytes:
+            raise ValueError(f"content-addressed artifact is corrupted: {digest}")
+        hasher = hashlib.new(self.algo)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        while block := os.read(descriptor, self.chunk_size):
+            hasher.update(block)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        if hasher.hexdigest() != digest:
+            raise ValueError(f"content-addressed artifact is corrupted: {digest}")
+
+    @contextmanager
+    def _artifact_handle(self, target: Path, parent_fd: int | None) -> Iterator[int]:
+        if parent_fd is None and target.is_symlink():
+            raise ValueError("content-addressed artifact path is a symlink")
+        flags = (
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        )
+        try:
+            descriptor = os.open(
+                target.name if parent_fd is not None else target,
+                flags,
+                dir_fd=parent_fd,
             )
-        if size_bytes is not None and target.stat().st_size != size_bytes:
-            raise ValueError(
-                f"content-addressed artifact is corrupted: {digest}"
-            )
-        if file_hash(
-            target,
-            algo=self.algo,
-            chunk_size=self.chunk_size,
-        ) != digest:
-            raise ValueError(
-                f"content-addressed artifact is corrupted: {digest}"
-            )
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise ValueError(
+                    "content-addressed artifact path is a symlink"
+                ) from exc
+            raise
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise ValueError("content-addressed target is not a regular file")
+            yield descriptor
+        finally:
+            os.close(descriptor)
+
+    def _verify_existing(
+        self, target: Path, digest: str, size_bytes: int | None = None
+    ) -> None:
+        with self._parent_handle(target, create=False) as parent_fd:
+            with self._artifact_handle(target, parent_fd) as descriptor:
+                self._verify_handle(descriptor, digest, size_bytes)
+                self._check_file_identity(target, descriptor, parent_fd)
+            self._check_prefix_path(target, create=False)
+            self._check_directory_identity(target.parent, parent_fd)
 
     def _check_prefix_path(
         self,
@@ -187,9 +326,7 @@ class ContentAddressedStore:
             if create:
                 current.mkdir(exist_ok=True)
             if current.exists() and not current.is_dir():
-                raise ValueError(
-                    "content-addressed prefix path must be a directory"
-                )
+                raise ValueError("content-addressed prefix path must be a directory")
 
     def _ensure_prefix_directory(self, target: Path) -> None:
         """Create fanout directories without accepting symlink components."""
@@ -200,63 +337,44 @@ class ContentAddressedStore:
         temporary: Path,
         digest: str,
         size_bytes: int,
+        *,
+        temporary_fd: int | None = None,
+        root_fd: int | None = None,
     ) -> StoredArtifact:
-        """Publish one already-hashed temporary file into the store."""
+        """Publish into an anchored fanout, retaining the verified staging inode."""
         target = self.path_for(digest)
-
-        if target.exists() or target.is_symlink():
-            self._verify_existing(
-                target,
-                digest,
-                size_bytes,
-            )
-            temporary.unlink(missing_ok=True)
-            return StoredArtifact(
-                digest=digest,
-                path=target,
-                size_bytes=size_bytes,
-            )
-
-        self._ensure_prefix_directory(target)
-
-        try:
-            os.link(
-                temporary,
-                target,
-            )
-        except FileExistsError:
-            self._verify_existing(
-                target,
-                digest,
-                size_bytes,
-            )
-        except OSError:
-            # Some filesystems do not support hard-link publication. Re-check
-            # for a concurrent winner before falling back to atomic replace.
-            if target.exists() or target.is_symlink():
-                self._verify_existing(
-                    target,
-                    digest,
-                    size_bytes,
+        with self._parent_handle(target, create=True) as parent_fd:
+            if temporary_fd is not None:
+                self._check_file_identity(temporary, temporary_fd, root_fd)
+            try:
+                os.link(
+                    temporary.name if root_fd is not None else temporary,
+                    target.name if parent_fd is not None else target,
+                    src_dir_fd=root_fd,
+                    dst_dir_fd=parent_fd,
+                    follow_symlinks=False,
                 )
-            else:
-                os.replace(
-                    temporary,
-                    target,
-                )
-                return StoredArtifact(
-                    digest=digest,
-                    path=target,
-                    size_bytes=size_bytes,
-                )
-        finally:
-            temporary.unlink(missing_ok=True)
-
-        return StoredArtifact(
-            digest=digest,
-            path=target,
-            size_bytes=size_bytes,
-        )
+            except FileExistsError:
+                with self._artifact_handle(target, parent_fd) as descriptor:
+                    self._verify_handle(descriptor, digest, size_bytes)
+            except OSError:
+                try:
+                    with self._artifact_handle(target, parent_fd) as descriptor:
+                        self._verify_handle(descriptor, digest, size_bytes)
+                except FileNotFoundError:
+                    # Same-digest cooperating writers may replace the winner inode;
+                    # fallback promises correct content, not inode preservation.
+                    os.replace(
+                        temporary.name if root_fd is not None else temporary,
+                        target.name if parent_fd is not None else target,
+                        src_dir_fd=root_fd,
+                        dst_dir_fd=parent_fd,
+                    )
+            self._check_prefix_path(target, create=False)
+            self._check_directory_identity(target.parent, parent_fd)
+            with self._artifact_handle(target, parent_fd) as descriptor:
+                self._verify_handle(descriptor, digest, size_bytes)
+        return StoredArtifact(digest=digest, path=target, size_bytes=size_bytes)
 
     def put_stream(
         self,
@@ -283,41 +401,43 @@ class ContentAddressedStore:
         if not hasattr(source, "read"):
             raise TypeError("source must provide a binary read() method")
 
-        descriptor, temporary_name = tempfile.mkstemp(
-            dir=self.root,
-            prefix=".incoming.",
-            suffix=".tmp",
-        )
-        temporary = Path(temporary_name)
+        root_fd = None
+        if _ANCHORED_IO:
+            root_fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
-            with os.fdopen(
-                descriptor,
-                "wb",
-            ) as target_handle:
-                copied = copy_and_hash(
-                    source,
-                    target_handle,
-                    algorithm=self.algo,
-                    chunk_size=self.chunk_size,
-                )
-                target_handle.flush()
-                os.fsync(target_handle.fileno())
-
-            return self._publish_temporary(
-                temporary,
-                copied.hexdigest,
-                copied.bytes_written,
+            descriptor, temporary = self._temporary_file(
+                self.root, root_fd, ".incoming."
             )
-        except BaseException:
-            temporary.unlink(missing_ok=True)
-            raise
+            try:
+                with self._duplicate_handle(descriptor, "wb") as target_handle:
+                    copied = copy_and_hash(
+                        source,
+                        target_handle,
+                        algorithm=self.algo,
+                        chunk_size=self.chunk_size,
+                    )
+                    target_handle.flush()
+                    os.fsync(target_handle.fileno())
+                return self._publish_temporary(
+                    temporary,
+                    copied.hexdigest,
+                    copied.bytes_written,
+                    temporary_fd=descriptor,
+                    root_fd=root_fd,
+                )
+            finally:
+                os.close(descriptor)
+                self._unlink(temporary, root_fd)
+        finally:
+            if root_fd is not None:
+                os.close(root_fd)
 
     def put_bytes(
         self,
         data: bytes | bytearray | memoryview,
     ) -> StoredArtifact:
         """Store an in-memory byte buffer without an intermediate source file."""
-        if not isinstance(data, (bytes, bytearray, memoryview)):
+        if not isinstance(data, bytes | bytearray | memoryview):
             raise TypeError("data must be bytes-like")
         with io.BytesIO(bytes(data)) as source:
             return self.put_stream(source)
@@ -394,6 +514,10 @@ class ContentAddressedStore:
         -----
         Publication is staged in the destination directory. With replace false,
         a final hard-link publication provides atomic no-overwrite semantics.
+        A concurrent staging-name substitution is detected, but detection after
+        publication may leave the substituted destination entry. Callers requiring
+        destination identity on failure must use a trusted destination parent;
+        arbitrary directory writers can also mutate returned paths after success.
         """
         if strategy not in {"hardlink", "copy"}:
             raise ValueError("strategy must be 'hardlink' or 'copy'")
@@ -405,54 +529,134 @@ class ContentAddressedStore:
             if not isinstance(value, bool):
                 raise ValueError(f"{name} must be bool")
 
-        source = self.get(
-            digest,
-            verify=verify,
-        )
+        normalized = self._validate_digest(digest)
+        source = self.path_for(normalized)
         target = Path(destination)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if (target.exists() or target.is_symlink()) and not replace:
-            raise FileExistsError(target)
-
-        descriptor, temporary_name = tempfile.mkstemp(
-            dir=target.parent,
-            prefix=f".{target.name}.",
-            suffix=".tmp",
-        )
-        os.close(descriptor)
-        temporary = Path(temporary_name)
-        temporary.unlink(missing_ok=True)
-
+        destination_fd = None
         try:
-            if strategy == "hardlink":
-                try:
-                    os.link(source, temporary)
-                except OSError:
-                    if not fallback_copy:
-                        raise
-                    shutil.copy2(source, temporary)
-            else:
-                shutil.copy2(source, temporary)
-
-            if replace:
-                os.replace(
-                    temporary,
-                    target,
-                )
-            else:
-                try:
-                    os.link(
-                        temporary,
-                        target,
+            with self._parent_handle(source, create=False) as source_parent_fd:
+                with self._artifact_handle(source, source_parent_fd) as source_fd:
+                    if verify:
+                        self._verify_handle(source_fd, normalized)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    if _ANCHORED_IO:
+                        destination_fd = os.open(
+                            target.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+                        )
+                    if not replace:
+                        try:
+                            os.stat(
+                                target.name if destination_fd is not None else target,
+                                dir_fd=destination_fd,
+                                follow_symlinks=False,
+                            )
+                        except FileNotFoundError:
+                            pass
+                        else:
+                            raise FileExistsError(target)
+                    descriptor, temporary = self._temporary_file(
+                        target.parent, destination_fd, f".{target.name}."
                     )
-                except FileExistsError:
-                    raise FileExistsError(target) from None
-                finally:
-                    temporary.unlink(missing_ok=True)
-        except BaseException:
-            temporary.unlink(missing_ok=True)
+                    try:
+                        linked = False
+                        if strategy == "hardlink":
+                            # Link to a fresh exclusive name; never reopen a removed
+                            # reservation for copying. Keep source descriptor pinned.
+                            link_path = target.parent / (
+                                f".{target.name}." + secrets.token_hex(16) + ".link"
+                            )
+                            link_created = False
+                            try:
+                                os.link(
+                                    source.name
+                                    if source_parent_fd is not None
+                                    else source,
+                                    link_path.name
+                                    if destination_fd is not None
+                                    else link_path,
+                                    src_dir_fd=source_parent_fd,
+                                    dst_dir_fd=destination_fd,
+                                    follow_symlinks=False,
+                                )
+                                link_created = True
+                                self._check_file_identity(
+                                    link_path, source_fd, destination_fd
+                                )
+                            except OSError:
+                                if not fallback_copy:
+                                    raise
+                            else:
+                                self._unlink(temporary, destination_fd)
+                                temporary = link_path
+                                linked = True
+                            finally:
+                                if link_created and not linked:
+                                    self._unlink(link_path, destination_fd)
+                        if not linked:
+                            with self._duplicate_handle(
+                                source_fd, "rb"
+                            ) as source_handle:
+                                with self._duplicate_handle(
+                                    descriptor, "wb"
+                                ) as target_handle:
+                                    shutil.copyfileobj(
+                                        source_handle, target_handle, self.chunk_size
+                                    )
+                                    target_handle.flush()
+                            source_info = os.fstat(source_fd)
+                            if hasattr(os, "fchmod"):
+                                os.fchmod(descriptor, stat.S_IMODE(source_info.st_mode))
+                            else:
+                                # Platforms without descriptor permissions require
+                                # the documented trusted destination tree.
+                                os.chmod(temporary, stat.S_IMODE(source_info.st_mode))
+                            if os.utime in os.supports_fd:
+                                os.utime(
+                                    descriptor,
+                                    ns=(
+                                        source_info.st_atime_ns,
+                                        source_info.st_mtime_ns,
+                                    ),
+                                )
+                        self._check_file_identity(
+                            temporary,
+                            source_fd if linked else descriptor,
+                            destination_fd,
+                        )
+                        self._check_directory_identity(target.parent, destination_fd)
+                        if replace:
+                            os.replace(
+                                temporary.name
+                                if destination_fd is not None
+                                else temporary,
+                                target.name if destination_fd is not None else target,
+                                src_dir_fd=destination_fd,
+                                dst_dir_fd=destination_fd,
+                            )
+                        else:
+                            os.link(
+                                temporary.name
+                                if destination_fd is not None
+                                else temporary,
+                                target.name if destination_fd is not None else target,
+                                src_dir_fd=destination_fd,
+                                dst_dir_fd=destination_fd,
+                                follow_symlinks=False,
+                            )
+                        self._check_file_identity(
+                            target, source_fd if linked else descriptor, destination_fd
+                        )
+                        self._check_directory_identity(target.parent, destination_fd)
+                    finally:
+                        os.close(descriptor)
+                        self._unlink(temporary, destination_fd)
+        except FileNotFoundError as exc:
+            if not source.exists():
+                raise KeyError(normalized) from exc
             raise
-
+        finally:
+            if destination_fd is not None:
+                os.close(destination_fd)
         return target
 
     def get(
@@ -466,18 +670,16 @@ class ContentAddressedStore:
             raise ValueError("verify must be bool")
         normalized = self._validate_digest(digest)
         target = self.path_for(normalized)
-        self._check_prefix_path(target, create=False)
-        if not target.exists() and not target.is_symlink():
-            raise KeyError(normalized)
-        if verify:
-            self._verify_existing(
-                target,
-                normalized,
-            )
-        elif target.is_symlink() or not target.is_file():
-            raise ValueError(
-                "content-addressed target is not a regular file"
-            )
+        try:
+            with self._parent_handle(target, create=False) as parent_fd:
+                with self._artifact_handle(target, parent_fd) as descriptor:
+                    if verify:
+                        self._verify_handle(descriptor, normalized)
+                    self._check_file_identity(target, descriptor, parent_fd)
+                self._check_prefix_path(target, create=False)
+                self._check_directory_identity(target.parent, parent_fd)
+        except FileNotFoundError:
+            raise KeyError(normalized) from None
         return target
 
     def verify(

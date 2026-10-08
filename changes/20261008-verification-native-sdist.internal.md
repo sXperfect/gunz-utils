@@ -1,0 +1,1 @@
+Require explicit native and pure-Python fallback activation during verification, and verify source-distribution installation, rebuild, typing marker and optional native build support in isolated scratch directories.

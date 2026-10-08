@@ -63,7 +63,9 @@ int gunz_native_decode_uvarint(
 /*
  * Recursive validation of pure JSON objects (no custom classes or byte objects).
  */
-static int check_json_clean(PyObject *obj, int depth, int max_depth) {
+static int check_json_clean(PyObject *obj, int depth, int max_depth);
+
+static int check_json_clean_inner(PyObject *obj, int depth, int max_depth) {
     if (depth > max_depth) {
         PyErr_Format(
             PyExc_ValueError,
@@ -71,6 +73,13 @@ static int check_json_clean(PyObject *obj, int depth, int max_depth) {
             max_depth
         );
         return -1;
+    }
+    /* CPython 3.12+ separates some C/Python recursion accounting. A hard
+     * fast-path budget bounds our C stack independently of those internals.
+     * Returning false delegates deeper input to the Python reference, which
+     * applies its own recursion/depth semantics rather than changing the API. */
+    if (depth > 128) {
+        return 0;
     }
     if (PyBytes_Check(obj)) {
         PyErr_SetString(
@@ -117,6 +126,16 @@ static int check_json_clean(PyObject *obj, int depth, int max_depth) {
     return 0; /* custom type or non-exact container */
 }
 
+/* Balance CPython recursion accounting on every success/failure path. */
+static int check_json_clean(PyObject *obj, int depth, int max_depth) {
+    if (Py_EnterRecursiveCall(" while validating JSON objects")) {
+        return -1;
+    }
+    int result = check_json_clean_inner(obj, depth, max_depth);
+    Py_LeaveRecursiveCall();
+    return result;
+}
+
 /*
  * Python C API wrapper for is_json_clean.
  */
@@ -147,6 +166,19 @@ static PyObject *py_encode_uvarint(PyObject *self, PyObject *args) {
     if (!PyLong_Check(py_val)) {
         PyErr_SetString(PyExc_TypeError, "an integer is required");
         return NULL;
+    }
+
+    /* Python integer subclasses may override arithmetic/comparison. Delegate
+     * them to the reference instead of silently bypassing those semantics. */
+    if (!PyLong_CheckExact(py_val) && !PyBool_Check(py_val)) {
+        PyObject *module = PyImport_ImportModule("gunz_utils.binary");
+        if (!module) return NULL;
+        PyObject *encoder = PyObject_GetAttrString(module, "_py_encode_uvarint");
+        Py_DECREF(module);
+        if (!encoder) return NULL;
+        PyObject *result = PyObject_CallOneArg(encoder, py_val);
+        Py_DECREF(encoder);
+        return result;
     }
 
     int overflow = 0;

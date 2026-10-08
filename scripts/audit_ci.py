@@ -55,7 +55,7 @@ def run_compatibility(python_executable: str) -> int:
     env = dict(os.environ)
     env["PYTHONPATH"] = str(SRC_DIR)
     return _run(
-        (python_executable, "-m", "pytest"),
+        (python_executable, str(CI_SCRIPT), "test"),
         env=env,
     )
 
@@ -113,8 +113,7 @@ def _summary_payload(results: Sequence[GateResult]) -> dict[str, object]:
         "schema_version": 1,
         "passed": all(item.returncode == 0 for item in results),
         "results": [
-            {"name": item.name, "returncode": item.returncode}
-            for item in results
+            {"name": item.name, "returncode": item.returncode} for item in results
         ],
     }
 

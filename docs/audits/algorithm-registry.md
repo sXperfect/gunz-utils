@@ -52,6 +52,38 @@ top.
 
 ## Audited algorithm set
 
+### 2026-10-08 follow-up status
+
+The [follow-up task hierarchy](../tasks/done/2026-10-08-audit-follow-up.md)
+reviews `80bde76a641ce4577574fde60ec957251aee2ba0` plus the dirty working tree on
+`audit/follow-up-20261008`. AU-01 through AU-06 are complete initial reviews;
+reproduced source defects and verification/documentation gaps produced AR-01
+through AR-11. Historical A4 rows below retain evidence for their original
+revision; they do not certify this new working tree.
+
+| Families | Current repair/proof packet |
+|---|---|
+| ALG-022 / ALG-056 | Rejected heartbeat coroutine closure, partial pipeline setup cleanup, terminal child cancellation and shielded owned-task draining |
+| ALG-039 | Synchronous bounded-capture deadline includes inherited-pipe draining; POSIX readers can stop without waiting for escaped descendants |
+| ALG-050 | Authenticated strict/legacy record policy, explicit trusted legacy upgrade, durable-generation reconciliation after failed rotation cleanup |
+| ALG-054 | Descriptor-relative fanout operations, opened-source verification/copy, reserved staging descriptors, strict ASCII digest domain |
+| ALG-055 | Atomic-write setup descriptor closure and atomic directory no-replace publication on supported OS/filesystem combinations |
+| ALG-066 / ALG-067 | URI authority validation after IDNA normalization and finite sync timeout rejection before marker mutation |
+| ALG-012 / ALG-076 / ALG-077 | Native recursion protection and integer-subclass fallback parity; compiled-present and forced-absent execution required by test gate |
+| Package/CI contracts | Both distribution formats installed and checked outside checkout; wheel rebuilt from extracted sdist; native support inventoried and activation checked |
+
+Focused repair evidence is recorded in each AR task. The final pinned aggregate
+verifier passed all six gates on both supported interpreters; the execution-tree
+fingerprint and counts are recorded in the completed parent task. This status
+table does not blanket-promote historical A4 levels.
+
+Residual contracts remain explicit: root/ancestor trust and mutable returned
+Paths, mutable-parent final-name substitution detected after publication with a
+potential substituted final entry left on failure, non-POSIX path guarantees,
+Windows descendant-pipe reader lifetime, whole-store authenticated snapshot
+rollback freshness, recursive deep graphs, non-transactional benchmark run
+directories, sampled process-tree observations, and caller-owned input budgets.
+
 | ID | Algorithm / family | Location | Level | Main proof obligations / evidence | Current result |
 |---|---|---|---|---|---|
 | ALG-001 | Percentile bootstrap mean CI | `stats.bootstrap_mean_ci` | A2 | seeded determinism, confidence/sample/seed domains, finite real observations; `test_stats.py` | strict numerical parameter domains added; basic percentile semantics retained |
@@ -75,7 +107,7 @@ top.
 | ALG-019 | Benchmark history trend summary | `benchmark.trends.summarize_history` | A2 | OLS slope, moving median, finite metric values, baseline window | hardened domains and unknown-metric errors |
 | ALG-020 | Stability diagnostics | `benchmark.diagnostics.analyze_stability` | A2 | CV/range/outlier diagnostics, finite non-negative samples/thresholds | fixed invalid config appearing stable |
 | ALG-021 | Retry backoff / deadline policy | `retry.RetryPolicy`, retry runners | A2 | bounded attempts, finite delays/timeouts, overflow-safe exponential cap | fixed NaN/inf timing acceptance and huge-exponent overflow |
-| ALG-022 | Renewable lease heartbeat race | `leases.run_with_lease_heartbeat` | A4 | lease-loss precedence, cleanup, cancellation, Awaitable support, setup-failure cleanup | setup/race proofs executed successfully in aggregate CI |
+| ALG-022 | Renewable lease heartbeat race | `leases.run_with_lease_heartbeat` | A4 | lease-loss precedence, cleanup, cancellation, Awaitable support, setup-failure cleanup | historical aggregate proof; current rejected-coroutine cleanup evidence in AR-06 |
 | ALG-023 | Bounded/digest streaming writes | `streaming.BoundedWriter`, `DigestWriter`, `copy_and_hash` | A4 | partial-write progress, committed-byte accounting, byte limits, strict JSONL constants | partial-write/failure and strict-JSONL proofs executed successfully |
 | ALG-024 | Partition overlap detection | `partitions.partition_overlaps`, `PartitionManifest` | A4 | deterministic pair order, overlap oracle, immutable manifest, invalid-shape handling | exhaustive small-domain overlap proof executed successfully |
 | ALG-025 | TTL/LRU caches | `cache.ttl_cache`, `async_ttl_cache` | A2 | TTL expiry, capacity, coalesced async misses, finite TTL | fixed NaN/inf/bool TTL/capacity domains |
@@ -92,7 +124,7 @@ top.
 | ALG-036 | Recursive redaction | `redaction.redact`, `redact_dict` | A2 | secret-context propagation, non-mutation, reveal-count bound | strict reveal-count domain added |
 | ALG-037 | Safe integer parsing | `parsing.safe_int` | A2 | strings/bytes/ordinary ints, base handling, bounds/fallback | fixed documented integer inputs returning fallback |
 | ALG-038 | Generic async timeout wrapper | `async_utils.with_timeout` | A2 | None semantics, finite timeout, cancellation | finite timeout validation added |
-| ALG-039 | Subprocess timeout/output validation | `subprocess.run_command`, `run_command_async` | A4 | structured argv, finite timeout/grace domains, prompt streaming output cap, process-group cleanup | integrated bounded-capture/timing proofs passed on the composed tree |
+| ALG-039 | Subprocess timeout/output validation | `subprocess.run_command`, `run_command_async` | A4 | structured argv, finite timeout/grace domains, prompt streaming output cap, process-group cleanup | historical composed-tree proof; current pipe-drain deadline and constructor cleanup evidence in AR-08 |
 | ALG-040 | Upstream policy wrapper | `upstream_protocol.PolicyUpstream` | A2 | finite timeout, concurrency/attempt counts, idempotent retry set | parameter contracts hardened |
 | ALG-041 | Scaling efficiency | `benchmark.metrics.scaling_efficiency` | A2 | valid baseline, per-point validity, ideal-scale formula | fixed invalid baseline producing nonsensical values |
 | ALG-042 | Benchmark history trend | `benchmark.history.BenchmarkHistory.trend` | A2 | finite values, absolute/relative change, min/max | hardened unknown/non-finite metric handling |
@@ -103,13 +135,13 @@ top.
 | ALG-047 | Project-root discovery/cache | `ext.project_stdlib`, `ext.project_gitpython` | A2 | ancestor search, cross-anchor cache correctness, optional sys.path injection | fixed cached root leakage and late-injection bug |
 | ALG-048 | Deep nested data utilities | `dict_utils.deep_get`, `deep_set`, `deep_merge` | A2 | path validation, override semantics, list strategies, non-mutation of roots | existing evidence reviewed; nested value aliasing remains contract-sensitive |
 | ALG-049 | Secure AES-GCM format/key derivation | `ext.secure_crypto` | A2 | explicit passphrase, PBKDF2/AES-GCM round trip, legacy rejection | existing security tests reviewed; malformed-length matrix still pending |
-| ALG-050 | Encrypted credential store | `ext.secure_store.SecureStore` | A4 | key modes, authenticated decrypt, ACLs, mutation/audit atomicity, threaded serialization, rotation recovery | transaction/concurrency/crash-recovery proofs executed; secure isolation had 42 passing tests |
+| ALG-050 | Encrypted credential store | `ext.secure_store.SecureStore` | A4 | key modes, authenticated decrypt, ACLs, mutation/audit atomicity, threaded serialization, rotation recovery | historical isolation had 42 tests; current authenticated policy/rotation recovery evidence in AR-04 |
 | ALG-051 | Stdlib runtime type checker | `ext.validation_stdlib.type_checked` | A4 | argument binding, PEP 604 unions, recursive containers, literals/Annotated, varargs/kwargs, redacted errors | recursive/type-boundary proofs executed; stdlib isolation had 18 passing tests |
 | ALG-052 | Version migration | `versioning.*` | A4 | version/envelope validation, one-step migration order, missing/downgrade paths, failure stop | focused migration/failure-boundary proof executed successfully |
 | ALG-053 | Plugin discovery/selection | `plugins.*` | A4 | deterministic ordering, sibling failure isolation, instantiation errors, process-control propagation | focused discovery/isolation proof executed successfully |
-| ALG-054 | Content-addressed storage | `content_store.ContentAddressedStore` | A4 | digest/path mapping, integrity verification, symlinked fanout rejection, fallback publication, materialization domains | adversarial path/fallback proofs executed; cross-process fallback race remains GAP-006 |
-| ALG-055 | Atomic filesystem publication | `fs.*`, `io.*` atomic helpers | A4 | temp isolation, replace failure cleanup, directory publication, no-overwrite symlinks, durability contract | injected replace/publication proofs executed; post-replace fsync semantics remain GAP-005 |
-| ALG-056 | Core concurrency schedulers | `concurrency.*`, `pipeline.*` | A4 | task/queue bounds, initial-scheduling cleanup, ordering, worker-failure cancellation | adversarial setup/cancellation/worker-bound proofs executed successfully |
+| ALG-054 | Content-addressed storage | `content_store.ContentAddressedStore` | A4 | digest/path mapping, integrity verification, symlinked fanout rejection, fallback publication, materialization domains | historical path/fallback proof; current anchored copy/publication evidence in AR-01; GAP-006 and mutable-final-entry limitation remain |
+| ALG-055 | Atomic filesystem publication | `fs.*`, `io.*` atomic helpers | A4 | temp isolation, replace failure cleanup, directory publication, no-overwrite symlinks, durability contract | historical publication proof; current no-replace/descriptor cleanup in AR-02/03; post-replace fsync semantics documented/tested |
+| ALG-056 | Core concurrency schedulers | `concurrency.*`, `pipeline.*` | A4 | task/queue bounds, initial-scheduling cleanup, ordering, worker-failure cancellation | historical proof missed pipeline setup/self-cancellation; current lifecycle regressions in AR-05 |
 | ALG-057 | Signal/resource lifecycle | `signals.*`, `resources.*` | A4 | partial registration rollback, idempotent restore, reverse sync/async cleanup | lifecycle/failure proofs executed successfully |
 | ALG-058 | Collection transforms | `collections.unique/group_by/index_by/partition` | A4 | stable order, duplicate semantics, unhashable values, key-derived collisions | focused proof suite executed successfully |
 | ALG-059 | Human-readable formatting | `formatting.*` | A4 | SI/IEC boundaries, duration decomposition, precision domain, non-finite/bool rejection, huge integer counts | domain coercion hardened and executed |
@@ -119,8 +151,8 @@ top.
 | ALG-063 | Deterministic fault injection | `faults.FailAfter`, `FaultSequence` | A4 | exact one-based transitions, configured failure indices, call accounting | focused transition proof executed |
 | ALG-064 | Read-only buffers/backend dispatch | `buffers.as_readonly_view`, `dispatch` | A4 | zero-copy aliasing, read-only enforcement, exact backend selection | focused aliasing/dispatch proof executed |
 | ALG-065 | Provenance manifests | `provenance.*` | A4 | allowlisted environment, copied/frozen caller mappings, identifier/version domains | immutability and allowlist evidence executed |
-| ALG-066 | URI construction/TCP reachability | `network.*` | A4 | IPv6 brackets, IDNA, user-info escaping, ports, finite timeout | non-finite timeout hole fixed and executed |
-| ALG-067 | Rsync mirror completion protocol | `sync.rsync_mirror` | A4 | source normalization, destructive-argument rejection, success-only completion marker | success/failure publication proof executed |
+| ALG-066 | URI construction/TCP reachability | `network.*` | A4 | IPv6 brackets, IDNA, user-info escaping, ports, finite timeout | historical timing proof; post-IDNA authority validation evidence in AR-07 |
+| ALG-067 | Rsync mirror completion protocol | `sync.rsync_mirror` | A4 | source normalization, destructive-argument rejection, success-only completion marker | historical publication proof; invalid timeout preserves marker before rejection in AR-09 |
 | ALG-068 | Benchmark artifact registry | `benchmark.artifacts.*` | A4 | checksum/tamper detection, regular-file identity, symlink rejection | symlink artifacts now rejected |
 | ALG-069 | Checked benchmark result loading | `benchmark.safe_io.load_result_checked` | A4 | bounded read, required structure, finite samples/stats, integer/schema domains | loader now bounds actual bytes read and validates persisted fields |
 | ALG-070 | Benchmark run-directory publication | `benchmark.run_directory.save_run_directory` | A4 | artifact-name collision handling, copied checksum validity, run metadata | collision proof executed; transactional publication remains GAP-004 |
@@ -129,8 +161,8 @@ top.
 | ALG-073 | Benchmark reporting/export/plot transforms | `benchmark.report/export/plot` | A4 | profile representation, CSV export, CPU-core transform, invalid metric rejection, real plot smoke | proof and isolated matplotlib smoke executed |
 | ALG-074 | Benchmark overhead probe | `benchmark.overhead.measure_runner_overhead` | A4 | positive integer iterations, bool rejection, zero timer-resolution semantics | focused proof executed |
 | ALG-075 | Optional Pydantic validation adapter | `ext.validation_pydantic.type_checked` | A4 | valid scalar behavior, strict-int differential parity, redacted validation errors | strict-mode differential proof executed; default Pydantic coercion remains intentional backend behavior |
-| ALG-076 | Native 64-bit varint codec & zero-copy parsing | `binary.encode_uvarint`, `binary.ByteReader.read_uvarint`, `_accel.*` | A4 | 64-bit uint range `[0, 2^64-1]`, canonical MSB continuation, rejection of non-canonical redundant zero bytes and overflow, zero-copy buffer view, pure-Python fallback parity | 28 dedicated boundary, equivalence and fallback tests executed |
-| ALG-077 | Fast JSON-clean validation & allocation bypass | `serialization.to_jsonable`, `streaming.write_jsonl`, `_accel.is_json_clean` | A4 | depth bounding (`max_depth=100`), strict byte rejection, finite float bounds, chunked streaming I/O batching, pure-Python fallback | unit/regression and roundtrip tests executed |
+| ALG-076 | Native 64-bit varint codec & zero-copy parsing | `binary.encode_uvarint`, `binary.ByteReader.read_uvarint`, `_accel.*` | A4 | 64-bit uint range `[0, 2^64-1]`, canonical MSB continuation, rejection of non-canonical redundant zero bytes and overflow, zero-copy buffer view, pure-Python fallback parity | historical 28-test packet; non-exact integer semantics and active/fallback verification in AR-10/11 |
+| ALG-077 | Fast JSON-clean validation & allocation bypass | `serialization.to_jsonable`, `streaming.write_jsonl`, `_accel.is_json_clean` | A4 | depth bounding (`max_depth=100`), strict byte rejection, finite float bounds, chunked streaming I/O batching, pure-Python fallback | historical roundtrip packet; interpreter-independent native depth safety and active/fallback verification in AR-10/11 |
 | ALG-078 | Adversarial chaos and stream/await fault injection | `faults.VirtualClock`, `faults.FaultyStream`, `faults.AwaitBoundaryChaos` | A4 | deterministic monotonic clock progression, partial read/write truncation, EIO/ENOSPC injection, cooperative await cancellation | 5 focused unit and contract tests executed |
 
 
@@ -287,9 +319,12 @@ publication is part of the public contract.
 
 ### GAP-005 — filesystem durability failure after replace
 
-Atomic helpers can publish the new target before a subsequent directory-fsync
-failure is reported. This is a standard durability distinction but must be
-covered by an explicit failure-atomicity contract and injected tests.
+The visibility/durability distinction is now documented by `io.atomic_write`
+and covered by the injected
+`test_atomic_write_directory_fsync_failure_has_documented_visibility` proof.
+New content may be visible before a directory-fsync failure is reported; rollback
+is not promised. This former unspecified-contract gap is resolved, while
+crash-durability and platform proofs remain distinct obligations.
 
 ### GAP-006 — content-store fallback publication
 
@@ -299,9 +334,12 @@ proof.
 
 ### GAP-008 — SecureStore backend completeness
 
-SecureStore has meaningful existing tests, but this branch has not yet completed
-every internal transaction/concurrency and malformed-format proof. The optional
-Pydantic validation adapter itself is now covered by ALG-075.
+Current SecureStore transaction/policy/recovery regressions and existing AES
+malformed salt/hex cases are recorded in AU-02 and AR-04. Remaining proof work
+includes real multiprocess crash/rotation schedules, an independent AES
+known-answer/component-tamper matrix, and fixed key/salt read/decode budgets.
+Do not describe malformed-format coverage as wholly absent. The optional
+Pydantic validation adapter itself is covered by ALG-075.
 
 ## Completion rule
 
