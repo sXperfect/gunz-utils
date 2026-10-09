@@ -7,6 +7,12 @@ in [`docs/tasks/README.md`](tasks/README.md); completed work is indexed in
 | Task ID | Date | Description | Status |
 |:---|:---:|:---|:---:|
 | ALGORITHM-2026-09-28 | 2026-09-28 | [Repository-wide algorithm proof program](tasks/active/2026-09-28-algorithm-correctness-audit.md) | Active — remaining proofs/limitations |
+| INPUT-ADMISSION-2026-10-08 | 2026-10-08 | [Fixed key/salt input admission](tasks/pending/2026-10-08-fixed-key-input-admission.md) | Pending; compatibility contract first |
+| PLATFORM-2026-10-08 | 2026-10-08 | [Native Windows/macOS verification](tasks/active/2026-10-08-platform-verification.md) | Active; native hosts pending |
+| NP-01 | 2026-10-08 | [Windows readiness and contracts](tasks/active/2026-10-08-platform-windows.md) | Preparation complete; native host pending |
+| NP-02 | 2026-10-08 | [macOS readiness and contracts](tasks/active/2026-10-08-platform-macos.md) | Preparation complete; native host pending |
+| NP-03 | 2026-10-08 | [Portable platform verifier](tasks/active/2026-10-08-platform-verifier.md) | Linux preparation verified; native hosts pending |
+| NP-04 | 2026-10-08 | [Async pipe deadline follow-up](tasks/active/2026-10-08-platform-async-drain.md) | Repaired and integrated on Linux; native proofs pending |
 
 The [2026-10-08 follow-up audit and repairs](tasks/done/2026-10-08-audit-follow-up.md)
 are complete for the stated scope; all six canonical gates passed. Detailed

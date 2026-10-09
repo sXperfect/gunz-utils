@@ -32,17 +32,22 @@ def to_jsonable(
     costly recursive re-allocation. Callers that require mutation isolation
     must explicitly deep-copy the object.
     """
-    if _depth == 0 and _accel_is_json_clean is not None:
-        if _accel_is_json_clean(value, _max_depth):
-            return value
-
-    # Security (VULN-2026-008): bound recursive traversal of attacker-shaped
-    # objects before Python's own recursion limit can be exhausted.
+    # Validate with Python integer semantics before narrowing an optimization
+    # budget for the native classifier. Negative depths retain reference errors.
     if _depth > _max_depth:
         raise ValueError(
             "object hierarchy exceeds maximum nesting depth "
             f"({_max_depth})"
         )
+
+    if _depth == 0 and _accel_is_json_clean is not None:
+        # Native traversal falls back beyond depth 128. The ceiling below only
+        # bounds its C-int argument; recursive normalization retains _max_depth.
+        native_depth = (
+            min(_max_depth, 129) if isinstance(_max_depth, int) else _max_depth
+        )
+        if _accel_is_json_clean(value, native_depth):
+            return value
 
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {

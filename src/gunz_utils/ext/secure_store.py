@@ -694,10 +694,21 @@ class SecureStore:
         return int(raw)
 
     def _verify_key_generation(self) -> None:
-        """Verify this store instance's key matches current database key generation."""
+        """Verify generation and authenticate current policy with the active key."""
         if self._read_generation() != self._key_generation:
             raise RuntimeError(
                 "Store key is stale; master key was rotated. Call unlock() again."
+            )
+        self._records_strict()
+
+    def _require_fresh_store_for_key_material(self) -> None:
+        """Refuse unrelated replacement material for a previously initialized store."""
+        metadata = self._conn.execute("SELECT 1 FROM store_meta LIMIT 1").fetchone()
+        secret = self._conn.execute("SELECT 1 FROM secrets LIMIT 1").fetchone()
+        audit = self._conn.execute("SELECT 1 FROM audit LIMIT 1").fetchone()
+        if metadata is not None or secret is not None or audit is not None:
+            raise RuntimeError(
+                "Existing store key material is missing; restore its key or salt"
             )
 
     def _records_strict(self) -> bool:
@@ -739,18 +750,20 @@ class SecureStore:
                         raise RuntimeError(
                             "Store is passphrase-protected; passphrase required"
                         )
+                    self._require_fresh_store_for_key_material()
                     key = Fernet.generate_key()
                     self._write_private(self._master_key_path, key)
                     existing = [self._master_key_path]
 
                 for path in existing:
                     key = self._read_private(path).strip()
-                    candidates.append(
-                        (
-                            Fernet(key),
-                            path == self._pending_key_path,
-                        )
-                    )
+                    try:
+                        candidate = Fernet(key)
+                    except ValueError:
+                        # A damaged regular-file key must not hide an independently
+                        # authenticatable pending candidate. Unsafe reads still fail.
+                        continue
+                    candidates.append((candidate, path == self._pending_key_path))
             else:
                 salt_paths = (
                     self._salt_path,
@@ -765,6 +778,7 @@ class SecureStore:
                         raise RuntimeError(
                             "Store uses file-key mode; do not supply passphrase"
                         )
+                    self._require_fresh_store_for_key_material()
                     salt = os.urandom(16)
                     self._write_private(self._salt_path, salt)
                     existing = [self._salt_path]
@@ -835,11 +849,11 @@ class SecureStore:
     def _transaction_locked(self) -> Iterator[None]:
         """Join an active transaction or own one for this mutation."""
         with self._coordination_lock:
-            self._verify_key_generation()
             started = not self._conn.in_transaction
             if started:
                 self._conn.execute("BEGIN IMMEDIATE")
             try:
+                self._verify_key_generation()
                 yield
             except BaseException:
                 if started and self._conn.in_transaction:

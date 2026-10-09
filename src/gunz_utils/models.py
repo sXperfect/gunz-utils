@@ -70,3 +70,5 @@ class GunzBaseModel(BaseModel):
         frozen=False,
     )
 
+
+__all__ = ["GunzBaseModel"]

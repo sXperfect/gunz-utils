@@ -10,7 +10,7 @@ import signal
 import subprocess
 import threading
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Coroutine, Mapping, Sequence
 from dataclasses import dataclass
 from typing import BinaryIO
 
@@ -323,6 +323,42 @@ async def _stop_process(
         await process.wait()
 
 
+async def _cleanup_async_process(
+    process: asyncio.subprocess.Process,
+    tasks: Sequence[asyncio.Task[None]] = (),
+    *,
+    terminate_grace: float,
+) -> None:
+    """Join owned tasks and close capture transports before stopping the child.
+
+    Pipe EOF may belong to an escaped descendant. StreamReader exposes no public
+    close method; its CPython transport is the owned read end on both supported
+    Python versions. Closing it also allows Process.wait to reap independently of
+    a foreign pipe writer. Repeated caller cancellation cannot abandon cleanup.
+    """
+
+    async def cleanup() -> None:
+        for task in tasks:
+            task.cancel()
+        for stream in (process.stdout, process.stderr):
+            transport = getattr(stream, "_transport", None)
+            if transport is not None:
+                transport.close()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await _stop_process(process, terminate_grace=terminate_grace)
+
+    pending = asyncio.create_task(cleanup())
+    cancelled = False
+    while not pending.done():
+        try:
+            await asyncio.shield(pending)
+        except asyncio.CancelledError:
+            cancelled = True
+    pending.result()
+    if cancelled:
+        raise asyncio.CancelledError
+
+
 async def _read_bounded_async_pipe(
     stream: asyncio.StreamReader,
     target: bytearray,
@@ -330,6 +366,7 @@ async def _read_bounded_async_pipe(
     *,
     max_output_bytes: int,
     state: _CaptureState,
+    failure: asyncio.Event,
 ) -> None:
     while True:
         chunk = await stream.read(64 * 1024)
@@ -344,6 +381,7 @@ async def _read_bounded_async_pipe(
             target.extend(chunk[:remaining])
             state.total += remaining
         state.exceeded = True
+        failure.set()
         if os.name == "posix":
             try:
                 os.killpg(process.pid, signal.SIGKILL)
@@ -364,53 +402,78 @@ async def _communicate_bounded(
     max_output_bytes: int,
     terminate_grace: float,
 ) -> tuple[bytes, bytes]:
+    loop = asyncio.get_running_loop()
+    deadline = None if timeout is None else loop.time() + timeout
     stdout_pipe = process.stdout
     stderr_pipe = process.stderr
     if stdout_pipe is None or stderr_pipe is None:
-        await _stop_process(process, terminate_grace=terminate_grace)
+        await _cleanup_async_process(process, terminate_grace=terminate_grace)
         raise RuntimeError("failed to create subprocess capture pipes")
 
     stdout = bytearray()
     stderr = bytearray()
     state = _CaptureState()
-    readers = [
-        asyncio.create_task(
-            _read_bounded_async_pipe(
-                stdout_pipe,
-                stdout,
-                process,
-                max_output_bytes=max_output_bytes,
-                state=state,
-            )
-        ),
-        asyncio.create_task(
-            _read_bounded_async_pipe(
-                stderr_pipe,
-                stderr,
-                process,
-                max_output_bytes=max_output_bytes,
-                state=state,
-            )
-        ),
-    ]
-    try:
-        await asyncio.wait_for(process.wait(), timeout=timeout)
-        await asyncio.gather(*readers)
-    except (TimeoutError, asyncio.CancelledError):
-        await asyncio.shield(
-            _stop_process(process, terminate_grace=terminate_grace)
-        )
-        await asyncio.gather(*readers, return_exceptions=True)
-        raise
-    except BaseException:
-        await asyncio.shield(
-            _stop_process(process, terminate_grace=terminate_grace)
-        )
-        await asyncio.gather(*readers, return_exceptions=True)
-        raise
+    failure = asyncio.Event()
+    readers: list[asyncio.Task[None]] = []
+    owned: list[asyncio.Task[None]] = []
 
-    if state.exceeded:
-        raise _output_limit_error(max_output_bytes)
+    def start(coroutine: Coroutine[object, object, None]) -> asyncio.Task[None]:
+        try:
+            task = asyncio.create_task(coroutine)
+        except BaseException:
+            coroutine.close()
+            raise
+        owned.append(task)
+        return task
+
+    def reader_finished(task: asyncio.Task[None]) -> None:
+        if not task.cancelled() and task.exception() is not None:
+            failure.set()
+
+    async def capture() -> None:
+        await process.wait()
+        await asyncio.gather(*readers)
+
+    async def failed() -> None:
+        await failure.wait()
+
+    try:
+        for stream, target in ((stdout_pipe, stdout), (stderr_pipe, stderr)):
+            coroutine = _read_bounded_async_pipe(
+                stream,
+                target,
+                process,
+                max_output_bytes=max_output_bytes,
+                state=state,
+                failure=failure,
+            )
+            task = start(coroutine)
+            task.add_done_callback(reader_finished)
+            readers.append(task)
+        capture_task = start(capture())
+        failure_task = start(failed())
+        remaining = None if deadline is None else max(0.0, deadline - loop.time())
+        done, _ = await asyncio.wait(
+            (capture_task, failure_task),
+            timeout=remaining,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if state.exceeded:
+            raise _output_limit_error(max_output_bytes)
+        for reader in readers:
+            if reader.done() and not reader.cancelled():
+                error = reader.exception()
+                if error is not None:
+                    raise error
+        if capture_task not in done:
+            raise TimeoutError
+        capture_task.result()
+    except BaseException:
+        await _cleanup_async_process(process, owned, terminate_grace=terminate_grace)
+        raise
+    else:
+        failure_task.cancel()
+        await asyncio.gather(failure_task, return_exceptions=True)
     return bytes(stdout), bytes(stderr)
 
 
@@ -426,7 +489,13 @@ async def run_command_async(
     max_output_bytes: int | None = None,
     terminate_grace: float = 1.0,
 ) -> CommandResult:
-    """Run a subprocess with graceful cleanup and optionally bounded output."""
+    """Run a subprocess with graceful cleanup and optionally bounded output.
+
+    Timeout covers process exit and capture-pipe draining after creation.
+    Failure/cancellation closes owned read ends and stops the owned child, signaling
+    its POSIX process group;
+    escaped descendants are outside that group and remain the caller's responsibility.
+    """
     if not args:
         raise ValueError("args must not be empty")
     timeout = _validate_timeout_value(timeout, name="timeout")
@@ -455,9 +524,7 @@ async def run_command_async(
                 timeout=timeout,
             )
         except (TimeoutError, asyncio.CancelledError):
-            await asyncio.shield(
-                _stop_process(process, terminate_grace=terminate_grace)
-            )
+            await _cleanup_async_process(process, terminate_grace=terminate_grace)
             raise
     else:
         stdout_b, stderr_b = await _communicate_bounded(
