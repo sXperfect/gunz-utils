@@ -108,7 +108,7 @@ this scoped review re-audited the entire repository.
 | ALG-042 | Benchmark history trend | `benchmark.history.BenchmarkHistory.trend` | A2 | finite values, absolute/relative change, min/max | hardened unknown/non-finite metric handling |
 | ALG-043 | Performance schema validation/migration | `benchmark.schema.*` | A2 | explicit version, shape requirements, deterministic migration | fixed `True == 1` schema-version acceptance |
 | ALG-044 | Linux proc-stat parsing | `benchmark.process._parse_proc_stat` | A3 | exact fields with spaces/parentheses/non-UTF-8 command bytes, matching procfs identity; `test_process_profile_regressions.py` | preserved arbitrary command bytes and rejected foreign PID namespaces; deterministic proofs passed |
-| ALG-045 | Process-tree sampling lifecycle | `benchmark.process.profile_command` | A3 | prelaunch capability validation, known/unknown memory, owned group cleanup, bounded reap and original failure preservation | deterministic and real process-group proofs passed; six procfs integration cases capability-skipped locally; sampled counter limits remain GAP-003/GAP-009 |
+| ALG-045 | Process-tree sampling lifecycle | `benchmark.process.profile_command` | A3 | prelaunch capability validation, PID/start-time lifetime identity, cumulative observed monotonic counters, known/unknown memory, owned group cleanup, bounded reap and original failure preservation | exited observed children and PID reuse are now accounted across samples; deterministic regressions passed in focused reconstructed execution; event-incomplete sampling remains GAP-003 |
 | ALG-046 | Benchmark experiment matrix | `benchmark.experiment.run_experiment` | A2 | Cartesian combinations, repetition association/count | strict repetition domain added |
 | ALG-047 | Project-root discovery/cache | `ext.project_stdlib`, `ext.project_gitpython` | A2 | ancestor search, cross-anchor cache correctness, optional sys.path injection | fixed cached root leakage and late-injection bug |
 | ALG-048 | Deep nested data utilities | `dict_utils.deep_get`, `deep_set`, `deep_merge` | A2 | path validation, override semantics, list strategies, non-mutation of roots | existing evidence reviewed; nested value aliasing remains contract-sensitive |
@@ -275,6 +275,17 @@ while retaining strict JSON, finite timeout validation, and diagnostic
 redaction. The combined worker/package proofs passed hosted run
 `36403271808`.
 
+### FIND-021 — process profile totals lost exited child counters
+
+Resolved for ALG-045. Final CPU, I/O, fault, and context-switch totals no longer
+use the maximum simultaneous aggregate snapshot. The profiler keeps a private
+ledger keyed by Linux `(pid, start_time_ticks)` and retains the greatest observed
+monotonic counter values for each process lifetime. Observed children therefore
+remain represented after exit, while numeric PID reuse is treated as a distinct
+lifetime. The public profile/sample schema is unchanged. Deterministic regressions
+cover exited children and reused PIDs. Exact event-complete accounting remains
+outside the sampled profiler contract under GAP-003.
+
 ## Open limitations / proof gaps
 
 ### GAP-002 — recursive graph depth
@@ -312,16 +323,6 @@ proof.
 SecureStore has meaningful existing tests, but this branch has not yet completed
 every internal transaction/concurrency and malformed-format proof. The optional
 Pydantic validation adapter itself is now covered by ALG-075.
-
-### GAP-009 — profile counters are maximum snapshot aggregates
-
-ALG-045 stores maximum simultaneous snapshot totals for CPU, I/O, fault, and
-context-switch counters. Contributions from a previously observed child can be
-lost after it exits, even if a later child is also observed. These fields must not
-be treated as exact cumulative lifetime accounting. A robust correction requires
-PID/start-time identity tracking, per-process counter retention, and deliberate
-report/schema semantics. See the
-[2026-10-09 follow-up](2026-10-09-ci-runtime-followup.md#remaining-limits-and-follow-up).
 
 ## Completion rule
 

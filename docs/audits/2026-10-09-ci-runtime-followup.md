@@ -218,13 +218,26 @@ The registry conservatively retains A3 for the reviewed families. This successfu
 local aggregate does not eliminate the documented capability and sampling limits
 or substitute for a hosted run with matching procfs and process PID namespaces.
 
+## Follow-up resolution: observed lifetime counters
+
+GAP-009 was corrected on the same branch after the initial aggregate run.
+The profiler now retains the greatest observed monotonic CPU, I/O, fault, and
+context-switch counters for each Linux process identity keyed by
+`(pid, start_time_ticks)`. A child that was sampled and later exits therefore
+continues to contribute to final profile totals. If Linux reuses its numeric PID,
+the different start time creates a separate lifetime and its counters are added
+independently rather than merged with the earlier process.
+
+The public `ProcessProfile` and `ProcessSample` schemas are unchanged. The
+lifetime ledger is private implementation state; per-snapshot samples still report
+the processes visible at that observation. Two deterministic regressions cover
+PID reuse and a sequence where exited child lifetimes would previously have been
+lost by maximum-snapshot aggregation. The focused reconstructed package execution
+passed both regressions. A new full aggregate run is still required before
+promoting this follow-up evidence beyond A3.
+
 ## Remaining limits and follow-up
 
-- **Observed process counters:** the profile uses maximum snapshot aggregates
-  for CPU, I/O, faults, and context switches. Exited observed children can lose
-  contributions from later totals. Correct lifetime accumulation needs per-process
-  identity including start time, counter tracking, and report/schema decisions;
-  this audit does not silently reinterpret those public fields.
 - **Sampling:** short-lived descendants may start and exit between observations.
   Exact event-complete resource accounting remains outside this sampler's contract.
 - **Wall time:** the reported duration includes observation and sleep overhead;
