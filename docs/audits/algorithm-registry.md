@@ -133,7 +133,7 @@ this scoped review re-audited the entire repository.
 | ALG-067 | Rsync mirror completion protocol | `sync.rsync_mirror` | A4 | source normalization, destructive-argument rejection, success-only completion marker | success/failure publication proof executed |
 | ALG-068 | Benchmark artifact registry | `benchmark.artifacts.*` | A4 | checksum/tamper detection, regular-file identity, symlink rejection | symlink artifacts now rejected |
 | ALG-069 | Checked benchmark result loading | `benchmark.safe_io.load_result_checked` | A4 | bounded read, required structure, finite samples/stats, integer/schema domains | loader now bounds actual bytes read and validates persisted fields |
-| ALG-070 | Benchmark run-directory publication | `benchmark.run_directory.save_run_directory` | A4 | artifact-name collision handling, copied checksum validity, run metadata | collision proof executed; transactional publication remains GAP-004 |
+| ALG-070 | Benchmark run-directory publication | `benchmark.run_directory.save_run_directory` | A4 | artifact-name collision handling, copied checksum validity, run metadata, rollback of files created by a failed publication | collision proof plus rollback regressions cover later-copy failure, pre-existing artifacts, and cleanup-error precedence; older unreferenced artifacts are not garbage-collected |
 | ALG-071 | Linux perf integration | `benchmark.perf.*` | A4 | event/frequency domains, unavailable counters, non-finite parser values | invalid domains/non-finite counters hardened |
 | ALG-072 | Benchmark worker protocol | `benchmark.worker.*` | A4 | module/interpreter/timeout domains, failure propagation, strict JSON, bounded capture | integrated bounded worker capture and redacted diagnostics passed on the composed tree |
 | ALG-073 | Benchmark reporting/export/plot transforms | `benchmark.report/export/plot` | A4 | profile representation, CSV export, CPU-core transform, invalid metric rejection, real plot smoke | proof and isolated matplotlib smoke executed |
@@ -286,6 +286,17 @@ lifetime. The public profile/sample schema is unchanged. Deterministic regressio
 cover exited children and reused PIDs. Exact event-complete accounting remains
 outside the sampled profiler contract under GAP-003.
 
+### FIND-022 — failed run-directory publication left partial artifacts
+
+Resolved for ALG-070. `save_run_directory` now records artifacts created by the
+current call and removes them if a later copy, registration, or manifest write
+fails. It removes newly created empty directories when possible while preserving
+pre-existing files/directories. Cleanup failures are added as type-only exception
+notes and do not replace the initiating error. `_copy_regular_source` applies the
+same rule when cleanup of a partially copied target fails. Existing unreferenced
+artifacts from earlier successful publications remain outside this rollback
+contract.
+
 ## Open limitations / proof gaps
 
 ### GAP-002 — recursive graph depth
@@ -299,12 +310,6 @@ implementation should be considered for untrusted/deep DAGs.
 ALG-045 can miss descendants that fork and exit between snapshots. Reports
 should be understood as sampled observations; exact accounting requires a
 different OS mechanism.
-
-### GAP-004 — run-directory packaging is non-transactional
-
-`benchmark.run_directory.save_run_directory` may leave a partially populated
-directory if an artifact copy or final write fails. Decide whether transactional
-publication is part of the public contract.
 
 ### GAP-005 — filesystem durability failure after replace
 

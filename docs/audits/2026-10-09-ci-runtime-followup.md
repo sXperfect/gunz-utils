@@ -236,6 +236,26 @@ lost by maximum-snapshot aggregation. The focused reconstructed package executio
 passed both regressions. A new full aggregate run is still required before
 promoting this follow-up evidence beyond A3.
 
+## Follow-up resolution: run-directory rollback
+
+GAP-004 was also resolved in this follow-up. `save_run_directory` now tracks
+artifact files created by the current publication attempt. If a later artifact
+copy, artifact registration, or `run.json` publication fails, those newly created
+files are removed in reverse order. Newly created empty `artifacts/` and run
+directories are then removed when possible. Pre-existing artifacts and directories
+are not deleted.
+
+Rollback failures do not replace the initiating publication/copy error. Their
+exception types are attached as notes instead, avoiding accidental disclosure of
+arbitrary cleanup exception text. A partial-copy cleanup failure follows the same
+rule. Regression coverage includes later-copy failure after an earlier successful
+copy, preservation of a pre-existing artifact, outer rollback failure, and
+partial-copy rollback failure.
+
+This is transactional rollback for files created by one failed publication call;
+it does not garbage-collect older unreferenced artifacts already present from
+earlier successful calls.
+
 ## Remaining limits and follow-up
 
 - **Sampling:** short-lived descendants may start and exit between observations.
