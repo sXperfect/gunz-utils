@@ -117,8 +117,8 @@ this scoped review re-audited the entire repository.
 | ALG-051 | Stdlib runtime type checker | `ext.validation_stdlib.type_checked` | A4 | argument binding, PEP 604 unions, recursive containers, literals/Annotated, varargs/kwargs, redacted errors | recursive/type-boundary proofs executed; stdlib isolation had 18 passing tests |
 | ALG-052 | Version migration | `versioning.*` | A4 | version/envelope validation, one-step migration order, missing/downgrade paths, failure stop | focused migration/failure-boundary proof executed successfully |
 | ALG-053 | Plugin discovery/selection | `plugins.*` | A4 | deterministic ordering, sibling failure isolation, instantiation errors, process-control propagation | focused discovery/isolation proof executed successfully |
-| ALG-054 | Content-addressed storage | `content_store.ContentAddressedStore` | A4 | digest/path mapping, integrity verification, symlinked fanout rejection, fallback publication, materialization domains | adversarial path/fallback proofs executed; cross-process fallback race remains GAP-006 |
-| ALG-055 | Atomic filesystem publication | `fs.*`, `io.*` atomic helpers | A4 | temp isolation, replace failure cleanup, directory publication, no-overwrite symlinks, durability contract | injected replace/publication proofs executed; post-replace fsync semantics remain GAP-005 |
+| ALG-054 | Content-addressed storage | `content_store.ContentAddressedStore` | A4 | digest/path mapping, integrity verification, symlinked fanout rejection, serialized fallback publication, materialization domains | adversarial path/fallback proofs plus deterministic concurrent-writer fallback regression; cooperating writers share a symlink-safe advisory publication lock |
+| ALG-055 | Atomic filesystem publication | `fs.*`, `io.*` atomic helpers | A4 | temp isolation, replace failure cleanup, directory publication, no-overwrite symlinks, explicit pre/post-replace durability semantics | injected tests prove pre-replace fsync failure preserves the old target and post-replace directory-fsync failure may leave the new target visible while raising |
 | ALG-056 | Core concurrency schedulers | `concurrency.*`, `pipeline.*` | A4 | task/queue bounds, initial-scheduling cleanup, ordering, worker-failure cancellation | adversarial setup/cancellation/worker-bound proofs executed successfully |
 | ALG-057 | Signal/resource lifecycle | `signals.*`, `resources.*` | A4 | partial registration rollback, idempotent restore, reverse sync/async cleanup | lifecycle/failure proofs executed successfully |
 | ALG-058 | Collection transforms | `collections.unique/group_by/index_by/partition` | A4 | stable order, duplicate semantics, unhashable values, key-derived collisions | focused proof suite executed successfully |
@@ -151,9 +151,9 @@ reviewed, given focused proof tests, and executed successfully in hosted
 aggregate CI run `36382828055` on `f55c510e014cf0233fd18f279808d3e9b22caf4a`.
 
 A green A4 execution level does not erase explicitly documented limitations.
-GAP-004 and the worker/process/resource gaps below remain active where the
-public contract is narrower than a stronger transactional or memory-bound
-guarantee.
+The remaining gaps below record contracts that are intentionally narrower than
+stronger recursive-depth, event-complete sampling, or backend-completeness
+guarantees.
 
 ## Resolved findings
 
@@ -297,6 +297,24 @@ same rule when cleanup of a partially copied target fails. Existing unreferenced
 artifacts from earlier successful publications remain outside this rollback
 contract.
 
+### FIND-023 — durability failure semantics were under-specified in the registry
+
+Resolved for ALG-055 without changing runtime behavior. Existing injected tests
+prove both sides of the durability boundary: file `fsync` failure before replace
+preserves the old target, while parent-directory `fsync` failure after replace
+raises after the new target has become visible. The latter is a durability
+uncertainty, not a claim of rollback atomicity.
+
+### FIND-024 — content-store fallback could overwrite a cooperating winner
+
+Resolved for ALG-054. All cooperating publishers now take a symlink-safe advisory
+lock in the target fanout directory before checking or publishing a digest path.
+The normal hard-link path and the hard-link-failure `os.replace` fallback share
+that critical section. A deterministic two-writer regression forces fallback and
+proves that the second writer waits, verifies the first writer's target, and does
+not execute another replacement. The contract does not protect against unrelated
+processes that deliberately ignore the advisory lock.
+
 ## Open limitations / proof gaps
 
 ### GAP-002 — recursive graph depth
@@ -310,18 +328,6 @@ implementation should be considered for untrusted/deep DAGs.
 ALG-045 can miss descendants that fork and exit between snapshots. Reports
 should be understood as sampled observations; exact accounting requires a
 different OS mechanism.
-
-### GAP-005 — filesystem durability failure after replace
-
-Atomic helpers can publish the new target before a subsequent directory-fsync
-failure is reported. This is a standard durability distinction but must be
-covered by an explicit failure-atomicity contract and injected tests.
-
-### GAP-006 — content-store fallback publication
-
-The normal hard-link publication path is concurrency-friendly; the fallback
-replace path still needs an adversarial concurrent-publication/fault-injection
-proof.
 
 ### GAP-008 — SecureStore backend completeness
 

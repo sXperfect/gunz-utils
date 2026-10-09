@@ -256,6 +256,30 @@ This is transactional rollback for files created by one failed publication call;
 it does not garbage-collect older unreferenced artifacts already present from
 earlier successful calls.
 
+## Follow-up resolution: durability and content-store publication
+
+The filesystem durability distinction tracked as GAP-005 was already covered by
+injected tests on this branch. A file-level `fsync` failure before `os.replace`
+leaves the old target intact and removes the temporary file. A parent-directory
+`fsync` failure after replacement raises while the new target remains visible,
+because publication has already happened and only persistence of the directory
+entry is uncertain. This is now treated as an explicit contract rather than an
+unresolved atomicity promise.
+
+GAP-006 was corrected by serializing cooperating content-store publishers with a
+symlink-safe advisory lock in each fanout directory. The hard-link path and its
+`os.replace` fallback now share the same publication critical section. A second
+writer therefore rechecks and verifies the winning target instead of replacing it
+after observing an earlier absence. The lock uses POSIX `flock` or Windows
+`msvcrt.locking`; persistent lock files avoid inode-replacement races between
+waiters. Deterministic concurrency coverage forces hard-link failure, blocks the
+first fallback replacement, starts a second writer, and verifies that only one
+replacement occurs.
+
+The content-store guarantee remains scoped to cooperating writers using this
+implementation. An unrelated process that ignores the advisory lock can still
+race filesystem operations directly.
+
 ## Remaining limits and follow-up
 
 - **Sampling:** short-lived descendants may start and exit between observations.
