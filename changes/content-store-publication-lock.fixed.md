@@ -1,0 +1,1 @@
+Serialize cooperating content-store publishers per fanout directory so hard-link fallback cannot overwrite a concurrent winner between the existence check and atomic replacement; publication locks are symlink-safe and work on POSIX and Windows.\n
