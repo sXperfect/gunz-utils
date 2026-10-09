@@ -116,3 +116,33 @@ def test_rollback_failure_does_not_replace_publication_error(
 
     assert caught.value is original
     assert any("PermissionError" in note for note in caught.value.__notes__)
+
+
+def test_partial_copy_cleanup_failure_preserves_copy_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"source")
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    original = RuntimeError("copy failed")
+
+    monkeypatch.setattr(
+        run_directory_module.shutil,
+        "copyfileobj",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(original),
+    )
+    real_unlink = Path.unlink
+
+    def deny_partial_unlink(path: Path, *args: object, **kwargs: object) -> None:
+        if path.parent == artifacts_dir:
+            raise PermissionError("injected partial cleanup failure")
+        real_unlink(path, *args, **kwargs)
+
+    with patch.object(Path, "unlink", deny_partial_unlink):
+        with pytest.raises(RuntimeError) as caught:
+            run_directory_module._copy_regular_source(source, artifacts_dir)
+
+    assert caught.value is original
+    assert any("PermissionError" in note for note in caught.value.__notes__)

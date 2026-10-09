@@ -99,9 +99,15 @@ def _copy_regular_source(
                 target_handle.flush()
                 os.fsync(target_handle.fileno())
         return target, True
-    except BaseException:
+    except BaseException as error:
         if target is not None:
-            target.unlink(missing_ok=True)
+            try:
+                target.unlink(missing_ok=True)
+            except OSError as cleanup_error:
+                error.add_note(
+                    "Partial-artifact rollback failed: "
+                    f"{type(cleanup_error).__name__}"
+                )
         raise
     finally:
         if source_fd >= 0:
