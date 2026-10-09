@@ -52,7 +52,10 @@ def _open_regular_source(path: Path) -> tuple[int, os.stat_result]:
         raise
 
 
-def _copy_regular_source(source: Path, artifacts_dir: Path) -> Path:
+def _copy_regular_source(
+    source: Path,
+    artifacts_dir: Path,
+) -> tuple[Path, bool]:
     source_fd, source_info = _open_regular_source(source)
     output_fd = -1
     target: Path | None = None
@@ -61,7 +64,7 @@ def _copy_regular_source(source: Path, artifacts_dir: Path) -> Path:
         if first.exists() and not first.is_symlink():
             try:
                 if os.path.samefile(source, first):
-                    return first
+                    return first, False
             except OSError:
                 pass
 
@@ -95,7 +98,7 @@ def _copy_regular_source(source: Path, artifacts_dir: Path) -> Path:
                 )
                 target_handle.flush()
                 os.fsync(target_handle.fileno())
-        return target
+        return target, True
     except BaseException:
         if target is not None:
             target.unlink(missing_ok=True)
@@ -115,33 +118,67 @@ def save_run_directory(
 ) -> PerformanceRun:
     """Write run.json and optionally copy registered artifacts safely."""
     root = Path(directory)
+    root_preexisting = root.exists()
     _ensure_directory(root, label="run directory")
     updated = run
-    if copy_artifacts:
-        updated = type(run)(
-            **{
-                **run.__dict__,
-                "artifacts": (),
-            }
-        )
-        artifacts_dir = root / "artifacts"
-        _ensure_directory(artifacts_dir, label="artifacts directory")
-        for artifact in run.artifacts:
-            source = Path(artifact.path)
-            target = _copy_regular_source(source, artifacts_dir)
-            updated = register_artifact(
-                updated,
-                target,
-                kind=artifact.kind,
-                media_type=artifact.media_type,
-                description=artifact.description,
+    created_artifacts: list[Path] = []
+    artifacts_dir: Path | None = None
+    artifacts_preexisting = False
+    try:
+        if copy_artifacts:
+            updated = type(run)(
+                **{
+                    **run.__dict__,
+                    "artifacts": (),
+                }
             )
-    atomic_write(
-        root / "run.json",
-        json.dumps(updated.to_dict(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    return updated
+            artifacts_dir = root / "artifacts"
+            artifacts_preexisting = artifacts_dir.exists()
+            _ensure_directory(artifacts_dir, label="artifacts directory")
+            for artifact in run.artifacts:
+                source = Path(artifact.path)
+                target, created = _copy_regular_source(source, artifacts_dir)
+                if created:
+                    created_artifacts.append(target)
+                updated = register_artifact(
+                    updated,
+                    target,
+                    kind=artifact.kind,
+                    media_type=artifact.media_type,
+                    description=artifact.description,
+                )
+        atomic_write(
+            root / "run.json",
+            json.dumps(updated.to_dict(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        return updated
+    except BaseException as error:
+        for target in reversed(created_artifacts):
+            try:
+                target.unlink(missing_ok=True)
+            except OSError as cleanup_error:
+                error.add_note(
+                    "Artifact rollback failed: "
+                    f"{type(cleanup_error).__name__}"
+                )
+        if artifacts_dir is not None and not artifacts_preexisting:
+            try:
+                artifacts_dir.rmdir()
+            except OSError as cleanup_error:
+                error.add_note(
+                    "Artifacts-directory rollback failed: "
+                    f"{type(cleanup_error).__name__}"
+                )
+        if not root_preexisting:
+            try:
+                root.rmdir()
+            except OSError as cleanup_error:
+                error.add_note(
+                    "Run-directory rollback failed: "
+                    f"{type(cleanup_error).__name__}"
+                )
+        raise
 
 
 __all__ = ["save_run_directory"]
