@@ -1,0 +1,1 @@
+Reject mismatched procfs PID namespaces before profiling, preserve non-UTF-8 process names and unknown memory readings, and terminate the owned process group on sampling failure while preserving the original exception.

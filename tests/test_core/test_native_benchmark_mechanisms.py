@@ -4,6 +4,8 @@ import math
 import sys
 import unittest
 
+import pytest
+
 from gunz_utils.benchmark import (
     analyze_stability,
     benchmark,
@@ -58,6 +60,7 @@ class TestNativeBenchmarkMechanisms(unittest.TestCase):
                     )
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc required")
+    @pytest.mark.usefixtures("compatible_procfs")
     def test_rss_only_profile(self) -> None:
         profile = profile_command(
             [sys.executable, "-c", "sum(range(10000))"],
@@ -69,6 +72,7 @@ class TestNativeBenchmarkMechanisms(unittest.TestCase):
         self.assertIsNone(profile.peak_private_bytes)
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc required")
+    @pytest.mark.usefixtures("compatible_procfs")
     def test_sparse_detailed_memory_sampling(self) -> None:
         profile = profile_command(
             [sys.executable, "-c", "import time;time.sleep(.02)"],

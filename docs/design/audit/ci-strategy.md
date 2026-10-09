@@ -119,12 +119,14 @@ the pipeline employs specific resource-bounding strategies:
    quota across high-frequency pull request reviews.
 
 3. **PR Diff-Based Conditional Gates**:
-   - *Packaging isolation skip*: If a PR touches neither packaging metadata
-     (`pyproject.toml`, `src/gunz_utils/ext/`), nor runner scripts, the heavy
-     venv isolation matrix is bypassed (`--skip-packaging`).
+   - *Packaging isolation skip*: The heavy venv isolation matrix is bypassed
+     (`--skip-packaging`) only when a PR leaves package source (`src/`), runner
+     scripts (`scripts/`), tests (`tests/`), workflows (`.github/`), and explicit
+     build inputs (`pyproject.toml`, `README.md`, `LICENSE.md`, `.gitignore`)
+     unchanged.
    - *Docs-only fast path*: If a PR modifies only documentation and changelog
      files (`docs/`, `changes/`, `*.md`), the secondary Python 3.12 compatibility
-     suite is skipped (`--skip-compat`), cutting runner duration by ~40%.
+     suite is skipped (`--skip-compat`), avoiding a second full-suite run.
 
 4. **Zero-Dependency Local Testing**:
    For environments where `pytest` is not globally installed, developers can

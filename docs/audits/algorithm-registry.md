@@ -50,6 +50,16 @@ filesystem/file-identity hardening, diagnostic redaction, and crypto downgrade
 protection) while layering the algorithm-audit contracts and proof suites on
 top.
 
+## CI/runtime follow-up — 2026-10-09
+
+The [focused follow-up record](2026-10-09-ci-runtime-followup.md) starts from
+`fix/ci-rate-limiter-clock@a44731baaa04ad81394feae3f8edd16e01043aaa` and records
+retry callback/deadline corrections, exact token-capacity validation, procfs
+identity checks, process-group cleanup, and truthful memory observations.
+Focused proof suites passed on Python 3.11.17 and 3.12.14. The affected families
+below are recorded at A3; older A4 evidence for other families is not a claim that
+this scoped review re-audited the entire repository.
+
 ## Audited algorithm set
 
 | ID | Algorithm / family | Location | Level | Main proof obligations / evidence | Current result |
@@ -67,14 +77,14 @@ top.
 | ALG-011 | Provenance DAG cycle/ancestor traversal | `provenance_graph.ProvenanceGraph` | A2 | cycle rollback, unresolved nodes, deterministic ancestors | reviewed; recursion depth is a limitation |
 | ALG-012 | Unsigned 64-bit canonical varint | `binary.encode_uvarint`, `ByteReader.read_uvarint` | A4 | exhaustive 0..65535 reference/round trip, uint64 boundaries, canonical form, malformed/truncation rollback | exhaustive/reference proof executed in CI |
 | ALG-013 | Priority + recent retention | `structures.retain_priority_and_recent` | A2 | stable order, priority preservation, zero/None limits | strengthened bound validation |
-| ALG-014 | Async token bucket | `rate_limit.AsyncRateLimiter` | A2 | balance in [0, capacity], no overdraw, timeout, finite parameters | fixed NaN/inf/bool state poisoning |
+| ALG-014 | Async token bucket | `rate_limit.AsyncRateLimiter` | A3 | balance in [0, capacity], exact integer capacity comparison, normalized request arithmetic, timeout, representable finite parameters; `test_deadline_regressions.py` | fixed large-integer validation/zero-delay loops and conversion-overflow handling; both interpreters passed |
 | ALG-015 | Benchmark loop calibration | `benchmark.runner.calibrate_loops` | A2 | monotonic loop growth, target/max bounds | fixed non-finite target and invalid max-loop domains |
 | ALG-016 | Benchmark sampling/stat summary | `benchmark.runner.benchmark` | A2 | iteration bounds, min-time semantics, finite config, percentile summary | configuration hardened; focused execution pending |
 | ALG-017 | Regression metric policy | `benchmark.policy.MetricPolicy`, `evaluate_metric` | A2 | valid direction, finite metrics, non-negative thresholds | fixed invalid direction/NaN/negative policy acceptance |
 | ALG-018 | Multi-metric regression gate | `benchmark.gate.evaluate_regression_gate` | A2 | required metrics, policy aggregation, comparability warnings | inherits hardened policy validation |
 | ALG-019 | Benchmark history trend summary | `benchmark.trends.summarize_history` | A2 | OLS slope, moving median, finite metric values, baseline window | hardened domains and unknown-metric errors |
 | ALG-020 | Stability diagnostics | `benchmark.diagnostics.analyze_stability` | A2 | CV/range/outlier diagnostics, finite non-negative samples/thresholds | fixed invalid config appearing stable |
-| ALG-021 | Retry backoff / deadline policy | `retry.RetryPolicy`, retry runners | A2 | bounded attempts, finite delays/timeouts, overflow-safe exponential cap | fixed NaN/inf timing acceptance and huge-exponent overflow |
+| ALG-021 | Retry backoff / deadline policy | `retry.RetryPolicy`, retry runners | A3 | bounded attempts, callback/predicate time accounting, exact deadline, finite delays/timeouts, overflow-safe cap; `test_deadline_regressions.py` | corrected all six callback-budget and deadline paths; invalid huge integers fail before work; both interpreters passed |
 | ALG-022 | Renewable lease heartbeat race | `leases.run_with_lease_heartbeat` | A4 | lease-loss precedence, cleanup, cancellation, Awaitable support, setup-failure cleanup | setup/race proofs executed successfully in aggregate CI |
 | ALG-023 | Bounded/digest streaming writes | `streaming.BoundedWriter`, `DigestWriter`, `copy_and_hash` | A4 | partial-write progress, committed-byte accounting, byte limits, strict JSONL constants | partial-write/failure and strict-JSONL proofs executed successfully |
 | ALG-024 | Partition overlap detection | `partitions.partition_overlaps`, `PartitionManifest` | A4 | deterministic pair order, overlap oracle, immutable manifest, invalid-shape handling | exhaustive small-domain overlap proof executed successfully |
@@ -97,8 +107,8 @@ top.
 | ALG-041 | Scaling efficiency | `benchmark.metrics.scaling_efficiency` | A2 | valid baseline, per-point validity, ideal-scale formula | fixed invalid baseline producing nonsensical values |
 | ALG-042 | Benchmark history trend | `benchmark.history.BenchmarkHistory.trend` | A2 | finite values, absolute/relative change, min/max | hardened unknown/non-finite metric handling |
 | ALG-043 | Performance schema validation/migration | `benchmark.schema.*` | A2 | explicit version, shape requirements, deterministic migration | fixed `True == 1` schema-version acceptance |
-| ALG-044 | Linux proc-stat parsing | `benchmark.process._parse_proc_stat` | A2 | exact field positions with spaces/parentheses in `comm` | fixed whitespace-split field corruption |
-| ALG-045 | Process-tree sampling lifecycle | `benchmark.process.profile_command` | A2 | finite interval, descendant aggregation, cleanup on sampling failure | child cleanup added; short-lived descendants can still be missed |
+| ALG-044 | Linux proc-stat parsing | `benchmark.process._parse_proc_stat` | A3 | exact fields with spaces/parentheses/non-UTF-8 command bytes, matching procfs identity; `test_process_profile_regressions.py` | preserved arbitrary command bytes and rejected foreign PID namespaces; deterministic proofs passed |
+| ALG-045 | Process-tree sampling lifecycle | `benchmark.process.profile_command` | A3 | prelaunch capability validation, known/unknown memory, owned group cleanup, bounded reap and original failure preservation | deterministic and real process-group proofs passed; six procfs integration cases capability-skipped locally; sampled counter limits remain GAP-003/GAP-009 |
 | ALG-046 | Benchmark experiment matrix | `benchmark.experiment.run_experiment` | A2 | Cartesian combinations, repetition association/count | strict repetition domain added |
 | ALG-047 | Project-root discovery/cache | `ext.project_stdlib`, `ext.project_gitpython` | A2 | ancestor search, cross-anchor cache correctness, optional sys.path injection | fixed cached root leakage and late-injection bug |
 | ALG-048 | Deep nested data utilities | `dict_utils.deep_get`, `deep_set`, `deep_merge` | A2 | path validation, override semantics, list strategies, non-mutation of roots | existing evidence reviewed; nested value aliasing remains contract-sensitive |
@@ -302,6 +312,16 @@ proof.
 SecureStore has meaningful existing tests, but this branch has not yet completed
 every internal transaction/concurrency and malformed-format proof. The optional
 Pydantic validation adapter itself is now covered by ALG-075.
+
+### GAP-009 — profile counters are maximum snapshot aggregates
+
+ALG-045 stores maximum simultaneous snapshot totals for CPU, I/O, fault, and
+context-switch counters. Contributions from a previously observed child can be
+lost after it exits, even if a later child is also observed. These fields must not
+be treated as exact cumulative lifetime accounting. A robust correction requires
+PID/start-time identity tracking, per-process counter retention, and deliberate
+report/schema semantics. See the
+[2026-10-09 follow-up](2026-10-09-ci-runtime-followup.md#remaining-limits-and-follow-up).
 
 ## Completion rule
 

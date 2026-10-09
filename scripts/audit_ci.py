@@ -51,11 +51,11 @@ def run_gate(name: str) -> int:
 
 
 def run_compatibility(python_executable: str) -> int:
-    """Run the full suite with a second Python interpreter."""
+    """Run the canonical test gate with a second Python interpreter."""
     env = dict(os.environ)
     env["PYTHONPATH"] = str(SRC_DIR)
     return _run(
-        (python_executable, "-m", "pytest"),
+        (python_executable, str(CI_SCRIPT), "test"),
         env=env,
     )
 

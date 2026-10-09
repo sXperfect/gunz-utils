@@ -74,7 +74,10 @@ class TestProcessSampling(unittest.TestCase):
             patch(
                 "gunz_utils.benchmark.process.subprocess.Popen", return_value=process
             ),
-            patch("gunz_utils.benchmark.process.Path.exists", return_value=True),
+            patch(
+                "gunz_utils.benchmark.process._require_compatible_procfs",
+                return_value=Path("/proc"),
+            ),
             patch("gunz_utils.benchmark.process.time.sleep"),
             patch(
                 "gunz_utils.benchmark.process._linux_snapshot", return_value=_sample()
@@ -97,7 +100,10 @@ class TestProcessSampling(unittest.TestCase):
             patch(
                 "gunz_utils.benchmark.process.subprocess.Popen", return_value=process
             ),
-            patch("gunz_utils.benchmark.process.Path.exists", return_value=True),
+            patch(
+                "gunz_utils.benchmark.process._require_compatible_procfs",
+                return_value=Path("/proc"),
+            ),
             patch("gunz_utils.benchmark.process.time.sleep"),
             patch(
                 "gunz_utils.benchmark.process._linux_snapshot",

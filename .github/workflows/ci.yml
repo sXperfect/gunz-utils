@@ -82,7 +82,7 @@ jobs:
             non_docs_changed=false
             while IFS= read -r path; do
               case "$path" in
-                pyproject.toml|src/gunz_utils/ext/*|scripts/ci.py|.github/*)
+                pyproject.toml|README.md|LICENSE.md|.gitignore|src/*|scripts/*|tests/*|.github/*)
                   packaging_changed=true
                   ;;
               esac

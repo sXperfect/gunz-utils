@@ -36,7 +36,9 @@ Hosted executions are bounded to preserve free-tier runner credits and storage:
 - **1-Day Ephemeral Retention**: Verification summary artifacts are stored for
   1 day (`retention-days: 1`), protecting the 500 MB account storage quota.
 - **Packaging Isolation Skip**: Bypasses heavy multi-venv packaging checks on
-  PRs where packaging files and extras are untouched (`--skip-packaging`).
+  PRs where package source, build inputs, verification scripts, workflows, and
+  tests are untouched (`--skip-packaging`). Core imports and `py.typed` can affect
+  installed artifacts even when no optional integration changes.
 - **Docs-Only Fast Path**: Skips the secondary Python 3.12 compatibility suite
   when a PR touches only documentation and changelogs (`--skip-compat`).
 
@@ -153,7 +155,15 @@ python -m pytest
 ```
 
 Pytest runs the full collection without an artificial `maxfail` cap so one
-run can report multiple failing tests.
+run can report multiple failing tests. Dispatcher tests live under
+`tests/test_core/` and are part of this collection.
+
+Real process-profiling integration tests additionally require Linux procfs to
+expose the current process's PID namespace. A mismatched container procfs view
+cannot identify the command being profiled. Those integration tests report an
+explicit capability skip in that environment; deterministic sampling, lifecycle,
+and namespace-mismatch regressions still run. On compatible Linux runners the
+integration tests execute normally.
 
 To run focused or fast subset tests:
 
@@ -187,6 +197,12 @@ python scripts/ci.py packaging
 Fresh virtual environments verify the zero-dependency core, optional extras,
 headless plotting, and wheel/sdist installation behavior without mutating the
 active environment.
+
+The isolation pytest commands explicitly clear pytest's configured `pythonpath`
+as well as the `PYTHONPATH` environment variable. Clearing the environment alone
+does not override the repository's `pythonpath = ["src"]` setting. Both the wheel
+and the source distribution are installed and checked from outside the checkout,
+including import origin and the `py.typed` marker.
 
 ## Python compatibility
 

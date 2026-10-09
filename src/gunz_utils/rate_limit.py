@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import math
+import sys
 import time
 
 
@@ -26,7 +26,7 @@ class AsyncRateLimiter:
 
     async def try_acquire(self, tokens: float = 1.0) -> bool:
         """Consume tokens immediately when available without waiting."""
-        self._validate_tokens(tokens)
+        tokens = self._validate_tokens(tokens)
         async with self._lock:
             self._refill()
             if self._tokens < tokens:
@@ -41,12 +41,11 @@ class AsyncRateLimiter:
         timeout: float | None = None,
     ) -> None:
         """Wait until tokens are available or the optional timeout expires."""
-        self._validate_tokens(tokens)
+        tokens = self._validate_tokens(tokens)
         if timeout is not None and (
             isinstance(timeout, bool)
             or not isinstance(timeout, (int, float))
-            or not math.isfinite(float(timeout))
-            or timeout < 0
+            or not 0 <= timeout <= sys.float_info.max
         ):
             raise ValueError("timeout must be a finite non-negative number or None")
         deadline = None if timeout is None else time.monotonic() + timeout
@@ -76,16 +75,17 @@ class AsyncRateLimiter:
         if (
             isinstance(value, bool)
             or not isinstance(value, (int, float))
-            or not math.isfinite(float(value))
-            or value <= 0
+            or not 0 < value <= sys.float_info.max
         ):
             raise ValueError(f"{name} must be a finite positive number")
         return float(value)
 
-    def _validate_tokens(self, tokens: float) -> None:
+    def _validate_tokens(self, tokens: float) -> float:
         value = self._finite_positive(tokens, name="tokens")
-        if value > self.capacity:
+        # Check the original value before rounding a large integer to float.
+        if tokens > self.capacity:
             raise ValueError("tokens must be positive and <= capacity")
+        return value
 
     def _refill(self) -> None:
         now = time.monotonic()

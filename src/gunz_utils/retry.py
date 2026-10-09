@@ -6,6 +6,7 @@ import asyncio
 import functools
 import math
 import random
+import sys
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -52,15 +53,13 @@ def _validate(
         if (
             isinstance(value, bool)
             or not isinstance(value, (int, float))
-            or not math.isfinite(float(value))
-            or value < 0
+            or not 0 <= value <= sys.float_info.max
         ):
             raise ValueError(f"{name} must be a finite non-negative number")
     if timeout is not None and (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
-        or not math.isfinite(float(timeout))
-        or timeout < 0
+        or not 0 <= timeout <= sys.float_info.max
     ):
         raise ValueError("timeout must be a finite non-negative number or None")
 
@@ -122,8 +121,7 @@ class RetryPolicy(Generic[T]):
                 if (
                     isinstance(override, bool)
                     or not isinstance(override, (int, float))
-                    or not math.isfinite(float(override))
-                    or override < 0
+                    or not 0 <= override <= sys.float_info.max
                 ):
                     raise ValueError(
                         "delay_override must return a finite "
@@ -193,8 +191,10 @@ def run_with_retry(
                         error=exc,
                     )
                 )
+                if not _has_wait_budget(deadline, delay):
+                    raise
             time.sleep(delay)
-            if deadline is not None and time.monotonic() > deadline:
+            if not _has_wait_budget(deadline, 0.0):
                 raise
             continue
 
@@ -218,8 +218,10 @@ def run_with_retry(
                     result=result,
                 )
             )
+            if not _has_wait_budget(deadline, delay):
+                return result
         time.sleep(delay)
-        if deadline is not None and time.monotonic() > deadline:
+        if not _has_wait_budget(deadline, 0.0):
             return result
     raise RuntimeError("unreachable")
 
@@ -259,8 +261,10 @@ async def async_run_with_retry(
                         error=exc,
                     )
                 )
+                if not _has_wait_budget(deadline, delay):
+                    raise
             await asyncio.sleep(delay)
-            if deadline is not None and time.monotonic() > deadline:
+            if not _has_wait_budget(deadline, 0.0):
                 raise
             continue
 
@@ -284,8 +288,10 @@ async def async_run_with_retry(
                     result=result,
                 )
             )
+            if not _has_wait_budget(deadline, delay):
+                return result
         await asyncio.sleep(delay)
-        if deadline is not None and time.monotonic() > deadline:
+        if not _has_wait_budget(deadline, 0.0):
             return result
     raise RuntimeError("unreachable")
 
@@ -307,7 +313,7 @@ def retry(
     def decorate(func: Callable[P, T]) -> Callable[P, T]:
         @functools.wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
-            deadline = None if timeout is None else time.monotonic() + timeout
+            deadline = _deadline(timeout)
             for attempt in range(1, attempts + 1):
                 try:
                     return func(*args, **kwargs)
@@ -322,14 +328,14 @@ def retry(
                         max_delay,
                         jitter,
                     )
-                    if deadline is not None:
-                        budget = deadline - time.monotonic()
-                        if budget <= 0 or delay > budget:
-                            raise
+                    if not _has_wait_budget(deadline, delay):
+                        raise
                     if on_retry is not None:
                         on_retry(exc, attempt, delay)
+                        if not _has_wait_budget(deadline, delay):
+                            raise
                     time.sleep(delay)
-                    if deadline is not None and time.monotonic() > deadline:
+                    if not _has_wait_budget(deadline, 0.0):
                         raise
             raise RuntimeError("unreachable")
 
@@ -355,7 +361,7 @@ def async_retry(
     def decorate(func: Callable[P, Any]) -> Callable[P, Any]:
         @functools.wraps(func)
         async def wrapped(*args: P.args, **kwargs: P.kwargs) -> Any:
-            deadline = None if timeout is None else time.monotonic() + timeout
+            deadline = _deadline(timeout)
             for attempt in range(1, attempts + 1):
                 try:
                     return await func(*args, **kwargs)
@@ -372,14 +378,14 @@ def async_retry(
                         max_delay,
                         jitter,
                     )
-                    if deadline is not None:
-                        budget = deadline - time.monotonic()
-                        if budget <= 0 or delay > budget:
-                            raise
+                    if not _has_wait_budget(deadline, delay):
+                        raise
                     if on_retry is not None:
                         on_retry(exc, attempt, delay)
+                        if not _has_wait_budget(deadline, delay):
+                            raise
                     await asyncio.sleep(delay)
-                    if deadline is not None and time.monotonic() > deadline:
+                    if not _has_wait_budget(deadline, 0.0):
                         raise
             raise RuntimeError("unreachable")
 

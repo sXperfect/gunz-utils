@@ -5,6 +5,8 @@ import math
 import sys
 import unittest
 
+import pytest
+
 from gunz_utils.benchmark import benchmark, compare_results, profile_command
 
 
@@ -82,6 +84,7 @@ class TestBenchmark(unittest.TestCase):
                     benchmark(lambda: None, **kwargs)
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc required")
+    @pytest.mark.usefixtures("compatible_procfs")
     def test_profile_command_native_process(self) -> None:
         profile = profile_command(
             [

@@ -1,12 +1,12 @@
 """Narrow subprocess/argument tests for the local CI dispatcher.
 
-These intentionally do NOT run the full 712-test suite. They exercise command
+These intentionally do not run the full test suite. They exercise command
 dispatch, unknown-command handling, exit-status propagation, release metadata,
 guard, and the packaging isolation-matrix loop (with the heavy venv case
 functions stubbed, so no network and no fresh venvs are created).
 
-Run from the project root with the hyperion env:
-    python -m pytest scripts/tests/test_ci_cli.py -q
+Run from the project root:
+    python -m pytest tests/test_core/test_ci_cli.py -q
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def test_cli_no_command_is_nonzero() -> None:
 def test_packaging_gate_runs_all_cases_without_network(monkeypatch) -> None:
     # The packaging gate is a fresh-venv isolation matrix (zero-dep, stdlib,
     # per-extra validation/project/observability/secure, plot, wheel/sdist).
-    # Running it for real would create 8 venvs and hit the network, so this unit
+    # Running it for real creates several venvs and downloads packages, so this unit
     # test stubs every heavy case function to a no-op success and asserts the
     # runner invokes the full matrix and returns 0. Real proof of each case is
     # `python scripts/ci.py packaging` (exit 0, 8/8), not this unit test.

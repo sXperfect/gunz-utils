@@ -36,7 +36,7 @@ manual workflow dispatch
 Feature branches use the local gate:
 
 ```bash
-python scripts/ci.py all
+python scripts/audit_ci.py --summary-json tmp/ci-summary.json
 ```
 
 This policy prevents ordinary development commits from consuming hosted runner
@@ -76,7 +76,10 @@ packaging/dependency-isolation matrix
 Python 3.12 full pytest
 ```
 
-A failure stops later expensive work automatically.
+Checkout, release preflight, early lint, and dependency installation fail fast.
+Once the aggregate verifier starts, it continues through independent gates and
+reports every result before returning a failing status. In particular, a green
+Python 3.12 compatibility result does not replace an earlier Python 3.11 failure.
 
 ## Concurrency
 
@@ -161,7 +164,8 @@ To operate reliably under GitHub's free-tier resource limits:
 2. **1-Day Ephemeral Artifact Retention**: Verification summaries are retained
    for 1 day, preventing the shared 500 MB account storage quota from filling up.
 3. **PR Diff Filtering**:
-   - Skips the multi-venv packaging isolation matrix if packaging files are unchanged.
+   - Skips the multi-venv packaging isolation matrix only when package source,
+     build inputs, verification scripts, workflows, and tests are unchanged.
    - Skips the secondary Python 3.12 compatibility suite (`--skip-compat`) when
      changes are strictly documentation and changelog files.
 4. **Standalone Local Testing**: Developers without global `pytest` can execute

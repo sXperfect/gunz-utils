@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from ..subprocess import _kill_process
+
 
 @dataclass(frozen=True)
 class ProcessDetail:
@@ -83,7 +85,11 @@ def _memory_rollup(path: Path) -> tuple[int | None, int | None]:
             if separator and key in {"Pss", "Private_Clean", "Private_Dirty"}:
                 values[key] = int(value.split()[0]) * 1024
         pss = values.get("Pss")
-        private = values.get("Private_Clean", 0) + values.get("Private_Dirty", 0)
+        private = (
+            values["Private_Clean"] + values["Private_Dirty"]
+            if {"Private_Clean", "Private_Dirty"} <= values.keys()
+            else None
+        )
         return pss, private
     except (
         FileNotFoundError, ProcessLookupError, PermissionError, ValueError, IndexError
@@ -108,6 +114,25 @@ def _parse_proc_stat(text: str) -> tuple[int, str, list[str]]:
     return pid, command, fields
 
 
+def _require_compatible_procfs() -> Path:
+    """Reject procfs mounts whose PID numbers address a different namespace."""
+    proc = Path("/proc")
+    try:
+        proc_pid, _command, _fields = _parse_proc_stat(
+            (proc / "self" / "stat").read_text(errors="surrogateescape")
+        )
+    except (OSError, ValueError) as error:
+        raise NotImplementedError(
+            "process-tree profiling requires readable Linux /proc/self/stat"
+        ) from error
+    if proc_pid != os.getpid():
+        raise NotImplementedError(
+            "process-tree profiling requires procfs in the same PID namespace "
+            f"(procfs PID {proc_pid}, process PID {os.getpid()})"
+        )
+    return proc
+
+
 def _linux_snapshot(
     root_pid: int,
     started: float,
@@ -116,16 +141,14 @@ def _linux_snapshot(
 ) -> ProcessSample:
     if memory_detail not in {"rss", "pss", "full"}:
         raise ValueError("memory_detail must be rss, pss, or full")
-    proc = Path("/proc")
-    if not proc.exists():
-        raise NotImplementedError("process-tree profiling currently requires Linux")
+    proc = _require_compatible_procfs()
     rows: dict[int, tuple[int, list[str]]] = {}
     for entry in proc.iterdir():
         if not entry.name.isdigit():
             continue
         try:
             parsed_pid, _command, stat = _parse_proc_stat(
-                (entry / "stat").read_text()
+                (entry / "stat").read_text(errors="surrogateescape")
             )
             rows[parsed_pid] = (int(stat[3]), stat)
         except (
@@ -268,10 +291,15 @@ def profile_command(
     Returns:
         Profile containing observed samples and peak resource measurements.
         Commands that exit before observation may have no samples.
+        Sampling failure or interruption kills the command's POSIX process
+        group and reaps its root process. Children that create their own session
+        are outside that cleanup group. Normal completion follows the root
+        command's lifetime; detached descendants may outlive it.
 
     Raises:
         ValueError: If arguments or sampling options are invalid.
-        NotImplementedError: If Linux process information is unavailable.
+        NotImplementedError: If Linux process information is unavailable or its
+            PID namespace differs from the caller's.
         subprocess.CalledProcessError: If ``check`` is true and the command fails.
     """
     if not args:
@@ -291,13 +319,13 @@ def profile_command(
         or detailed_memory_every <= 0
     ):
         raise ValueError("detailed_memory_every must be a positive integer")
-    if not Path("/proc").exists():
-        raise NotImplementedError("process-tree profiling currently requires Linux")
+    _require_compatible_procfs()
     started = time.perf_counter()
     process = subprocess.Popen(
         list(args),
         cwd=cwd,
         env=None if env is None else {**os.environ, **env},
+        start_new_session=os.name == "posix",
     )
     samples: list[ProcessSample] = []
     snapshot_index = 0
@@ -317,14 +345,18 @@ def profile_command(
                 samples.append(sample)
             snapshot_index += 1
             time.sleep(float(interval))
-    except BaseException:
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=1.0)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
+    except BaseException as error:
+        # A sampling failure owns the whole launched command, including children
+        # still alive after the root exits. Preserve the original failure even
+        # if the process disappears during signaling or cannot be reaped.
+        try:
+            _kill_process(process)
+        except BaseException as cleanup_error:
+            error.add_note(f"Process cleanup failed: {type(cleanup_error).__name__}")
+        try:
+            process.wait(timeout=1.0)
+        except BaseException as cleanup_error:
+            error.add_note(f"Process reap failed: {type(cleanup_error).__name__}")
         raise
     wall = time.perf_counter() - started
     if check and process.returncode:

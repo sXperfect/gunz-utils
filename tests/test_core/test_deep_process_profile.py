@@ -6,10 +6,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 from gunz_utils.benchmark import profile_command, save_process_csv
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc required")
+@pytest.mark.usefixtures("compatible_procfs")
 class TestDeepProcessProfile(unittest.TestCase):
     def test_lineage_and_extended_metrics(self) -> None:
         profile = profile_command(

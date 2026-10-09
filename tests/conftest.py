@@ -13,6 +13,7 @@ Marker Taxonomy:
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -24,3 +25,17 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 def repo_root() -> Path:
     """Return the resolved root directory of the repository."""
     return PROJECT_ROOT
+
+
+@pytest.fixture(scope="session")
+def compatible_procfs() -> None:
+    """Require real procfs observations to use this process's PID namespace."""
+    try:
+        proc_pid = int(Path("/proc/self/stat").read_bytes().split(b" ", 1)[0])
+    except (OSError, ValueError):
+        pytest.skip("real process profiling requires readable Linux /proc/self/stat")
+    if proc_pid != os.getpid():
+        pytest.skip(
+            "real process profiling requires procfs in the same PID namespace "
+            f"(procfs PID {proc_pid}, process PID {os.getpid()})"
+        )

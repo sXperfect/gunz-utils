@@ -4,6 +4,8 @@ import asyncio
 import sys
 import unittest
 
+import pytest
+
 from gunz_utils.benchmark import profile_command
 from gunz_utils.concurrency import gather_limited
 from gunz_utils.resilience import AsyncCircuitBreaker, CircuitState
@@ -52,6 +54,7 @@ class TestDeepAuditRound2(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await breaker.call(recover), "ok")
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc required")
+    @pytest.mark.usefixtures("compatible_procfs")
     async def test_profile_has_no_empty_post_exit_tail(self) -> None:
         profile = profile_command(
             [sys.executable, "-c", "import time;time.sleep(.02)"],

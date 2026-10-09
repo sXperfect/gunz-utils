@@ -12,8 +12,8 @@ check the CI workflow would run, **without** mutating the active environment:
     python scripts/ci.py all         # every gate sequentially, stop on first failure
 
 Ordinary checking never reinstalls or upgrades the environment and never touches
-the shared ``gunz_utils`` editable install. The package-import origin is always
-verified to resolve inside this worktree's ``src/`` before any check runs.
+the shared ``gunz_utils`` editable install. The test gate verifies the package's
+import origin resolves inside this worktree's ``src/`` before pytest runs.
 ``packaging`` is the one gate that intentionally creates fresh throwaway venvs
 under ``tmp/c05-venvs/`` (and builds artifacts under ``tmp/c05-dist/``) so each
 dependency boundary is proven in genuine isolation without ever mutating the
@@ -67,14 +67,14 @@ def _env() -> dict[str, str]:
     return env
 
 
-def _origin_ok(path: str) -> bool:
+def _origin_ok(path: str | None) -> bool:
     """Return True when ``gunz_utils`` resolves inside this worktree's ``src``.
 
     This is the deliberate-import-origin guard: a local check that imports a
     copy of the package from the original/shared checkout (or an installed
     wheel from elsewhere) is not evidence for the code under test.
     """
-    return str(path).startswith(str(SRC_DIR))
+    return path is not None and Path(path).resolve().is_relative_to(SRC_DIR.resolve())
 
 
 def _verify_import_origin() -> None:
@@ -86,12 +86,13 @@ def _verify_import_origin() -> None:
     code = (
         "import gunz_utils\n"
         "import sys\n"
+        "from pathlib import Path\n"
         "path = gunz_utils.__file__\n"
         "print(path)\n"
-        f"expected = {str(SRC_DIR)!r}\n"
-        "if not str(path).startswith(expected):\n"
+        f"expected = Path({str(SRC_DIR)!r}).resolve()\n"
+        "if path is None or not Path(path).resolve().is_relative_to(expected):\n"
         "    sys.stderr.write('gunz_utils resolved outside worktree: '\n"
-        "                     + path + '\\n')\n"
+        "                     + str(path) + '\\n')\n"
         "    sys.exit(3)\n"
     )
     result = subprocess.run(
@@ -150,8 +151,9 @@ def _clean_env() -> dict[str, str]:
 
     Fresh-venv cases install the package and must import the *installed* copy
     from the venv's ``site-packages``, never the worktree ``src/``. Clearing
-    ``PYTHONPATH`` guarantees the installed artifact is what actually gets
-    imported, independent of the active interpreter's site-packages.
+    ``PYTHONPATH`` prevents that environment variable from selecting source
+    code. Isolation pytest commands also override the development-only
+    ``pythonpath`` setting in pyproject.toml.
     """
     env = dict(os.environ)
     env.pop("PYTHONPATH", None)
@@ -227,9 +229,9 @@ def _case_zero_dep() -> int:
         "import sys\n"
         "import gunz_utils\n"
         "from pathlib import Path\n"
-        f"sp = {str(sp)!r}\n"
+        f"sp = Path({str(sp)!r}).resolve()\n"
         f"forbidden = {sorted(FORBIDDEN_OPTIONAL_MODULES)!r}\n"
-        "if not str(gunz_utils.__file__).startswith(sp):\n"
+        "if not Path(gunz_utils.__file__).resolve().is_relative_to(sp):\n"
         "    sys.exit('zero-dep: gunz_utils resolved outside venv site-packages: '\n"
         "             + str(gunz_utils.__file__))\n"
         "loaded = [m for m in forbidden if m in sys.modules]\n"
@@ -247,7 +249,11 @@ def _case_stdlib() -> int:
     status = _pip_install(py, ".", "pytest==9.0.3")
     if status != 0:
         return status
-    status = _run_venv([str(py), "-m", "pytest", "-q", "tests/test_ext_stdlib"])
+    # The development pytest configuration otherwise reinserts src/ even with
+    # PYTHONPATH cleared, concealing defects in the installed distribution.
+    status = _run_venv(
+        [str(py), "-m", "pytest", "-o", "pythonpath=", "-q", "tests/test_ext_stdlib"]
+    )
     if status != 0:
         return status
     code = (
@@ -269,7 +275,11 @@ def _case_extra(extra: str, test_dir: str) -> int:
     status = _pip_install(py, f".[{extra}]", "pytest==9.0.3")
     if status != 0:
         return status
-    return _run_venv([str(py), "-m", "pytest", "-q", f"tests/{test_dir}"])
+    # pyproject.toml adds src/ for ordinary development tests. Disable that
+    # setting here so pytest exercises the freshly installed distribution.
+    return _run_venv(
+        [str(py), "-m", "pytest", "-o", "pythonpath=", "-q", f"tests/{test_dir}"]
+    )
 
 
 def _case_plot() -> int:
@@ -297,7 +307,7 @@ def _case_plot() -> int:
 
 
 def _case_wheel_sdist() -> int:
-    """Build wheel+sdist, install the wheel, import from outside the checkout.
+    """Build wheel+sdist, install each, import from outside the checkout.
 
     The import runs from ``OUTSIDE_CWD`` (a dedicated empty dir in system temp,
     i.e. not the worktree and not under ``src/``) with no ``PYTHONPATH``, so if
@@ -329,29 +339,34 @@ def _case_wheel_sdist() -> int:
     if not wheels or not sdists:
         print(f"!! no wheel/sdist produced in {DIST_DIR}", file=sys.stderr)
         return 2
-    wheel = wheels[0]
-    install_py, install_venv = _fresh_venv_python("wheel-install")
-    status = _pip_install(install_py, str(wheel))
-    if status != 0:
-        return status
-    sp = _site_packages(install_venv)
     OUTSIDE_CWD.mkdir(parents=True, exist_ok=True)
-    code = (
-        "import sys\n"
-        "from pathlib import Path\n"
-        "import gunz_utils\n"
-        f"sp = {str(sp)!r}\n"
-        "p = str(gunz_utils.__file__)\n"
-        "print('wheel import origin:', p)\n"
-        "if not p.startswith(sp):\n"
-        "    sys.exit('wheel: source shadowing! gunz_utils '\n"
-        "             'resolved outside venv: ' + p)\n"
-        "marker = Path(gunz_utils.__file__).parent / 'py.typed'\n"
-        "if not marker.is_file():\n"
-        "    sys.exit('wheel: missing PEP 561 marker: ' + str(marker))\n"
-        "print('wheel/sdist OK: installed artifact + py.typed verified')\n"
-    )
-    return _run_venv([str(install_py), "-c", code], cwd=OUTSIDE_CWD)
+    for kind, artifact in (("wheel", wheels[0]), ("sdist", sdists[0])):
+        install_py, install_venv = _fresh_venv_python(f"{kind}-install")
+        # In particular, the sdist must rebuild from its contents rather than
+        # reusing a wheel cached from an earlier source distribution.
+        status = _pip_install(install_py, "--no-cache-dir", str(artifact))
+        if status != 0:
+            return status
+        sp = _site_packages(install_venv)
+        code = (
+            "import sys\n"
+            "from pathlib import Path\n"
+            "import gunz_utils\n"
+            f"sp = Path({str(sp)!r}).resolve()\n"
+            "p = str(gunz_utils.__file__)\n"
+            f"print('{kind} import origin:', p)\n"
+            "if not Path(p).resolve().is_relative_to(sp):\n"
+            f"    sys.exit('{kind}: source shadowing! gunz_utils '\n"
+            "             'resolved outside venv: ' + p)\n"
+            "marker = Path(gunz_utils.__file__).parent / 'py.typed'\n"
+            "if not marker.is_file():\n"
+            f"    sys.exit('{kind}: missing PEP 561 marker: ' + str(marker))\n"
+            f"print('{kind} OK: installed artifact + py.typed verified')\n"
+        )
+        status = _run_venv([str(install_py), "-c", code], cwd=OUTSIDE_CWD)
+        if status != 0:
+            return status
+    return 0
 
 
 def run_lint() -> int:
