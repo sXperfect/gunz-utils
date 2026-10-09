@@ -121,3 +121,31 @@ restrictions, release checks, history depth, caching, or strict docs exist.
 
 Lesson: maintain both the executable workflow and the design rationale under
 `docs/guides/ci/` so future refactors preserve the constraints intentionally.
+
+## 11. Keep fake clocks consistent from object construction onward
+
+The [October 5, 2026 verification run](https://github.com/sXperfect/gunz-utils/actions/runs/37303235431/job/111740721673)
+failed the primary Python 3.11 suite in
+`test_acquire_deadline_enforced_on_wakeup`, while the later Python 3.12 suite
+passed. The aggregate verifier correctly retained the primary failure; the
+successful summary at the end of the log belonged to the compatibility suite.
+
+The test constructed and drained an `AsyncRateLimiter` using the real monotonic
+clock, then replaced that clock with a fake starting at `100.0`. The limiter's
+stored refill timestamp therefore belonged to a different clock. A forward jump
+could refill the bucket and allow immediate acquisition instead of testing the
+wakeup deadline. A backward jump could produce a negative token balance and
+raise an immediate budget timeout, falsely passing without sleeping at all.
+This made the result depend on the host clock and when the gate ran, rather
+than demonstrating an interpreter compatibility difference.
+
+The corrected test installs its fake clock before constructing the limiter,
+drains the initial token through `acquire`, and simulates a requested 20 ms
+sleep resuming after 50 ms against a 30 ms deadline. It checks both that the
+sleep occurred and that the timed-out acquisition did not consume refilled
+tokens. Replacing the limiter module's `time` and `asyncio` references keeps
+the event loop's shared standard-library modules untouched.
+
+Lesson: mock a consistent clock for the complete object lifecycle, and assert
+the intended wait path as well as the final exception. When reading aggregate
+logs, associate each pytest result with its interpreter and gate header.

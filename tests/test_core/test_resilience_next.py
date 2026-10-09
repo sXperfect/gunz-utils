@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from gunz_utils.cache import CacheInfo, ttl_cache
@@ -175,24 +176,40 @@ class TestAsyncResilience(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await limiter.try_acquire(0.5))
 
     async def test_acquire_deadline_enforced_on_wakeup(self) -> None:
-        limiter = AsyncRateLimiter(10, capacity=1)
-        await limiter.acquire(1.0)
-        limiter._tokens = 0.0
-
         current_time = [100.0]
+        sleep_delays: list[float] = []
 
         def fake_monotonic() -> float:
             return current_time[0]
 
         async def fake_sleep(duration: float) -> None:
+            sleep_delays.append(duration)
+            # The requested 20 ms sleep resumes after the 30 ms deadline.
             current_time[0] += 0.05
 
+        # Use one clock from construction onward, without changing the event
+        # loop's shared time/asyncio modules or depending on the host's uptime.
         with (
-            patch("gunz_utils.rate_limit.time.monotonic", side_effect=fake_monotonic),
-            patch("gunz_utils.rate_limit.asyncio.sleep", side_effect=fake_sleep),
+            patch(
+                "gunz_utils.rate_limit.time",
+                SimpleNamespace(monotonic=fake_monotonic),
+            ),
+            patch(
+                "gunz_utils.rate_limit.asyncio",
+                SimpleNamespace(Lock=asyncio.Lock, sleep=fake_sleep),
+            ),
         ):
+            limiter = AsyncRateLimiter(10, capacity=1)
+            await limiter.acquire(1.0)
+            self.assertEqual(limiter.available_tokens, 0.0)
+
             with self.assertRaises(TimeoutError):
                 await limiter.acquire(0.2, timeout=0.03)
+
+            # Require the wakeup path, not an immediate insufficient-budget
+            # timeout, and verify that the timed-out request consumed no tokens.
+            self.assertEqual(sleep_delays, [0.02])
+            self.assertAlmostEqual(limiter.available_tokens, 0.5)
 
     async def test_acquire_zero_timeout_non_blocking(self) -> None:
         limiter = AsyncRateLimiter(10, capacity=1)
