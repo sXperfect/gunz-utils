@@ -77,6 +77,48 @@ class ProcessProfile:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class _ProcessCounters:
+    """Monotonic counters retained for one Linux process lifetime."""
+
+    cpu_user_seconds: float
+    cpu_system_seconds: float
+    read_bytes: int
+    write_bytes: int
+    minor_faults: int
+    major_faults: int
+    voluntary_context_switches: int
+    involuntary_context_switches: int
+
+
+_ProcessIdentity = tuple[int, int]
+
+
+def _merge_process_counters(
+    previous: _ProcessCounters | None,
+    current: _ProcessCounters,
+) -> _ProcessCounters:
+    """Keep the greatest observed monotonic value for one process lifetime."""
+    if previous is None:
+        return current
+    return _ProcessCounters(
+        cpu_user_seconds=max(previous.cpu_user_seconds, current.cpu_user_seconds),
+        cpu_system_seconds=max(previous.cpu_system_seconds, current.cpu_system_seconds),
+        read_bytes=max(previous.read_bytes, current.read_bytes),
+        write_bytes=max(previous.write_bytes, current.write_bytes),
+        minor_faults=max(previous.minor_faults, current.minor_faults),
+        major_faults=max(previous.major_faults, current.major_faults),
+        voluntary_context_switches=max(
+            previous.voluntary_context_switches,
+            current.voluntary_context_switches,
+        ),
+        involuntary_context_switches=max(
+            previous.involuntary_context_switches,
+            current.involuntary_context_switches,
+        ),
+    )
+
+
 def _memory_rollup(path: Path) -> tuple[int | None, int | None]:
     try:
         values: dict[str, int] = {}
@@ -138,6 +180,7 @@ def _linux_snapshot(
     started: float,
     *,
     memory_detail: str = "pss",
+    lifetime_counters: dict[_ProcessIdentity, _ProcessCounters] | None = None,
 ) -> ProcessSample:
     if memory_detail not in {"rss", "pss", "full"}:
         raise ValueError("memory_detail must be rss, pss, or full")
@@ -188,6 +231,9 @@ def _linux_snapshot(
         pid_system = int(stat[14]) / ticks
         pid_rss = max(0, int(stat[23])) * page_size
         pid_threads = int(stat[19])
+        pid_start_ticks = int(stat[21])
+        pid_minor_faults = int(stat[9])
+        pid_major_faults = int(stat[11])
         if memory_detail == "rss":
             pss, private = None, None
         else:
@@ -199,8 +245,8 @@ def _linux_snapshot(
         system += pid_system
         rss += pid_rss
         threads += pid_threads
-        minor_faults += int(stat[9])
-        major_faults += int(stat[11])
+        minor_faults += pid_minor_faults
+        major_faults += pid_major_faults
         if pss is None:
             pss_complete = False
         else:
@@ -209,6 +255,56 @@ def _linux_snapshot(
             private_complete = False
         else:
             private_total += private
+        pid_read_bytes = 0
+        pid_write_bytes = 0
+        try:
+            io_values = {}
+            for line in (proc / str(pid) / "io").read_text().splitlines():
+                key, value = line.split(":", 1)
+                io_values[key] = int(value.strip())
+            pid_read_bytes = io_values.get("read_bytes", 0)
+            pid_write_bytes = io_values.get("write_bytes", 0)
+            read_bytes += pid_read_bytes
+            write_bytes += pid_write_bytes
+        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError):
+            pass
+
+        pid_voluntary = 0
+        pid_involuntary = 0
+        try:
+            for line in (proc / str(pid) / "status").read_text().splitlines():
+                if line.startswith("voluntary_ctxt_switches:"):
+                    pid_voluntary = int(line.split()[1])
+                elif line.startswith("nonvoluntary_ctxt_switches:"):
+                    pid_involuntary = int(line.split()[1])
+            voluntary += pid_voluntary
+            involuntary += pid_involuntary
+        except (
+            FileNotFoundError,
+            ProcessLookupError,
+            PermissionError,
+            ValueError,
+            IndexError,
+        ):
+            pass
+
+        if lifetime_counters is not None:
+            identity = (pid, pid_start_ticks)
+            current = _ProcessCounters(
+                cpu_user_seconds=pid_user,
+                cpu_system_seconds=pid_system,
+                read_bytes=pid_read_bytes,
+                write_bytes=pid_write_bytes,
+                minor_faults=pid_minor_faults,
+                major_faults=pid_major_faults,
+                voluntary_context_switches=pid_voluntary,
+                involuntary_context_switches=pid_involuntary,
+            )
+            lifetime_counters[identity] = _merge_process_counters(
+                lifetime_counters.get(identity),
+                current,
+            )
+
         details.append(
             ProcessDetail(
                 pid=pid,
@@ -222,29 +318,6 @@ def _linux_snapshot(
                 threads=pid_threads,
             )
         )
-        try:
-            io_values = {}
-            for line in (proc / str(pid) / "io").read_text().splitlines():
-                key, value = line.split(":", 1)
-                io_values[key] = int(value.strip())
-            read_bytes += io_values.get("read_bytes", 0)
-            write_bytes += io_values.get("write_bytes", 0)
-        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError):
-            pass
-        try:
-            for line in (proc / str(pid) / "status").read_text().splitlines():
-                if line.startswith("voluntary_ctxt_switches:"):
-                    voluntary += int(line.split()[1])
-                elif line.startswith("nonvoluntary_ctxt_switches:"):
-                    involuntary += int(line.split()[1])
-        except (
-            FileNotFoundError,
-            ProcessLookupError,
-            PermissionError,
-            ValueError,
-            IndexError,
-        ):
-            pass
 
     return ProcessSample(
         elapsed=time.perf_counter() - started,
@@ -328,6 +401,7 @@ def profile_command(
         start_new_session=os.name == "posix",
     )
     samples: list[ProcessSample] = []
+    lifetime_counters: dict[_ProcessIdentity, _ProcessCounters] = {}
     snapshot_index = 0
     try:
         while process.poll() is None:
@@ -340,6 +414,7 @@ def profile_command(
                 process.pid,
                 started,
                 memory_detail=detail,
+                lifetime_counters=lifetime_counters,
             )
             if sample.process_count:
                 samples.append(sample)
@@ -370,6 +445,21 @@ def profile_command(
         known = [int(value) for value in values if value is not None]
         return max(known) if known else None
 
+    def lifetime_float(name: str, sample_name: str) -> float:
+        if lifetime_counters:
+            return sum(
+                float(getattr(item, name)) for item in lifetime_counters.values()
+            )
+        return max(
+            (float(getattr(sample, sample_name)) for sample in samples),
+            default=0.0,
+        )
+
+    def lifetime_int(name: str, sample_name: str) -> int:
+        if lifetime_counters:
+            return sum(int(getattr(item, name)) for item in lifetime_counters.values())
+        return peak(sample_name)
+
     return ProcessProfile(
         args=tuple(args),
         returncode=process.returncode or 0,
@@ -377,16 +467,22 @@ def profile_command(
         peak_rss_bytes=peak("rss_bytes"),
         peak_pss_bytes=optional_peak("pss_bytes"),
         peak_private_bytes=optional_peak("private_bytes"),
-        cpu_user_seconds=max((s.cpu_user_seconds for s in samples), default=0.0),
-        cpu_system_seconds=max((s.cpu_system_seconds for s in samples), default=0.0),
-        read_bytes=peak("read_bytes"),
-        write_bytes=peak("write_bytes"),
+        cpu_user_seconds=lifetime_float("cpu_user_seconds", "cpu_user_seconds"),
+        cpu_system_seconds=lifetime_float("cpu_system_seconds", "cpu_system_seconds"),
+        read_bytes=lifetime_int("read_bytes", "read_bytes"),
+        write_bytes=lifetime_int("write_bytes", "write_bytes"),
         peak_process_count=peak("process_count"),
         peak_threads=peak("threads"),
-        minor_faults=peak("minor_faults"),
-        major_faults=peak("major_faults"),
-        voluntary_context_switches=peak("voluntary_context_switches"),
-        involuntary_context_switches=peak("involuntary_context_switches"),
+        minor_faults=lifetime_int("minor_faults", "minor_faults"),
+        major_faults=lifetime_int("major_faults", "major_faults"),
+        voluntary_context_switches=lifetime_int(
+            "voluntary_context_switches",
+            "voluntary_context_switches",
+        ),
+        involuntary_context_switches=lifetime_int(
+            "involuntary_context_switches",
+            "involuntary_context_switches",
+        ),
         samples=tuple(samples),
     )
 

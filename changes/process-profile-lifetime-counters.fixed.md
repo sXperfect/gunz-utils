@@ -1,0 +1,1 @@
+Retain monotonic CPU, I/O, fault, and context-switch counters across observed process lifetimes using PID plus Linux start time, so exited children remain represented and PID reuse cannot merge distinct processes.\n
