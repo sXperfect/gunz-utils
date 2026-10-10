@@ -101,6 +101,15 @@ def build_network_uri(
             normalized_host = normalized_host.encode("idna").decode("ascii")
         except UnicodeError as exc:
             raise ValueError("host is not a valid DNS name") from exc
+        # IDNA can map Unicode characters into authority delimiters. Validate
+        # the actual encoded host before combining distinct URI components.
+        if any(character in normalized_host for character in "@/?#%:[]"):
+            raise ValueError("host contains invalid authority delimiters")
+        if "\\" in normalized_host or any(
+            character.isspace() or ord(character) < 0x20 or ord(character) == 0x7F
+            for character in normalized_host
+        ):
+            raise ValueError("host contains invalid authority characters")
     if port is not None and (
         isinstance(port, bool)
         or not isinstance(port, int)

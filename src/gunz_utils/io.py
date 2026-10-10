@@ -83,14 +83,20 @@ def atomic_write(
                 fd,
                 permissions,
             )
+        file_handle = os.fdopen(
+            fd, mode, encoding=None if is_binary else encoding or "utf-8",
+            closefd=False,
+        )
+        # Keep raw ownership even if wrapper construction closes an incomplete
+        # wrapper before raising (for example for an unknown text encoding).
         if is_binary:
-            with os.fdopen(fd, mode) as file:
+            with file_handle as file:
                 file.write(content)
                 if durable:
                     file.flush()
                     os.fsync(file.fileno())
         else:
-            with os.fdopen(fd, mode, encoding=encoding or "utf-8") as file:
+            with file_handle as file:
                 file.write(content)
                 if durable:
                     file.flush()
@@ -108,6 +114,8 @@ def atomic_write(
         except OSError:
             pass
         raise
+    finally:
+        os.close(fd)
 
 
 def atomic_json_write(

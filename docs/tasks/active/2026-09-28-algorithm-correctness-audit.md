@@ -1,13 +1,23 @@
 # Repository-wide algorithm correctness audit
 
-Status: active — security-hardened main and algorithm-audit histories composed
-and verified; integration branch is ready to merge before the next A2 sweep
+Status: active — remaining algorithm proof obligations and documented limitations;
+older integration-branch metadata below records the original audit history
 Branch: `audit/algorithm-correctness`
 Integration branch: `merge/algorithm-audit-main`
 Integration base: `main@07244be5e6d24d83b3b7dcde62bc1702ff1f6e9d`
 Audit parent: `36846e285bfec8624cb24a3b38bcfb7a6f62ad7a`
 Started: 2026-09-28
 Base: `main@cf3697d7457c5901ee1c927bc6dae347d5428722`
+
+## 2026-10-08 coordination update
+
+[The follow-up review and eleven scoped repairs](../done/2026-10-08-audit-follow-up.md)
+passed the complete canonical gate on Python 3.11/3.12, including actual compiled
+native and fallback modes, packaging isolation and strict docs. Historical
+checkboxes below describe the original sweep. Remaining graph-depth decisions,
+independent state-machine/multiprocess proofs, AES interoperability/tamper matrix,
+resource budgets and platform contracts remain in the maintained registry; this
+long-horizon program is not declared complete.
 
 ## Goal
 

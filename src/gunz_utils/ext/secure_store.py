@@ -94,6 +94,10 @@ _DIR_MODE = 0o700
 _LIBRARY_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _RECORD_ENVELOPE_MAGIC = b"\x00GZENV1\x00"
 _RECORD_FORMAT_STRICT = b"envelope-v1"
+_RECORD_FORMAT_LEGACY = b"legacy"
+_KEY_CHECK_LEGACY = b"gunz-utils-secure-store-v1"
+_KEY_CHECK_STRICT = b"gunz-utils-secure-store-v2:strict"
+_KEY_CHECK_MIGRATION = b"gunz-utils-secure-store-v2:legacy"
 _WINDOWS_LOCK_TIMEOUT = 60.0
 
 
@@ -452,14 +456,10 @@ class SecureStore:
         try:
             info = os.fstat(descriptor)
             if not stat.S_ISREG(info.st_mode):
-                raise ValueError(
-                    f"private path must be a regular file: {path.name}"
-                )
+                raise ValueError(f"private path must be a regular file: {path.name}")
             if os.name == "posix":
                 if info.st_uid != os.getuid():
-                    raise PermissionError(
-                        f"private file has wrong owner: {path.name}"
-                    )
+                    raise PermissionError(f"private file has wrong owner: {path.name}")
                 os.fchmod(descriptor, _KEY_FILE_MODE)
             with os.fdopen(descriptor, "rb") as handle:
                 descriptor = -1
@@ -573,43 +573,92 @@ class SecureStore:
             self._pending_salt_path.unlink(missing_ok=True)
         self._fsync_base_dir()
 
-    def _verify_or_initialize_key(self, fernet: Fernet) -> None:
-        """Verify ``fernet`` or initialize metadata. Caller holds both locks."""
+    def _read_record_policy(self, fernet: Fernet) -> bool:
+        """Verify authenticated policy and its persisted format marker."""
+        check = self._conn.execute(
+            "SELECT value FROM store_meta WHERE key = 'key_check'"
+        ).fetchone()
+        if check is None:
+            raise InvalidToken("Key check marker invalid or missing")
+        policy = fernet.decrypt(check["value"])
+        formats = {
+            _KEY_CHECK_STRICT: _RECORD_FORMAT_STRICT,
+            _KEY_CHECK_MIGRATION: _RECORD_FORMAT_LEGACY,
+        }
+        expected = formats.get(policy)
+        if expected is None:
+            raise InvalidToken("Authenticated record policy is missing or invalid")
+        row = self._conn.execute(
+            "SELECT value FROM store_meta WHERE key = 'record_format'"
+        ).fetchone()
+        if row is None or row["value"] != expected:
+            raise InvalidToken(
+                "Record format marker does not match authenticated policy"
+            )
+        return policy == _KEY_CHECK_STRICT
+
+    def _write_record_policy(self, fernet: Fernet, *, strict: bool) -> None:
+        """Write policy and authenticated check within the caller's transaction."""
+        self._conn.execute(
+            "INSERT OR REPLACE INTO store_meta(key, value) VALUES ('key_check', ?)",
+            (fernet.encrypt(_KEY_CHECK_STRICT if strict else _KEY_CHECK_MIGRATION),),
+        )
+        self._conn.execute(
+            "INSERT OR REPLACE INTO store_meta(key, value) VALUES ('record_format', ?)",
+            (_RECORD_FORMAT_STRICT if strict else _RECORD_FORMAT_LEGACY,),
+        )
+
+    def _verify_or_initialize_key(
+        self, fernet: Fernet, *, allow_legacy: bool = False
+    ) -> None:
+        """Verify key/policy or explicitly upgrade legacy metadata under both locks."""
         row = self._conn.execute(
             "SELECT value FROM store_meta WHERE key = 'key_check'"
         ).fetchone()
-        if row is not None:
-            if fernet.decrypt(row["value"]) != b"gunz-utils-secure-store-v1":
-                raise InvalidToken
-        else:
-            secret = self._conn.execute(
-                "SELECT ciphertext FROM secrets LIMIT 1"
-            ).fetchone()
-            if secret is not None:
-                fernet.decrypt(secret["ciphertext"])
-            token = fernet.encrypt(b"gunz-utils-secure-store-v1")
-            self._conn.execute(
-                "INSERT INTO store_meta(key, value) VALUES ('key_check', ?)",
-                (token,),
-            )
-            if secret is None:
-                # Brand-new store: never accept unbound legacy records.
-                self._conn.execute(
-                    "INSERT OR REPLACE INTO store_meta(key, value) "
-                    "VALUES ('record_format', ?)",
-                    (_RECORD_FORMAT_STRICT,),
-                )
+        policy = fernet.decrypt(row["value"]) if row is not None else None
+        if policy in (_KEY_CHECK_STRICT, _KEY_CHECK_MIGRATION):
+            self._read_record_policy(fernet)
+            generation = self._read_generation()
+            if generation is None:  # Kept explicit for the optional return annotation.
+                raise RuntimeError("Store generation metadata is missing")
+            self._key_generation = generation
+            return
+        if policy not in (None, _KEY_CHECK_LEGACY):
+            raise InvalidToken("Key check marker invalid")
 
+        format_row = self._conn.execute(
+            "SELECT value FROM store_meta WHERE key = 'record_format'"
+        ).fetchone()
+        secret = self._conn.execute("SELECT ciphertext FROM secrets LIMIT 1").fetchone()
+        strict = format_row is not None and format_row["value"] == _RECORD_FORMAT_STRICT
+        if not strict and secret is not None and not allow_legacy:
+            raise InvalidToken(
+                "Legacy metadata requires explicit trusted unlock(allow_legacy=True)"
+            )
+        if format_row is not None and not strict:
+            raise InvalidToken("Legacy record format metadata is invalid")
+        if secret is not None:
+            fernet.decrypt(secret["ciphertext"])
         generation = self._read_generation(missing_ok=True)
         if generation is None:
-            # Controlled legacy initialization: only reachable from the
-            # coordinated unlock path, never from ordinary verification.
             generation = 1
+        # Seal the upgrade atomically: an interrupted unlock must not publish
+        # an authenticated policy without its corresponding format/generation.
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            self._write_record_policy(fernet, strict=strict or secret is None)
             self._conn.execute(
                 "INSERT OR REPLACE INTO store_meta(key, value) "
                 "VALUES ('key_generation', ?)",
-                (b"1",),
+                (str(generation).encode("ascii"),),
             )
+            self._conn.execute("COMMIT")
+        except BaseException as failure:
+            try:
+                self._reconnect_database()
+            except BaseException:
+                failure.add_note("Legacy policy upgrade connection recovery failed.")
+            raise
         self._key_generation = generation
 
     def _read_generation(self, *, missing_ok: bool = False) -> int | None:
@@ -643,19 +692,26 @@ class SecureStore:
             )
 
     def _records_strict(self) -> bool:
-        """Return True once the store has been migrated to bound records."""
-        row = self._conn.execute(
-            "SELECT value FROM store_meta WHERE key = 'record_format'"
-        ).fetchone()
-        return row is not None and row["value"] == _RECORD_FORMAT_STRICT
+        """Require a valid authenticated strict or trusted migration policy."""
+        if self._fernet is None:
+            raise RuntimeError("Store is locked. Call unlock() first.")
+        return self._read_record_policy(self._fernet)
 
-    def unlock(self, passphrase: str | None = None) -> None:
+    def unlock(
+        self, passphrase: str | None = None, *, allow_legacy: bool = False
+    ) -> None:
         """Unlock the store, recovering interrupted key publication if needed.
 
-        The whole candidate-selection, verification, initialization and
-        pending-key recovery sequence runs under the inter-process
-        coordination lock so it cannot interleave with a rotation.
+        ``allow_legacy=True`` explicitly trusts a pre-policy database for an
+        initial upgrade. Use it only for trusted legacy input, then call
+        :meth:`migrate_records`. It never bypasses a damaged modern policy.
+        Whole-database authenticated snapshot rollback needs external freshness
+        state and is outside this store's contract.
+
+        Candidate verification and recovery run under the inter-process lock.
         """
+        if not isinstance(allow_legacy, bool):
+            raise ValueError("allow_legacy must be bool")
         if passphrase is not None and (
             not isinstance(passphrase, str) or not passphrase
         ):
@@ -670,10 +726,7 @@ class SecureStore:
                 )
                 existing = [path for path in key_paths if path.exists()]
                 if not existing:
-                    if (
-                        self._salt_path.exists()
-                        or self._pending_salt_path.exists()
-                    ):
+                    if self._salt_path.exists() or self._pending_salt_path.exists():
                         raise RuntimeError(
                             "Store is passphrase-protected; passphrase required"
                         )
@@ -719,7 +772,7 @@ class SecureStore:
             last_error: InvalidToken | None = None
             for candidate, pending in candidates:
                 try:
-                    self._verify_or_initialize_key(candidate)
+                    self._verify_or_initialize_key(candidate, allow_legacy=allow_legacy)
                 except InvalidToken as exc:
                     last_error = exc
                     continue
@@ -743,10 +796,13 @@ class SecureStore:
         if not isinstance(passphrase, str) or not passphrase:
             raise ValueError("passphrase must be a non-empty string")
         kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(), length=32, salt=salt,
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
             iterations=_PBKDF2_ITERATIONS,
         )
         return base64.urlsafe_b64encode(kdf.derive(passphrase.encode()))
+
     def _audit(
         self,
         caller: str,
@@ -821,9 +877,7 @@ class SecureStore:
                     if existing is not None:
                         stored_acl_str = existing["acl"] or ""
                         try:
-                            raw_payload = self._fernet.decrypt(
-                                existing["ciphertext"]
-                            )
+                            raw_payload = self._fernet.decrypt(existing["ciphertext"])
                             allow_legacy = not self._records_strict()
                             _decode_record(
                                 raw_payload,
@@ -838,20 +892,14 @@ class SecureStore:
                             ) from exc
 
                         current_acl = [
-                            item
-                            for item in stored_acl_str.split(",")
-                            if item
+                            item for item in stored_acl_str.split(",") if item
                         ]
                         if current_acl and caller not in current_acl:
                             raise PermissionError(
                                 f"Caller {caller!r} not permitted to modify "
                                 f"{name!r}"
                             )
-                        acl_str = (
-                            stored_acl_str
-                            if acl is None
-                            else ",".join(acl)
-                        )
+                        acl_str = stored_acl_str if acl is None else ",".join(acl)
                     else:
                         acl_str = ",".join(acl) if acl else ""
 
@@ -918,6 +966,7 @@ class SecureStore:
         """Decrypt and UTF-8 decode a text secret, or None if not found."""
         value = self.get_bytes(name, caller=caller)
         return None if value is None else value.decode("utf-8")
+
     def delete(self, name: str, *, caller: str = "library") -> bool:
         """Delete an authorized secret. The store must be unlocked."""
         name = self._validate_secret_name(name)
@@ -951,15 +1000,10 @@ class SecureStore:
                             "envelope integrity check failed"
                         ) from exc
 
-                    acl = [
-                        item
-                        for item in stored_acl_str.split(",")
-                        if item
-                    ]
+                    acl = [item for item in stored_acl_str.split(",") if item]
                     if acl and caller not in acl:
                         raise PermissionError(
-                            f"Caller {caller!r} not permitted to delete "
-                            f"{name!r}"
+                            f"Caller {caller!r} not permitted to delete " f"{name!r}"
                         )
 
                     self._conn.execute(
@@ -1023,6 +1067,7 @@ class SecureStore:
         caller = self._validate_identity(caller, field="caller")
         validated = [self._validate_secret_name(name) for name in names]
         return {name: self.get(name, caller=caller) for name in validated}
+
     def list_keys(
         self, *, caller: str = "library", acl_filter: bool = True
     ) -> list[SecretMetadata]:
@@ -1106,6 +1151,13 @@ class SecureStore:
 
             with self._coordination_lock:
                 self._verify_key_generation()
+                self._records_strict()
+                if self._pending_key_path.exists() or self._pending_salt_path.exists():
+                    # A prior rotation may have committed without publishing.
+                    # Preserve its only durable key before staging another one.
+                    self._promote_pending_key_material(
+                        passphrase_mode=self._passphrase_mode,
+                    )
                 self._cleanup_pending_key_material()
                 old_fernet = self._fernet
                 if new_passphrase is None:
@@ -1117,6 +1169,8 @@ class SecureStore:
                     self._write_private(self._pending_salt_path, new_salt)
 
                 new_fernet = Fernet(new_key)
+                old_generation = self._key_generation
+                new_gen = old_generation + 1
 
                 try:
                     self._conn.execute("BEGIN IMMEDIATE")
@@ -1140,8 +1194,6 @@ class SecureStore:
                         new_enveloped = _pack_envelope(name, acl_str, plaintext)
                         rewritten.append((new_fernet.encrypt(new_enveloped), name))
 
-                    check = new_fernet.encrypt(b"gunz-utils-secure-store-v1")
-                    new_gen = self._key_generation + 1
                     new_gen_bytes = str(new_gen).encode("ascii")
 
                     self._conn.executemany(
@@ -1150,26 +1202,20 @@ class SecureStore:
                     )
                     self._conn.execute(
                         "INSERT OR REPLACE INTO store_meta(key, value) "
-                        "VALUES ('key_check', ?)",
-                        (check,),
-                    )
-                    self._conn.execute(
-                        "INSERT OR REPLACE INTO store_meta(key, value) "
                         "VALUES ('key_generation', ?)",
                         (new_gen_bytes,),
                     )
-                    # Once all rows have been rewritten into envelopes,
-                    # enforce strict envelope checking going forward.
-                    self._conn.execute(
-                        "INSERT OR REPLACE INTO store_meta(key, value) "
-                        "VALUES ('record_format', ?)",
-                        (_RECORD_FORMAT_STRICT,),
-                    )
+                    self._write_record_policy(new_fernet, strict=True)
                     self._conn.execute("COMMIT")
-                except BaseException:
-                    if self._conn.in_transaction:
-                        self._conn.execute("ROLLBACK")
-                    self._cleanup_pending_key_material()
+                except BaseException as failure:
+                    self._recover_failed_rotation(
+                        failure,
+                        old_fernet=old_fernet,
+                        new_fernet=new_fernet,
+                        old_generation=old_generation,
+                        new_generation=new_gen,
+                        passphrase_mode=target_is_passphrase,
+                    )
                     raise
 
                 self._fernet = new_fernet
@@ -1178,6 +1224,48 @@ class SecureStore:
                 self._promote_pending_key_material(
                     passphrase_mode=target_is_passphrase,
                 )
+
+    def _recover_failed_rotation(
+        self,
+        failure: BaseException,
+        *,
+        old_fernet: Fernet,
+        new_fernet: Fernet,
+        old_generation: int,
+        new_generation: int,
+        passphrase_mode: bool,
+    ) -> None:
+        """Reconcile durable state without losing the original rotation failure."""
+        try:
+            if self._conn.in_transaction:
+                try:
+                    self._conn.execute("ROLLBACK")
+                except BaseException:
+                    # Closing the connection drops an uncommitted transaction.
+                    # COMMIT may also have succeeded before its wrapper failed.
+                    pass
+            self._reconnect_database()
+            generation = self._read_generation()
+            if generation == old_generation:
+                self._read_record_policy(old_fernet)
+                self._fernet = old_fernet
+                self._key_generation = old_generation
+                self._cleanup_pending_key_material()
+            elif generation == new_generation:
+                self._read_record_policy(new_fernet)
+                self._fernet = new_fernet
+                self._key_generation = new_generation
+                self._passphrase_mode = passphrase_mode
+                # Keep pending material: the database is committed but key
+                # publication still needs recovery by coordinated unlock.
+            else:
+                raise RuntimeError("Unexpected durable key generation")
+        except BaseException:
+            self._fernet = None
+            failure.add_note(
+                "Rotation recovery could not verify durable state; store locked "
+                "and pending key material retained for recovery."
+            )
 
     def migrate_records(self) -> int:
         """Migrate any legacy un-enveloped secrets to authenticated envelopes.
@@ -1219,11 +1307,7 @@ class SecureStore:
                         "UPDATE secrets SET ciphertext = ? WHERE name = ?",
                         rewritten,
                     )
-                self._conn.execute(
-                    "INSERT OR REPLACE INTO store_meta(key, value) "
-                    "VALUES ('record_format', ?)",
-                    (_RECORD_FORMAT_STRICT,),
-                )
+                self._write_record_policy(self._fernet, strict=True)
             return migrated_count
 
     def verify_integrity(self) -> bool:
@@ -1236,14 +1320,7 @@ class SecureStore:
             if self._fernet is None:
                 raise RuntimeError("Store is locked. Call unlock() first.")
             self._verify_key_generation()
-            row = self._conn.execute(
-                "SELECT value FROM store_meta WHERE key = 'key_check'"
-            ).fetchone()
-            if (
-                row is None
-                or self._fernet.decrypt(row["value"]) != b"gunz-utils-secure-store-v1"
-            ):
-                raise InvalidToken("Key check marker invalid or missing")
+            self._read_record_policy(self._fernet)
 
             rows = self._conn.execute(
                 "SELECT name, ciphertext, acl FROM secrets"
@@ -1278,7 +1355,8 @@ class SecureStore:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT timestamp, caller, action, secret_name, allowed "
-                "FROM audit ORDER BY id DESC LIMIT ?", (limit,)
+                "FROM audit ORDER BY id DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -1287,6 +1365,7 @@ class SecureStore:
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
         self.close()
+
     def close(self) -> None:
         with self._lock:
             self._conn.close()

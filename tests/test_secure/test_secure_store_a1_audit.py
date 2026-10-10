@@ -569,10 +569,14 @@ def test_legacy_record_migration_and_strict_envelope_enforcement(
             """,
             ("legacy_key", legacy_ciphertext, "admin", 0.0, 0.0),
         )
-        # Clear record_format so store behaves like an upgraded pre-migration store
+        # Construct genuine v1 metadata, rather than corrupting a modern policy.
         store._conn.execute(
-            "DELETE FROM store_meta WHERE key = 'record_format'"
+            "UPDATE store_meta SET value = ? WHERE key = 'key_check'",
+            (store._fernet.encrypt(b"gunz-utils-secure-store-v1"),),
         )
+        store._conn.execute("DELETE FROM store_meta WHERE key = 'record_format'")
+        store.lock()
+        store.unlock(allow_legacy=True)
 
         # Before migration, legacy records can be read
         assert store.get("legacy_key", caller="admin") == "legacy_secret_value"

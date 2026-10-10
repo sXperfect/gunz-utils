@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import shutil
+import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -48,9 +50,59 @@ def atomic_write_bytes(path: str | Path, data: bytes) -> None:
     )
 
 
+def _rename_directory_noreplace(source: Path, target: Path) -> None:
+    """Use an OS no-replace rename, failing closed when unavailable."""
+    if os.name == "nt":
+        # Windows rename rejects an existing destination atomically.
+        os.rename(source, target)
+        return
+
+    import ctypes
+
+    source_bytes = os.fsencode(source)
+    target_bytes = os.fsencode(target)
+    if b"\0" in source_bytes or b"\0" in target_bytes:
+        raise ValueError("paths must not contain NUL")
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform.startswith("linux"):
+        function = getattr(library, "renameat2", None)
+        if function is None:
+            raise NotImplementedError("atomic no-replace rename is unavailable")
+        function.argtypes = [
+            ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p,
+            ctypes.c_uint,
+        ]
+        function.restype = ctypes.c_int
+        # AT_FDCWD = -100; RENAME_NOREPLACE = 1.
+        result = function(-100, source_bytes, -100, target_bytes, 1)
+    elif sys.platform == "darwin":
+        function = getattr(library, "renamex_np", None)
+        if function is None:
+            raise NotImplementedError("atomic no-replace rename is unavailable")
+        function.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+        function.restype = ctypes.c_int
+        # RENAME_EXCL = 0x00000004.
+        result = function(source_bytes, target_bytes, 4)
+    else:
+        raise NotImplementedError("atomic no-replace rename is unavailable")
+    if result != 0:
+        error = ctypes.get_errno()
+        if error in {errno.ENOSYS, errno.EINVAL, errno.ENOTSUP}:
+            raise NotImplementedError(
+                "filesystem does not support atomic no-replace rename"
+            )
+        raise OSError(error, os.strerror(error), str(target))
+
+
 @contextmanager
 def transactional_directory(path: str | Path) -> Iterator[Path]:
-    """Build a directory privately and atomically publish it on success."""
+    """Build privately and publish atomically without replacing any target.
+
+    Requires Windows rename, Linux renameat2/RENAME_NOREPLACE, or macOS
+    renamex_np/RENAME_EXCL support. Unsupported platforms/filesystems raise
+    NotImplementedError and clean staging. Parent directories must be trusted;
+    this helper does not anchor their identity against malicious replacement.
+    """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(dir=target.parent, prefix=f".{target.name}."))
@@ -60,7 +112,7 @@ def transactional_directory(path: str | Path) -> Iterator[Path]:
         # symlinks, before publishing the staged directory.
         if target.is_symlink() or target.exists():
             raise FileExistsError(target)
-        os.replace(staging, target)
+        _rename_directory_noreplace(staging, target)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise

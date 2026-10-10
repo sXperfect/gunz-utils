@@ -33,6 +33,8 @@ import os
 import shutil
 import subprocess
 import sys
+import tarfile
+import zipfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
@@ -106,8 +108,7 @@ def _verify_import_origin() -> None:
         print(result.stdout, end="", flush=True)
     if result.returncode != 0:
         print(
-            "!! package import did not resolve into the worktree "
-            f"({SRC_DIR})",
+            f"!! package import did not resolve into the worktree ({SRC_DIR})",
             file=sys.stderr,
         )
         if result.stderr:
@@ -143,7 +144,10 @@ def run_release() -> int:
 def run_test() -> int:
     """Run the complete pytest collection."""
     _verify_import_origin()
-    return _run([sys.executable, "-m", "pytest"])
+    status = _run([sys.executable, "-m", "pytest"])
+    if status:
+        return status
+    return _run([sys.executable, str(PROJECT_ROOT / "scripts" / "verify_native.py")])
 
 
 def _clean_env() -> dict[str, str]:
@@ -306,6 +310,86 @@ def _case_plot() -> int:
     return _run_venv([str(py), "-c", code])
 
 
+def _check_distribution_contents(wheel: Path, sdist: Path) -> None:
+    """Require pure wheels and advertised optional native source/build support."""
+    with zipfile.ZipFile(wheel) as archive:
+        names = archive.namelist()
+        if "gunz_utils/py.typed" not in names:
+            raise ValueError("wheel missing py.typed")
+        if any(name.endswith((".so", ".pyd", ".dll", ".dylib")) for name in names):
+            raise ValueError("pure wheel contains compiled native artifact")
+        metadata = next(name for name in names if name.endswith(".dist-info/WHEEL"))
+        if b"Root-Is-Purelib: true" not in archive.read(metadata):
+            raise ValueError("wheel must preserve pure-Python installation")
+    with tarfile.open(sdist) as archive:
+        names = {"/".join(Path(name).parts[1:]) for name in archive.getnames()}
+        required = {
+            "src/gunz_utils/py.typed",
+            "native/src/_accel.c",
+            "native/include/gunz_utils_native.h",
+            "scripts/build_native.py",
+            "pyproject.toml",
+        }
+        if missing := required - names:
+            raise ValueError(f"sdist missing required files: {sorted(missing)}")
+
+
+def _extract_sdist(sdist: Path, destination: Path) -> Path:
+    """Extract regular files/directories without allowing archive path redirection."""
+    destination.mkdir(parents=True, exist_ok=True)
+    roots: set[str] = set()
+    with tarfile.open(sdist) as archive:
+        for member in archive:
+            path = Path(member.name)
+            if path.is_absolute() or ".." in path.parts or not path.parts:
+                raise ValueError("unsafe sdist member path")
+            if not member.isdir() and not member.isfile():
+                raise ValueError(
+                    "sdist must contain only regular files and directories"
+                )
+            roots.add(path.parts[0])
+            target = destination / path
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                handle = archive.extractfile(member)
+                if handle is None:
+                    raise ValueError("sdist regular member has no data")
+                with handle, target.open("wb") as output:
+                    shutil.copyfileobj(handle, output)
+    if len(roots) != 1:
+        raise ValueError("sdist requires one root directory")
+    return destination / roots.pop()
+
+
+def _check_installed_artifact(py: Path, venv: Path) -> int:
+    """Verify installed origin, typing marker and zero-dependency fallback."""
+    sp = _site_packages(venv)
+    OUTSIDE_CWD.mkdir(parents=True, exist_ok=True)
+    code = (
+        "import sys\n"
+        "from pathlib import Path\n"
+        "import gunz_utils\n"
+        "from gunz_utils import binary, serialization\n"
+        f"sp = Path({str(sp)!r}).resolve()\n"
+        "p = Path(gunz_utils.__file__).resolve()\n"
+        "if not p.is_relative_to(sp):\n"
+        "    sys.exit('installed artifact: source shadowing')\n"
+        "if not (p.parent / 'py.typed').is_file():\n"
+        "    sys.exit('installed artifact: missing py.typed')\n"
+        f"forbidden = {sorted(FORBIDDEN_OPTIONAL_MODULES | {'matplotlib'})!r}\n"
+        "if any(name in sys.modules for name in forbidden):\n"
+        "    sys.exit('installed artifact: imported optional dependency')\n"
+        "hooks = (binary._accel_encode, binary._accel_decode, "
+        "serialization._accel_is_json_clean)\n"
+        "if any(hook is not None for hook in hooks):\n"
+        "    sys.exit('pure installed artifact unexpectedly activated native code')\n"
+        "print('installed artifact OK:', p)\n"
+    )
+    return _run_venv([str(py), "-c", code], cwd=OUTSIDE_CWD)
+
+
 def _case_wheel_sdist() -> int:
     """Build wheel+sdist, install each, import from outside the checkout.
 
@@ -339,6 +423,8 @@ def _case_wheel_sdist() -> int:
     if not wheels or not sdists:
         print(f"!! no wheel/sdist produced in {DIST_DIR}", file=sys.stderr)
         return 2
+    if zipfile.is_zipfile(wheels[0]) and tarfile.is_tarfile(sdists[0]):
+        _check_distribution_contents(wheels[0], sdists[0])
     OUTSIDE_CWD.mkdir(parents=True, exist_ok=True)
     for kind, artifact in (("wheel", wheels[0]), ("sdist", sdists[0])):
         install_py, install_venv = _fresh_venv_python(f"{kind}-install")
@@ -451,6 +537,7 @@ def run_packaging() -> int:
             print(f"   - {name}: exit {status}", file=sys.stderr)
         return 1
     return 0
+
 
 GATES: dict[str, tuple[str, str]] = {
     "release": ("Validate release/version/changelog metadata", "release metadata"),

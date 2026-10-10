@@ -113,8 +113,7 @@ def _summary_payload(results: Sequence[GateResult]) -> dict[str, object]:
         "schema_version": 1,
         "passed": all(item.returncode == 0 for item in results),
         "results": [
-            {"name": item.name, "returncode": item.returncode}
-            for item in results
+            {"name": item.name, "returncode": item.returncode} for item in results
         ],
     }
 

@@ -6,9 +6,8 @@ import threading
 import time
 from pathlib import Path
 
-import pytest
-
 import gunz_utils.content_store as content_store_module
+import pytest
 from gunz_utils.content_store import ContentAddressedStore
 
 
@@ -32,7 +31,9 @@ def test_fallback_publication_serializes_cooperating_writers(
     def no_hardlinks(*_args: object, **_kwargs: object) -> None:
         raise OSError("hard links unavailable")
 
-    def controlled_replace(source: Path, target: Path) -> None:
+    def controlled_replace(
+        source: Path | str, target: Path | str, *args: object, **kwargs: object
+    ) -> None:
         nonlocal replace_calls
         with counter_lock:
             replace_calls += 1
@@ -40,7 +41,7 @@ def test_fallback_publication_serializes_cooperating_writers(
         if call_number == 1:
             first_replace_entered.set()
             assert allow_first_replace.wait(3.0)
-        real_replace(source, target)
+        real_replace(source, target, *args, **kwargs)
 
     def worker() -> None:
         try:

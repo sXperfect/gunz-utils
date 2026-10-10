@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import re
 import shutil
@@ -205,9 +206,10 @@ def rsync_mirror(
     if timeout is not None and (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
         or timeout <= 0
     ):
-        raise ValueError("timeout must be a positive number or None")
+        raise ValueError("timeout must be a finite positive number or None")
     if max_output_bytes is not None and (
         isinstance(max_output_bytes, bool)
         or not isinstance(max_output_bytes, int)

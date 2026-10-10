@@ -10,6 +10,25 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [2026-10-08-audit-concurrency-cancellation](tasks/done/2026-10-08-audit-concurrency-cancellation.md)
+- [2026-10-08-audit-filesystem-publication](tasks/done/2026-10-08-audit-filesystem-publication.md)
+- [2026-10-08-audit-follow-up](tasks/done/2026-10-08-audit-follow-up.md)
+- [2026-10-08-audit-graph-input-bounds](tasks/done/2026-10-08-audit-graph-input-bounds.md)
+- [2026-10-08-audit-native-acceleration](tasks/done/2026-10-08-audit-native-acceleration.md)
+- [2026-10-08-audit-packaging-evidence](tasks/done/2026-10-08-audit-packaging-evidence.md)
+- [2026-10-08-audit-secure-store-crypto](tasks/done/2026-10-08-audit-secure-store-crypto.md)
+- [2026-10-08-repair-atomic-write-descriptor-cleanup](tasks/done/2026-10-08-repair-atomic-write-descriptor-cleanup.md)
+- [2026-10-08-repair-cas-publication-materialization](tasks/done/2026-10-08-repair-cas-publication-materialization.md)
+- [2026-10-08-repair-directory-no-replace](tasks/done/2026-10-08-repair-directory-no-replace.md)
+- [2026-10-08-repair-lease-coroutine-cleanup](tasks/done/2026-10-08-repair-lease-coroutine-cleanup.md)
+- [2026-10-08-repair-native-safety-parity](tasks/done/2026-10-08-repair-native-safety-parity.md)
+- [2026-10-08-repair-network-idna-authority](tasks/done/2026-10-08-repair-network-idna-authority.md)
+- [2026-10-08-repair-pipeline-lifecycle](tasks/done/2026-10-08-repair-pipeline-lifecycle.md)
+- [2026-10-08-repair-secure-store-policy-recovery](tasks/done/2026-10-08-repair-secure-store-policy-recovery.md)
+- [2026-10-08-repair-subprocess-drain-deadline](tasks/done/2026-10-08-repair-subprocess-drain-deadline.md)
+- [2026-10-08-repair-sync-timeout-before-marker](tasks/done/2026-10-08-repair-sync-timeout-before-marker.md)
+- [2026-10-08-repair-verification-matrix](tasks/done/2026-10-08-repair-verification-matrix.md)
+
 - [`2026.10.02-fix-concurrency_dag_and_dict_isolation`](tasks/done/2026.10.02-fix-concurrency_dag_and_dict_isolation.md)
 - [`2026.10.02-fix-audit_bugs_and_disparities`](tasks/done/2026.10.02-fix-audit_bugs_and_disparities.md)
 - [`2026.10.01-testing-chaos_fault_injection`](tasks/done/2026.10.01-testing-chaos_fault_injection.md)

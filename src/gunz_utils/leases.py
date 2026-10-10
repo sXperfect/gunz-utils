@@ -147,13 +147,16 @@ async def run_with_lease_heartbeat(
         # including an already-created Future. Task creation is inside the
         # cleanup scope so a later setup failure cannot orphan the operation.
         operation_task = asyncio.ensure_future(operation())
-        heartbeat_task = asyncio.create_task(
-            _heartbeat_loop(
-                renew,
-                interval=float(heartbeat_interval),
-                renew_immediately=renew_immediately,
-            )
+        heartbeat_coroutine = _heartbeat_loop(
+            renew,
+            interval=float(heartbeat_interval),
+            renew_immediately=renew_immediately,
         )
+        try:
+            heartbeat_task = asyncio.create_task(heartbeat_coroutine)
+        except BaseException:
+            heartbeat_coroutine.close()
+            raise
 
         done, _pending = await asyncio.wait(
             {operation_task, heartbeat_task},

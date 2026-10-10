@@ -56,7 +56,7 @@ docs = [
 packages = ["src/gunz_utils"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/"]
+include = ["src/", "native/", "scripts/build_native.py"]
 
 # --- Ruff (linter + formatter) ----------------------------------------------
 # Ruff linting is part of the canonical local/CI gate; formatting is intentionally excluded.

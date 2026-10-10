@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import math
 import os
+import selectors
 import signal
 import subprocess
 import threading
@@ -103,29 +104,45 @@ def _read_bounded_pipe(
     state: _CaptureState,
     lock: threading.Lock,
     errors: list[BaseException],
+    stop: threading.Event,
 ) -> None:
     """Drain one pipe while retaining at most the shared output limit."""
     try:
         read_chunk = getattr(stream, "read1", stream.read)
-        while True:
-            chunk = read_chunk(64 * 1024)
-            if not chunk:
-                return
-            with lock:
-                remaining = max_output_bytes - state.total
-                if remaining >= len(chunk):
-                    target.extend(chunk)
-                    state.total += len(chunk)
+        # POSIX pipe readiness lets cleanup interrupt a silent inherited pipe
+        # even if its holder has escaped the owned process group.
+        selector = selectors.DefaultSelector() if os.name == "posix" else None
+        try:
+            if selector is not None:
+                selector.register(stream, selectors.EVENT_READ)
+            while not stop.is_set():
+                if selector is not None and not selector.select(timeout=0.05):
                     continue
-                if remaining > 0:
-                    target.extend(chunk[:remaining])
-                    state.total += remaining
-                state.exceeded = True
-            _kill_process(process)
-            return
+                if stop.is_set():
+                    return
+                chunk = read_chunk(64 * 1024)
+                if not chunk:
+                    return
+                with lock:
+                    remaining = max_output_bytes - state.total
+                    if remaining >= len(chunk):
+                        target.extend(chunk)
+                        state.total += len(chunk)
+                        continue
+                    if remaining > 0:
+                        target.extend(chunk[:remaining])
+                        state.total += remaining
+                    state.exceeded = True
+                _kill_process(process)
+                return
+        finally:
+            if selector is not None:
+                selector.close()
     except BaseException as exc:
         errors.append(exc)
         _kill_process(process)
+    finally:
+        stream.close()
 
 
 def _run_command_bounded(
@@ -137,6 +154,19 @@ def _run_command_bounded(
     max_output_bytes: int,
 ) -> tuple[int, bytes, bytes]:
     """Run a command while streaming stdout/stderr into bounded buffers."""
+    deadline = None if timeout is None else time.monotonic() + timeout
+    stdout = bytearray()
+    stderr = bytearray()
+    state = _CaptureState()
+    lock = threading.Lock()
+    reader_errors: list[BaseException] = []
+    stop = threading.Event()
+    threads: list[threading.Thread] = []
+    started_threads: list[threading.Thread] = []
+
+    def remaining_timeout() -> float | None:
+        return None if deadline is None else max(0.0, deadline - time.monotonic())
+
     process = subprocess.Popen(
         list(args),
         stdin=subprocess.DEVNULL,
@@ -149,58 +179,65 @@ def _run_command_bounded(
     )
     stdout_pipe = process.stdout
     stderr_pipe = process.stderr
-    if stdout_pipe is None or stderr_pipe is None:
-        _kill_process(process)
-        process.wait()
-        raise RuntimeError("failed to create subprocess capture pipes")
-
-    stdout = bytearray()
-    stderr = bytearray()
-    state = _CaptureState()
-    lock = threading.Lock()
-    reader_errors: list[BaseException] = []
-    threads = [
-        threading.Thread(
-            target=_read_bounded_pipe,
-            args=(stdout_pipe, stdout, process),
-            kwargs={
-                "max_output_bytes": max_output_bytes,
-                "state": state,
-                "lock": lock,
-                "errors": reader_errors,
-            },
-            daemon=True,
-        ),
-        threading.Thread(
-            target=_read_bounded_pipe,
-            args=(stderr_pipe, stderr, process),
-            kwargs={
-                "max_output_bytes": max_output_bytes,
-                "state": state,
-                "lock": lock,
-                "errors": reader_errors,
-            },
-            daemon=True,
-        ),
-    ]
-    for thread in threads:
-        thread.start()
 
     try:
-        returncode = process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        _kill_process(process)
-        process.wait()
+        if stdout_pipe is None or stderr_pipe is None:
+            raise RuntimeError("failed to create subprocess capture pipes")
+        for pipe, target in ((stdout_pipe, stdout), (stderr_pipe, stderr)):
+            threads.append(
+                threading.Thread(
+                    target=_read_bounded_pipe,
+                    args=(pipe, target, process),
+                    kwargs={
+                        "max_output_bytes": max_output_bytes,
+                        "state": state,
+                        "lock": lock,
+                        "errors": reader_errors,
+                        "stop": stop,
+                    },
+                    daemon=True,
+                )
+            )
         for thread in threads:
-            thread.join()
-        stdout_pipe.close()
-        stderr_pipe.close()
+            thread.start()
+            started_threads.append(thread)
+        returncode = process.wait(timeout=remaining_timeout())
+        for thread in threads:
+            while thread.is_alive():
+                if state.exceeded:
+                    raise _output_limit_error(max_output_bytes)
+                if reader_errors:
+                    error = RuntimeError("failed while capturing subprocess output")
+                    raise error from reader_errors[0]
+                remaining = remaining_timeout()
+                if remaining is not None and remaining <= 0:
+                    raise subprocess.TimeoutExpired(process.args, timeout or 0.0)
+                thread.join(timeout=0.05 if remaining is None else min(0.05, remaining))
+    except BaseException as exc:
+        _kill_process(process)
+        stop.set()
+        cleanup_deadline = time.monotonic() + 0.5
+        try:
+            process.wait(timeout=max(0.0, cleanup_deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            pass
+        for thread in started_threads:
+            thread.join(timeout=max(0.0, cleanup_deadline - time.monotonic()))
+        # Readers own their pipes once started. Never close a buffered stream
+        # from another thread while it may hold the stream's blocking-read lock.
+        # Windows cannot poll anonymous pipes; a descendant outside supported
+        # process cleanup may retain a daemon reader until it closes its pipe.
+        for index, cleanup_pipe in enumerate((stdout_pipe, stderr_pipe)):
+            if cleanup_pipe is not None and (
+                index >= len(threads) or threads[index] not in started_threads
+            ):
+                try:
+                    cleanup_pipe.close()
+                except OSError:
+                    pass
+        if isinstance(exc, subprocess.TimeoutExpired) and state.exceeded:
+            raise _output_limit_error(max_output_bytes) from None
         raise
-
-    for thread in threads:
-        thread.join()
-    stdout_pipe.close()
-    stderr_pipe.close()
     if reader_errors:
         error = RuntimeError("failed while capturing subprocess output")
         raise error from reader_errors[0]
