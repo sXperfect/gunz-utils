@@ -1,7 +1,9 @@
 """Safe synchronous and asynchronous subprocess helpers."""
-
 from __future__ import annotations
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import asyncio
 import math
 import os
@@ -28,10 +30,10 @@ class CommandResult:
 class CommandError(RuntimeError):
     """Raised when a checked command exits unsuccessfully."""
 
-    def __init__(self, result: CommandResult) -> None:
-        super().__init__(
-            f"command failed with exit code {result.returncode}"
-        )
+    def __init__(self,
+        result: CommandResult,
+    ) -> None:
+        super().__init__(f"command failed with exit code {result.returncode}")
         self.result = result
 
 
@@ -50,11 +52,30 @@ def _validate_timeout_value(
     *,
     name: str,
 ) -> float | None:
+    """Validate and normalize a timeout value.
+
+    Parameters
+    ----------
+    value : float or None
+        Raw timeout to validate, or ``None`` when unset.
+    name : str
+        Argument name used in the error message.
+
+    Returns
+    -------
+    float or None
+        The value coerced to ``float``, or ``None`` when the input was ``None``.
+
+    Raises
+    ------
+    ValueError
+        If ``value`` is not a finite non-negative number.
+    """
     if value is None:
         return None
     if (
         isinstance(value, bool)
-        or not isinstance(value, (int, float))
+        or not isinstance(value, int | float)
         or not math.isfinite(float(value))
         or value < 0
     ):
@@ -62,7 +83,21 @@ def _validate_timeout_value(
     return float(value)
 
 
-def _validate_output_limit(max_output_bytes: int | None) -> None:
+def _validate_output_limit(
+    max_output_bytes: int | None,
+) -> None:
+    """Validate a captured-output byte limit.
+
+    Parameters
+    ----------
+    max_output_bytes : int or None
+        Output limit to validate, or ``None`` when unbounded.
+
+    Raises
+    ------
+    ValueError
+        If ``max_output_bytes`` is not a non-negative integer.
+    """
     if max_output_bytes is None:
         return
     if (
@@ -73,14 +108,36 @@ def _validate_output_limit(max_output_bytes: int | None) -> None:
         raise ValueError("max_output_bytes must be a non-negative integer or None")
 
 
-def _output_limit_error(max_output_bytes: int) -> CommandOutputLimitError:
+def _output_limit_error(
+    max_output_bytes: int,
+) -> CommandOutputLimitError:
+    """Build the error raised when captured output exceeds the limit.
+
+    Parameters
+    ----------
+    max_output_bytes : int
+        The configured output limit.
+
+    Returns
+    -------
+    CommandOutputLimitError
+        A ready-to-raise exception describing the exceeded limit.
+    """
     return CommandOutputLimitError(
         f"captured command output exceeded {max_output_bytes} bytes"
     )
 
 
-def _kill_process(process: subprocess.Popen[bytes]) -> None:
-    """Kill a bounded-capture process and its POSIX process group."""
+def _kill_process(
+    process: subprocess.Popen[bytes],
+) -> None:
+    """Kill a bounded-capture process and its POSIX process group.
+
+    Parameters
+    ----------
+    process : subprocess.Popen
+        The running subprocess to terminate.
+    """
     if os.name == "posix":
         try:
             os.killpg(process.pid, signal.SIGKILL)
@@ -104,7 +161,25 @@ def _read_bounded_pipe(
     lock: threading.Lock,
     errors: list[BaseException],
 ) -> None:
-    """Drain one pipe while retaining at most the shared output limit."""
+    """Drain one pipe while retaining at most the shared output limit.
+
+    Parameters
+    ----------
+    stream : BinaryIO
+        The pipe to drain.
+    target : bytearray
+        Buffer receiving the retained output.
+    process : subprocess.Popen
+        Process killed when the limit is exceeded.
+    max_output_bytes : int
+        Maximum bytes retained across all pipes.
+    state : _CaptureState
+        Shared running-total and exceeded flag.
+    lock : threading.Lock
+        Guards ``state`` across concurrent readers.
+    errors : list[BaseException]
+        Collects reader exceptions for re-raising by the caller.
+    """
     try:
         read_chunk = getattr(stream, "read1", stream.read)
         while True:
@@ -136,7 +211,31 @@ def _run_command_bounded(
     env: Mapping[str, str] | None,
     max_output_bytes: int,
 ) -> tuple[int, bytes, bytes]:
-    """Run a command while streaming stdout/stderr into bounded buffers."""
+    """Run a command while streaming stdout/stderr into bounded buffers.
+
+    Parameters
+    ----------
+    args : Sequence[str]
+        Command and arguments to execute without a shell.
+    timeout : float or None
+        Wall-clock limit before the process is killed.
+    cwd : str or None
+        Working directory for the child process.
+    env : Mapping[str, str] or None
+        Extra environment overrides merged over ``os.environ``.
+    max_output_bytes : int
+        Maximum combined captured output before raising.
+
+    Returns
+    -------
+    tuple[int, bytes, bytes]
+        The exit code, stdout bytes, and stderr bytes.
+
+    Raises
+    ------
+    CommandOutputLimitError
+        If captured output exceeds ``max_output_bytes``.
+    """
     process = subprocess.Popen(
         list(args),
         stdin=subprocess.DEVNULL,
@@ -212,15 +311,53 @@ def _run_command_bounded(
 def run_command(
     args: Sequence[str],
     *,
+    #? --- Execution ---
     timeout: float | None = None,
     check: bool = False,
     cwd: str | None = None,
     env: Mapping[str, str] | None = None,
+    #? --- Output capture ---
     encoding: str = "utf-8",
     errors: str = "strict",
     max_output_bytes: int | None = None,
 ) -> CommandResult:
-    """Run a command without a shell and capture optionally bounded text output."""
+    """Run a command without a shell and capture optionally bounded text output.
+
+    Parameters
+    ----------
+    args : Sequence[str]
+        Command and arguments to execute without a shell.
+    timeout : float or None, optional
+        Wall-clock limit before the process is killed. Defaults to no limit.
+    check : bool, optional
+        Raise ``CommandError`` when the exit code is non-zero. Defaults to
+        ``False``.
+    cwd : str or None, optional
+        Working directory for the child process.
+    env : Mapping[str, str] or None, optional
+        Extra environment overrides merged over ``os.environ``.
+    encoding : str, optional
+        Text encoding used to decode captured output. Defaults to ``"utf-8"``.
+    errors : str, optional
+        Decoding error handler. Defaults to ``"strict"``.
+    max_output_bytes : int or None, optional
+        Maximum combined captured output before raising. Defaults to
+        unbounded.
+
+    Returns
+    -------
+    CommandResult
+        The captured result with elapsed wall-clock duration.
+
+    Raises
+    ------
+    ValueError
+        If ``args`` is empty or an option is invalid.
+    CommandError
+        If ``check`` is true and the exit code is non-zero.
+    CommandOutputLimitError
+        If captured output exceeds ``max_output_bytes``.
+    """
     if not args:
         raise ValueError("args must not be empty")
     timeout = _validate_timeout_value(timeout, name="timeout")
@@ -266,6 +403,15 @@ async def _stop_process(
     *,
     terminate_grace: float,
 ) -> None:
+    """Terminate a process, escalating to SIGKILL after a grace period.
+
+    Parameters
+    ----------
+    process : asyncio.subprocess.Process
+        The running subprocess to stop.
+    terminate_grace : float
+        Seconds to wait for graceful termination before force-killing.
+    """
     if os.name == "posix":
         try:
             os.killpg(process.pid, signal.SIGTERM)
@@ -294,6 +440,21 @@ async def _read_bounded_async_pipe(
     max_output_bytes: int,
     state: _CaptureState,
 ) -> None:
+    """Drain one async pipe while retaining at most the shared output limit.
+
+    Parameters
+    ----------
+    stream : asyncio.StreamReader
+        The pipe to drain.
+    target : bytearray
+        Buffer receiving the retained output.
+    process : asyncio.subprocess.Process
+        Process killed when the limit is exceeded.
+    max_output_bytes : int
+        Maximum bytes retained across all pipes.
+    state : _CaptureState
+        Shared running-total and exceeded flag.
+    """
     while True:
         chunk = await stream.read(64 * 1024)
         if not chunk:
@@ -327,6 +488,29 @@ async def _communicate_bounded(
     max_output_bytes: int,
     terminate_grace: float,
 ) -> tuple[bytes, bytes]:
+    """Await a process while streaming output into bounded buffers.
+
+    Parameters
+    ----------
+    process : asyncio.subprocess.Process
+        The running subprocess to communicate with.
+    timeout : float or None
+        Wall-clock limit before the process is stopped.
+    max_output_bytes : int
+        Maximum combined captured output before raising.
+    terminate_grace : float
+        Seconds to wait for graceful termination before force-killing.
+
+    Returns
+    -------
+    tuple[bytes, bytes]
+        The stdout bytes and stderr bytes.
+
+    Raises
+    ------
+    CommandOutputLimitError
+        If captured output exceeds ``max_output_bytes``.
+    """
     stdout_pipe = process.stdout
     stderr_pipe = process.stderr
     if stdout_pipe is None or stderr_pipe is None:
@@ -360,15 +544,11 @@ async def _communicate_bounded(
         await asyncio.wait_for(process.wait(), timeout=timeout)
         await asyncio.gather(*readers)
     except (TimeoutError, asyncio.CancelledError):
-        await asyncio.shield(
-            _stop_process(process, terminate_grace=terminate_grace)
-        )
+        await asyncio.shield(_stop_process(process, terminate_grace=terminate_grace))
         await asyncio.gather(*readers, return_exceptions=True)
         raise
     except BaseException:
-        await asyncio.shield(
-            _stop_process(process, terminate_grace=terminate_grace)
-        )
+        await asyncio.shield(_stop_process(process, terminate_grace=terminate_grace))
         await asyncio.gather(*readers, return_exceptions=True)
         raise
 
@@ -380,16 +560,58 @@ async def _communicate_bounded(
 async def run_command_async(
     args: Sequence[str],
     *,
+    #? --- Execution ---
     timeout: float | None = None,
     check: bool = False,
     cwd: str | None = None,
     env: Mapping[str, str] | None = None,
+    #? --- Output capture ---
     encoding: str = "utf-8",
     errors: str = "strict",
     max_output_bytes: int | None = None,
+    #? --- Cleanup ---
     terminate_grace: float = 1.0,
 ) -> CommandResult:
-    """Run a subprocess with graceful cleanup and optionally bounded output."""
+    """Run a subprocess with graceful cleanup and optionally bounded output.
+
+    Parameters
+    ----------
+    args : Sequence[str]
+        Command and arguments to execute without a shell.
+    timeout : float or None, optional
+        Wall-clock limit before the process is stopped. Defaults to no limit.
+    check : bool, optional
+        Raise ``CommandError`` when the exit code is non-zero. Defaults to
+        ``False``.
+    cwd : str or None, optional
+        Working directory for the child process.
+    env : Mapping[str, str] or None, optional
+        Extra environment overrides merged over ``os.environ``.
+    encoding : str, optional
+        Text encoding used to decode captured output. Defaults to ``"utf-8"``.
+    errors : str, optional
+        Decoding error handler. Defaults to ``"strict"``.
+    max_output_bytes : int or None, optional
+        Maximum combined captured output before raising. Defaults to
+        unbounded.
+    terminate_grace : float, optional
+        Seconds to wait for graceful termination before force-killing.
+        Defaults to ``1.0``.
+
+    Returns
+    -------
+    CommandResult
+        The captured result with elapsed wall-clock duration.
+
+    Raises
+    ------
+    ValueError
+        If ``args`` is empty or an option is invalid.
+    CommandError
+        If ``check`` is true and the exit code is non-zero.
+    CommandOutputLimitError
+        If captured output exceeds ``max_output_bytes``.
+    """
     if not args:
         raise ValueError("args must not be empty")
     timeout = _validate_timeout_value(timeout, name="timeout")
