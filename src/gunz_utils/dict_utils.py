@@ -1,11 +1,19 @@
 """Helpers for working with nested mappings (dotted-path access, recursive merge)."""
-
 from __future__ import annotations
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import copy
 from collections.abc import Mapping, MutableMapping, Sequence
 from typing import Any, Literal, cast
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
@@ -241,7 +249,22 @@ def deep_merge(
     memo: dict[int, Any] = {}
     merge_memo: dict[tuple[int, int], Any] = {}
 
-    def _isolate(val: Any) -> Any:
+    def _isolate(
+        val: Any,
+    ) -> Any:
+        """Return a deep, cycle-safe copy of ``val`` preserving shared references.
+
+        Parameters
+        ----------
+        val : Any
+            Value to isolate from the source mapping.
+
+        Returns
+        -------
+        Any
+            A copy sharing no mutable substructure with ``val``; scalars and
+            non-copyable values are returned as-is.
+        """
         val_id = id(val)
         if val_id in memo:
             return memo[val_id]
@@ -284,7 +307,24 @@ def deep_merge(
             memo[val_id] = val
             return val
 
-    def _merge(a: Any, b: Any) -> Any:
+    def _merge(
+        a: Any,
+        b: Any,
+    ) -> Any:
+        """Merge two values recursively without mutating either input.
+
+        Parameters
+        ----------
+        a : Any
+            Base value; takes precedence for non-list/non-mapping pairs.
+        b : Any
+            Override value; wins over ``a`` for scalars and mixed pairs.
+
+        Returns
+        -------
+        Any
+            The merged value as a fresh, isolated structure.
+        """
         if isinstance(a, Mapping) and isinstance(b, Mapping):
             pair_key = (id(a), id(b))
             if pair_key in merge_memo:
