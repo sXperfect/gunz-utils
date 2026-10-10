@@ -4,12 +4,19 @@ Provides three reusable formatters that are stable enough to appear in
 log lines, CLI output, and status messages without each consumer
 hand-rolling its own convention.
 """
-
 from __future__ import annotations
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import math
 from decimal import Decimal
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+#? Re-export the package version through this module's namespace for
+#? backwards-compatible module-level access.
 from ._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
@@ -18,7 +25,26 @@ __license__ = "Clear BSD"
 __all__ = ["format_bytes", "format_duration", "format_count"]
 
 
-def _validated_precision(precision: int) -> int:
+def _validated_precision(
+    precision: int,
+) -> int:
+    """Validate and return a decimal precision within the supported range.
+
+    Parameters
+    ----------
+    precision : int
+        The precision to validate. Must not be a boolean.
+
+    Returns
+    -------
+    int
+        The validated precision.
+
+    Raises
+    ------
+    ValueError
+        If ``precision`` is a bool, not an integer, or outside ``0..20``.
+    """
     if (
         isinstance(precision, bool)
         or not isinstance(precision, int)
@@ -28,8 +54,32 @@ def _validated_precision(precision: int) -> int:
     return precision
 
 
-def _finite_float(value: object, *, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+def _finite_float(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    """Coerce a value to a finite float, rejecting booleans and non-finite numbers.
+
+    Parameters
+    ----------
+    value : object
+        The value to coerce.
+    name : str
+        The parameter name, used in error messages.
+
+    Returns
+    -------
+    float
+        The value converted to a finite float.
+
+    Raises
+    ------
+    ValueError
+        If ``value`` is a bool, not a real number, or not finitely
+        representable as a float.
+    """
+    if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueError(f"{name} must be a finite real number")
     try:
         result = float(value)
