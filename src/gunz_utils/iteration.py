@@ -1,22 +1,34 @@
 """Lazy iteration helpers for chunking, flattening, and single-element retrieval."""
-
 from __future__ import annotations
-
-from collections.abc import Iterable, Iterator
-from itertools import islice
-from typing import Any, TypeVar, cast
-
-from ._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = ["chunked", "batched", "flatten", "first"]
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
+from collections.abc import Iterable, Iterator
+from itertools import islice
+from typing import Any, TypeVar, cast
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+from ._version import __version__ as __version__
+
 T = TypeVar("T")
 
 
-def chunked(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
+def chunked(
+    iterable: Iterable[T],
+    n: int,
+) -> Iterator[tuple[T, ...]]:
     """Yield successive ``n``-sized tuples from ``iterable``.
 
     The final tuple may be shorter if the input length is not a multiple of
@@ -64,8 +76,32 @@ def chunked(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
         yield group
 
 
-def batched(iterable: Iterable[T], n: int) -> Iterator[list[T]]:
-    """Yield successive ``n``-sized lists from ``iterable`` lazily."""
+def batched(
+    iterable: Iterable[T],
+    n: int,
+) -> Iterator[list[T]]:
+    """Yield successive ``n``-sized lists from ``iterable`` lazily.
+
+    Lists (rather than tuples) are returned because callers that build
+    mutable accumulators benefit from appendable groups.
+
+    Parameters
+    ----------
+    iterable : Iterable[T]
+        Source iterable. Consumed lazily — generators are supported.
+    n : int
+        Group size. Must be positive.
+
+    Yields
+    ------
+    list[T]
+        Groups of up to ``n`` items.
+
+    Raises
+    ------
+    ValueError
+        If ``n`` is not positive.
+    """
     if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
         raise ValueError(f"n must be a positive integer, got {n!r}")
     it = iter(iterable)
@@ -75,9 +111,12 @@ def batched(iterable: Iterable[T], n: int) -> Iterator[list[T]]:
             return
         yield group
 
+
 def flatten(
+    #? --- Source iterable ---
     nested: Iterable,
     *,
+    #? --- Flattening behavior ---
     max_depth: int | None = None,
     types: tuple[type, ...] = (list, tuple),
     max_nesting: int = 256,
@@ -121,25 +160,38 @@ def flatten(
     [1, 2, 3]
     """
     if max_depth is not None and (
-        isinstance(max_depth, bool)
-        or not isinstance(max_depth, int)
-        or max_depth < 0
+        isinstance(max_depth, bool) or not isinstance(max_depth, int) or max_depth < 0
     ):
         raise ValueError(
-            f"max_depth must be a non-negative integer or None, "
-            f"got {max_depth!r}"
+            f"max_depth must be a non-negative integer or None, " f"got {max_depth!r}"
         )
     if (
         isinstance(max_nesting, bool)
         or not isinstance(max_nesting, int)
         or max_nesting <= 0
     ):
-        raise ValueError(
-            f"max_nesting must be a positive integer, got {max_nesting!r}"
-        )
+        raise ValueError(f"max_nesting must be a positive integer, got {max_nesting!r}")
     active: set[int] = set()
 
-    def _walk(item: Any, depth: int) -> Iterator:
+    def _walk(
+        item: Any,
+        depth: int,
+    ) -> Iterator:
+        """Yield the leaves of ``item``, guarding depth, nesting, and cycles.
+
+        Parameters
+        ----------
+        item : Any
+            The container or scalar to descend into.
+        depth : int
+            Current container depth (1 at the top level, incremented on
+            each descent).
+
+        Yields
+        ------
+        Any
+            Each non-container leaf found at or below ``depth``.
+        """
         #? Strict `>` (rather than `>=`) gives Lodash-compatible semantics:
         #? max_depth=N means we may descend into up to N levels of
         #? containers. Items at depth > max_depth are yielded as leaves,
@@ -176,7 +228,11 @@ def flatten(
         yield from _walk(item, 1)
 
 
-def first(iterable: Iterable[T], *, default: T | None = None) -> T | None:
+def first(
+    iterable: Iterable[T],
+    *,
+    default: T | None = None,
+) -> T | None:
     """Return the first item from ``iterable``, or ``default`` if empty.
 
     Follows the ``more_itertools.first`` convention. Note that ``None`` is
