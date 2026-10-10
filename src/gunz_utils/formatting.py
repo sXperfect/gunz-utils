@@ -91,7 +91,9 @@ def _finite_float(
 
 
 def format_bytes(
+    #? --- Input ---
     n: float,
+    #? --- Output options ---
     *,
     precision: int = 1,
     binary: bool = False,
