@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import asyncio
 import math
 import os
@@ -29,12 +32,13 @@ class CommandResult:
 class CommandError(RuntimeError):
     """Raised when a checked command exits unsuccessfully."""
 
-    def __init__(self, result: CommandResult) -> None:
+    def __init__(self,
+        result: CommandResult,
+    ) -> None:
         super().__init__(
             f"command failed with exit code {result.returncode}"
         )
         self.result = result
-
 
 class CommandOutputLimitError(RuntimeError):
     """Raised when captured command output exceeds the configured limit."""
@@ -51,11 +55,30 @@ def _validate_timeout_value(
     *,
     name: str,
 ) -> float | None:
+    """Validate and coerce a finite non-negative timeout value.
+
+    Parameters
+    ----------
+    value : float or None
+        The timeout to validate.
+    name : str
+        The parameter name, used in error messages.
+
+    Returns
+    -------
+    float or None
+        The coerced finite timeout, or None when the input was None.
+
+    Raises
+    ------
+    ValueError
+        If ``value`` is a bool, not a finite number, or negative.
+    """
     if value is None:
         return None
     if (
         isinstance(value, bool)
-        or not isinstance(value, (int, float))
+        or not isinstance(value, int | float)
         or not math.isfinite(float(value))
         or value < 0
     ):
@@ -63,7 +86,21 @@ def _validate_timeout_value(
     return float(value)
 
 
-def _validate_output_limit(max_output_bytes: int | None) -> None:
+def _validate_output_limit(
+    max_output_bytes: int | None,
+) -> None:
+    """Validate a non-negative output limit.
+
+    Parameters
+    ----------
+    max_output_bytes : int or None
+        The output limit to validate.
+
+    Raises
+    ------
+    ValueError
+        If ``max_output_bytes`` is a bool, not an integer, or negative.
+    """
     if max_output_bytes is None:
         return
     if (
@@ -74,14 +111,36 @@ def _validate_output_limit(max_output_bytes: int | None) -> None:
         raise ValueError("max_output_bytes must be a non-negative integer or None")
 
 
-def _output_limit_error(max_output_bytes: int) -> CommandOutputLimitError:
+def _output_limit_error(
+    max_output_bytes: int,
+) -> CommandOutputLimitError:
+    """Build the error raised when captured output exceeds the limit.
+
+    Parameters
+    ----------
+    max_output_bytes : int
+        The configured output limit.
+
+    Returns
+    -------
+    CommandOutputLimitError
+        A ready-to-raise error describing the exceeded limit.
+    """
     return CommandOutputLimitError(
         f"captured command output exceeded {max_output_bytes} bytes"
     )
 
 
-def _kill_process(process: subprocess.Popen[bytes]) -> None:
-    """Kill a bounded-capture process and its POSIX process group."""
+def _kill_process(
+    process: subprocess.Popen[bytes],
+) -> None:
+    """Kill a bounded-capture process and its POSIX process group.
+
+    Parameters
+    ----------
+    process : subprocess.Popen[bytes]
+        The process to terminate.
+    """
     if os.name == "posix":
         try:
             os.killpg(process.pid, signal.SIGKILL)
@@ -109,8 +168,8 @@ def _read_bounded_pipe(
     """Drain one pipe while retaining at most the shared output limit."""
     try:
         read_chunk = getattr(stream, "read1", stream.read)
-        # POSIX pipe readiness lets cleanup interrupt a silent inherited pipe
-        # even if its holder has escaped the owned process group.
+        #? POSIX pipe readiness lets cleanup interrupt a silent inherited pipe
+        #? even if its holder has escaped the owned process group.
         selector = selectors.DefaultSelector() if os.name == "posix" else None
         try:
             if selector is not None:
@@ -223,10 +282,10 @@ def _run_command_bounded(
             pass
         for thread in started_threads:
             thread.join(timeout=max(0.0, cleanup_deadline - time.monotonic()))
-        # Readers own their pipes once started. Never close a buffered stream
-        # from another thread while it may hold the stream's blocking-read lock.
-        # Windows cannot poll anonymous pipes; a descendant outside supported
-        # process cleanup may retain a daemon reader until it closes its pipe.
+        #? Readers own their pipes once started. Never close a buffered stream
+        #? from another thread while it may hold the stream's blocking-read lock.
+        #? Windows cannot poll anonymous pipes; a descendant outside supported
+        #? process cleanup may retain a daemon reader until it closes its pipe.
         for index, cleanup_pipe in enumerate((stdout_pipe, stderr_pipe)):
             if cleanup_pipe is not None and (
                 index >= len(threads) or threads[index] not in started_threads
