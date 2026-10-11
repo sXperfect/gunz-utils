@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import threading
 import unittest
 import weakref
 from datetime import UTC, datetime, timedelta
@@ -63,6 +64,47 @@ class TestTTLCache(unittest.TestCase):
 
         self.assertEqual(work([1]), 1)
         self.assertEqual(work([1]), 1)
+        self.assertEqual(calls, 2)
+
+    def test_cache_clear_does_not_reinsert_inflight_sync_result(self) -> None:
+        started = threading.Event()
+        release = threading.Event()
+        calls = 0
+        results: list[int] = []
+        failures: list[BaseException] = []
+
+        @ttl_cache(ttl=60)
+        def work(value: int) -> int:
+            nonlocal calls
+            calls += 1
+            version = calls
+            if version == 1:
+                started.set()
+                if not release.wait(timeout=5):
+                    raise TimeoutError("test producer was not released")
+            return version
+
+        def old_caller() -> None:
+            try:
+                results.append(work(1))
+            except BaseException as exc:
+                failures.append(exc)
+
+        thread = threading.Thread(target=old_caller)
+        thread.start()
+        try:
+            self.assertTrue(started.wait(timeout=5))
+            work.cache_clear()
+            self.assertEqual(work.cache_info().size, 0)
+            self.assertEqual(work(1), 2)
+        finally:
+            release.set()
+            thread.join(timeout=5)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(failures, [])
+        self.assertEqual(results, [1])
+        self.assertEqual(work(1), 2)
         self.assertEqual(calls, 2)
 
 
