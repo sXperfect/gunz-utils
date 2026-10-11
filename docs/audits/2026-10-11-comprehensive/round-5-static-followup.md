@@ -29,3 +29,11 @@ File: `src/gunz_utils/limits.py`, `ResourceBudget.consume_bytes/consume_items/co
 2. Confirm R5-002/R5-003/R5-004 contracts; only change behavior if an actual guarantee is violated.
 3. Run focused cache/limits regressions on Python 3.11 and 3.12 and the aggregate local-only gates.
 4. Preserve no-hosted-CI/no-main-merge policy and append actual logs, commit and results to `local-verification.md`.
+
+## Follow-up implementation (unverified locally)
+
+- Commit `8d8b1054`: added lock-guarded generation tracking to synchronous TTL cache. Computations started before `cache_clear()` retain their own return value but cannot insert it into the new cache generation. Hit/miss counters retain the existing clear semantics.
+- Commit `42509fa3`: added deterministic two-thread regression using events in `tests/test_core/test_cache.py`.
+- Local execution and aggregate static gates **have not been run for these commits**. The prior 1710-pass result belongs to the preceding snapshot.
+- Next local checks: `python -m pytest tests/test_core/test_cache.py -q`, `python -m ruff check .`, `python -m mypy src/gunz_utils`, then the repository's canonical local audit gate on Python 3.11/3.12.
+- R5-002 through R5-004 remain explicit contract-review items, not newly fixed defects.
