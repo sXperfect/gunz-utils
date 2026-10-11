@@ -29,3 +29,7 @@ docs/_build/
 # Transient data
 tmp/
 data/
+
+# Local virtual environments
+.venv/
+venv/

@@ -16,6 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

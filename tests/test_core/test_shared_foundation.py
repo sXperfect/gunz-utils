@@ -11,6 +11,7 @@ from importlib import import_module
 from typing import Any, cast
 from unittest.mock import patch
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

@@ -9,6 +9,7 @@ from __future__ import annotations
 import time
 import unittest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

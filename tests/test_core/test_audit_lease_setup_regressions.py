@@ -13,12 +13,14 @@ from collections.abc import Coroutine
 from types import CoroutineType
 from typing import Any
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 
 import pytest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

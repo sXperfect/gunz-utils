@@ -1,0 +1,1 @@
+Configure the optional Windows MSVC build with the running CPython import library, matching dynamic runtime and isolated intermediate outputs; add preparation checks and Windows-only native contract tests.

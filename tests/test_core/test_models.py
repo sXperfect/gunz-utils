@@ -15,6 +15,7 @@ Covers the shared strictness defaults exposed by :class:`GunzBaseModel`:
 
 import unittest
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
@@ -25,6 +26,7 @@ pytest.importorskip("pydantic")
 
 from pydantic import ConfigDict, ValidationError
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Unreleased changes are collected as conflict-free fragments in `changes/`. Run `python scripts/release.py status` to inspect them.
 
+## [1.14.1] — 2026-10-08
+
+### Fixed
+
+- Repair `WorkflowDAG.async_execute()` to execute compensation rollback and drain child tasks on caller or stage cancellation, stage cache writes to prevent compensated outputs from surviving failure, isolate newly executed stages from cached hits during compensation, ensure recursive container isolation in `deep_merge()` even when leaf objects cannot be deepcopied, and avoid float overflow in `VirtualClock.now_ns()` for extreme finite seconds.
+
+- Add startup barrier in `WorkflowDAG.async_execute()` to prevent eager execution race conditions during sibling cancellation, ensure uninterruptible completion of compensation rollback under repeated cancellations, make cache publication transactional with rollback on publication failure, add identity-based memoization to `deep_merge()` container isolation to preserve self-referential cycles and avoid exponential DAG expansion, and independently test Python varint decoder by disabling `_accel_decode`.
+
+- Fix regression counting in `scripts/bench.py`, repair async test execution in `test_chaos_fault_injection.py`, guard optional `pydantic` import in `test_models.py`, restore keyword argument parity and test fresh fallback imports in `encode_uvarint`, tighten parameter and finiteness validation across chaos primitives (`VirtualClock`, `FaultyStream`, `AwaitBoundaryChaos`), enforce prompt sibling task cancellation on failure in `WorkflowDAG.async_execute`, reject non-finite floats in pure-Python `to_jsonable()` for native parity with documented identity contracts, isolate subtrees against caller mutation in `deep_merge()`, and handle compiler-launch errors gracefully in `scripts/build_native.py`.
+
+- Repair type parameter handling in `top_k` to ensure cross-version compatibility between mypy 1.19.1 and mypy 2.x without triggering unused-ignore warnings.
+
+- Fix async cache task retention leak when all callers cancel by delegating in-flight cleanup and publication to the producer coroutine, implement descriptor method binding on `_TTLCache` and `_AsyncTTLCache` for instance, class, and static methods across decorator orders, handle overlapping cyclic mappings and recursive tuple back-references in `deep_merge()`, trigger graceful-shutdown cleanup callbacks on task cancellation in `GracefulShutdown.__aexit__()`, ensure write-then-raise cache publication failures purge uncommitted entries in `WorkflowDAG`, and bound asynchronous compensation rollback with an explicit timeout deadline.
+
+- Prevent asynchronous DAG compensation loops from continuing or hanging after rollback timeout cancellation, report skipped stages as cancelled, bound rollback task join in `WorkflowDAG._safe_rollback_async()`, reject non-finite `rollback_timeout` values (`NaN`, `inf`), cancel and drain child tasks on DAG setup failures before unblocking execution, and retain active tasks in `concurrency.map_unordered()` so completed sibling exceptions and early exit cancellations are safely observed without unretrieved-exception warnings.
+
+- Default bucket capacity in `AsyncRateLimiter` to `max(1.0, float(rate))` when capacity is omitted so fractional rates permit default acquisition, enforce acquisition timeouts upon wakeup before deducting token balances, and recheck retry policy deadlines after sleep and retry hooks to prevent starting subsequent attempts after deadline expiration in `run_with_retry()`, `async_run_with_retry()`, `retry()`, and `async_retry()`.
+
+- Bound rollback task join in `WorkflowDAG._safe_rollback_async()` using an explicit deadline to prevent cancellation-suppressing compensators from hanging rollback indefinitely and report unfinished tasks, close un-owned coroutines when stage task creation fails in `WorkflowDAG.async_execute()`, ensure `AsyncCircuitBreaker` clears the half-open probe in-flight flag in a `finally` block even when failure predicates raise while preserving chained causes, and capture event-loop task exception reports in concurrency tests.
+
+- Coordinate `SecureStore` key rotation with inter-process file locks, immediate transactions, and key generation verification (`A12-SS-01`).
+- Require `allow_mode_switch=True` during `SecureStore.rotate_master_key()` to prevent unintended passphrase downgrade or conversion (`A12-SS-02`).
+- Bind record name and ACL to Fernet ciphertexts using authenticated record envelopes, preventing ciphertext substitution or ACL tampering (`A12-SS-03`).
+
+- Record explicit compensation errors when synchronous rollback encounters asynchronous compensation callbacks in `WorkflowDAG._rollback_sync()`, track generation epochs in `AsyncCircuitBreaker` so in-flight requests admitted before a failure cannot close an open circuit and bypass cooldown recovery, and validate size types transactionally in `ByteReader.read()` before advancing offsets.
+
+- Coordinate `SecureStore.unlock()` candidate selection, verification, initialization, and recovery under `_coordination_lock` to eliminate rotation-recovery races (`A13-SS-01`).
+- Ensure exception-safe `_ReentrantFileLock.acquire()` and `release()` descriptor and thread-lock cleanup (`A13-LOCK-01`).
+- Add platform-conditional file locking on Windows via `msvcrt.locking` (`A13-PORT-01`).
+- Enforce strict envelope verification with explicit `migrate_records()` and `record_format` persistence (`A13-ENV-01`).
+- Reject missing or malformed key generation metadata with fail-closed behavior (`A13-GEN-01`).
+
+- Roll back or reconnect SQLite database on transaction commit failures in `SecureStore._transaction_locked()` to prevent uncommitted transaction state poisoning subsequent writes, and authenticate existing record envelopes in `set()` and `delete()` before trusting ACL metadata to prevent unauthorized mutations against tampered database records.
+
+- **`gunz_utils.enums` / `gunz_utils.models`** — added explicit `__all__`
+  (consistency with the rest of the package's public modules). `enums` now
+  exports `BaseStrEnum`, `OptionalBaseStrEnum`, `BaseIntEnum`, and
+  `DEFAULT_MAX_INPUT_LENGTH`; `models` exports `GunzBaseModel`.
+
 ## [1.14.0] — 2026-10-02
 
 ### Added

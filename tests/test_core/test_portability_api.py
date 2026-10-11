@@ -7,6 +7,7 @@ from __future__ import annotations
 import unittest
 import warnings
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

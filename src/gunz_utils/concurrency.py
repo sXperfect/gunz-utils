@@ -16,6 +16,26 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 
+async def _cancel_and_drain(
+    tasks: Iterable[asyncio.Task[Any]],
+) -> asyncio.CancelledError | None:
+    """Cancel owned tasks once and finish their cooperative cleanup."""
+    owned = tuple(tasks)
+    for task in owned:
+        if not task.done():
+            task.cancel()
+    if not owned:
+        return None
+    drain = asyncio.gather(*owned, return_exceptions=True)
+    cancelled: asyncio.CancelledError | None = None
+    while not drain.done():
+        try:
+            await asyncio.shield(drain)
+        except asyncio.CancelledError as exc:
+            cancelled = exc
+    return cancelled
+
+
 async def gather_limited(
     awaitables: Iterable[Coroutine[Any, Any, T]],
     *,
@@ -60,10 +80,16 @@ async def gather_limited(
             item = next(iterator)
         except StopIteration:
             return False
-        pending[asyncio.create_task(item)] = next_index
+        try:
+            task = asyncio.create_task(item)
+        except BaseException:
+            item.close()
+            raise
+        pending[task] = next_index
         next_index += 1
         return True
 
+    failure: BaseException | None = None
     try:
         for _ in range(limit):
             if not schedule_one():
@@ -84,11 +110,13 @@ async def gather_limited(
                         raise
                     ordered[index] = exc
                 schedule_one()
+    except BaseException as exc:
+        failure = exc
+        raise
     finally:
-        for task in pending:
-            task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
+        cancelled = await _cancel_and_drain(pending)
+        if failure is None and cancelled is not None:
+            raise cancelled
     return [ordered[index] for index in range(next_index)]
 
 
@@ -163,9 +191,16 @@ async def map_unordered(
             item = next(iterator)
         except StopIteration:
             return False
-        active.add(asyncio.create_task(func(item)))
+        coroutine = func(item)
+        try:
+            task = asyncio.create_task(coroutine)
+        except BaseException:
+            coroutine.close()
+            raise
+        active.add(task)
         return True
 
+    failure: BaseException | None = None
     try:
         for _ in range(limit):
             if not schedule_one():
@@ -179,11 +214,15 @@ async def map_unordered(
                 active.discard(task)
                 yield task.result()
                 schedule_one()
+    except BaseException as exc:
+        failure = exc
+        raise
     finally:
-        for task in active:
-            task.cancel()
-        if active:
-            await asyncio.gather(*active, return_exceptions=True)
+        cancelled = await _cancel_and_drain(active)
+        if cancelled is not None and (
+            failure is None or isinstance(failure, GeneratorExit)
+        ):
+            raise cancelled
 
 
 def process_map(

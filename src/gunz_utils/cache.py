@@ -299,7 +299,12 @@ class _AsyncTTLCache(Generic[P, T]):
                             if self._in_flight.get(key) is current_task:
                                 self._in_flight.pop(key, None)
 
-                current_task = asyncio.create_task(_producer())
+                coroutine = _producer()
+                try:
+                    current_task = asyncio.create_task(coroutine)
+                except BaseException:
+                    coroutine.close()
+                    raise
 
                 def _silence_unretrieved(
                     t: asyncio.Task[Any],
@@ -417,7 +422,12 @@ class SingleFlight:
                             if self._tasks.get(key) is current_task:
                                 self._tasks.pop(key, None)
 
-                current_task = asyncio.create_task(_worker())
+                coroutine = _worker()
+                try:
+                    current_task = asyncio.create_task(coroutine)
+                except BaseException:
+                    coroutine.close()
+                    raise
 
                 def _silence(
                     t: asyncio.Task[Any],

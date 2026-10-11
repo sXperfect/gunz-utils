@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from types import MappingProxyType
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

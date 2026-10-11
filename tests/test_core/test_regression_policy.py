@@ -8,6 +8,7 @@ import math
 import unittest
 from typing import Any, cast
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

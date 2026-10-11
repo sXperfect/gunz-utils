@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

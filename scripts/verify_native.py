@@ -16,6 +16,7 @@ TESTS = (
     "tests/test_core/test_binary_accel.py",
     "tests/test_core/test_serialization.py",
     "tests/test_core/test_audit_native_safety_regressions.py",
+    "tests/test_core/test_parser_native_resource_audit.py",
 )
 
 

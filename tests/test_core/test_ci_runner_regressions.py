@@ -14,6 +14,7 @@ import textwrap
 from pathlib import Path
 from types import ModuleType
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================

@@ -10,6 +10,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
@@ -17,6 +18,7 @@ from typing import Any
 import pytest
 from cryptography.fernet import InvalidToken
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

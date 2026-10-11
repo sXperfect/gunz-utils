@@ -10,6 +10,23 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [2026-10-11-main-audit-merge](tasks/done/2026-10-11-main-audit-merge.md)
+
+- [2026-10-08-resource-security-audit](tasks/done/2026-10-08-resource-security-audit.md)
+- [2026-10-08-resource-lifetime](tasks/done/2026-10-08-resource-lifetime.md)
+- [2026-10-08-secure-input-budgets](tasks/done/2026-10-08-secure-input-budgets.md)
+- [2026-10-08-parser-native-safety](tasks/done/2026-10-08-parser-native-safety.md)
+- [2026-10-08-resource-security-repairs](tasks/done/2026-10-08-resource-security-repairs.md)
+- [2026-10-08-repair-secure-store](tasks/done/2026-10-08-repair-secure-store.md)
+- [2026-10-08-repair-resource-cleanup](tasks/done/2026-10-08-repair-resource-cleanup.md)
+- [2026-10-08-repair-native-depth](tasks/done/2026-10-08-repair-native-depth.md)
+
+- [2026-10-08-storage-cas-process-proofs](tasks/done/2026-10-08-storage-cas-process-proofs.md)
+- [2026-10-08-storage-mode-switch-crash-repair](tasks/done/2026-10-08-storage-mode-switch-crash-repair.md)
+- [2026-10-08-storage-process-proofs](tasks/done/2026-10-08-storage-process-proofs.md)
+- [2026-10-08-storage-store-crash-recovery](tasks/done/2026-10-08-storage-store-crash-recovery.md)
+- [2026-10-08-storage-store-process-locks](tasks/done/2026-10-08-storage-store-process-locks.md)
+
 - [2026-10-08-audit-concurrency-cancellation](tasks/done/2026-10-08-audit-concurrency-cancellation.md)
 - [2026-10-08-audit-filesystem-publication](tasks/done/2026-10-08-audit-filesystem-publication.md)
 - [2026-10-08-audit-follow-up](tasks/done/2026-10-08-audit-follow-up.md)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import unittest
 from typing import Any
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

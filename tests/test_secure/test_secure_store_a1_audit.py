@@ -11,6 +11,7 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
@@ -18,6 +19,7 @@ from unittest.mock import patch
 import pytest
 from cryptography.fernet import InvalidToken
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

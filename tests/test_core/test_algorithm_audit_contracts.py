@@ -9,12 +9,14 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Iterable
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 
 import pytest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

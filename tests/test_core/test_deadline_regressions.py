@@ -15,12 +15,14 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from unittest.mock import patch
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 
 import pytest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

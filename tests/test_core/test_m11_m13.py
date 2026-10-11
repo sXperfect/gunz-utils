@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import unittest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

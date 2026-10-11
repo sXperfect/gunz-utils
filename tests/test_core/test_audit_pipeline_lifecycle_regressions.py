@@ -12,12 +12,14 @@ import warnings
 from collections.abc import AsyncGenerator, Coroutine, Iterator
 from typing import Any, cast
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 
 import pytest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

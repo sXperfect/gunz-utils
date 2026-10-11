@@ -7,6 +7,7 @@ from __future__ import annotations
 import math
 import unittest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

@@ -11,6 +11,7 @@ import importlib.metadata
 import tomllib
 from pathlib import Path
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

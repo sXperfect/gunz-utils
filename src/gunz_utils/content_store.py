@@ -18,7 +18,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, Literal, cast
+from typing import Any, BinaryIO, Literal, cast
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
@@ -77,15 +77,16 @@ def _publication_lock(
         if os.name == "nt":
             import msvcrt
 
+            windows_runtime = cast(Any, msvcrt)
             if descriptor_info.st_size == 0:
                 os.write(descriptor, b"\0")
             os.lseek(descriptor, 0, os.SEEK_SET)
-            msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+            windows_runtime.locking(descriptor, windows_runtime.LK_LOCK, 1)
             try:
                 yield
             finally:
                 os.lseek(descriptor, 0, os.SEEK_SET)
-                msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                windows_runtime.locking(descriptor, windows_runtime.LK_UNLCK, 1)
         else:
             import fcntl
 
@@ -908,6 +909,10 @@ class ContentAddressedStore:
         verify: bool = True,
     ) -> Path:
         """Return a stored artifact path, optionally verifying its digest.
+
+        A concurrent pathname replacement can raise ValueError even when the
+        replacement has the same content digest. Callers may retry after
+        cooperating publication settles. Returned paths remain snapshots.
 
         Parameters
         ----------

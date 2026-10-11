@@ -9,12 +9,14 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 
 import pytest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

@@ -9,12 +9,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Annotated, Literal
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 
 import pytest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

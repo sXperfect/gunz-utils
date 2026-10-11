@@ -10,16 +10,20 @@ import threading
 import time
 from pathlib import Path
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 
 import gunz_utils.content_store as content_store_module
+
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 
 import pytest
+
 from gunz_utils.content_store import ContentAddressedStore
 
 

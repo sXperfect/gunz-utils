@@ -10,6 +10,7 @@ import unittest
 import weakref
 from datetime import UTC, datetime, timedelta
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================

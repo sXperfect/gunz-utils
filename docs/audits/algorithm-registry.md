@@ -62,6 +62,24 @@ this scoped review re-audited the entire repository.
 
 ## Audited algorithm set
 
+### Cross-process follow-up on 3f474ad
+
+[The process proof program](../tasks/done/2026-10-08-storage-process-proofs.md)
+adds bounded acknowledged spawn-process schedules on Python 3.11/3.12. SP-01
+has 12 passing CAS cases; SP-02 has 10 passing real-flock/SQLite coordination
+cases. SP-03 now passes all 26 strict crash cases after the approved mode-switch
+recovery repair. SP-04 adds ten ordinary rejected-authentication and cleanup/fsync
+failure regressions. Full canonical verification passed all six gates on both
+interpreters; the completed parent records the actual source-input fingerprint.
+
+The confirmed SP-04 recovery defect leaves obsolete opposite-mode primary key/
+salt material after current-candidate unlock; the leftover salt blocks future
+file-mode rotation. After the user authorized the concrete patch, authenticated
+normal-candidate recovery now completes opposite-primary cleanup. Unchanged strict
+crash tests and the complete aggregate gate now pass on both Python versions. Wrong credentials
+and damaged policy preserve current/pending bytes in the executed proof packet.
+Historical A4 rows below do not certify these new schedules by themselves.
+
 ### 2026-10-08 follow-up status
 
 The [follow-up task hierarchy](../tasks/done/2026-10-08-audit-follow-up.md)
@@ -134,7 +152,7 @@ directories, sampled process-tree observations, and caller-owned input budgets.
 | ALG-036 | Recursive redaction | `redaction.redact`, `redact_dict` | A2 | secret-context propagation, non-mutation, reveal-count bound | strict reveal-count domain added |
 | ALG-037 | Safe integer parsing | `parsing.safe_int` | A2 | strings/bytes/ordinary ints, base handling, bounds/fallback | fixed documented integer inputs returning fallback |
 | ALG-038 | Generic async timeout wrapper | `async_utils.with_timeout` | A2 | None semantics, finite timeout, cancellation | finite timeout validation added |
-| ALG-039 | Subprocess timeout/output validation | `subprocess.run_command`, `run_command_async` | A4 | structured argv, finite timeout/grace domains, prompt streaming output cap, process-group cleanup | historical composed-tree proof; current pipe-drain deadline and constructor cleanup evidence in AR-08 |
+| ALG-039 | Subprocess timeout/output validation | `subprocess.run_command`, `run_command_async` | A4 | structured argv, finite timeout/grace domains, streaming output cap, exit/drain deadline, owned cleanup | historical composed-tree proof; AR-08 sync and NP-04 async deadline proofs; actual Windows/macOS and final OS reap limits remain |
 | ALG-040 | Upstream policy wrapper | `upstream_protocol.PolicyUpstream` | A2 | finite timeout, concurrency/attempt counts, idempotent retry set | parameter contracts hardened |
 | ALG-041 | Scaling efficiency | `benchmark.metrics.scaling_efficiency` | A2 | valid baseline, per-point validity, ideal-scale formula | fixed invalid baseline producing nonsensical values |
 | ALG-042 | Benchmark history trend | `benchmark.history.BenchmarkHistory.trend` | A2 | finite values, absolute/relative change, min/max | hardened unknown/non-finite metric handling |
@@ -174,6 +192,7 @@ directories, sampled process-tree observations, and caller-owned input budgets.
 | ALG-076 | Native 64-bit varint codec & zero-copy parsing | `binary.encode_uvarint`, `binary.ByteReader.read_uvarint`, `_accel.*` | A4 | 64-bit uint range `[0, 2^64-1]`, canonical MSB continuation, rejection of non-canonical redundant zero bytes and overflow, zero-copy buffer view, pure-Python fallback parity | historical 28-test packet; non-exact integer semantics and active/fallback verification in AR-10/11 |
 | ALG-077 | Fast JSON-clean validation & allocation bypass | `serialization.to_jsonable`, `streaming.write_jsonl`, `_accel.is_json_clean` | A4 | depth bounding (`max_depth=100`), strict byte rejection, finite float bounds, chunked streaming I/O batching, pure-Python fallback | historical roundtrip packet; interpreter-independent native depth safety and active/fallback verification in AR-10/11 |
 | ALG-078 | Adversarial chaos and stream/await fault injection | `faults.VirtualClock`, `faults.FaultyStream`, `faults.AwaitBoundaryChaos` | A4 | deterministic monotonic clock progression, partial read/write truncation, EIO/ENOSPC injection, cooperative await cancellation | 5 focused unit and contract tests executed |
+| ALG-079 | SingleFlight producer resource ownership | `cache.SingleFlight.run` | A3 | shared producer lifetime, waiter cancellation, registry release after completion, rejected coroutine submission closure | RS-01/RP-02 bounded lifetime and cache proofs pass on both Python versions; broader family guarantees are not inferred from this ownership packet |
 
 
 ## A0 sweep result
@@ -366,10 +385,78 @@ different OS mechanism.
 
 Current SecureStore transaction/policy/recovery regressions and existing AES
 malformed salt/hex cases are recorded in AU-02 and AR-04. Remaining proof work
-includes real multiprocess crash/rotation schedules, an independent AES
-known-answer/component-tamper matrix, and fixed key/salt read/decode budgets.
+now includes broader multiprocess/platform schedules beyond the passing
+SP-01 through SP-04 packets and fixed key/salt read/decode budgets. RS-02 now
+adds independent OpenSSL AES/PBKDF/component and bounded lifetime evidence;
+RP-01 preserves those proofs alongside repaired authentication/recovery cases.
+Do not continue to classify the independent known-answer/component matrix as
+wholly absent; its exact scope and limitations are in the RS-02 record.
 Do not describe malformed-format coverage as wholly absent. The optional
 Pydantic validation adapter itself is covered by ALG-075.
+
+### GAP-010 — actual Windows/macOS execution
+
+[Native platform tasks](../tasks/active/2026-10-08-platform-verification.md)
+separate Linux preparation and mocked dispatch evidence from real Windows/macOS
+kernel, filesystem, lock, process and compiler execution. Native verification
+requires both Python 3.11 and 3.12 and explicit accounting for skipped coverage.
+No native host has been confirmed; no audit level is promoted by preparation.
+The portable verifier's stable Linux preparation report records both interpreters,
+unchanged source fingerprints and 18 filesystem/46 SecureStore/20 subprocess/
+35 fallback/57 compiled-native passes per interpreter, with 22 explicitly
+native-only fallback exclusions. Its native-platform completion flag remains
+false. See NP-03 for commands and local JSON/JUnit provenance.
+The integrated follow-up report supersedes the original 20 subprocess cases with
+34, including the repaired async drain proofs; it again records stable source
+and zero unexplained skips. All six canonical integration gates pass, with
+1,370 full-suite passes/29 skips and 57 compiled-native passes per Python version.
+
+ALG-039's async drain concern was reproduced by two independently bounded
+controlled-process/StreamReader cases before repair. The implementation now
+applies one deadline across exit and drain, wakes on overflow/read failure, and
+cancels/joins owned tasks and closes owned capture transports before reaping.
+[NP-04](../tasks/active/2026-10-08-platform-async-drain.md) records 92 focused
+passes plus 14 subtests on each supported Python version, including a finite
+real-child cleanup probe. Combined integration verification passed all six gates. The
+CPython private StreamReader transport dependency, final OS reap and escaped
+descendant ownership remain explicit limits; real Windows/macOS proof is pending.
+
+### 2026-10-08 resource/security repair follow-up
+
+[RS-01 through RS-03](../tasks/done/2026-10-08-resource-security-audit.md)
+reproduced six resource cleanup regressions, four SecureStore authentication/
+recovery regressions and two native/reference depth-budget parity cases before
+source repair. The user authorized [RP-01 through RP-03](../tasks/done/2026-10-08-resource-security-repairs.md).
+
+- ALG-025/056/079: rejected consumed/generated coroutines close before ownership
+  publication; owned scheduler children drain through repeated cancellation,
+  retaining initiating failures and cooperative descriptor cleanup. Positive
+  weakref/cache/task/fd checks remain strict. Focused proof: 101 passes plus seven
+  subtests per supported Python version.
+- ALG-050: guarded mutations authenticate current policy and numeric generation
+  inside SQLite write exclusion; raw-writer interleavings are tested for owned
+  and joined transactions. Missing material cannot initialize a database with
+  prior metadata/secrets/audit history; format-invalid primary file keys do not
+  hide independently valid pending recovery. Unsafe-file errors still propagate.
+  Focused proof: 160 secure tests pass per version. This does not authenticate a
+  whole old snapshot's freshness or promise arbitrary concurrent hostile-root safety.
+- ALG-077: Python depth rejection precedes acceleration, and only the native
+  optimization budget is capped at 129, beyond its existing depth128 fallback
+  boundary. Caller recursion budgets and reference values/errors remain intact.
+  Both native matrices pass 91 tests; fallback passes 60 with 31 exact native-only
+  exclusions. Finite C buffer/refcount/weakref/allocation probes found no additional
+  leak; they do not prove all allocations or arbitrarily long workloads safe.
+
+Coordinator integration passed all six canonical gates. Main Python 3.11 had
+1,440 passes/38 skips; final Python 3.12 had 1,444 passes/38 skips. Four final
+verifier exclusion regressions were separately executed on both runtimes (41
+verifier cases total); final lint and typing passed. Stable-source evidence
+records 18 filesystem/75 secure-store/34 subprocess/60 fallback/91 compiled-native
+passes per version, with 31 exact native-only fallback exclusions and zero other
+gaps. See the completed parent for JSON paths and executable fingerprint. Fixed-format key/salt read budgets and
+early fixed-field crypto admission remain documented follow-ups under GAP-008;
+arbitrary valid payload limits remain caller-owned. Actual Windows/macOS evidence
+is pending. Historical A4 rows are not blanket-promoted by these focused packets.
 
 ## Completion rule
 
@@ -383,3 +470,21 @@ The long-horizon repository-wide algorithm audit is complete only when:
 4. every discovered correctness defect has a regression test;
 5. the canonical aggregate verifier passes on the audited code revision;
 6. this registry is updated with the final audited commit and execution evidence.
+
+## Merge reconciliation — 2026-10-11
+
+The local audit branch is being integrated with main@b105e26. Main retains
+its newer process_imap API, style/docstring changes, cumulative process lifetime
+accounting, run-directory rollback and cooperating content-store publication
+locking. Audit authentication, recovery, cancellation and native parity repairs
+and their strict regressions are retained. Older GAP-004/005/006 descriptions
+from the audit branch do not reopen guarantees already reconciled on main.
+Native-platform execution is numbered GAP-010 to avoid conflating it with the
+2026-10-09 observed-process-lifetime GAP-009 record. Historical proof counts
+remain evidence for their original trees; this merge needs fresh integration
+verification before commit. That verification completed successfully; see the
+[merge record](../tasks/done/2026-10-11-main-audit-merge.md) for corrected
+publication schedules, full-suite/backend counts and exact rerun provenance.
+Serialized cooperating CAS publication preserves the winning inode on both
+paths; raw noncooperating replacement remains a reader snapshot risk. No actual
+Windows/macOS or hosted-CI claim is added.

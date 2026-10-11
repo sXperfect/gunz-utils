@@ -10,12 +10,14 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+# isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 
 import pytest
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
