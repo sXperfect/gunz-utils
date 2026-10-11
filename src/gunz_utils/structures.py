@@ -150,15 +150,15 @@ def retain_priority_and_recent(
     other priority records must never be discarded while routine records can be
     capped.
     """
-    values = list(items)
-    if max_recent is None:
-        return values
-    if (
+    if max_recent is not None and (
         isinstance(max_recent, bool)
         or not isinstance(max_recent, int)
         or max_recent < 0
     ):
         raise ValueError("max_recent must be a non-negative integer or None")
+    values = list(items)
+    if max_recent is None:
+        return values
 
     #? Priority items are always kept; only the newest max_recent ordinary
     #? items survive, preserving their original order.
@@ -212,7 +212,8 @@ def deep_diff(
 ) -> list[DeepDifference]:
     """Return ordered structural differences between nested Python values.
 
-    Mappings, lists, and tuples are traversed recursively. Missing keys/items
+    Mappings, lists, and tuples are traversed depth-first using an explicit stack.
+    Missing keys/items
     are distinguished from present values equal to None. Strings and bytes are
     treated as scalar leaves.
 
@@ -232,7 +233,10 @@ def deep_diff(
 
     Notes
     -----
-    This helper targets configuration, manifest, and metadata structures. Leaf
+    Alias topology is not compared. Mapping order is deterministic for keys with
+    stable, distinct representations; arbitrary custom repr methods are outside
+    that guarantee. This helper targets configuration, manifest, and metadata
+    structures. Leaf
     values should implement scalar boolean equality. Specialized array/tensor
     equality belongs in the owning numerical package.
     """
@@ -240,6 +244,9 @@ def deep_diff(
     #? Track id pairs of already-visited containers to stop traversal on
     #? shared or cyclic substructure without an unbounded recursion.
     visited: set[tuple[int, int]] = set()
+    pending: list[Iterator[tuple[t.Any, t.Any, str] | DeepDifference]] = [
+        iter(((left, right, path),))
+    ]
 
     def child_path(
         parent: str,
@@ -268,7 +275,7 @@ def deep_diff(
         right_value: t.Any,
         current: str,
     ) -> None:
-        """Recursively record differences between two nested values.
+        """Record one pair and schedule its children for depth-first traversal.
 
         Parameters
         ----------
@@ -295,32 +302,22 @@ def deep_diff(
                 set(left_value) | set(right_value),
                 key=repr,
             )
-            for key in keys:
-                nested = child_path(current, key)
-                if key not in left_value:
-                    differences.append(
-                        DeepDifference(
-                            nested,
-                            "missing_left",
-                            None,
-                            right_value[key],
+            def mapping_children(
+            ) -> Iterator[tuple[t.Any, t.Any, str] | DeepDifference]:
+                for key in keys:
+                    nested = child_path(current, key)
+                    if key not in left_value:
+                        yield DeepDifference(
+                            nested, "missing_left", None, right_value[key]
                         )
-                    )
-                elif key not in right_value:
-                    differences.append(
-                        DeepDifference(
-                            nested,
-                            "missing_right",
-                            left_value[key],
-                            None,
+                    elif key not in right_value:
+                        yield DeepDifference(
+                            nested, "missing_right", left_value[key], None
                         )
-                    )
-                else:
-                    walk(
-                        left_value[key],
-                        right_value[key],
-                        nested,
-                    )
+                    else:
+                        yield left_value[key], right_value[key], nested
+
+            pending.append(mapping_children())
             return
 
         #? Strings, bytes, and bytearrays are scalar leaves, not sequences.
@@ -356,30 +353,22 @@ def deep_diff(
                 )
             #? Compare the shared prefix, then report the trailing tail of the
             #? longer sequence as missing on the shorter side.
-            for index in range(min(left_length, right_length)):
-                walk(
-                    left_value[index],
-                    right_value[index],
-                    f"{current}[{index}]",
-                )
-            for index in range(right_length, left_length):
-                differences.append(
-                    DeepDifference(
-                        f"{current}[{index}]",
-                        "missing_right",
-                        left_value[index],
-                        None,
-                    )
-                )
-            for index in range(left_length, right_length):
-                differences.append(
-                    DeepDifference(
-                        f"{current}[{index}]",
-                        "missing_left",
-                        None,
-                        right_value[index],
-                    )
-                )
+            def sequence_children(
+            ) -> Iterator[tuple[t.Any, t.Any, str] | DeepDifference]:
+                for index in range(max(left_length, right_length)):
+                    nested = f"{current}[{index}]"
+                    if index >= right_length:
+                        yield DeepDifference(
+                            nested, "missing_right", left_value[index], None
+                        )
+                    elif index >= left_length:
+                        yield DeepDifference(
+                            nested, "missing_left", None, right_value[index]
+                        )
+                    else:
+                        yield left_value[index], right_value[index], nested
+
+            pending.append(sequence_children())
             return
 
         if type(left_value) is not type(right_value):
@@ -409,7 +398,16 @@ def deep_diff(
                 )
             )
 
-    walk(left, right, path)
+    while pending:
+        try:
+            item = next(pending[-1])
+        except StopIteration:
+            pending.pop()
+            continue
+        if isinstance(item, DeepDifference):
+            differences.append(item)
+        else:
+            walk(*item)
     return differences
 
 
@@ -420,7 +418,10 @@ def freeze_structure(
 
     Mappings become read-only mapping proxies, lists/tuples become tuples, and
     sets become frozensets. Scalar/other leaf values are defensively deep-copied.
-    Cyclic container graphs are rejected explicitly.
+    Cyclic container graphs are rejected explicitly. Standard containers are
+    processed iteratively; custom leaf/key deepcopy hooks retain their own
+    recursion and execution behavior. Mapping keys are also copied, so
+    identity-based keys must be retrieved using the copied keys in the result.
 
     Parameters
     ----------
@@ -437,52 +438,49 @@ def freeze_structure(
     ValueError
         If a cycle is encountered in a supported container graph.
     """
-    #? `active` tracks containers on the current recursion path so a cycle is
-    #? detected instead of recursing forever.
+    #? Postorder assembly avoids Python recursion for standard containers.
+    #? Active IDs reject cycles while allowing separate copies of shared nodes.
     active: set[int] = set()
-
-    def freeze(
-        item: t.Any,
-    ) -> t.Any:
-        """Freeze one value, rejecting cycles in supported containers.
-
-        Parameters
-        ----------
-        item : Any
-            Value to make structurally immutable.
-
-        Returns
-        -------
-        Any
-            Frozen copy of the value for standard container types.
-        """
-        container = isinstance(
-            item,
-            Mapping | list | tuple | set | frozenset,
-        )
-        identifier = id(item)
-        if container:
+    pending: list[tuple[str, t.Any, int]] = [("visit", value, 0)]
+    results: list[t.Any] = []
+    while pending:
+        action, item, count = pending.pop()
+        if action == "key":
+            results.append(copy.deepcopy(item))
+            continue
+        if action != "visit":
+            children = results[-count:] if count else []
+            if count:
+                del results[-count:]
+            result: t.Any
+            if action == "mapping":
+                result = MappingProxyType(
+                    dict(zip(children[::2], children[1::2], strict=True))
+                )
+            elif action == "sequence":
+                result = tuple(children)
+            else:
+                result = frozenset(children)
+            active.remove(id(item))
+            results.append(result)
+            continue
+        if isinstance(item, Mapping | list | tuple | set | frozenset):
+            identifier = id(item)
             if identifier in active:
                 raise ValueError("cycle detected while freezing structure")
             active.add(identifier)
-
-        try:
             if isinstance(item, Mapping):
-                return MappingProxyType(
-                    {
-                        #? Keys are deep-copied too, since mappings may use
-                        #? mutable objects as keys.
-                        copy.deepcopy(key): freeze(child)
-                        for key, child in item.items()
-                    }
-                )
-            if isinstance(item, list | tuple):
-                return tuple(freeze(child) for child in item)
-            if isinstance(item, set | frozenset):
-                return frozenset(freeze(child) for child in item)
-            return copy.deepcopy(item)
-        finally:
-            if container:
-                active.remove(identifier)
-
-    return freeze(value)
+                entries = list(item.items())
+                pending.append(("mapping", item, 2 * len(entries)))
+                for key, child in reversed(entries):
+                    pending.append(("visit", child, 0))
+                    pending.append(("key", key, 0))
+            else:
+                values = list(item)
+                action = "sequence" if isinstance(item, list | tuple) else "set"
+                pending.append((action, item, len(values)))
+                for child in reversed(values):
+                    pending.append(("visit", child, 0))
+        else:
+            results.append(copy.deepcopy(item))
+    return results[0]

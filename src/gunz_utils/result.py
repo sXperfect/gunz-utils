@@ -17,11 +17,22 @@ U = TypeVar("U")
 
 @dataclass(frozen=True)
 class Result(Generic[T, E]):
-    """A value containing exactly one success value or error."""
+    """A tagged success or error with no payload in the inactive variant.
+
+    None is valid in either active variant; _ok identifies which is active.
+    """
 
     value: T | None = None
     error: E | None = None
     _ok: bool = True
+
+    def __post_init__(self) -> None:
+        if not isinstance(self._ok, bool):
+            raise TypeError("_ok must be a boolean")
+        if self._ok and self.error is not None:
+            raise ValueError("successful result cannot contain an error")
+        if not self._ok and self.value is not None:
+            raise ValueError("error result cannot contain a success value")
 
     @classmethod
     def ok(cls,

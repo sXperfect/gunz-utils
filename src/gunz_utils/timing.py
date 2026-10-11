@@ -56,6 +56,9 @@ class Timer:
     def stop(self) -> None:
         """Stop the timer, preserving the first stop time for idempotence.
 
+        Stopping before start leaves elapsed at zero; a later start clears the
+        stop timestamp, including implicit start on context entry.
+
         No parameters and no return value.
         """
         if self._end_time is None:

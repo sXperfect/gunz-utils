@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import math
 import signal
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -55,7 +56,12 @@ class SignalRegistration:
 
 @dataclass
 class AsyncSignalRegistration:
-    """Asyncio loop signal handlers with idempotent restoration."""
+    """Asyncio loop signal handlers with idempotent restoration.
+
+    Requires exclusive control of the registered process and loop handlers.
+    Nested registrations must restore in reverse order; unrelated replacements
+    during registration are outside this ownership contract.
+    """
 
     loop: asyncio.AbstractEventLoop
     signums: tuple[int, ...]
@@ -261,7 +267,8 @@ class GracefulShutdown:
     signums : tuple[int, ...], optional
         Signals to capture. Defaults to (SIGINT, SIGTERM).
     timeout : float, optional
-        Maximum timeout in seconds to wait for async cleanup callbacks.
+        Timeout in seconds for each awaited cleanup callback. Synchronous callbacks
+        are not preempted; cancellation-suppressing awaitables can delay shutdown.
     loop : asyncio.AbstractEventLoop | None, optional
         Target event loop.
     """
@@ -275,9 +282,10 @@ class GracefulShutdown:
         if (
             isinstance(timeout, bool)
             or not isinstance(timeout, (int, float))
+            or not math.isfinite(float(timeout))
             or timeout <= 0
         ):
-            raise ValueError("timeout must be a positive number")
+            raise ValueError("timeout must be a finite positive number")
         self.signums = signums
         self.timeout = float(timeout)
         self._loop = loop
@@ -359,7 +367,10 @@ class GracefulShutdown:
         return self._signal_received
 
     async def run_cleanup(self) -> list[tuple[Callable[[], Any], BaseException]]:
-        """Run all registered callbacks in LIFO order within the timeout.
+        """Run callbacks in LIFO order with a separate timeout for each awaitable.
+
+        Ordinary exceptions are collected. Cancellation and other BaseException
+        signals propagate; synchronous callbacks cannot be interrupted here.
 
         Returns
         -------
@@ -372,7 +383,7 @@ class GracefulShutdown:
                 res = cb()
                 if inspect.isawaitable(res):
                     await asyncio.wait_for(res, timeout=self.timeout)
-            except BaseException as exc:
+            except Exception as exc:
                 errors.append((cb, exc))
         return errors
 

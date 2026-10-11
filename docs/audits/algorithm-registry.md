@@ -544,3 +544,16 @@ local gates pass (1716 tests per interpreter, actual native 91 each). Scoped
 contracts have local A4 evidence on input SHA256 `f7615473b8c32f494e89fc1f28ede57f138d1cf9c56f2a224d8d41c095a68f80`; this does not
 certify unexecuted hosts or invent budget thread safety. Existing family-wide
 levels and broader proof gaps remain as recorded.
+
+
+## Offline rounds 6–9 — 2026-10-12
+
+[Local execution](2026-10-11-comprehensive/2026-10-12-offline-verification.md)
+starts from `af0366f`. Scoped A3 packets establish iterative standard-container
+traversal with preserved shallow/original oracles, cycle/value order, Result
+variant integrity including None, finite cleanup timeout domains and cancellation,
+and ALG-013 invalid-bound rejection before source consumption. ALG-029 polling
+and handler/environment ownership are explicitly cooperative/caller-controlled.
+Full interpreter/native suites and offline static/docs/artifact variants pass.
+No canonical A4 promotion is claimed from reused cached dependencies or
+unexecuted Windows/macOS hosts. Input SHA256: `b912b51a45747a6325e2cf930e27948696360e989c0ce9cb8cabc664c59d91fb`.

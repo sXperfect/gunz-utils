@@ -10,6 +10,9 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [2026-10-12-offline-rounds6-9](tasks/done/2026-10-12-offline-rounds6-9.md)
+- [2026-10-11-round7-9-local-handoff](tasks/done/2026-10-11-round7-9-local-handoff.md)
+
 - [2026-10-11-round5-local-verification](tasks/done/2026-10-11-round5-local-verification.md)
 
 - [2026-10-11-remote-audit-repairs](tasks/done/2026-10-11-remote-audit-repairs.md)

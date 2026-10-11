@@ -72,6 +72,9 @@ def discover_plugins(
     keeps plugin discovery diagnostics useful without copying arbitrary
     plugin-provided text that may contain credentials or other secrets.
 
+    Ordinary exceptions become typed failures. BaseException subclasses such
+    as cancellation, KeyboardInterrupt and SystemExit propagate.
+
     Parameters
     ----------
     group : str

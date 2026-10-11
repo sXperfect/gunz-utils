@@ -141,7 +141,9 @@ def flatten(
     types : tuple[type, ...], optional
         Container types that should be descended into. Default is
         ``(list, tuple)``. Pass ``(list, tuple, set, frozenset)`` to also
-        flatten set-valued nesting, etc.
+        flatten set-valued nesting, etc. Explicitly including str can encounter
+        self-similar one-character strings; cycle/nesting guards then reject
+        that traversal rather than treating strings as default scalar leaves.
 
     Yields
     ------

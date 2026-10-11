@@ -53,7 +53,7 @@ def operation_context(
     Parameters
     ----------
     value : str | None
-        value parameter.
+        Explicit non-empty identifier. None or an empty string generates a UUID.
 
     Returns
     -------

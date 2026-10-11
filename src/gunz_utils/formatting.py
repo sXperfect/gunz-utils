@@ -112,7 +112,8 @@ def format_bytes(
         Byte count. May be negative; the sign is preserved on output.
     precision : int, optional
         Number of decimal places for scaled values. The unscaled byte
-        count is always emitted as an integer. Default is 1.
+        count is always emitted as an integer, truncating the magnitude toward
+        zero while preserving a negative sign. Default is 1.
     binary : bool, optional
         If ``False`` (default), use SI suffixes ``B/KB/MB/GB/TB`` with
         a base of 1000. If ``True``, use IEC suffixes

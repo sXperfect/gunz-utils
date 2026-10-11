@@ -31,3 +31,7 @@ First checkout this branch locally. Record exact HEAD and environment. Run focus
 
 ## Acceptance
 Each finding receives status: reproduced, disproved, fixed-and-verified, or deferred with documented reason. Track time/memory and platform-specific differences. Independent auditor reviews fixes and confirms no accidental API break before merge.
+
+## Rounds 6–9 executed follow-up
+[2026-10-12 offline verification](2026-10-12-offline-verification.md) records
+reproductions, repairs, contract decisions, exact results and offline exceptions.

@@ -20,6 +20,9 @@ def temporary_env(
 ) -> Iterator[None]:
     """Temporarily set or remove environment variables and restore them.
 
+    This changes process-global state. Overlapping contexts across threads
+    require caller synchronization; nested contexts restore in reverse order.
+
     Parameters
     ----------
     values : Mapping[str, str | None]
@@ -53,6 +56,9 @@ def eventually(
     interval: float = 0.01,
 ) -> None:
     """Wait until a predicate succeeds or raise TimeoutError.
+
+    Polling is cooperative: a predicate invocation cannot be interrupted here
+    and a successful invocation is accepted even if it returns after the timeout.
 
     Parameters
     ----------
@@ -93,6 +99,9 @@ async def eventually_async(
     interval: float = 0.01,
 ) -> None:
     """Poll an async predicate without blocking other tasks.
+
+    Predicate invocations are cooperative and may outlast the polling timeout.
+    Use an outer asyncio deadline when a hung predicate must be cancelled.
 
     Args:
         predicate: Async condition to check until it succeeds.

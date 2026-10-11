@@ -97,7 +97,9 @@ def bootstrap_mean_ci(
     Notes
     -----
     This is a basic percentile bootstrap. It does not perform BCa correction or
-    account for dependence between observations.
+    account for dependence between observations. Runtime is proportional to
+    samples times observations, plus sorting the samples; inputs and resample
+    count are caller-selected budgets without a hard memory or time limit.
     """
     observations = _finite_values(
         values,

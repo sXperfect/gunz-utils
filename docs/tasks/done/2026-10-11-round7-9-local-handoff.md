@@ -11,3 +11,7 @@ Tasks:
 5. Update verification evidence and audit registry; independent audit before main merge.
 
 Avoid actual fatal signal delivery in test runner: isolate in subprocess. Do not activate hosted CI. Do not treat unexecuted OSes as verified.
+
+## Local execution successor
+Superseded by the [completed scoped offline audit](2026-10-12-offline-rounds6-9.md),
+which records actual findings, repairs, accepted limits and verification.
