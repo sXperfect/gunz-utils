@@ -243,6 +243,7 @@ class _AsyncTTLCache(Generic[P, T]):
         self._maxsize = maxsize
         self._cache: OrderedDict[Hashable, tuple[float, T]] = OrderedDict()
         self._in_flight: dict[Hashable, asyncio.Task[T]] = {}
+        self._generation = 0
         self._lock = asyncio.Lock()
 
     def __get__(self,
@@ -278,6 +279,8 @@ class _AsyncTTLCache(Generic[P, T]):
                 self._cache.pop(key, None)
             task = self._in_flight.get(key)
             if task is None:
+                generation = self._generation
+
                 async def _producer() -> T:
                     """_producer() function.
 
@@ -289,6 +292,8 @@ class _AsyncTTLCache(Generic[P, T]):
                     try:
                         val = await func(*args, **kwargs)
                         async with self._lock:
+                            if generation != self._generation:
+                                return val
                             self._cache[key] = (time.monotonic(), val)
                             self._cache.move_to_end(key)
                             while len(self._cache) > self._maxsize:
@@ -331,9 +336,11 @@ class _AsyncTTLCache(Generic[P, T]):
         No parameters and no return value.
         """
         async with self._lock:
+            self._generation += 1
             self._cache.clear()
-            for k in [k for k, t in self._in_flight.items() if t.done()]:
-                self._in_flight.pop(k, None)
+            # Detach old producers without cancelling callers already awaiting
+            # them. A subsequent lookup starts a fresh generation.
+            self._in_flight.clear()
 
 
 def async_ttl_cache(
