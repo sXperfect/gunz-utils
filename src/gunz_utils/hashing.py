@@ -323,22 +323,19 @@ def directory_manifest(
     manifest: dict[str, str] = {}
     for path in files:
         relative = path.relative_to(base).as_posix()
-        try:
-            #? Security (VULN-2026-011): containment failures can occur
-            #? when enumeration encounters a path through an unsafe symlink.
-            with open_path_under_base(
-                str(base),
-                relative,
-                mode="rb",
-            ) as handle:
-                manifest[relative] = _hash_binary_handle(
-                    cast(BinaryIO, handle),
-                    algo=algo,
-                    chunk_size=chunk_size,
-                )
-        except ValueError:
-            #? Skip file if path traversal / symlink policy rejects opening under base
-            continue
+        # Do not silently produce a partial integrity manifest when a file
+        # changes or secure opening rejects a previously enumerated path.
+        # Symlinks are already excluded during enumeration.
+        with open_path_under_base(
+            str(base),
+            relative,
+            mode="rb",
+        ) as handle:
+            manifest[relative] = _hash_binary_handle(
+                cast(BinaryIO, handle),
+                algo=algo,
+                chunk_size=chunk_size,
+            )
     return manifest
 
 
