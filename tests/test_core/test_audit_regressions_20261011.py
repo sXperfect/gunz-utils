@@ -124,3 +124,56 @@ class TestDirectoryManifest(unittest.TestCase):
             except (OSError, NotImplementedError):
                 self.skipTest("symlinks unsupported")
             self.assertNotIn("link.txt", directory_manifest(root))
+
+
+class _StreamingExecutor:
+    def __init__(self, **kwargs: object) -> None:
+        pass
+
+    def __enter__(self) -> "_StreamingExecutor":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        pass
+
+    def map(self, func, items, **kwargs):
+        for item in items:
+            yield func(item)
+
+
+class TestStreamingProcessMap(unittest.TestCase):
+    def test_generator_consumption_is_bounded_before_first_result(self) -> None:
+        consumed = []
+
+        def source():
+            for value in range(1000):
+                consumed.append(value)
+                yield value
+
+        with patch(
+            "gunz_utils.concurrency.concurrent.futures.ProcessPoolExecutor",
+            _StreamingExecutor,
+        ):
+            results = process_imap(_identity, source(), workers=2, threshold=0)
+            self.assertEqual(next(results), 0)
+            self.assertLessEqual(len(consumed), 5)
+            self.assertEqual(list(results), list(range(1, 1000)))
+
+    def test_empty_generator_rejects_invalid_chunksize(self) -> None:
+        with self.assertRaises(ValueError):
+            list(process_imap(_identity, iter(()), chunksize=0))
+
+
+class TestEventLoopReuse(unittest.TestCase):
+    def test_async_cache_reusable_across_completed_event_loops(self) -> None:
+        calls = []
+
+        @async_ttl_cache(ttl=60)
+        async def compute(value: int) -> int:
+            calls.append(value)
+            return value * 2
+
+        self.assertEqual(asyncio.run(compute(1)), 2)
+        self.assertEqual(asyncio.run(compute(1)), 2)
+        self.assertEqual(asyncio.run(compute(2)), 4)
+        self.assertEqual(calls, [1, 2])
