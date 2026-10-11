@@ -10,6 +10,7 @@ import asyncio
 import concurrent.futures
 import os
 import pickle
+from itertools import chain, islice
 from collections.abc import AsyncIterator, Callable, Coroutine, Iterable, Iterator
 from typing import Any, TypeVar
 
@@ -341,52 +342,52 @@ def process_imap(
     R
         Mapped results.
     """
-    item_list = list(items) if not isinstance(items, list) else items
-    total = len(item_list)
     if workers is not None:
         if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
             raise ValueError("workers must be a positive integer or None")
-
     if chunksize is not None:
-        if (
-            isinstance(chunksize, bool)
-            or not isinstance(chunksize, int)
-            or chunksize < 1
-        ):
+        if isinstance(chunksize, bool) or not isinstance(chunksize, int) or chunksize < 1:
             raise ValueError("chunksize must be a positive integer or None")
+    if isinstance(threshold, bool) or not isinstance(threshold, int) or threshold < 0:
+        raise ValueError("threshold must be a non-negative integer")
 
-    if total == 0:
-        return
-    if total <= threshold or workers == 1:
-        for item in item_list:
+    iterator = iter(items)
+    if workers == 1:
+        for item in iterator:
             yield func(item)
         return
 
-    max_workers = workers
-    if max_workers is None:
-        cpu_count = os.cpu_count() or 1
-        max_workers = min(total, cpu_count)
-        if max_workers <= 1:
-            for item in item_list:
-                yield func(item)
-            return
+    # Look ahead only enough to select the serial fast path. In particular,
+    # never materialize a generator just to discover its length.
+    prefix = list(islice(iterator, threshold + 1))
+    if len(prefix) <= threshold:
+        for item in prefix:
+            yield func(item)
+        return
 
-    calc_chunksize = chunksize
-    if calc_chunksize is None:
-        calc_chunksize = max(1, total // (max_workers * 4))
+    max_workers = workers or (os.cpu_count() or 1)
+    if max_workers <= 1:
+        for item in chain(prefix, iterator):
+            yield func(item)
+        return
 
-    # A streaming iterator must not restart after yielding results.
     if fallback_serial:
         try:
             pickle.dumps(func)
         except (pickle.PickleError, AttributeError, TypeError):
-            for item in item_list:
+            for item in chain(prefix, iterator):
                 yield func(item)
             return
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=max_workers
-    ) as executor:
-        yield from executor.map(func, item_list, chunksize=calc_chunksize)
+
+    # Executor.map eagerly submits the supplied iterable in some Python
+    # versions. Feed finite windows to guarantee bounded submission on all
+    # supported interpreters, preserving ordering within and across windows.
+    batch_size = chunksize or 1
+    window_size = max_workers * batch_size * 2
+    remaining = chain(prefix, iterator)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        while batch := list(islice(remaining, window_size)):
+            yield from executor.map(func, batch, chunksize=batch_size)
 
 
 __all__ = [
