@@ -1,12 +1,24 @@
 """Concurrency regressions for content-addressed publication fallback."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import threading
 import time
 from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+
 import gunz_utils.content_store as content_store_module
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
 from gunz_utils.content_store import ContentAddressedStore
 
@@ -28,11 +40,17 @@ def test_fallback_publication_serializes_cooperating_writers(
     results = []
     errors: list[BaseException] = []
 
-    def no_hardlinks(*_args: object, **_kwargs: object) -> None:
+    def no_hardlinks(
+        *_args: object,
+        **_kwargs: object,
+    ) -> None:
         raise OSError("hard links unavailable")
 
     def controlled_replace(
-        source: Path | str, target: Path | str, *args: object, **kwargs: object
+        source: Path | str,
+        target: Path | str,
+        *args: object,
+        **kwargs: object,
     ) -> None:
         nonlocal replace_calls
         with counter_lock:

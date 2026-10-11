@@ -1,5 +1,9 @@
 """Additional deterministic testing helpers and property generators."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -21,9 +25,25 @@ class ManualClock:
     now: float = 0.0
 
     def monotonic(self) -> float:
+        """monotonic() function.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         return self.now
 
-    def advance(self, seconds: float) -> None:
+    def advance(self,
+        seconds: float,
+    ) -> None:
+        """advance() function.
+
+        Parameters
+        ----------
+        seconds : float
+            seconds parameter.
+        """
         if (
             isinstance(seconds, bool)
             or not isinstance(seconds, (int, float))
@@ -42,8 +62,7 @@ class ManualClock:
 class PropertyFailure(AssertionError):
     """Raised when a property assertion fails on generated test inputs."""
 
-    def __init__(
-        self,
+    def __init__(self,
         message: str,
         *,
         iteration: int,
@@ -62,9 +81,30 @@ class PropertyFailure(AssertionError):
 
 
 def fuzz_integers(
-    *, seed: int, count: int, minimum: int = 0, maximum: int = 2**31 - 1
+    *,
+    seed: int,
+    count: int,
+    minimum: int = 0,
+    maximum: int = 2**31 - 1,
 ) -> Iterator[int]:
-    """Yield deterministic pseudo-random integers for lightweight fuzz tests."""
+    """Yield deterministic pseudo-random integers for lightweight fuzz tests.
+
+    Parameters
+    ----------
+    seed : int
+        seed parameter.
+    count : int
+        count parameter.
+    minimum : int
+        minimum parameter.
+    maximum : int
+        maximum parameter.
+
+    Returns
+    -------
+    Iterator[int]
+        The result of the operation.
+    """
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     for name, value in (("minimum", minimum), ("maximum", maximum)):
@@ -86,7 +126,28 @@ def fuzz_floats(
     allow_nan: bool = False,
     allow_infinity: bool = False,
 ) -> Iterator[float]:
-    """Yield deterministic pseudo-random floats with optional special values."""
+    """Yield deterministic pseudo-random floats with optional special values.
+
+    Parameters
+    ----------
+    seed : int
+        seed parameter.
+    count : int
+        count parameter.
+    minimum : float
+        minimum parameter.
+    maximum : float
+        maximum parameter.
+    allow_nan : bool
+        allow_nan parameter.
+    allow_infinity : bool
+        allow_infinity parameter.
+
+    Returns
+    -------
+    Iterator[float]
+        The result of the operation.
+    """
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     for name, value in (("minimum", minimum), ("maximum", maximum)):
@@ -123,7 +184,26 @@ def fuzz_strings(
     max_length: int = 64,
     alphabet: str | None = None,
 ) -> Iterator[str]:
-    """Yield deterministic pseudo-random strings with a configurable alphabet."""
+    """Yield deterministic pseudo-random strings with a configurable alphabet.
+
+    Parameters
+    ----------
+    seed : int
+        seed parameter.
+    count : int
+        count parameter.
+    min_length : int
+        min_length parameter.
+    max_length : int
+        max_length parameter.
+    alphabet : str | None
+        alphabet parameter.
+
+    Returns
+    -------
+    Iterator[str]
+        The result of the operation.
+    """
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     for name, value in (("min_length", min_length), ("max_length", max_length)):
@@ -152,7 +232,24 @@ def fuzz_bytes(
     min_length: int = 0,
     max_length: int = 64,
 ) -> Iterator[bytes]:
-    """Yield deterministic pseudo-random byte sequences."""
+    """Yield deterministic pseudo-random byte sequences.
+
+    Parameters
+    ----------
+    seed : int
+        seed parameter.
+    count : int
+        count parameter.
+    min_length : int
+        min_length parameter.
+    max_length : int
+        max_length parameter.
+
+    Returns
+    -------
+    Iterator[bytes]
+        The result of the operation.
+    """
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     for name, value in (("min_length", min_length), ("max_length", max_length)):
@@ -172,7 +269,20 @@ def fuzz_primitives(
     seed: int,
     count: int,
 ) -> Iterator[int | float | str | bool | None]:
-    """Yield deterministic scalar primitives (int, float, str, bool, None)."""
+    """Yield deterministic scalar primitives (int, float, str, bool, None).
+
+    Parameters
+    ----------
+    seed : int
+        seed parameter.
+    count : int
+        count parameter.
+
+    Returns
+    -------
+    Iterator[int | float | str | bool | None]
+        The result of the operation.
+    """
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
 
@@ -199,6 +309,24 @@ def _generate_nested_json(
     max_depth: int,
     max_breadth: int,
 ) -> Any:
+    """_generate_nested_json() function.
+
+    Parameters
+    ----------
+    rng : random.Random
+        rng parameter.
+    current_depth : int
+        current_depth parameter.
+    max_depth : int
+        max_depth parameter.
+    max_breadth : int
+        max_breadth parameter.
+
+    Returns
+    -------
+    Any
+        The result of the operation.
+    """
     if current_depth >= max_depth:
         choice = rng.randint(0, 4)
         if choice == 0:
@@ -213,7 +341,7 @@ def _generate_nested_json(
 
     node_type = rng.randint(0, 2)
     if node_type == 0:
-        # dict
+        #? dict
         size = rng.randint(0, max_breadth)
         result_dict: dict[str, Any] = {}
         for _ in range(size):
@@ -226,7 +354,7 @@ def _generate_nested_json(
             )
         return result_dict
     if node_type == 1:
-        # list
+        #? list
         size = rng.randint(0, max_breadth)
         return [
             _generate_nested_json(
@@ -237,7 +365,7 @@ def _generate_nested_json(
             )
             for _ in range(size)
         ]
-    # scalar
+    #? scalar
     return _generate_nested_json(
         rng,
         current_depth=max_depth,
@@ -253,7 +381,24 @@ def fuzz_json_objects(
     max_depth: int = 3,
     max_breadth: int = 4,
 ) -> Iterator[dict[str, Any] | list[Any]]:
-    """Yield deterministic nested JSON structures (dicts and lists)."""
+    """Yield deterministic nested JSON structures (dicts and lists).
+
+    Parameters
+    ----------
+    seed : int
+        seed parameter.
+    count : int
+        count parameter.
+    max_depth : int
+        max_depth parameter.
+    max_breadth : int
+        max_breadth parameter.
+
+    Returns
+    -------
+    Iterator[dict[str, Any] | list[Any]]
+        The result of the operation.
+    """
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     if (

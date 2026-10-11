@@ -1,17 +1,31 @@
 """Tests for shell-free rsync mirroring."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.subprocess import CommandError, CommandResult
 from gunz_utils.sync import _advisory_lock, _normalize_rsync_source, rsync_mirror
 
 
-def _result(args: list[str]) -> CommandResult:
+def _result(
+    args: list[str],
+) -> CommandResult:
     return CommandResult(
         args=tuple(args),
         returncode=0,
@@ -34,15 +48,17 @@ def test_rsync_mirror_holds_lock_through_transfer_and_marker(
         def __enter__(self) -> None:
             events.append("lock-enter")
 
-        def __exit__(
-            self,
+        def __exit__(self,
             _exc_type: object,
             _exc: object,
             _traceback: object,
         ) -> None:
             events.append("lock-exit")
 
-    def fake_run(args: list[str], **_kwargs: object) -> CommandResult:
+    def fake_run(
+        args: list[str],
+        **_kwargs: object,
+    ) -> CommandResult:
         events.append("rsync")
         captured.append(list(args))
         return _result(list(args))
@@ -79,10 +95,15 @@ def test_rsync_mirror_holds_lock_through_transfer_and_marker(
     ]
 
 
-def test_rsync_mirror_preserves_remote_source_syntax(tmp_path: Path) -> None:
+def test_rsync_mirror_preserves_remote_source_syntax(
+    tmp_path: Path,
+) -> None:
     captured: list[list[str]] = []
 
-    def fake_run(args: list[str], **_kwargs: object) -> CommandResult:
+    def fake_run(
+        args: list[str],
+        **_kwargs: object,
+    ) -> CommandResult:
         captured.append(list(args))
         return _result(list(args))
 
@@ -102,7 +123,9 @@ def test_rsync_mirror_preserves_remote_source_syntax(tmp_path: Path) -> None:
     assert captured[0][-2] == "host:/data/input/"
 
 
-def test_rsync_mirror_removes_marker_on_failure(tmp_path: Path) -> None:
+def test_rsync_mirror_removes_marker_on_failure(
+    tmp_path: Path,
+) -> None:
     target = tmp_path / "target"
     target.mkdir()
     marker = target / ".gunz-sync-complete"
@@ -133,10 +156,15 @@ def test_rsync_mirror_removes_marker_on_failure(tmp_path: Path) -> None:
     assert not marker.exists()
 
 
-def test_rsync_mirror_delete_is_opt_in(tmp_path: Path) -> None:
+def test_rsync_mirror_delete_is_opt_in(
+    tmp_path: Path,
+) -> None:
     captured: list[list[str]] = []
 
-    def fake_run(args: list[str], **_kwargs: object) -> CommandResult:
+    def fake_run(
+        args: list[str],
+        **_kwargs: object,
+    ) -> CommandResult:
         captured.append(list(args))
         return _result(list(args))
 
@@ -161,7 +189,9 @@ def test_rsync_mirror_delete_is_opt_in(tmp_path: Path) -> None:
     assert "--delete" in captured[1]
 
 
-def test_rsync_mirror_validates_tools_and_marker(tmp_path: Path) -> None:
+def test_rsync_mirror_validates_tools_and_marker(
+    tmp_path: Path,
+) -> None:
     with patch("gunz_utils.sync.shutil.which", return_value=None):
         with pytest.raises(FileNotFoundError, match="rsync"):
             rsync_mirror(
@@ -251,7 +281,10 @@ def test_normalize_rsync_source_keeps_shell_remote_distinct() -> None:
 def test_rsync_mirror_lock_false_does_not_require_advisory_lock(
     tmp_path: Path,
 ) -> None:
-    def fake_run(args: list[str], **_kwargs: object) -> CommandResult:
+    def fake_run(
+        args: list[str],
+        **_kwargs: object,
+    ) -> CommandResult:
         return _result(list(args))
 
     with (
@@ -270,7 +303,9 @@ def test_rsync_mirror_lock_false_does_not_require_advisory_lock(
 
 
 
-def test_normalize_explicit_path_with_colon_is_local(tmp_path: Path) -> None:
+def test_normalize_explicit_path_with_colon_is_local(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "local:name"
 
     normalized = _normalize_rsync_source(source)
@@ -289,7 +324,9 @@ def test_rsync_mirror_rejects_empty_target() -> None:
 
 
 
-def test_advisory_lock_rejects_symlink_path(tmp_path: Path) -> None:
+def test_advisory_lock_rejects_symlink_path(
+    tmp_path: Path,
+) -> None:
     target = tmp_path / "real-lock"
     target.write_text("", encoding="utf-8")
     link = tmp_path / "lock-link"

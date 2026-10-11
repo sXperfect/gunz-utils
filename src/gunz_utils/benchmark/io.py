@@ -1,5 +1,9 @@
 """JSON persistence and git provenance for benchmark artifacts."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import json
@@ -7,6 +11,9 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ..subprocess import (
     CommandError,
     CommandOutputLimitError,
@@ -25,9 +32,36 @@ class GitInfo:
     dirty: bool | None
 
 
-def capture_git_info(cwd: str | None = None) -> GitInfo:
-    """Capture git revision metadata without requiring GitPython."""
-    def run(*args: str) -> str | None:
+def capture_git_info(
+    cwd: str | None = None,
+) -> GitInfo:
+    """Capture git revision metadata without requiring GitPython.
+
+    Parameters
+    ----------
+    cwd : str | None
+        cwd parameter.
+
+    Returns
+    -------
+    GitInfo
+        The result of the operation.
+    """
+    def run(
+        *args: str,
+    ) -> str | None:
+        """run() function.
+
+        Parameters
+        ----------
+        args : str
+            args parameter.
+
+        Returns
+        -------
+        str | None
+            The result of the operation.
+        """
         try:
             result = run_command(
                 ["git", *args],
@@ -55,8 +89,19 @@ def capture_git_info(cwd: str | None = None) -> GitInfo:
     )
 
 
-def save_result(result: BenchmarkResult, path: str | Path) -> None:
-    """Persist a benchmark result as stable indented JSON."""
+def save_result(
+    result: BenchmarkResult,
+    path: str | Path,
+) -> None:
+    """Persist a benchmark result as stable indented JSON.
+
+    Parameters
+    ----------
+    result : BenchmarkResult
+        result parameter.
+    path : str | Path
+        path parameter.
+    """
     Path(path).write_text(
         json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -68,7 +113,20 @@ def load_result(
     *,
     max_bytes: int = DEFAULT_MAX_RESULT_BYTES,
 ) -> BenchmarkResult:
-    """Load and validate a benchmark result within a bounded input size."""
+    """Load and validate a benchmark result within a bounded input size.
+
+    Parameters
+    ----------
+    path : str | Path
+        path parameter.
+    max_bytes : int
+        max_bytes parameter.
+
+    Returns
+    -------
+    BenchmarkResult
+        The result of the operation.
+    """
     return load_result_checked(path, max_bytes=max_bytes)
 
 

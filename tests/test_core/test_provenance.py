@@ -1,11 +1,23 @@
 """Tests for generic execution provenance manifests."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.benchmark.io import GitInfo
 from gunz_utils.provenance import (
@@ -34,7 +46,9 @@ def test_capture_manifest_uses_explicit_environment_allowlist(
     assert "SECRET_TOKEN" not in manifest.runtime.environment
 
 
-def test_capture_manifest_copies_config_and_inputs(tmp_path: Path) -> None:
+def test_capture_manifest_copies_config_and_inputs(
+    tmp_path: Path,
+) -> None:
     config = {"nested": {"value": 1}}
     inputs = {"dataset": "abc"}
 
@@ -51,7 +65,9 @@ def test_capture_manifest_copies_config_and_inputs(tmp_path: Path) -> None:
     assert manifest.inputs["dataset"] == "abc"
 
 
-def test_capture_manifest_validates_attempt_and_run_id(tmp_path: Path) -> None:
+def test_capture_manifest_validates_attempt_and_run_id(
+    tmp_path: Path,
+) -> None:
     with pytest.raises(ValueError, match="attempt"):
         capture_execution_manifest(
             project_root=tmp_path,
@@ -107,7 +123,9 @@ def test_capture_manifest_normalizes_identifiers_and_rejects_bool_attempt(
         )
 
 
-def test_capture_manifest_rejects_empty_parent_run_id(tmp_path: Path) -> None:
+def test_capture_manifest_rejects_empty_parent_run_id(
+    tmp_path: Path,
+) -> None:
     with pytest.raises(ValueError, match="parent_run_id"):
         capture_execution_manifest(
             project_root=tmp_path,
@@ -116,7 +134,9 @@ def test_capture_manifest_rejects_empty_parent_run_id(tmp_path: Path) -> None:
 
 
 
-def test_execution_manifest_is_deeply_immutable(tmp_path: Path) -> None:
+def test_execution_manifest_is_deeply_immutable(
+    tmp_path: Path,
+) -> None:
     manifest = capture_execution_manifest(
         project_root=tmp_path,
         config={"nested": {"value": 1}},

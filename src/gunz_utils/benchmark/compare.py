@@ -1,10 +1,17 @@
 """Benchmark regression comparison."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .result import BenchmarkResult
 
 
@@ -18,7 +25,24 @@ class BenchmarkComparison:
     regressed: bool
 
 
-def _finite_non_negative(name: str, value: float) -> float:
+def _finite_non_negative(
+    name: str,
+    value: float,
+) -> float:
+    """_finite_non_negative() function.
+
+    Parameters
+    ----------
+    name : str
+        name parameter.
+    value : float
+        value parameter.
+
+    Returns
+    -------
+    float
+        The result of the operation.
+    """
     if (
         isinstance(value, bool)
         or not isinstance(value, (int, float))
@@ -31,7 +55,24 @@ def _finite_non_negative(name: str, value: float) -> float:
     return float(value)
 
 
-def _change(before: float, after: float) -> float:
+def _change(
+    before: float,
+    after: float,
+) -> float:
+    """_change() function.
+
+    Parameters
+    ----------
+    before : float
+        before parameter.
+    after : float
+        after parameter.
+
+    Returns
+    -------
+    float
+        The result of the operation.
+    """
     if before == 0:
         return 0.0 if after == 0 else float("inf")
     return (after - before) / before
@@ -44,7 +85,24 @@ def compare_results(
     median_threshold: float = 0.05,
     p95_threshold: float = 0.10,
 ) -> BenchmarkComparison:
-    """Compare timing results against configurable relative regression limits."""
+    """Compare timing results against configurable relative regression limits.
+
+    Parameters
+    ----------
+    baseline : BenchmarkResult
+        baseline parameter.
+    candidate : BenchmarkResult
+        candidate parameter.
+    median_threshold : float
+        median_threshold parameter.
+    p95_threshold : float
+        p95_threshold parameter.
+
+    Returns
+    -------
+    BenchmarkComparison
+        The result of the operation.
+    """
     median_threshold = _finite_non_negative(
         "median_threshold",
         median_threshold,

@@ -1,5 +1,9 @@
 """Async token-bucket rate limiting."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +14,11 @@ import time
 class AsyncRateLimiter:
     """Token-bucket limiter with bounded burst capacity."""
 
-    def __init__(self, rate: float, *, capacity: float | None = None) -> None:
+    def __init__(self,
+        rate: float,
+        *,
+        capacity: float | None = None,
+    ) -> None:
         self.rate = self._finite_positive(rate, name="rate")
         raw_capacity = max(1.0, self.rate) if capacity is None else capacity
         self.capacity = self._finite_positive(raw_capacity, name="capacity")
@@ -20,12 +28,31 @@ class AsyncRateLimiter:
 
     @property
     def available_tokens(self) -> float:
-        """Return the estimated token balance without waiting."""
+        """Return the estimated token balance without waiting.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         elapsed = time.monotonic() - self._updated
         return min(self.capacity, self._tokens + elapsed * self.rate)
 
-    async def try_acquire(self, tokens: float = 1.0) -> bool:
-        """Consume tokens immediately when available without waiting."""
+    async def try_acquire(self,
+        tokens: float = 1.0,
+    ) -> bool:
+        """Consume tokens immediately when available without waiting.
+
+        Parameters
+        ----------
+        tokens : float
+            tokens parameter.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         tokens = self._validate_tokens(tokens)
         async with self._lock:
             self._refill()
@@ -34,13 +61,20 @@ class AsyncRateLimiter:
             self._tokens -= tokens
             return True
 
-    async def acquire(
-        self,
+    async def acquire(self,
         tokens: float = 1.0,
         *,
         timeout: float | None = None,
     ) -> None:
-        """Wait until tokens are available or the optional timeout expires."""
+        """Wait until tokens are available or the optional timeout expires.
+
+        Parameters
+        ----------
+        tokens : float
+            tokens parameter.
+        timeout : float | None
+            timeout parameter.
+        """
         tokens = self._validate_tokens(tokens)
         if timeout is not None and (
             isinstance(timeout, bool)
@@ -71,7 +105,25 @@ class AsyncRateLimiter:
             await asyncio.sleep(wait)
 
     @staticmethod
-    def _finite_positive(value: float, *, name: str) -> float:
+    def _finite_positive(
+        value: float,
+        *,
+        name: str,
+    ) -> float:
+        """_finite_positive() function.
+
+        Parameters
+        ----------
+        value : float
+            value parameter.
+        name : str
+            name parameter.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         if (
             isinstance(value, bool)
             or not isinstance(value, (int, float))
@@ -80,14 +132,32 @@ class AsyncRateLimiter:
             raise ValueError(f"{name} must be a finite positive number")
         return float(value)
 
-    def _validate_tokens(self, tokens: float) -> float:
+    def _validate_tokens(self,
+        tokens: float,
+    ) -> float:
+        """_validate_tokens() function.
+
+        Parameters
+        ----------
+        tokens : float
+            tokens parameter.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         value = self._finite_positive(tokens, name="tokens")
-        # Check the original value before rounding a large integer to float.
+        #? Check the original value before rounding a large integer to float.
         if tokens > self.capacity:
             raise ValueError("tokens must be positive and <= capacity")
         return value
 
     def _refill(self) -> None:
+        """_refill() function.
+
+        No parameters and no return value.
+        """
         now = time.monotonic()
         elapsed = now - self._updated
         self._tokens = min(self.capacity, self._tokens + elapsed * self.rate)
@@ -97,7 +167,9 @@ class AsyncRateLimiter:
         await self.acquire()
         return self
 
-    async def __aexit__(self, *args: object) -> None:
+    async def __aexit__(self,
+        *args: object,
+    ) -> None:
         return None
 
 

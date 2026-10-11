@@ -137,3 +137,7 @@ ignore_missing_imports = true
 # Optional third-party backend adapters naturally receive Any from external libraries.
 module = "gunz_utils.ext.*"
 warn_return_any = false
+
+[tool.gunz-style]
+ignore = ["docs", "GS059"]
+per-path-ignores = { "tests/**" = ["GS010", "GS046"] }

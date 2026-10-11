@@ -1,5 +1,9 @@
 """Small testing helpers with no test-framework dependency."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -14,7 +18,18 @@ from contextlib import contextmanager
 def temporary_env(
     values: Mapping[str, str | None],
 ) -> Iterator[None]:
-    """Temporarily set or remove environment variables and restore them."""
+    """Temporarily set or remove environment variables and restore them.
+
+    Parameters
+    ----------
+    values : Mapping[str, str | None]
+        values parameter.
+
+    Returns
+    -------
+    Iterator[None]
+        The result of the operation.
+    """
     previous = {key: os.environ.get(key) for key in values}
     try:
         for key, value in values.items():
@@ -37,7 +52,17 @@ def eventually(
     timeout: float = 1.0,
     interval: float = 0.01,
 ) -> None:
-    """Wait until a predicate succeeds or raise TimeoutError."""
+    """Wait until a predicate succeeds or raise TimeoutError.
+
+    Parameters
+    ----------
+    predicate : Callable[[], bool]
+        predicate parameter.
+    timeout : float
+        timeout parameter.
+    interval : float
+        interval parameter.
+    """
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))

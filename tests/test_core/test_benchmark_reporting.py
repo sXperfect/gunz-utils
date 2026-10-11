@@ -1,8 +1,16 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import tempfile
 import unittest
 from pathlib import Path
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.benchmark import (
     BenchmarkSuite,

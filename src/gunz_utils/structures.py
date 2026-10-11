@@ -1,6 +1,10 @@
 """Reusable bounded data structures and stream algorithms."""
 from __future__ import annotations
 
+__author__ = "Yeremia Gunawan Adhisantoso"
+__email__ = "yeremiag@gmail.com"
+__license__ = "Clear BSD"
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
@@ -438,7 +442,7 @@ def freeze_structure(
     active: set[int] = set()
 
     def freeze(
-            item: t.Any,
+        item: t.Any,
     ) -> t.Any:
         """Freeze one value, rejecting cycles in supported containers.
 

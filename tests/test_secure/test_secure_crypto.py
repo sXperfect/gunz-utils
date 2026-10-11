@@ -1,10 +1,18 @@
 """Security regression tests for AES-GCM helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import unittest
 import warnings
 from unittest.mock import patch
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.deprecation import GunzDeprecationWarning
 from gunz_utils.ext.secure_crypto import (

@@ -1,5 +1,9 @@
 """Stable manifests for disjoint named partitions."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping
@@ -7,6 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .hashing import structured_hash
 from .io import atomic_write
 from .serialization import json_dumps
@@ -54,7 +61,10 @@ class PartitionManifest:
         self.validate()
 
     def validate(self) -> None:
-        """Validate names, duplicates within partitions, and cross-partition overlap."""
+        """Validate names, duplicates within partitions, and cross-partition overlap.
+
+        No parameters and no return value.
+        """
         if not self.partitions:
             raise ValueError("partitions must not be empty")
 
@@ -76,7 +86,13 @@ class PartitionManifest:
 
     @property
     def fingerprint(self) -> str:
-        """Return a deterministic fingerprint of partition assignments."""
+        """Return a deterministic fingerprint of partition assignments.
+
+        Returns
+        -------
+        str
+            The result of the operation.
+        """
         self.validate()
         normalized = {
             name: list(identifiers)
@@ -84,13 +100,25 @@ class PartitionManifest:
         }
         return structured_hash(normalized)
 
-    def write(
-        self,
+    def write(self,
         path: str | Path,
         *,
         durable: bool = False,
     ) -> Path:
-        """Atomically persist partitions and their fingerprint as JSON."""
+        """Atomically persist partitions and their fingerprint as JSON.
+
+        Parameters
+        ----------
+        path : str | Path
+            path parameter.
+        durable : bool
+            durable parameter.
+
+        Returns
+        -------
+        Path
+            The result of the operation.
+        """
         self.validate()
         target = Path(path)
         payload = {
@@ -164,7 +192,13 @@ def partition_overlaps(
 def assert_disjoint_partitions(
     partitions: Mapping[str, Iterable[Hashable]],
 ) -> None:
-    """Require named partitions to have no shared identifiers."""
+    """Require named partitions to have no shared identifiers.
+
+    Parameters
+    ----------
+    partitions : Mapping[str, Iterable[Hashable]]
+        partitions parameter.
+    """
     overlaps = partition_overlaps(partitions)
     if overlaps:
         pairs = ", ".join(

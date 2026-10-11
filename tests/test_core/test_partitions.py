@@ -1,11 +1,23 @@
 """Tests for stable disjoint partition manifests."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.partitions import (
     PartitionManifest,
@@ -84,7 +96,9 @@ def test_partition_manifest_rejects_empty_or_invalid_identifiers() -> None:
         ).validate()
 
 
-def test_partition_manifest_write_is_stable_json(tmp_path: Path) -> None:
+def test_partition_manifest_write_is_stable_json(
+    tmp_path: Path,
+) -> None:
     manifest = PartitionManifest(
         {
             "b": ("2",),

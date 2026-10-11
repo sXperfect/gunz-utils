@@ -1,8 +1,16 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
 import math
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.resilience import (
     AsyncBulkhead,
@@ -56,7 +64,9 @@ class TestCircuitBreaker(unittest.IsolatedAsyncioTestCase):
     async def test_half_open_probe_failure_predicate_exception_releases_flag(
         self,
     ) -> None:
-        def predicate(exc: BaseException) -> bool:
+        def predicate(
+            exc: BaseException,
+        ) -> bool:
             if isinstance(exc, ValueError):
                 return True
             raise RuntimeError("predicate raised unexpected error")

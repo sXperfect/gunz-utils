@@ -1,11 +1,23 @@
 """Context-aware retry-delay override tests."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
 from unittest.mock import patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.retry import (
     RetryPolicy,
@@ -17,7 +29,9 @@ from gunz_utils.retry import (
 class RetryAfterError(RuntimeError):
     """Test exception carrying an exact retry delay."""
 
-    def __init__(self, retry_after: float) -> None:
+    def __init__(self,
+        retry_after: float,
+    ) -> None:
         super().__init__("rate limited")
         self.retry_after = retry_after
 
@@ -128,7 +142,9 @@ def test_async_retry_policy_passes_exception_context_to_delay_override() -> None
                 raise RetryAfterError(3.5)
             return "ok"
 
-        async def fake_sleep(delay: float) -> None:
+        async def fake_sleep(
+            delay: float,
+        ) -> None:
             sleeps.append(delay)
 
         policy: RetryPolicy[str] = RetryPolicy(

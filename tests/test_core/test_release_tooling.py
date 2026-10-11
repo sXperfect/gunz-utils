@@ -1,10 +1,18 @@
 """Tests for the repository-local release tooling."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import importlib.util
 import sys
 from pathlib import Path
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 
 import pytest
 
@@ -27,7 +35,9 @@ def _load_release_module():
 release = _load_release_module()
 
 
-def _fixture_repo(tmp_path: Path):
+def _fixture_repo(
+    tmp_path: Path,
+):
     (tmp_path / "changes").mkdir()
     (tmp_path / "src" / "gunz_utils").mkdir(parents=True)
     (tmp_path / "docs" / "source").mkdir(parents=True)
@@ -83,7 +93,9 @@ def test_semver_is_strict() -> None:
             release.SemVer.parse(invalid)
 
 
-def test_required_bump_uses_strongest_fragment(tmp_path: Path) -> None:
+def test_required_bump_uses_strongest_fragment(
+    tmp_path: Path,
+) -> None:
     repo = _fixture_repo(tmp_path)
     (tmp_path / "changes" / "a.fixed.md").write_text("Fix a bug.", encoding="utf-8")
     (tmp_path / "changes" / "b.added.md").write_text("Add an API.", encoding="utf-8")
@@ -97,7 +109,9 @@ def test_required_bump_uses_strongest_fragment(tmp_path: Path) -> None:
     )
 
 
-def test_duplicate_fragment_ids_are_rejected(tmp_path: Path) -> None:
+def test_duplicate_fragment_ids_are_rejected(
+    tmp_path: Path,
+) -> None:
     repo = _fixture_repo(tmp_path)
     (tmp_path / "changes" / "same.added.md").write_text("Add.", encoding="utf-8")
     (tmp_path / "changes" / "same.fixed.md").write_text("Fix.", encoding="utf-8")
@@ -130,7 +144,9 @@ def test_prepare_enforces_breaking_major_and_preserves_toml(
     assert repo.verify() == 0
 
 
-def test_check_rejects_module_version_literals(tmp_path: Path) -> None:
+def test_check_rejects_module_version_literals(
+    tmp_path: Path,
+) -> None:
     repo = _fixture_repo(tmp_path)
     module = tmp_path / "src" / "gunz_utils" / "example.py"
     module.write_text('__version__ = "9.9.9"\n', encoding="utf-8")
@@ -143,7 +159,9 @@ def test_check_rejects_module_version_literals(tmp_path: Path) -> None:
     )
 
 
-def test_prepare_auto_resolves_minimum_valid_target(tmp_path: Path) -> None:
+def test_prepare_auto_resolves_minimum_valid_target(
+    tmp_path: Path,
+) -> None:
     repo = _fixture_repo(tmp_path)
     fragment = tmp_path / "changes" / "feature.added.md"
     fragment.write_text("Add new feature.", encoding="utf-8")
@@ -157,7 +175,8 @@ def test_prepare_auto_resolves_minimum_valid_target(tmp_path: Path) -> None:
 
 
 def test_prepare_dry_run_does_not_modify_files_or_unlink_fragments(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     repo = _fixture_repo(tmp_path)
     fragment = tmp_path / "changes" / "fix.fixed.md"
@@ -179,7 +198,8 @@ def test_prepare_dry_run_does_not_modify_files_or_unlink_fragments(
 
 
 def test_notes_extracts_specified_and_current_version(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     repo = _fixture_repo(tmp_path)
     assert repo.notes("1.10.0") == 0
@@ -192,7 +212,8 @@ def test_notes_extracts_specified_and_current_version(
 
 
 def test_unreleased_renders_pending_fragments(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     repo = _fixture_repo(tmp_path)
     (tmp_path / "changes" / "f1.fixed.md").write_text("Fix crash.", encoding="utf-8")
@@ -202,7 +223,9 @@ def test_unreleased_renders_pending_fragments(
     assert "- Fix crash." in captured.out
 
 
-def test_new_fragment_creates_properly_formatted_file(tmp_path: Path) -> None:
+def test_new_fragment_creates_properly_formatted_file(
+    tmp_path: Path,
+) -> None:
     repo = _fixture_repo(tmp_path)
     status = repo.new_fragment(
         category="security",
@@ -215,7 +238,9 @@ def test_new_fragment_creates_properly_formatted_file(tmp_path: Path) -> None:
     assert created.read_text(encoding="utf-8") == "- Harden input validation\n"
 
 
-def test_check_rejects_unresolved_conflict_markers(tmp_path: Path) -> None:
+def test_check_rejects_unresolved_conflict_markers(
+    tmp_path: Path,
+) -> None:
     repo = _fixture_repo(tmp_path)
     fragment = tmp_path / "changes" / "conflict.fixed.md"
     fragment.write_text(

@@ -1,8 +1,16 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
 import math
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.context import correlation_id, ensure_correlation_id, operation_context
 from gunz_utils.rate_limit import AsyncRateLimiter

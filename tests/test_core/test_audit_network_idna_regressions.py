@@ -1,10 +1,22 @@
 """Normalized hostnames must preserve URI component boundaries."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from urllib.parse import urlsplit
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.network import build_network_uri
 
@@ -12,7 +24,9 @@ from gunz_utils.network import build_network_uri
 @pytest.mark.parametrize(
     "separator", ["＠", "／", "：", "？", "＃", "％", "［", "］", "＼"]
 )
-def test_idna_cannot_manufacture_authority_delimiters(separator: str) -> None:
+def test_idna_cannot_manufacture_authority_delimiters(
+    separator: str,
+) -> None:
     with pytest.raises(ValueError, match="host"):
         build_network_uri("https", f"example{separator}evil.test")
 
@@ -27,7 +41,8 @@ def test_idna_cannot_manufacture_authority_delimiters(separator: str) -> None:
     ],
 )
 def test_valid_host_components_survive_uri_composition(
-    host: str, expected: str
+    host: str,
+    expected: str,
 ) -> None:
     parsed = urlsplit(
         build_network_uri(

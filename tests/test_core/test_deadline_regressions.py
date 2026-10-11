@@ -1,5 +1,9 @@
 """Deterministic retry budgets and token-bucket numerical boundaries."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -11,7 +15,15 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from unittest.mock import patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.rate_limit import AsyncRateLimiter
 from gunz_utils.retry import RetryEvent, RetryPolicy
@@ -38,17 +50,23 @@ class _Clock:
     def monotonic(self) -> float:
         return self.now
 
-    def sleep(self, delay: float) -> None:
+    def sleep(self,
+        delay: float,
+    ) -> None:
         self.sleeps.append(delay)
         self.now += delay + self.oversleep
 
-    async def async_sleep(self, delay: float) -> None:
+    async def async_sleep(self,
+        delay: float,
+    ) -> None:
         self.sleep(delay)
 
 
 @contextmanager
-def _retry_clock(clock: _Clock) -> Iterator[None]:
-    # Replace module references, preserving the event loop's real clock/sleep.
+def _retry_clock(
+    clock: _Clock,
+) -> Iterator[None]:
+    #? Replace module references, preserving the event loop's real clock/sleep.
     with (
         patch.object(
             retry_module,
@@ -88,7 +106,11 @@ def _exercise_retry(
 
     def execute() -> str:
         if variant.startswith("decorator"):
-            def hook(error: BaseException, attempt: int, delay: float) -> None:
+            def hook(
+                error: BaseException,
+                attempt: int,
+                delay: float,
+            ) -> None:
                 if on_retry is not None:
                     on_retry(RetryEvent(attempt=attempt, delay=delay, error=error))
 
@@ -131,12 +153,15 @@ def _exercise_retry(
 @pytest.mark.parametrize("variant", RETRY_VARIANTS)
 @pytest.mark.parametrize("hook_duration", [0.75, 1.5, 2.0])
 def test_retry_hook_cannot_sleep_beyond_remaining_budget(
-    variant: str, hook_duration: float
+    variant: str,
+    hook_duration: float,
 ) -> None:
     clock = _Clock()
     events: list[RetryEvent[str]] = []
 
-    def hook(event: RetryEvent[str]) -> None:
+    def hook(
+        event: RetryEvent[str],
+    ) -> None:
         events.append(event)
         clock.now += hook_duration
 
@@ -159,10 +184,14 @@ def test_retry_hook_cannot_sleep_beyond_remaining_budget(
 
 
 @pytest.mark.parametrize("variant", RETRY_VARIANTS)
-def test_retry_hook_with_enough_budget_still_retries(variant: str) -> None:
+def test_retry_hook_with_enough_budget_still_retries(
+    variant: str,
+) -> None:
     clock = _Clock()
 
-    def hook(event: RetryEvent[str]) -> None:
+    def hook(
+        event: RetryEvent[str],
+    ) -> None:
         clock.now += 0.25
 
     calls = _exercise_retry(
@@ -184,7 +213,8 @@ def test_retry_hook_with_enough_budget_still_retries(variant: str) -> None:
 @pytest.mark.parametrize("variant", RETRY_VARIANTS)
 @pytest.mark.parametrize("oversleep", [0.0, 0.5])
 def test_retry_does_not_start_at_or_after_deadline(
-    variant: str, oversleep: float
+    variant: str,
+    oversleep: float,
 ) -> None:
     clock = _Clock(oversleep=oversleep)
     calls = _exercise_retry(
@@ -203,7 +233,9 @@ def test_retry_does_not_start_at_or_after_deadline(
 
 
 @pytest.mark.parametrize("variant", RETRY_VARIANTS)
-def test_retry_zero_timeout_preserves_first_attempt(variant: str) -> None:
+def test_retry_zero_timeout_preserves_first_attempt(
+    variant: str,
+) -> None:
     clock = _Clock()
     calls = _exercise_retry(
         variant,
@@ -220,10 +252,14 @@ def test_retry_zero_timeout_preserves_first_attempt(variant: str) -> None:
 
 
 @pytest.mark.parametrize("variant", RETRY_VARIANTS)
-def test_retry_predicate_time_counts_against_budget(variant: str) -> None:
+def test_retry_predicate_time_counts_against_budget(
+    variant: str,
+) -> None:
     clock = _Clock()
 
-    def predicate(value: object) -> bool:
+    def predicate(
+        value: object,
+    ) -> bool:
         clock.now += 2.0
         return True
 
@@ -244,11 +280,15 @@ def test_retry_predicate_time_counts_against_budget(variant: str) -> None:
 
 
 @pytest.mark.parametrize("variant", RETRY_VARIANTS[2:])
-def test_retry_delay_override_time_counts_against_budget(variant: str) -> None:
+def test_retry_delay_override_time_counts_against_budget(
+    variant: str,
+) -> None:
     clock = _Clock()
 
     def override(
-        attempt: int, result: str | None, error: BaseException | None
+        attempt: int,
+        result: str | None,
+        error: BaseException | None,
     ) -> float:
         clock.now += 2.0
         return 0.5
@@ -302,7 +342,9 @@ def test_async_retry_preserves_cancellation_with_broad_exception_policy(
     "factory", [RetryPolicy, retry_module.retry, retry_module.async_retry]
 )
 def test_retry_rejects_unrepresentable_timing_as_value_error(
-    value: int, name: str, factory: Callable[..., object]
+    value: int,
+    name: str,
+    factory: Callable[..., object],
 ) -> None:
     with pytest.raises(ValueError, match=name):
         factory(**{name: value})
@@ -319,7 +361,9 @@ def test_retry_rejects_unrepresentable_delay_override_as_value_error(
 
 @contextmanager
 def _stationary_limiter_clock() -> Iterator[None]:
-    async def unexpected_sleep(delay: float) -> None:
+    async def unexpected_sleep(
+        delay: float,
+    ) -> None:
         pytest.fail(f"immediate acquisition unexpectedly requested sleep({delay})")
 
     with (
@@ -344,7 +388,7 @@ def test_rate_limiter_rejects_integer_above_capacity_before_rounding(
             capacity = 2**53
             limiter = AsyncRateLimiter(1, capacity=capacity)
             request = capacity + 1
-            # An exact integer oracle: the request exceeds a full bucket.
+            #? An exact integer oracle: the request exceeds a full bucket.
             assert request > capacity
             assert float(request) == float(capacity)
             with pytest.raises(ValueError, match="capacity"):
@@ -367,7 +411,7 @@ def test_rate_limiter_normalizes_accepted_integer_request_arithmetic(
             capacity = request + 1
             limiter = AsyncRateLimiter(1, capacity=capacity)
             await limiter.acquire(1)
-            # These two integer requests exactly consume the initial capacity.
+            #? These two integer requests exactly consume the initial capacity.
             outcome = await getattr(limiter, method)(request)
             assert outcome is (True if method == "try_acquire" else None)
             assert limiter.available_tokens == 0.0
@@ -378,7 +422,8 @@ def test_rate_limiter_normalizes_accepted_integer_request_arithmetic(
 @pytest.mark.parametrize("value", [10**400, -(10**400)])
 @pytest.mark.parametrize("name", ["rate", "capacity"])
 def test_rate_limiter_rejects_unrepresentable_constructor_values(
-    value: int, name: str
+    value: int,
+    name: str,
 ) -> None:
     with pytest.raises(ValueError, match=name):
         if name == "rate":
@@ -390,7 +435,8 @@ def test_rate_limiter_rejects_unrepresentable_constructor_values(
 @pytest.mark.parametrize("value", [10**400, -(10**400)])
 @pytest.mark.parametrize("method", ["try_acquire", "acquire"])
 def test_rate_limiter_rejects_unrepresentable_requests_atomically(
-    value: int, method: str
+    value: int,
+    method: str,
 ) -> None:
     async def scenario() -> None:
         with _stationary_limiter_clock():
@@ -403,7 +449,9 @@ def test_rate_limiter_rejects_unrepresentable_requests_atomically(
 
 
 @pytest.mark.parametrize("value", [10**400, -(10**400)])
-def test_rate_limiter_rejects_unrepresentable_timeout_atomically(value: int) -> None:
+def test_rate_limiter_rejects_unrepresentable_timeout_atomically(
+    value: int,
+) -> None:
     async def scenario() -> None:
         with _stationary_limiter_clock():
             limiter = AsyncRateLimiter(1)

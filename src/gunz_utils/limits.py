@@ -1,5 +1,9 @@
 """Reusable resource limits and consumable budgets for defensive processing."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -40,19 +44,46 @@ class Limits:
         ):
             raise ValueError("timeout must be a finite non-negative number or None")
 
-    def check_bytes(self, size: int) -> None:
+    def check_bytes(self,
+        size: int,
+    ) -> None:
+        """check_bytes() function.
+
+        Parameters
+        ----------
+        size : int
+            size parameter.
+        """
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
             raise ValueError("size must be a non-negative integer")
         if self.max_bytes is not None and size > self.max_bytes:
             raise ValueError("byte limit exceeded")
 
-    def check_items(self, count: int) -> None:
+    def check_items(self,
+        count: int,
+    ) -> None:
+        """check_items() function.
+
+        Parameters
+        ----------
+        count : int
+            count parameter.
+        """
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise ValueError("count must be a non-negative integer")
         if self.max_items is not None and count > self.max_items:
             raise ValueError("item limit exceeded")
 
-    def check_steps(self, count: int) -> None:
+    def check_steps(self,
+        count: int,
+    ) -> None:
+        """check_steps() function.
+
+        Parameters
+        ----------
+        count : int
+            count parameter.
+        """
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise ValueError("count must be a non-negative integer")
         if self.max_steps is not None and count > self.max_steps:
@@ -75,8 +106,7 @@ class ResourceBudget:
         "_deadline",
     )
 
-    def __init__(
-        self,
+    def __init__(self,
         *,
         max_bytes: int | None = None,
         max_items: int | None = None,
@@ -107,13 +137,25 @@ class ResourceBudget:
             self._deadline = deadline
 
     @classmethod
-    def from_limits(
-        cls,
+    def from_limits(cls,
         limits: Limits,
         *,
         clock: Callable[[], float] = time.monotonic,
     ) -> ResourceBudget:
-        """Create a fresh consumable budget from stateless limits."""
+        """Create a fresh consumable budget from stateless limits.
+
+        Parameters
+        ----------
+        limits : Limits
+            limits parameter.
+        clock : Callable[[], float]
+            clock parameter.
+
+        Returns
+        -------
+        ResourceBudget
+            The result of the operation.
+        """
         return cls(
             max_bytes=limits.max_bytes,
             max_items=limits.max_items,
@@ -123,8 +165,21 @@ class ResourceBudget:
             clock=clock,
         )
 
-    def consume_bytes(self, amount: int) -> int:
-        """Consume bytes and return the new cumulative count."""
+    def consume_bytes(self,
+        amount: int,
+    ) -> int:
+        """Consume bytes and return the new cumulative count.
+
+        Parameters
+        ----------
+        amount : int
+            amount parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
             raise ValueError("amount must be a non-negative integer")
         candidate = self.bytes_used + amount
@@ -133,8 +188,21 @@ class ResourceBudget:
         self.bytes_used = candidate
         return candidate
 
-    def consume_items(self, amount: int = 1) -> int:
-        """Consume items and return the new cumulative count."""
+    def consume_items(self,
+        amount: int = 1,
+    ) -> int:
+        """Consume items and return the new cumulative count.
+
+        Parameters
+        ----------
+        amount : int
+            amount parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
             raise ValueError("amount must be a non-negative integer")
         candidate = self.items_used + amount
@@ -143,8 +211,21 @@ class ResourceBudget:
         self.items_used = candidate
         return candidate
 
-    def consume_steps(self, amount: int = 1) -> int:
-        """Consume execution steps and return the new cumulative count."""
+    def consume_steps(self,
+        amount: int = 1,
+    ) -> int:
+        """Consume execution steps and return the new cumulative count.
+
+        Parameters
+        ----------
+        amount : int
+            amount parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
             raise ValueError("amount must be a non-negative integer")
         candidate = self.steps_used + amount
@@ -154,21 +235,49 @@ class ResourceBudget:
         return candidate
 
     @contextmanager
-    def step(self, amount: int = 1) -> Generator[None, None, None]:
-        """Context manager validating deadline and consuming steps on entry."""
+    def step(self,
+        amount: int = 1,
+    ) -> Generator[None, None, None]:
+        """Context manager validating deadline and consuming steps on entry.
+
+        Parameters
+        ----------
+        amount : int
+            amount parameter.
+
+        Returns
+        -------
+        Generator[None, None, None]
+            The result of the operation.
+        """
         self.check_deadline()
         self.consume_steps(amount)
         yield
         self.check_deadline()
 
-    def check_depth(self, depth: int) -> None:
-        """Reject a nesting depth beyond the configured maximum."""
+    def check_depth(self,
+        depth: int,
+    ) -> None:
+        """Reject a nesting depth beyond the configured maximum.
+
+        Parameters
+        ----------
+        depth : int
+            depth parameter.
+        """
         if isinstance(depth, bool) or not isinstance(depth, int) or depth < 0:
             raise ValueError("depth must be a non-negative integer")
         if self.max_depth is not None and depth > self.max_depth:
             raise BudgetExceededError("depth budget exceeded")
 
     def _clock_now(self) -> float:
+        """_clock_now() function.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         value = self._clock()
         if (
             isinstance(value, bool)
@@ -179,7 +288,10 @@ class ResourceBudget:
         return float(value)
 
     def check_deadline(self) -> None:
-        """Reject work at or after the configured monotonic deadline."""
+        """Reject work at or after the configured monotonic deadline.
+
+        No parameters and no return value.
+        """
         if (
             self._deadline is not None
             and self._clock_now() >= self._deadline
@@ -188,28 +300,52 @@ class ResourceBudget:
 
     @property
     def remaining_bytes(self) -> int | None:
-        """Return remaining bytes or None when unbounded."""
+        """Return remaining bytes or None when unbounded.
+
+        Returns
+        -------
+        int | None
+            The result of the operation.
+        """
         if self.max_bytes is None:
             return None
         return self.max_bytes - self.bytes_used
 
     @property
     def remaining_items(self) -> int | None:
-        """Return remaining items or None when unbounded."""
+        """Return remaining items or None when unbounded.
+
+        Returns
+        -------
+        int | None
+            The result of the operation.
+        """
         if self.max_items is None:
             return None
         return self.max_items - self.items_used
 
     @property
     def remaining_steps(self) -> int | None:
-        """Return remaining steps or None when unbounded."""
+        """Return remaining steps or None when unbounded.
+
+        Returns
+        -------
+        int | None
+            The result of the operation.
+        """
         if self.max_steps is None:
             return None
         return self.max_steps - self.steps_used
 
     @property
     def remaining_seconds(self) -> float | None:
-        """Return non-negative time remaining or None when unbounded."""
+        """Return non-negative time remaining or None when unbounded.
+
+        Returns
+        -------
+        float | None
+            The result of the operation.
+        """
         if self._deadline is None:
             return None
         return max(0.0, self._deadline - self._clock_now())

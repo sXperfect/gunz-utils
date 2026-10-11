@@ -1,9 +1,16 @@
 """Multi-metric regression gate with validity requirements."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .policy import MetricDecision, MetricPolicy, evaluate_metric
 
 
@@ -24,7 +31,26 @@ def evaluate_regression_gate(
     warnings: tuple[str, ...] = (),
     require_comparable: bool = True,
 ) -> RegressionGate:
-    """Evaluate multiple metrics and optionally fail on validity warnings."""
+    """Evaluate multiple metrics and optionally fail on validity warnings.
+
+    Parameters
+    ----------
+    baseline : dict[str, float]
+        baseline parameter.
+    candidate : dict[str, float]
+        candidate parameter.
+    policies : tuple[MetricPolicy, ...]
+        policies parameter.
+    warnings : tuple[str, ...]
+        warnings parameter.
+    require_comparable : bool
+        require_comparable parameter.
+
+    Returns
+    -------
+    RegressionGate
+        The result of the operation.
+    """
     decisions: list[MetricDecision] = []
     for policy in policies:
         if policy.name not in baseline or policy.name not in candidate:

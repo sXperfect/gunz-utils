@@ -1,5 +1,9 @@
 """Shell-free rsync directory mirroring for shared/local caches."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -11,6 +15,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .io import atomic_write
 from .subprocess import CommandResult, run_command
 
@@ -41,8 +48,21 @@ _FORBIDDEN_LONG_OPTIONS = frozenset(
 )
 
 
-def _unsafe_rsync_extra_argument(argument: str) -> bool:
-    """Reject destructive/execution-affecting options, including abbreviations."""
+def _unsafe_rsync_extra_argument(
+    argument: str,
+) -> bool:
+    """Reject destructive/execution-affecting options, including abbreviations.
+
+    Parameters
+    ----------
+    argument : str
+        argument parameter.
+
+    Returns
+    -------
+    bool
+        The result of the operation.
+    """
     option = argument.split("=", 1)[0]
     if argument == "--" or argument.startswith("--delete"):
         return True
@@ -52,9 +72,9 @@ def _unsafe_rsync_extra_argument(argument: str) -> bool:
         return option in _FORBIDDEN_EXTRA_OPTIONS
     if option in _FORBIDDEN_LONG_OPTIONS:
         return True
-    # GNU-style long options may accept unique abbreviations. Treat any
-    # prefix of a forbidden long option as forbidden rather than maintaining
-    # a brittle exact-name blocklist.
+    #? GNU-style long options may accept unique abbreviations. Treat any
+    #? prefix of a forbidden long option as forbidden rather than maintaining
+    #? a brittle exact-name blocklist.
     return len(option) >= 3 and any(
         forbidden.startswith(option)
         for forbidden in _FORBIDDEN_LONG_OPTIONS
@@ -74,7 +94,18 @@ class MirrorResult:
 def _normalize_rsync_source(
     source: str | Path,
 ) -> str:
-    """Preserve rsync remote syntax while resolving local paths."""
+    """Preserve rsync remote syntax while resolving local paths.
+
+    Parameters
+    ----------
+    source : str | Path
+        source parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     explicit_path = isinstance(source, Path)
     text = str(source)
     if not text:
@@ -113,7 +144,18 @@ def _normalize_rsync_source(
 def _advisory_lock(
     path: Path,
 ) -> Iterator[None]:
-    """Hold a POSIX advisory lock for the complete guarded operation."""
+    """Hold a POSIX advisory lock for the complete guarded operation.
+
+    Parameters
+    ----------
+    path : Path
+        path parameter.
+
+    Returns
+    -------
+    Iterator[None]
+        The result of the operation.
+    """
     try:
         import fcntl
     except ImportError as exc:
@@ -280,6 +322,13 @@ def rsync_mirror(
 
     @contextmanager
     def synchronization_scope() -> Iterator[None]:
+        """synchronization_scope() function.
+
+        Returns
+        -------
+        Iterator[None]
+            The result of the operation.
+        """
         if lock:
             with _advisory_lock(lock_path):
                 yield

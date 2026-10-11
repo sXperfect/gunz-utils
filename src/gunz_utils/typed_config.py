@@ -1,5 +1,9 @@
 """Layered typed configuration values with provenance."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -15,7 +19,21 @@ class ConfigValue(Generic[T]):
     source: str
 
 
-def parse_bool(value: str) -> bool:
+def parse_bool(
+    value: str,
+) -> bool:
+    """parse_bool() function.
+
+    Parameters
+    ----------
+    value : str
+        value parameter.
+
+    Returns
+    -------
+    bool
+        The result of the operation.
+    """
     normalized = value.strip().lower()
     if normalized in {"1", "true", "yes", "on"}:
         return True
@@ -25,8 +43,27 @@ def parse_bool(value: str) -> bool:
 
 
 def convert(
-    value: str, parser: Callable[[str], T], *, source: str = "environment"
+    value: str,
+    parser: Callable[[str], T],
+    *,
+    source: str = "environment",
 ) -> ConfigValue[T]:
+    """convert() function.
+
+    Parameters
+    ----------
+    value : str
+        value parameter.
+    parser : Callable[[str], T]
+        parser parameter.
+    source : str
+        source parameter.
+
+    Returns
+    -------
+    ConfigValue[T]
+        The result of the operation.
+    """
     return ConfigValue(parser(value), source)
 
 

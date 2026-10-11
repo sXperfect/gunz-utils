@@ -1,5 +1,9 @@
 """Tests for dependency-ordered fingerprint-aware workflows."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 try:
@@ -9,10 +13,17 @@ except ImportError:
 
     class _PytestShim:
         @staticmethod
-        def raises(expected_exception: type[BaseException], match: str | None = None):
+        def raises(
+            expected_exception: type[BaseException],
+            match: str | None = None,
+        ):
             return unittest.TestCase().assertRaises(expected_exception)
 
     pytest = _PytestShim()  # type: ignore[assignment]
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.dag import WorkflowDAG, WorkflowStage
 
@@ -89,7 +100,9 @@ def test_workflow_cache_reuses_fingerprinted_stage() -> None:
     calls = {"source": 0}
     cache: dict[tuple[str, str], object] = {}
 
-    def source(_deps: object) -> int:
+    def source(
+        _deps: object,
+    ) -> int:
         calls["source"] += 1
         return 7
 
@@ -112,8 +125,12 @@ def test_dependency_fingerprint_change_invalidates_downstream_cache() -> None:
     cache: dict[tuple[str, str], object] = {}
     calls = {"final": 0}
 
-    def make_dag(source_fingerprint: str) -> WorkflowDAG:
-        def final(deps: object) -> int:
+    def make_dag(
+        source_fingerprint: str,
+    ) -> WorkflowDAG:
+        def final(
+            deps: object,
+        ) -> int:
             calls["final"] += 1
             assert isinstance(deps, dict)
             return int(deps["source"]) + 1
@@ -146,11 +163,15 @@ def test_unfingerprinted_dependency_disables_downstream_cache() -> None:
     calls = {"source": 0, "final": 0}
     cache: dict[tuple[str, str], object] = {}
 
-    def source(_deps: object) -> int:
+    def source(
+        _deps: object,
+    ) -> int:
         calls["source"] += 1
         return calls["source"]
 
-    def final(deps: object) -> int:
+    def final(
+        deps: object,
+    ) -> int:
         calls["final"] += 1
         assert isinstance(deps, dict)
         return int(deps["source"])

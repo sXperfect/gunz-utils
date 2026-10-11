@@ -1,8 +1,20 @@
 """Tests for priority-aware bounded retention."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.structures import retain_priority_and_recent
 
@@ -62,7 +74,9 @@ def test_retain_priority_and_recent_rejects_negative_limit() -> None:
 def test_retain_priority_predicate_is_evaluated_once_per_item() -> None:
     calls: dict[int, int] = {}
 
-    def priority(value: int) -> bool:
+    def priority(
+        value: int,
+    ) -> bool:
         calls[value] = calls.get(value, 0) + 1
         return value == 2
 

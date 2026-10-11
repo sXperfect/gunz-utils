@@ -1,7 +1,15 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import unittest
 import warnings
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.benchmark import default_sampler
 from gunz_utils.deprecation import GunzDeprecationWarning, deprecated

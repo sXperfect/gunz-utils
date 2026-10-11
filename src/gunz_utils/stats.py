@@ -1,5 +1,9 @@
 """Small dependency-free statistical helpers for repeated experiments."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -37,7 +41,20 @@ def _finite_values(
     *,
     name: str,
 ) -> list[float]:
-    """Convert values to finite floats and require at least one observation."""
+    """Convert values to finite floats and require at least one observation.
+
+    Parameters
+    ----------
+    values : Iterable[float]
+        values parameter.
+    name : str
+        name parameter.
+
+    Returns
+    -------
+    list[float]
+        The result of the operation.
+    """
     raw = list(values)
     if not raw:
         raise ValueError(f"{name} must not be empty")

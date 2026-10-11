@@ -1,11 +1,18 @@
 """Hashing helpers for content addressing and file integrity."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import hashlib
 import pathlib
 from typing import BinaryIO, cast
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
@@ -33,13 +40,17 @@ DEFAULT_CHUNK_SIZE: int = 65536
 SUPPORTED_ALGOS: frozenset[str] = frozenset(
     {"sha256", "sha512", "sha1", "blake2b", "blake2s", "sha3_256", "md5"}
 )
-# MD5 and SHA-1 remain for compatibility and non-adversarial fingerprints only.
-# Security-sensitive identity code such as ContentAddressedStore rejects them.
+#? MD5 and SHA-1 remain for compatibility and non-adversarial fingerprints only.
+#? Security-sensitive identity code such as ContentAddressedStore rejects them.
 _MIN_SHORT_CHARS: int = 4
 _MAX_SHORT_CHARS: int = 128
 
 
-def content_hash(data: bytes | str, *, algo: str = DEFAULT_ALGO) -> str:
+def content_hash(
+    data: bytes | str,
+    *,
+    algo: str = DEFAULT_ALGO,
+) -> str:
     """Compute the lowercase hex digest of ``data``.
 
     String inputs are UTF-8 encoded before hashing. Algorithm is validated
@@ -90,6 +101,22 @@ def _hash_binary_handle(
     algo: str,
     chunk_size: int,
 ) -> str:
+    """_hash_binary_handle() function.
+
+    Parameters
+    ----------
+    handle : BinaryIO
+        handle parameter.
+    algo : str
+        algo parameter.
+    chunk_size : int
+        chunk_size parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     hasher = hashlib.new(algo)
     while block := handle.read(chunk_size):
         hasher.update(block)
@@ -150,7 +177,12 @@ def file_hash(
         )
 
 
-def short_hash(data: bytes | str, *, chars: int = 8, algo: str = DEFAULT_ALGO) -> str:
+def short_hash(
+    data: bytes | str,
+    *,
+    chars: int = 8,
+    algo: str = DEFAULT_ALGO,
+) -> str:
     """Return the first ``chars`` hex characters of :func:`content_hash`.
 
     Useful for human-visible content fingerprints (logs, cache keys, git-style
@@ -292,8 +324,8 @@ def directory_manifest(
     for path in files:
         relative = path.relative_to(base).as_posix()
         try:
-            # Security (VULN-2026-011): containment failures can occur
-            # when enumeration encounters a path through an unsafe symlink.
+            #? Security (VULN-2026-011): containment failures can occur
+            #? when enumeration encounters a path through an unsafe symlink.
             with open_path_under_base(
                 str(base),
                 relative,
@@ -305,7 +337,7 @@ def directory_manifest(
                     chunk_size=chunk_size,
                 )
         except ValueError:
-            # Skip file if path traversal / symlink policy rejects opening under base
+            #? Skip file if path traversal / symlink policy rejects opening under base
             continue
     return manifest
 

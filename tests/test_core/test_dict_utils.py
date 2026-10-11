@@ -1,9 +1,17 @@
 """Tests for nested-dict utilities."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import unittest
 from typing import Any
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.dict_utils import deep_get, deep_merge, deep_set
 
@@ -104,7 +112,7 @@ class TestDeepSet(unittest.TestCase):
     def test_intermediate_non_dict_replaced(self) -> None:
         #? Lodash-style _.set behavior: a non-dict intermediate is replaced
         #? with a fresh dict. The previous value (5) is silently lost.
-        deep_set({"a": 5}, "a.b", 1)  # does not mutate self.target
+        deep_set({"a": 5}, "a.b", 1)  #? does not mutate self.target
         target = {"a": 5}
         deep_set(target, "a.b", 1)
         self.assertEqual(target, {"a": {"b": 1}})
@@ -197,13 +205,13 @@ class TestDeepMerge(unittest.TestCase):
         }
         merged = deep_merge(base, override)
 
-        # Mutate merged dict subtrees
+        #? Mutate merged dict subtrees
         merged["base_only"]["secret"] = "mutated"
         merged["override_only"]["flag"] = False
         merged["a"]["items"].append(30)
         merged["b"]["tags"].append("c")
 
-        # Caller input structures must remain untouched
+        #? Caller input structures must remain untouched
         self.assertEqual(base["base_only"]["secret"], "x")
         self.assertEqual(override["override_only"]["flag"], True)
         self.assertEqual(base["a"]["items"], [10, 20])
@@ -266,7 +274,9 @@ class TestIntegration(unittest.TestCase):
 
     def test_merge_isolation_with_uncopyable_leaf_object(self) -> None:
         class Uncopyable:
-            def __deepcopy__(self, memo: object) -> object:
+            def __deepcopy__(self,
+                memo: object,
+            ) -> object:
                 raise TypeError("cannot deepcopy Uncopyable")
 
         uncopyable = Uncopyable()
@@ -304,7 +314,7 @@ class TestIntegration(unittest.TestCase):
             node = [node, node]
         base = {"graph": node}
 
-        # Should finish instantaneously without expanding 2^13 lists
+        #? Should finish instantaneously without expanding 2^13 lists
         merged = deep_merge(base, {"flag": True})
         self.assertIsNot(merged["graph"], base["graph"])
         self.assertIs(merged["graph"][0], merged["graph"][1])

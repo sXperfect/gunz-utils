@@ -1,8 +1,16 @@
 """Regression coverage for the public, optional history plotting helper."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import unittest
 from dataclasses import replace
 from unittest.mock import Mock, patch
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.benchmark import BenchmarkHistory, benchmark, plot_history
 

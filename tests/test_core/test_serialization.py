@@ -1,9 +1,17 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import dataclasses
 import unittest
 from pathlib import Path
 from types import MappingProxyType
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.serialization as ser_mod
 from gunz_utils.serialization import canonical_json, json_loads, to_jsonable
@@ -113,11 +121,11 @@ class TestSerializationDifferential(unittest.TestCase):
         ]
 
         for case in test_cases:
-            # Native run (dispatched)
+            #? Native run (dispatched)
             native_jsonable = to_jsonable(case)
             native_json = canonical_json(case)
 
-            # Pure Python run (with _accel_is_json_clean mocked to None)
+            #? Pure Python run (with _accel_is_json_clean mocked to None)
             saved_clean = ser_mod._accel_is_json_clean
             try:
                 ser_mod._accel_is_json_clean = None
@@ -126,9 +134,9 @@ class TestSerializationDifferential(unittest.TestCase):
             finally:
                 ser_mod._accel_is_json_clean = saved_clean
 
-            # Serialized representations must be identical
+            #? Serialized representations must be identical
             self.assertEqual(native_json, py_json)
-            # Converted values must be equal in content
+            #? Converted values must be equal in content
             self.assertEqual(native_jsonable, py_jsonable)
 
     def test_native_vs_python_exception_parity(self) -> None:
@@ -145,11 +153,11 @@ class TestSerializationDifferential(unittest.TestCase):
 
         for val, exc_type, match_str in error_cases:
             with self.subTest(val=val):
-                # Native run
+                #? Native run
                 with self.assertRaisesRegex(exc_type, match_str):
                     to_jsonable(val)
 
-                # Pure Python run
+                #? Pure Python run
                 saved_clean = ser_mod._accel_is_json_clean
                 try:
                     ser_mod._accel_is_json_clean = None
@@ -167,11 +175,11 @@ class TestSerializationDifferential(unittest.TestCase):
         cycle_dict["self"] = cycle_dict
 
         for cycle_obj in (cycle_list, cycle_dict):
-            # Native run
+            #? Native run
             with self.assertRaisesRegex(ValueError, "maximum nesting depth"):
                 to_jsonable(cycle_obj)
 
-            # Pure Python run
+            #? Pure Python run
             saved_clean = ser_mod._accel_is_json_clean
             try:
                 ser_mod._accel_is_json_clean = None
@@ -186,11 +194,11 @@ class TestSerializationDifferential(unittest.TestCase):
         clean_list = [1, 2, "three"]
 
         if ser_mod._accel_is_json_clean is not None:
-            # Native acceleration avoids re-allocating clean input trees
+            #? Native acceleration avoids re-allocating clean input trees
             self.assertIs(to_jsonable(clean_dict), clean_dict)
             self.assertIs(to_jsonable(clean_list), clean_list)
 
-        # Fallback pure-Python path converts mappings and sequences
+        #? Fallback pure-Python path converts mappings and sequences
         saved_clean = ser_mod._accel_is_json_clean
         try:
             ser_mod._accel_is_json_clean = None

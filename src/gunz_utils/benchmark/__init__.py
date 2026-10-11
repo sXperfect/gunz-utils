@@ -1,7 +1,14 @@
 """Deprecated benchmarking and profiling compatibility API."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import warnings
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .artifacts import register_artifact, verify_artifact
 from .backends import (
     LinuxProcSampler,

@@ -1,5 +1,9 @@
 """Ownership and terminal-signal regressions for bounded worker pipelines."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -8,14 +12,23 @@ import warnings
 from collections.abc import AsyncGenerator, Coroutine, Iterator
 from typing import Any, cast
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.pipeline import worker_map
 
 
 @pytest.mark.parametrize("rejected_submission", [1, 2, 4])
 def test_partial_setup_closes_coroutine_and_drains_tasks(
-    monkeypatch: pytest.MonkeyPatch, rejected_submission: int
+    monkeypatch: pytest.MonkeyPatch,
+    rejected_submission: int,
 ) -> None:
     async def scenario() -> None:
         original = asyncio.create_task
@@ -24,7 +37,9 @@ def test_partial_setup_closes_coroutine_and_drains_tasks(
         invoked: list[int] = []
         failure = RuntimeError("task submission rejected")
 
-        def submit(coroutine: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+        def submit(
+            coroutine: Coroutine[Any, Any, None],
+        ) -> asyncio.Task[None]:
             nonlocal submissions
             submissions += 1
             if submissions == rejected_submission:
@@ -33,7 +48,9 @@ def test_partial_setup_closes_coroutine_and_drains_tasks(
             created.append(task)
             return task
 
-        async def operation(value: int) -> int:
+        async def operation(
+            value: int,
+        ) -> int:
             invoked.append(value)
             await asyncio.Event().wait()
             return value
@@ -56,7 +73,9 @@ def test_partial_setup_closes_coroutine_and_drains_tasks(
 
 
 @pytest.mark.parametrize("cancel_source", ["worker", "producer"])
-def test_child_self_cancellation_propagates_and_drains(cancel_source: str) -> None:
+def test_child_self_cancellation_propagates_and_drains(
+    cancel_source: str,
+) -> None:
     async def scenario() -> None:
         baseline = asyncio.all_tasks()
 
@@ -65,7 +84,9 @@ def test_child_self_cancellation_propagates_and_drains(cancel_source: str) -> No
                 raise asyncio.CancelledError("producer self-cancelled")
             yield 1
 
-        async def operation(value: int) -> int:
+        async def operation(
+            value: int,
+        ) -> int:
             raise asyncio.CancelledError("worker self-cancelled")
 
         stream = worker_map(operation, source(), workers=2, queue_size=1)
@@ -86,7 +107,9 @@ def test_repeated_caller_cancellation_waits_for_owned_cleanup() -> None:
         release_cleanup = asyncio.Event()
         cleaned = False
 
-        async def operation(value: int) -> int:
+        async def operation(
+            value: int,
+        ) -> int:
             nonlocal cleaned
             operation_started.set()
             try:
@@ -122,7 +145,9 @@ def test_simultaneous_result_and_cancellation_propagates_cancellation() -> None:
         both_started = asyncio.Event()
         started = 0
 
-        async def operation(value: int) -> int:
+        async def operation(
+            value: int,
+        ) -> int:
             nonlocal started
             started += 1
             if started == 2:
@@ -150,7 +175,9 @@ def test_early_close_with_full_queues_drains_owned_tasks() -> None:
         active = 0
         peak = 0
 
-        async def operation(value: int) -> int:
+        async def operation(
+            value: int,
+        ) -> int:
             nonlocal active, peak
             active += 1
             peak = max(active, peak)

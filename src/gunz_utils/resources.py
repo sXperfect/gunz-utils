@@ -1,5 +1,9 @@
 """Deterministic sync/async resource ownership groups."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from contextlib import AsyncExitStack, ExitStack
@@ -15,11 +19,24 @@ class ResourceGroup:
         self._stack.__enter__()
         return self
 
-    def enter(self, resource: Any) -> Any:
+    def enter(self,
+        resource: Any,
+    ) -> Any:
+        """enter() function.
+
+        Parameters
+        ----------
+        resource : Any
+            resource parameter.
+
+        Returns
+        -------
+        Any
+            The result of the operation.
+        """
         return self._stack.enter_context(resource)
 
-    def __exit__(
-        self,
+    def __exit__(self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
@@ -35,11 +52,24 @@ class AsyncResourceGroup:
         await self._stack.__aenter__()
         return self
 
-    async def enter(self, resource: Any) -> Any:
+    async def enter(self,
+        resource: Any,
+    ) -> Any:
+        """enter() function.
+
+        Parameters
+        ----------
+        resource : Any
+            resource parameter.
+
+        Returns
+        -------
+        Any
+            The result of the operation.
+        """
         return await self._stack.enter_async_context(resource)
 
-    async def __aexit__(
-        self,
+    async def __aexit__(self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,

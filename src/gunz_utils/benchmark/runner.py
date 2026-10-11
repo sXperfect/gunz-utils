@@ -1,5 +1,9 @@
 """Repeatable microbenchmark runner with native calibration and controls."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import gc
@@ -11,12 +15,32 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any, TypeVar
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .result import BenchmarkResult, BenchmarkStats, SystemInfo
 
 T = TypeVar("T")
 
 
-def _percentile(values: list[float], percentile: float) -> float:
+def _percentile(
+    values: list[float],
+    percentile: float,
+) -> float:
+    """_percentile() function.
+
+    Parameters
+    ----------
+    values : list[float]
+        values parameter.
+    percentile : float
+        percentile parameter.
+
+    Returns
+    -------
+    float
+        The result of the operation.
+    """
     ordered = sorted(values)
     if len(ordered) == 1:
         return ordered[0]
@@ -33,7 +57,20 @@ def benchmark_environment(
     disable_gc: bool = True,
     cpu_affinity: set[int] | None = None,
 ) -> Iterator[None]:
-    """Temporarily control GC and CPU affinity for benchmark execution."""
+    """Temporarily control GC and CPU affinity for benchmark execution.
+
+    Parameters
+    ----------
+    disable_gc : bool
+        disable_gc parameter.
+    cpu_affinity : set[int] | None
+        cpu_affinity parameter.
+
+    Returns
+    -------
+    Iterator[None]
+        The result of the operation.
+    """
     gc_enabled = gc.isenabled()
     previous_affinity = None
     try:
@@ -65,6 +102,26 @@ def calibrate_loops(
     max_loops: int = 1 << 30,
     **kwargs: Any,
 ) -> int:
+    """calibrate_loops() function.
+
+    Parameters
+    ----------
+    func : Callable[..., T]
+        func parameter.
+    args : Any
+        args parameter.
+    target_time : float
+        target_time parameter.
+    max_loops : int
+        max_loops parameter.
+    kwargs : Any
+        kwargs parameter.
+
+    Returns
+    -------
+    int
+        The result of the operation.
+    """
     if (
         isinstance(target_time, bool)
         or not isinstance(target_time, (int, float))
@@ -96,6 +153,24 @@ def _sample(
     kwargs: dict[str, Any],
     loops: int,
 ) -> float:
+    """_sample() function.
+
+    Parameters
+    ----------
+    func : Callable[..., T]
+        func parameter.
+    args : tuple[Any, ...]
+        args parameter.
+    kwargs : dict[str, Any]
+        kwargs parameter.
+    loops : int
+        loops parameter.
+
+    Returns
+    -------
+    float
+        The result of the operation.
+    """
     started = time.perf_counter()
     for _ in range(loops):
         func(*args, **kwargs)
@@ -117,7 +192,42 @@ def benchmark(
     cpu_affinity: set[int] | None = None,
     **kwargs: Any,
 ) -> BenchmarkResult:
-    """Benchmark a callable with calibration and controlled execution."""
+    """Benchmark a callable with calibration and controlled execution.
+
+    Parameters
+    ----------
+    func : Callable[..., T]
+        func parameter.
+    args : Any
+        args parameter.
+    name : str | None
+        name parameter.
+    warmup : int
+        warmup parameter.
+    iterations : int
+        iterations parameter.
+    min_time : float | None
+        min_time parameter.
+    max_iterations : int
+        max_iterations parameter.
+    parameters : dict[str, Any] | None
+        parameters parameter.
+    loops : int | None
+        loops parameter.
+    target_time : float
+        target_time parameter.
+    disable_gc : bool
+        disable_gc parameter.
+    cpu_affinity : set[int] | None
+        cpu_affinity parameter.
+    kwargs : Any
+        kwargs parameter.
+
+    Returns
+    -------
+    BenchmarkResult
+        The result of the operation.
+    """
     if (
         isinstance(warmup, bool)
         or not isinstance(warmup, int)

@@ -1,17 +1,31 @@
 """Content-addressed local store tests."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import hashlib
 import io
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.content_store import ContentAddressedStore
 
 
-def test_content_store_put_and_get_round_trip(tmp_path: Path) -> None:
+def test_content_store_put_and_get_round_trip(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "source.bin"
     source.write_bytes(b"hello world")
     store = ContentAddressedStore(tmp_path / "store")
@@ -25,7 +39,9 @@ def test_content_store_put_and_get_round_trip(tmp_path: Path) -> None:
     assert store.verify(artifact.digest)
 
 
-def test_content_store_reuses_existing_verified_content(tmp_path: Path) -> None:
+def test_content_store_reuses_existing_verified_content(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "source.txt"
     source.write_text("same", encoding="utf-8")
     store = ContentAddressedStore(tmp_path / "store")
@@ -36,7 +52,9 @@ def test_content_store_reuses_existing_verified_content(tmp_path: Path) -> None:
     assert second == first
 
 
-def test_content_store_detects_corruption(tmp_path: Path) -> None:
+def test_content_store_detects_corruption(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "source.txt"
     source.write_text("original", encoding="utf-8")
     store = ContentAddressedStore(tmp_path / "store")
@@ -49,7 +67,9 @@ def test_content_store_detects_corruption(tmp_path: Path) -> None:
         store.get(artifact.digest)
 
 
-def test_content_store_rejects_invalid_digest(tmp_path: Path) -> None:
+def test_content_store_rejects_invalid_digest(
+    tmp_path: Path,
+) -> None:
     store = ContentAddressedStore(tmp_path / "store")
 
     with pytest.raises(ValueError, match="hexadecimal"):
@@ -59,7 +79,9 @@ def test_content_store_rejects_invalid_digest(tmp_path: Path) -> None:
         store.get("abcd")
 
 
-def test_content_store_missing_digest_raises_key_error(tmp_path: Path) -> None:
+def test_content_store_missing_digest_raises_key_error(
+    tmp_path: Path,
+) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     missing = "0" * store.digest_chars
 
@@ -117,7 +139,9 @@ def test_content_store_rejects_collision_prone_identity_algorithms(
             )
 
 
-def test_content_store_rejects_symlink_root(tmp_path: Path) -> None:
+def test_content_store_rejects_symlink_root(
+    tmp_path: Path,
+) -> None:
     real = tmp_path / "real-store"
     real.mkdir()
     link = tmp_path / "store-link"
@@ -173,7 +197,9 @@ def test_content_store_supports_configurable_digest_fanout(
     assert artifact.path.name == artifact.digest
 
 
-def test_content_store_materialize_copy_round_trip(tmp_path: Path) -> None:
+def test_content_store_materialize_copy_round_trip(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "source.txt"
     source.write_text("payload", encoding="utf-8")
     store = ContentAddressedStore(tmp_path / "store")
@@ -276,7 +302,9 @@ def test_content_store_validates_fanout_and_materialization_strategy(
 
 
 
-def test_content_store_put_bytes_round_trip(tmp_path: Path) -> None:
+def test_content_store_put_bytes_round_trip(
+    tmp_path: Path,
+) -> None:
     store = ContentAddressedStore(tmp_path / "store")
 
     artifact = store.put_bytes(b"streamed-payload")
@@ -299,7 +327,9 @@ def test_content_store_put_stream_uses_current_stream_position(
     assert not source.closed
 
 
-def test_content_store_put_bytes_accepts_memoryview(tmp_path: Path) -> None:
+def test_content_store_put_bytes_accepts_memoryview(
+    tmp_path: Path,
+) -> None:
     store = ContentAddressedStore(tmp_path / "store")
 
     artifact = store.put_bytes(memoryview(b"memory"))
@@ -307,7 +337,9 @@ def test_content_store_put_bytes_accepts_memoryview(tmp_path: Path) -> None:
     assert artifact.path.read_bytes() == b"memory"
 
 
-def test_content_store_put_bytes_rejects_non_bytes_like(tmp_path: Path) -> None:
+def test_content_store_put_bytes_rejects_non_bytes_like(
+    tmp_path: Path,
+) -> None:
     store = ContentAddressedStore(tmp_path / "store")
 
     with pytest.raises(TypeError, match="bytes-like"):

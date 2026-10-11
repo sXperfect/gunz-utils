@@ -1,6 +1,10 @@
 """Helpers for working with nested mappings (dotted-path access, recursive merge)."""
 from __future__ import annotations
 
+__author__ = "Yeremia Gunawan Adhisantoso"
+__email__ = "yeremiag@gmail.com"
+__license__ = "Clear BSD"
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
@@ -16,9 +20,6 @@ from typing import Any, Literal, cast
 # =============================================================================
 from ._version import __version__ as __version__
 
-__author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "yeremiag@gmail.com"
-__license__ = "Clear BSD"
 __all__ = ["deep_get", "deep_set", "deep_merge"]
 
 #? Singleton sentinel used to detect "no default supplied" distinctly from

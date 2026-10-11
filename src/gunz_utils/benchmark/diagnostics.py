@@ -1,11 +1,18 @@
 """Benchmark stability and comparability diagnostics."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 import statistics
 from dataclasses import dataclass
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .result import BenchmarkResult
 
 
@@ -26,7 +33,22 @@ def analyze_stability(
     max_cv: float = 0.05,
     max_relative_range: float = 0.20,
 ) -> StabilityReport:
-    """Detect noisy timing distributions using robust simple diagnostics."""
+    """Detect noisy timing distributions using robust simple diagnostics.
+
+    Parameters
+    ----------
+    result : BenchmarkResult
+        result parameter.
+    max_cv : float
+        max_cv parameter.
+    max_relative_range : float
+        max_relative_range parameter.
+
+    Returns
+    -------
+    StabilityReport
+        The result of the operation.
+    """
     for name, value in (
         ("max_cv", max_cv),
         ("max_relative_range", max_relative_range),
@@ -89,7 +111,20 @@ def comparability_warnings(
     baseline: BenchmarkResult,
     candidate: BenchmarkResult,
 ) -> tuple[str, ...]:
-    """Describe environment differences that can invalidate comparisons."""
+    """Describe environment differences that can invalidate comparisons.
+
+    Parameters
+    ----------
+    baseline : BenchmarkResult
+        baseline parameter.
+    candidate : BenchmarkResult
+        candidate parameter.
+
+    Returns
+    -------
+    tuple[str, ...]
+        The result of the operation.
+    """
     warnings: list[str] = []
     left, right = baseline.system, candidate.system
     if left.machine != right.machine:

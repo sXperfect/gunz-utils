@@ -1,10 +1,22 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import pathlib
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 from git import Repo
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import resolve_project_root
 from gunz_utils.ext import project_gitpython as project_module

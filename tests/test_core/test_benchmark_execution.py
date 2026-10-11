@@ -1,8 +1,16 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import gc
 import json
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.benchmark import (
     BenchmarkSuite,
@@ -36,7 +44,10 @@ class TestExecutionControls(unittest.TestCase):
         self.assertGreaterEqual(result.iterations, 2)
 
     def test_parameter_sweep(self) -> None:
-        def work(*, size: int) -> int:
+        def work(
+            *,
+            size: int,
+        ) -> int:
             return sum(range(size))
 
         suite = BenchmarkSuite("sweep")

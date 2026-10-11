@@ -1,5 +1,9 @@
 """Repository CI policy regression tests."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 
 
-def _job_blocks(text: str) -> list[str]:
+def _job_blocks(
+    text: str,
+) -> list[str]:
     """Return top-level GitHub Actions job blocks from workflow YAML text."""
     lines = text.splitlines()
     blocks: list[list[str]] = []

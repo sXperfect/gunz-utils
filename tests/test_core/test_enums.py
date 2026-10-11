@@ -1,4 +1,12 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
 
@@ -6,7 +14,7 @@ from gunz_utils.enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
 class TestBaseStrEnum(unittest.TestCase):
     def setUp(self):
         class Color(BaseStrEnum):
-            # _ignore_ = ["ALIASES"] # No longer needed with __ALIASES__
+            #? _ignore_ = ["ALIASES"] # No longer needed with __ALIASES__
             __ALIASES__ = {"dark": "dark_blue", "crimson": "red"}
             RED = "red"
             BLUE = "blue"
@@ -105,7 +113,7 @@ class TestOptionalBaseStrEnum(unittest.TestCase):
 class TestBaseIntEnum(unittest.TestCase):
     def setUp(self):
         class ErrorCode(BaseIntEnum):
-            # _ignore_ = ["ALIASES"]
+            #? _ignore_ = ["ALIASES"]
             __ALIASES__ = {"missing": 404, "ok": 200}
             OK = 200
             NOT_FOUND = 404

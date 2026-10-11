@@ -1,3 +1,7 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -5,6 +9,10 @@ import math
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.cache import CacheInfo, ttl_cache
 from gunz_utils.concurrency import map_unordered
@@ -27,7 +35,9 @@ class TestResultOperations(unittest.TestCase):
 class TestCacheInfo(unittest.TestCase):
     def test_cache_info_and_clear(self) -> None:
         @ttl_cache(ttl=60, maxsize=2)
-        def work(value: int) -> int:
+        def work(
+            value: int,
+        ) -> int:
             return value
 
         work(1)
@@ -107,7 +117,9 @@ class TestAsyncResilience(unittest.IsolatedAsyncioTestCase):
         active = 0
         peak = 0
 
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             nonlocal active, peak
             active += 1
             peak = max(peak, active)
@@ -161,7 +173,7 @@ class TestAsyncResilience(unittest.IsolatedAsyncioTestCase):
         limiter = AsyncRateLimiter(0.5)
         self.assertEqual(limiter.capacity, 1.0)
         self.assertEqual(limiter.rate, 0.5)
-        # Verify default acquire() and context manager entry succeed
+        #? Verify default acquire() and context manager entry succeed
         await limiter.acquire()
         self.assertLess(limiter.available_tokens, 1.0)
 
@@ -182,13 +194,15 @@ class TestAsyncResilience(unittest.IsolatedAsyncioTestCase):
         def fake_monotonic() -> float:
             return current_time[0]
 
-        async def fake_sleep(duration: float) -> None:
+        async def fake_sleep(
+            duration: float,
+        ) -> None:
             sleep_delays.append(duration)
-            # The requested 20 ms sleep resumes after the 30 ms deadline.
+            #? The requested 20 ms sleep resumes after the 30 ms deadline.
             current_time[0] += 0.05
 
-        # Use one clock from construction onward, without changing the event
-        # loop's shared time/asyncio modules or depending on the host's uptime.
+        #? Use one clock from construction onward, without changing the event
+        #? loop's shared time/asyncio modules or depending on the host's uptime.
         with (
             patch(
                 "gunz_utils.rate_limit.time",
@@ -206,15 +220,15 @@ class TestAsyncResilience(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(TimeoutError):
                 await limiter.acquire(0.2, timeout=0.03)
 
-            # Require the wakeup path, not an immediate insufficient-budget
-            # timeout, and verify that the timed-out request consumed no tokens.
+            #? Require the wakeup path, not an immediate insufficient-budget
+            #? timeout, and verify that the timed-out request consumed no tokens.
             self.assertEqual(sleep_delays, [0.02])
             self.assertAlmostEqual(limiter.available_tokens, 0.5)
 
     async def test_acquire_zero_timeout_non_blocking(self) -> None:
         limiter = AsyncRateLimiter(10, capacity=1)
-        # Immediate success when tokens available
+        #? Immediate success when tokens available
         await limiter.acquire(1.0, timeout=0.0)
-        # Immediate TimeoutError when exhausted
+        #? Immediate TimeoutError when exhausted
         with self.assertRaises(TimeoutError):
             await limiter.acquire(1.0, timeout=0.0)

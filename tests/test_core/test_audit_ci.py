@@ -1,5 +1,9 @@
 """Tests for the aggregate audit CI orchestrator."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import importlib.util
@@ -55,13 +59,17 @@ def test_collect_results_keeps_running_after_independent_failures() -> None:
         "packaging": 0,
     }
 
-    def runner(name: str) -> int:
+    def runner(
+        name: str,
+    ) -> int:
         calls.append(name)
         return statuses[name]
 
     compatibility: list[str] = []
 
-    def compat(python: str) -> int:
+    def compat(
+        python: str,
+    ) -> int:
         compatibility.append(python)
         return 4
 
@@ -86,7 +94,9 @@ def test_collect_results_keeps_running_after_independent_failures() -> None:
 def test_collect_results_can_fail_fast_for_local_diagnosis() -> None:
     calls: list[str] = []
 
-    def runner(name: str) -> int:
+    def runner(
+        name: str,
+    ) -> int:
         calls.append(name)
         return 1 if name == "lint" else 0
 
@@ -105,7 +115,9 @@ def test_collect_results_can_fail_fast_for_local_diagnosis() -> None:
 def test_gate_exception_becomes_visible_failure_and_collection_continues() -> None:
     calls: list[str] = []
 
-    def runner(name: str) -> int:
+    def runner(
+        name: str,
+    ) -> int:
         calls.append(name)
         if name == "release":
             raise RuntimeError("boom")
@@ -119,7 +131,9 @@ def test_gate_exception_becomes_visible_failure_and_collection_continues() -> No
     assert all(item.returncode == 0 for item in results[1:])
 
 
-def test_json_summary_is_complete_and_machine_readable(tmp_path: Path) -> None:
+def test_json_summary_is_complete_and_machine_readable(
+    tmp_path: Path,
+) -> None:
     results = [
         audit_ci.GateResult("release", 0),
         audit_ci.GateResult("lint", 1),
@@ -141,17 +155,25 @@ def test_json_summary_is_complete_and_machine_readable(tmp_path: Path) -> None:
     }
 
 
-def test_packaging_gate_collects_all_case_failures(monkeypatch) -> None:
+def test_packaging_gate_collects_all_case_failures(
+    monkeypatch,
+) -> None:
     calls: list[str] = []
 
-    def case(name: str, status: int = 0):
+    def case(
+        name: str,
+        status: int = 0,
+    ):
         def run() -> int:
             calls.append(name)
             return status
 
         return run
 
-    def extra(name: str, _test_dir: str) -> int:
+    def extra(
+        name: str,
+        _test_dir: str,
+    ) -> int:
         calls.append(name)
         return 0
 
@@ -174,10 +196,14 @@ def test_packaging_gate_collects_all_case_failures(monkeypatch) -> None:
     ]
 
 
-def test_gate_exception_output_redacts_exception_message(capsys) -> None:
+def test_gate_exception_output_redacts_exception_message(
+    capsys,
+) -> None:
     secret = "tooling-secret-value"
 
-    def runner(_name: str) -> int:
+    def runner(
+        _name: str,
+    ) -> int:
         raise RuntimeError(secret)
 
     results = audit_ci.collect_results(
@@ -191,10 +217,15 @@ def test_gate_exception_output_redacts_exception_message(capsys) -> None:
     assert secret not in captured.err
 
 
-def test_audit_ci_skips_packaging_when_requested(monkeypatch) -> None:
+def test_audit_ci_skips_packaging_when_requested(
+    monkeypatch,
+) -> None:
     captured_gates: list[str] = []
 
-    def fake_collect(gates, **_kwargs):
+    def fake_collect(
+        gates,
+        **_kwargs,
+    ):
         captured_gates.extend(gates)
         return []
 
@@ -209,10 +240,15 @@ def test_audit_ci_skips_packaging_when_requested(monkeypatch) -> None:
     assert captured_gates == ["lint", "test", "docs"]
 
 
-def test_audit_ci_skips_compat_when_requested(monkeypatch) -> None:
+def test_audit_ci_skips_compat_when_requested(
+    monkeypatch,
+) -> None:
     captured_kwargs: dict = {}
 
-    def fake_collect(gates, **kwargs):
+    def fake_collect(
+        gates,
+        **kwargs,
+    ):
         captured_kwargs.update(kwargs)
         return []
 

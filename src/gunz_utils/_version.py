@@ -6,6 +6,10 @@ module-level `__version__` attributes stay synchronized without duplicated
 literals.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from importlib import metadata

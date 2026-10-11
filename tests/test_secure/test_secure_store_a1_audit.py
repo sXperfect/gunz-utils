@@ -1,5 +1,9 @@
 """Adversarial SecureStore proofs for the A1 algorithm audit."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import concurrent.futures
@@ -7,8 +11,16 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
 from cryptography.fernet import InvalidToken
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.ext.secure_store import SecureStore
 
@@ -33,7 +45,9 @@ def test_set_many_rolls_back_data_and_audit_on_mid_batch_failure(
         store.close()
 
 
-def test_secure_store_validates_names_acl_and_audit_limit(tmp_path: Path) -> None:
+def test_secure_store_validates_names_acl_and_audit_limit(
+    tmp_path: Path,
+) -> None:
     store = SecureStore(base_dir=tmp_path)
     try:
         store.unlock()
@@ -58,7 +72,9 @@ def test_secure_store_validates_names_acl_and_audit_limit(tmp_path: Path) -> Non
         store.close()
 
 
-def test_file_key_rotation_round_trip_survives_reopen(tmp_path: Path) -> None:
+def test_file_key_rotation_round_trip_survives_reopen(
+    tmp_path: Path,
+) -> None:
     store = SecureStore(base_dir=tmp_path)
     store.unlock()
     store.set("secret", "value")
@@ -79,7 +95,9 @@ def test_file_key_rotation_round_trip_survives_reopen(tmp_path: Path) -> None:
         reopened.close()
 
 
-def test_rotation_file_key_to_passphrase_and_back(tmp_path: Path) -> None:
+def test_rotation_file_key_to_passphrase_and_back(
+    tmp_path: Path,
+) -> None:
     store = SecureStore(base_dir=tmp_path)
     store.unlock()
     store.set("secret", "value")
@@ -189,12 +207,16 @@ def test_wrong_old_key_does_not_mask_pending_rotation_recovery(
         reopened.close()
 
 
-def test_secure_store_serializes_concurrent_access(tmp_path: Path) -> None:
+def test_secure_store_serializes_concurrent_access(
+    tmp_path: Path,
+) -> None:
     store = SecureStore(base_dir=tmp_path)
     try:
         store.unlock()
 
-        def write_and_read(index: int) -> str | None:
+        def write_and_read(
+            index: int,
+        ) -> str | None:
             name = f"key-{index}"
             value = f"value-{index}"
             store.set(name, value)
@@ -258,7 +280,9 @@ def test_passphrase_rotation_publication_failure_recovers_pending_salt(
         reopened.close()
 
 
-def test_stale_instance_fails_closed_after_rotation(tmp_path: Path) -> None:
+def test_stale_instance_fails_closed_after_rotation(
+    tmp_path: Path,
+) -> None:
     store1 = SecureStore(base_dir=tmp_path)
     store2 = SecureStore(base_dir=tmp_path)
     try:
@@ -267,22 +291,22 @@ def test_stale_instance_fails_closed_after_rotation(tmp_path: Path) -> None:
         store1.set("secret", "original_value")
         assert store2.get("secret") == "original_value"
 
-        # Rotate key using store1
+        #? Rotate key using store1
         store1.rotate_master_key()
         store1.set("secret", "updated_after_rotation")
 
-        # Stale store2 write must fail closed
+        #? Stale store2 write must fail closed
         with pytest.raises(RuntimeError, match="stale"):
             store2.set("secret", "stale_write")
 
-        # Stale store2 read must fail closed
+        #? Stale store2 read must fail closed
         with pytest.raises(RuntimeError, match="stale"):
             store2.get("secret")
 
-        # Value in store1 remains unchanged and uncorrupted
+        #? Value in store1 remains unchanged and uncorrupted
         assert store1.get("secret") == "updated_after_rotation"
 
-        # After re-unlocking, store2 functions normally
+        #? After re-unlocking, store2 functions normally
         store2.unlock()
         assert store2.get("secret") == "updated_after_rotation"
     finally:
@@ -290,26 +314,28 @@ def test_stale_instance_fails_closed_after_rotation(tmp_path: Path) -> None:
         store2.close()
 
 
-def test_rotation_prevents_unintended_mode_switch(tmp_path: Path) -> None:
+def test_rotation_prevents_unintended_mode_switch(
+    tmp_path: Path,
+) -> None:
     store = SecureStore(base_dir=tmp_path)
     try:
         store.unlock()
         store.set("key1", "val1")
 
-        # File-key store rotating to passphrase without allow_mode_switch must fail
+        #? File-key store rotating to passphrase without allow_mode_switch must fail
         with pytest.raises(ValueError, match="allow_mode_switch"):
             store.rotate_master_key(new_passphrase="passphrase-1")
 
-        # With allow_mode_switch=True, it succeeds
+        #? With allow_mode_switch=True, it succeeds
         store.rotate_master_key(
             new_passphrase="passphrase-1", allow_mode_switch=True
         )
 
-        # Passphrase store rotating without passphrase and allow_mode_switch fails
+        #? Passphrase store rotating without passphrase and allow_mode_switch fails
         with pytest.raises(ValueError, match="allow_mode_switch"):
             store.rotate_master_key()
 
-        # With allow_mode_switch=True, it converts back to file-key
+        #? With allow_mode_switch=True, it converts back to file-key
         store.rotate_master_key(allow_mode_switch=True)
         assert store.get("key1") == "val1"
     finally:
@@ -328,20 +354,20 @@ def test_tampered_acl_or_ciphertext_substitution_rejected(
         assert store.get("secret_a", caller="admin") == "val_a"
         assert store.get("secret_b", caller="guest") == "val_b"
 
-        # 1. Tamper ACL in database: change secret_a ACL to guest directly in SQLite
+        #? 1. Tamper ACL in database: change secret_a ACL to guest directly in SQLite
         store._conn.execute(
             "UPDATE secrets SET acl = 'guest' WHERE name = 'secret_a'"
         )
         with pytest.raises(InvalidToken):
             store.get("secret_a", caller="guest")
 
-        # Restore secret_a ACL
+        #? Restore secret_a ACL
         store._conn.execute(
             "UPDATE secrets SET acl = 'admin' WHERE name = 'secret_a'"
         )
         assert store.get("secret_a", caller="admin") == "val_a"
 
-        # 2. Swap ciphertexts between secret_a and secret_b
+        #? 2. Swap ciphertexts between secret_a and secret_b
         row_b = store._conn.execute(
             "SELECT ciphertext FROM secrets WHERE name = 'secret_b'"
         ).fetchone()
@@ -350,24 +376,26 @@ def test_tampered_acl_or_ciphertext_substitution_rejected(
             (row_b["ciphertext"],),
         )
 
-        # secret_a now contains secret_b's ciphertext. Must fail envelope check!
+        #? secret_a now contains secret_b's ciphertext. Must fail envelope check!
         with pytest.raises(InvalidToken):
             store.get("secret_a", caller="admin")
     finally:
         store.close()
 
 
-def test_verify_integrity(tmp_path: Path) -> None:
+def test_verify_integrity(
+    tmp_path: Path,
+) -> None:
     store = SecureStore(base_dir=tmp_path)
     try:
         store.unlock()
         store.set("k1", "v1")
         store.set("k2", "v2", acl=["worker"])
 
-        # Intact store verifies successfully
+        #? Intact store verifies successfully
         assert store.verify_integrity() is True
 
-        # Tampering with key_check causes verify_integrity to raise InvalidToken
+        #? Tampering with key_check causes verify_integrity to raise InvalidToken
         store._conn.execute(
             "UPDATE store_meta SET value = ? WHERE key = 'key_check'",
             (b"corrupted_marker",),
@@ -386,10 +414,10 @@ def test_failed_commit_does_not_poison_subsequent_writes(
         store.unlock()
         store.set("init", "val0")
 
-        # Lower timeout for rapid test execution
+        #? Lower timeout for rapid test execution
         store._conn.execute("PRAGMA busy_timeout = 50")
 
-        # Hold reader lock to induce commit failure
+        #? Hold reader lock to induce commit failure
         reader = sqlite3.connect(
             str(tmp_path / "config.db"), isolation_level=None
         )
@@ -401,7 +429,7 @@ def test_failed_commit_does_not_poison_subsequent_writes(
             with pytest.raises(sqlite3.OperationalError):
                 store.set("failed_key", "failed_val")
 
-            # Transaction must not remain poisoned/open
+            #? Transaction must not remain poisoned/open
             assert not store._conn.in_transaction
         finally:
             try:
@@ -410,12 +438,12 @@ def test_failed_commit_does_not_poison_subsequent_writes(
                 pass
             reader.close()
 
-        # Subsequent write must succeed and persist
+        #? Subsequent write must succeed and persist
         store.set("second_key", "second_val")
     finally:
         store.close()
 
-    # Verify through independent connection
+    #? Verify through independent connection
     reopened = SecureStore(base_dir=tmp_path)
     try:
         reopened.unlock()
@@ -424,26 +452,28 @@ def test_failed_commit_does_not_poison_subsequent_writes(
         reopened.close()
 
 
-def test_mutations_reject_tampered_acls(tmp_path: Path) -> None:
+def test_mutations_reject_tampered_acls(
+    tmp_path: Path,
+) -> None:
     store = SecureStore(base_dir=tmp_path)
     try:
         store.unlock()
         store.set("secret", "secret_val", acl=["admin"])
 
-        # Tamper ACL column directly in database
+        #? Tamper ACL column directly in database
         store._conn.execute(
             "UPDATE secrets SET acl = 'guest' WHERE name = 'secret'"
         )
 
-        # Overwrite attempt by unauthorized caller must fail integrity check
+        #? Overwrite attempt by unauthorized caller must fail integrity check
         with pytest.raises(InvalidToken):
             store.set("secret", "new_val", caller="guest")
 
-        # Delete attempt by unauthorized caller must fail integrity check
+        #? Delete attempt by unauthorized caller must fail integrity check
         with pytest.raises(InvalidToken):
             store.delete("secret", caller="guest")
 
-        # Restore ACL and verify secret is uncorrupted and intact
+        #? Restore ACL and verify secret is uncorrupted and intact
         store._conn.execute(
             "UPDATE secrets SET acl = 'admin' WHERE name = 'secret'"
         )
@@ -452,23 +482,25 @@ def test_mutations_reject_tampered_acls(tmp_path: Path) -> None:
         store.close()
 
 
-def test_lock_cleanup_on_open_and_unlock_failures(tmp_path: Path) -> None:
+def test_lock_cleanup_on_open_and_unlock_failures(
+    tmp_path: Path,
+) -> None:
     from gunz_utils.ext.secure_store import _ReentrantFileLock
 
     lock_file = tmp_path / ".test.lock"
     lock = _ReentrantFileLock(lock_file)
 
-    # 1. Failure in os.open must not retain thread lock
+    #? 1. Failure in os.open must not retain thread lock
     with patch("os.open", side_effect=OSError("injected open failure")):
         with pytest.raises(OSError, match="injected open failure"):
             lock.acquire()
 
-    # The thread lock must be free to acquire by another thread or here
+    #? The thread lock must be free to acquire by another thread or here
     acquired = lock._thread_lock.acquire(blocking=False)
     assert acquired is True
     lock._thread_lock.release()
 
-    # 2. Failure in unlock must not retain thread lock
+    #? 2. Failure in unlock must not retain thread lock
     lock.acquire()
     with patch(
         "gunz_utils.ext.secure_store._unlock_fd",
@@ -491,19 +523,22 @@ def test_concurrent_unlock_does_not_destroy_in_flight_rotation_pending_key(
         store1.unlock()
         store1.set("secret", "val1")
 
-        # Because unlock() now holds _coordination_lock, any attempt to unlock
-        # store2 while store1 holds the lock will wait or be serialized.
+        #? Because unlock() now holds _coordination_lock, any attempt to unlock
+        #? store2 while store1 holds the lock will wait or be serialized.
         original_write = store1._write_private
         pending_key_existed_during_unlock = False
 
-        def hook_write(path: Path, data: bytes) -> None:
+        def hook_write(
+            path: Path,
+            data: bytes,
+        ) -> None:
             nonlocal pending_key_existed_during_unlock
             original_write(path, data)
             if path == store1._pending_key_path:
                 assert store1._coordination_lock._depth > 0
                 assert path.exists()
-                # If store2 tries to unlock, it blocks on _coordination_lock
-                # Here we verify _pending_key_path is safely retained throughout
+                #? If store2 tries to unlock, it blocks on _coordination_lock
+                #? Here we verify _pending_key_path is safely retained throughout
                 pending_key_existed_during_unlock = True
 
         with patch.object(store1, "_write_private", side_effect=hook_write):
@@ -529,7 +564,7 @@ def test_generation_metadata_missing_or_corrupted_fails_closed(
         store.unlock()
         store.set("secret", "val")
 
-        # Corrupt key_generation row to non-digit
+        #? Corrupt key_generation row to non-digit
         store._conn.execute(
             "UPDATE store_meta SET value = ? WHERE key = 'key_generation'",
             (b"invalid_generation",),
@@ -540,7 +575,7 @@ def test_generation_metadata_missing_or_corrupted_fails_closed(
         with pytest.raises(RuntimeError, match="generation metadata is invalid"):
             store.set("secret", "new_val")
 
-        # Remove key_generation row entirely
+        #? Remove key_generation row entirely
         store._conn.execute(
             "DELETE FROM store_meta WHERE key = 'key_generation'"
         )
@@ -559,7 +594,7 @@ def test_legacy_record_migration_and_strict_envelope_enforcement(
     store = SecureStore(base_dir=tmp_path)
     try:
         store.unlock()
-        # Seed a legacy un-enveloped record directly into secrets table
+        #? Seed a legacy un-enveloped record directly into secrets table
         legacy_plaintext = b"legacy_secret_value"
         legacy_ciphertext = store._fernet.encrypt(legacy_plaintext)
         store._conn.execute(
@@ -569,7 +604,7 @@ def test_legacy_record_migration_and_strict_envelope_enforcement(
             """,
             ("legacy_key", legacy_ciphertext, "admin", 0.0, 0.0),
         )
-        # Construct genuine v1 metadata, rather than corrupting a modern policy.
+        #? Construct genuine v1 metadata, rather than corrupting a modern policy.
         store._conn.execute(
             "UPDATE store_meta SET value = ? WHERE key = 'key_check'",
             (store._fernet.encrypt(b"gunz-utils-secure-store-v1"),),
@@ -578,26 +613,26 @@ def test_legacy_record_migration_and_strict_envelope_enforcement(
         store.lock()
         store.unlock(allow_legacy=True)
 
-        # Before migration, legacy records can be read
+        #? Before migration, legacy records can be read
         assert store.get("legacy_key", caller="admin") == "legacy_secret_value"
         assert store._records_strict() is False
 
-        # Run explicit migration
+        #? Run explicit migration
         migrated = store.migrate_records()
         assert migrated == 1
         assert store._records_strict() is True
 
-        # Now all records are migrated into envelopes
+        #? Now all records are migrated into envelopes
         assert store.get("legacy_key", caller="admin") == "legacy_secret_value"
 
-        # Tampering with name or ACL in database is now rejected with InvalidToken
+        #? Tampering with name or ACL in database is now rejected with InvalidToken
         store._conn.execute(
             "UPDATE secrets SET acl = 'other' WHERE name = 'legacy_key'"
         )
         with pytest.raises(InvalidToken):
             store.get("legacy_key", caller="other")
 
-        # Also, raw legacy records injected post-migration fail closed
+        #? Also, raw legacy records injected post-migration fail closed
         raw_unbound = store._fernet.encrypt(b"unbound_val")
         store._conn.execute(
             """

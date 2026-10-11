@@ -1,11 +1,18 @@
 """Benchmark suites for reusable cross-project performance checks."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .result import BenchmarkResult
 from .runner import benchmark
 
@@ -22,18 +29,39 @@ class BenchmarkCase:
 class BenchmarkSuite:
     """Collection of benchmark cases sharing runner configuration."""
 
-    def __init__(self, name: str) -> None:
+    def __init__(self,
+        name: str,
+    ) -> None:
         self.name = name
         self._cases: list[BenchmarkCase] = []
 
-    def add(
-        self,
+    def add(self,
         name: str,
         func: Callable[..., Any],
         *args: Any,
         parameters: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> BenchmarkSuite:
+        """add() function.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+        func : Callable[..., Any]
+            func parameter.
+        args : Any
+            args parameter.
+        parameters : dict[str, Any] | None
+            parameters parameter.
+        kwargs : Any
+            kwargs parameter.
+
+        Returns
+        -------
+        BenchmarkSuite
+            The result of the operation.
+        """
         self._cases.append(
             BenchmarkCase(
                 name=name,
@@ -45,8 +73,7 @@ class BenchmarkSuite:
         )
         return self
 
-    def add_parameters(
-        self,
+    def add_parameters(self,
         name: str,
         func: Callable[..., Any],
         parameter: str,
@@ -54,7 +81,28 @@ class BenchmarkSuite:
         *args: Any,
         **kwargs: Any,
     ) -> BenchmarkSuite:
-        """Add one case per value in a parameter sweep."""
+        """Add one case per value in a parameter sweep.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+        func : Callable[..., Any]
+            func parameter.
+        parameter : str
+            parameter parameter.
+        values : list[Any]
+            values parameter.
+        args : Any
+            args parameter.
+        kwargs : Any
+            kwargs parameter.
+
+        Returns
+        -------
+        BenchmarkSuite
+            The result of the operation.
+        """
         for value in values:
             case_kwargs = dict(kwargs)
             case_kwargs[parameter] = value
@@ -67,8 +115,25 @@ class BenchmarkSuite:
             )
         return self
 
-    def run(self, *, warmup: int = 3, iterations: int = 20) -> list[BenchmarkResult]:
-        """Run every case in insertion order."""
+    def run(self,
+        *,
+        warmup: int = 3,
+        iterations: int = 20,
+    ) -> list[BenchmarkResult]:
+        """Run every case in insertion order.
+
+        Parameters
+        ----------
+        warmup : int
+            warmup parameter.
+        iterations : int
+            iterations parameter.
+
+        Returns
+        -------
+        list[BenchmarkResult]
+            The result of the operation.
+        """
         return [
             benchmark(
                 case.func,

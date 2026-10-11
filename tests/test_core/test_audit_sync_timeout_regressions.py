@@ -1,12 +1,24 @@
 """Invalid sync configuration preserves filesystem coordination evidence."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 from pathlib import Path
 from unittest.mock import Mock
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.subprocess import CommandResult
 from gunz_utils.sync import rsync_mirror
@@ -15,7 +27,10 @@ from gunz_utils.sync import rsync_mirror
 @pytest.mark.parametrize("timeout", [math.nan, math.inf, -math.inf, True, False, -1, 0])
 @pytest.mark.parametrize("existing", [True, False])
 def test_invalid_timeout_is_rejected_before_filesystem_or_command_actions(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, timeout: float, existing: bool
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    timeout: float,
+    existing: bool,
 ) -> None:
     destination = tmp_path / "destination"
     marker = destination / ".gunz-sync-complete"
@@ -40,7 +55,8 @@ def test_invalid_timeout_is_rejected_before_filesystem_or_command_actions(
 
 
 def test_valid_timeout_keeps_marker_success_and_failure_lifecycle(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     destination = tmp_path / "destination"
     destination.mkdir()
@@ -49,7 +65,10 @@ def test_valid_timeout_keeps_marker_success_and_failure_lifecycle(
         "gunz_utils.sync.shutil.which", lambda _name: "/synthetic/rsync"
     )
 
-    def execute(args: list[str], **kwargs: object) -> CommandResult:
+    def execute(
+        args: list[str],
+        **kwargs: object,
+    ) -> CommandResult:
         assert not marker.exists()
         assert kwargs["timeout"] == 1
         assert "--dry-run" in args
@@ -67,7 +86,10 @@ def test_valid_timeout_keeps_marker_success_and_failure_lifecycle(
     assert marker.read_text() == "complete\n"
     failure = RuntimeError("synthetic sync failed")
 
-    def fail(args: list[str], **kwargs: object) -> CommandResult:
+    def fail(
+        args: list[str],
+        **kwargs: object,
+    ) -> CommandResult:
         assert not marker.exists()
         raise failure
 

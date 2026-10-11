@@ -1,5 +1,9 @@
 """Regression checks for truthful local and artifact verification."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import importlib.util
@@ -10,13 +14,19 @@ import textwrap
 from pathlib import Path
 from types import ModuleType
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 pytestmark = pytest.mark.policy
 
 
-def _load_script(name: str) -> ModuleType:
+def _load_script(
+    name: str,
+) -> ModuleType:
     spec = importlib.util.spec_from_file_location(
         f"gunz_ci_regression_{name}", PROJECT_ROOT / "scripts" / f"{name}.py"
     )
@@ -28,7 +38,9 @@ def _load_script(name: str) -> ModuleType:
 
 
 @pytest.mark.parametrize("suffix", ["-other/gunz_utils/__init__.py", "/../other.py"])
-def test_origin_guard_rejects_textual_prefix_outside_src(suffix: str) -> None:
+def test_origin_guard_rejects_textual_prefix_outside_src(
+    suffix: str,
+) -> None:
     ci = _load_script("ci")
     assert not ci._origin_ok(str(ci.SRC_DIR) + suffix)
 
@@ -38,7 +50,8 @@ def test_origin_guard_rejects_missing_origin() -> None:
 
 
 def test_import_origin_subprocess_rejects_symlink_outside_worktree(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ci = _load_script("ci")
     source = tmp_path / "project" / "src"
@@ -89,9 +102,13 @@ def test_isolation_pytest_uses_installed_copy_despite_source_configuration(
         encoding="utf-8",
     )
 
-    def run_child(command, *, cwd=None):
-        # Put the fixture's installed copy on the initial interpreter path;
-        # pytest must not override it using the project's pythonpath setting.
+    def run_child(
+        command,
+        *,
+        cwd=None,
+    ):
+        #? Put the fixture's installed copy on the initial interpreter path;
+        #? pytest must not override it using the project's pythonpath setting.
         env = dict(os.environ)
         env["PYTHONPATH"] = str(installed.parent)
         env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
@@ -133,12 +150,17 @@ def test_sdist_must_install_and_pass_artifact_checks_independently(
     installed_artifacts: list[Path] = []
     checked_venvs: list[str] = []
 
-    def fresh(name: str):
+    def fresh(
+        name: str,
+    ):
         venv = tmp_path / name
         venv.mkdir()
         return venv / "python", venv
 
-    def install(python: Path, *args: str) -> int:
+    def install(
+        python: Path,
+        *args: str,
+    ) -> int:
         if args == ("build",):
             return 0
         artifact = Path(args[-1])
@@ -152,7 +174,11 @@ def test_sdist_must_install_and_pass_artifact_checks_independently(
             (package / "py.typed").touch()
         return 0
 
-    def run_child(command, *, cwd=None):
+    def run_child(
+        command,
+        *,
+        cwd=None,
+    ):
         if command[1:3] == ["-m", "build"]:
             (dist / "gunz_utils-1.0.0-py3-none-any.whl").touch()
             (dist / "gunz_utils-1.0.0.tar.gz").touch()
@@ -187,7 +213,8 @@ def test_sdist_must_install_and_pass_artifact_checks_independently(
 
 
 def test_compatibility_uses_the_canonical_test_dispatcher(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     audit_ci = _load_script("audit_ci")
     dispatcher = tmp_path / "ci.py"
@@ -223,7 +250,9 @@ def test_compatibility_uses_the_canonical_test_dispatcher(
     ],
 )
 def test_pr_gate_selection_covers_artifact_and_isolation_inputs(
-    path: str, packaging: bool, compatibility: bool
+    path: str,
+    packaging: bool,
+    compatibility: bool,
 ) -> None:
     """Execute the workflow's actual classifier, including the docs fast path."""
     text = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(

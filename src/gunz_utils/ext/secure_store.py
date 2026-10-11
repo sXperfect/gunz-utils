@@ -54,6 +54,10 @@ Example (passphrase mode)::
     >>> store.set("google.api_key", "AIza...", acl=["mcp"])
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 # =============================================================================
@@ -77,10 +81,16 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .._version import __version__ as __version__
 
 if sys.platform == "win32":
@@ -88,8 +98,8 @@ if sys.platform == "win32":
 else:
     import fcntl
 
-_PBKDF2_ITERATIONS = 600_000  # OWASP 2023 recommendation for SHA-256
-_KEY_FILE_MODE = 0o600  # owner read/write only
+_PBKDF2_ITERATIONS = 600_000  #? OWASP 2023 recommendation for SHA-256
+_KEY_FILE_MODE = 0o600  #? owner read/write only
 _DIR_MODE = 0o700
 _LIBRARY_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _RECORD_ENVELOPE_MAGIC = b"\x00GZENV1\x00"
@@ -101,8 +111,16 @@ _KEY_CHECK_MIGRATION = b"gunz-utils-secure-store-v2:legacy"
 _WINDOWS_LOCK_TIMEOUT = 60.0
 
 
-def _lock_fd(fd: int) -> None:
-    """Take an exclusive inter-process lock on ``fd`` (blocking)."""
+def _lock_fd(
+    fd: int,
+) -> None:
+    """Take an exclusive inter-process lock on ``fd`` (blocking).
+
+    Parameters
+    ----------
+    fd : int
+        fd parameter.
+    """
     if sys.platform == "win32":
         deadline = time.monotonic() + _WINDOWS_LOCK_TIMEOUT
         while True:
@@ -120,8 +138,16 @@ def _lock_fd(fd: int) -> None:
         fcntl.flock(fd, fcntl.LOCK_EX)
 
 
-def _unlock_fd(fd: int) -> None:
-    """Release the inter-process lock held on ``fd``."""
+def _unlock_fd(
+    fd: int,
+) -> None:
+    """Release the inter-process lock held on ``fd``.
+
+    Parameters
+    ----------
+    fd : int
+        fd parameter.
+    """
     if sys.platform == "win32":
         os.lseek(fd, 0, os.SEEK_SET)
         msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
@@ -129,8 +155,16 @@ def _unlock_fd(fd: int) -> None:
         fcntl.flock(fd, fcntl.LOCK_UN)
 
 
-def _close_quietly(fd: int) -> None:
-    """Close ``fd`` without masking an in-flight exception."""
+def _close_quietly(
+    fd: int,
+) -> None:
+    """Close ``fd`` without masking an in-flight exception.
+
+    Parameters
+    ----------
+    fd : int
+        fd parameter.
+    """
     try:
         os.close(fd)
     except OSError:
@@ -140,13 +174,19 @@ def _close_quietly(fd: int) -> None:
 class _ReentrantFileLock:
     """Inter-process and inter-thread file lock protecting store mutations."""
 
-    def __init__(self, lock_path: Path) -> None:
+    def __init__(self,
+        lock_path: Path,
+    ) -> None:
         self._path = lock_path
         self._thread_lock = threading.RLock()
         self._depth = 0
         self._fd: int = -1
 
     def acquire(self) -> None:
+        """acquire() function.
+
+        No parameters and no return value.
+        """
         self._thread_lock.acquire()
         try:
             if self._depth == 0:
@@ -170,6 +210,10 @@ class _ReentrantFileLock:
             raise
 
     def release(self) -> None:
+        """release() function.
+
+        No parameters and no return value.
+        """
         if self._depth == 0:
             raise RuntimeError("Cannot release un-acquired file lock")
         try:
@@ -180,8 +224,8 @@ class _ReentrantFileLock:
                 try:
                     _unlock_fd(fd)
                 finally:
-                    # Closing the descriptor drops any remaining OS lock; a
-                    # close failure must not mask an unlock failure.
+                    #? Closing the descriptor drops any remaining OS lock; a
+                    #? close failure must not mask an unlock failure.
                     _close_quietly(fd)
         finally:
             self._thread_lock.release()
@@ -190,12 +234,35 @@ class _ReentrantFileLock:
         self.acquire()
         return self
 
-    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+    def __exit__(self,
+        exc_type: object,
+        exc: object,
+        tb: object,
+    ) -> None:
         self.release()
 
 
-def _pack_envelope(name: str, acl_str: str, payload: bytes) -> bytes:
-    """Wrap raw secret payload with authenticated record binding metadata."""
+def _pack_envelope(
+    name: str,
+    acl_str: str,
+    payload: bytes,
+) -> bytes:
+    """Wrap raw secret payload with authenticated record binding metadata.
+
+    Parameters
+    ----------
+    name : str
+        name parameter.
+    acl_str : str
+        acl_str parameter.
+    payload : bytes
+        payload parameter.
+
+    Returns
+    -------
+    bytes
+        The result of the operation.
+    """
     envelope = {
         "name": name,
         "acl": acl_str,
@@ -208,7 +275,11 @@ def _pack_envelope(name: str, acl_str: str, payload: bytes) -> bytes:
 
 
 def _decode_record(
-    raw: bytes, *, expected_name: str, expected_acl: str, allow_legacy: bool
+    raw: bytes,
+    *,
+    expected_name: str,
+    expected_acl: str,
+    allow_legacy: bool,
 ) -> tuple[bytes, bool]:
     """Decode a decrypted record, returning ``(payload, metadata_bound)``.
 
@@ -238,7 +309,7 @@ def _decode_record(
         ):
             raise ValueError("malformed envelope fields")
         payload = base64.b64decode(b64_payload.encode("ascii"), validate=True)
-    except ValueError as exc:  # JSON, Unicode and base64 errors subclass it
+    except ValueError as exc:  #? JSON, Unicode and base64 errors subclass it
         if allow_legacy:
             return raw, False
         raise InvalidToken("Malformed record envelope") from exc
@@ -248,7 +319,9 @@ def _decode_record(
     return payload, True
 
 
-def default_base_dir(library_name: str) -> Path:
+def default_base_dir(
+    library_name: str,
+) -> Path:
     """Resolve the default XDG base directory for ``library_name``.
 
     Honours the ``HYPERHEDRON_CONFIG_DIR`` env var (overrides all
@@ -305,8 +378,7 @@ class SecureStore:
         ``"gunz-youtrack"``).
     """
 
-    def __init__(
-        self,
+    def __init__(self,
         base_dir: str | Path | None = None,
         *,
         library_name: str = "hyperhedron",
@@ -333,20 +405,30 @@ class SecureStore:
         self._ensure_private_file(self._db_path)
 
     def _open_connection(self) -> sqlite3.Connection:
+        """_open_connection() function.
+
+        Returns
+        -------
+        sqlite3.Connection
+            The result of the operation.
+        """
         conn = sqlite3.connect(
             str(self._db_path),
             check_same_thread=False,
             isolation_level=None,
         )
         conn.row_factory = sqlite3.Row
-        # Security (VULN-2026-006): bound SQLite lock waiting so concurrent
-        # processes cannot leave this connection waiting indefinitely.
+        #? Security (VULN-2026-006): bound SQLite lock waiting so concurrent
+        #? processes cannot leave this connection waiting indefinitely.
         conn.execute("PRAGMA busy_timeout = 10000")
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
     def _reconnect_database(self) -> None:
-        """Close and reconnect database if transaction state is corrupted."""
+        """Close and reconnect database if transaction state is corrupted.
+
+        No parameters and no return value.
+        """
         try:
             self._conn.close()
         except Exception:
@@ -354,6 +436,10 @@ class SecureStore:
         self._conn = self._open_connection()
 
     def _init_schema(self) -> None:
+        """_init_schema() function.
+
+        No parameters and no return value.
+        """
         with self._lock:
             self._conn.executescript(
                 """
@@ -382,18 +468,39 @@ class SecureStore:
             )
 
     def is_unlocked(self) -> bool:
+        """is_unlocked() function.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         with self._fernet_lock:
             return self._fernet is not None
 
     @property
     def fernet(self) -> Fernet | None:
-        """Thread-safe Fernet accessor; returns the current instance or None."""
+        """Thread-safe Fernet accessor; returns the current instance or None.
+
+        Returns
+        -------
+        Fernet | None
+            The result of the operation.
+        """
         with self._fernet_lock:
             return self._fernet
 
     @staticmethod
-    def _ensure_private_directory(path: Path) -> None:
-        """Create and verify an owner-private non-symlink directory."""
+    def _ensure_private_directory(
+        path: Path,
+    ) -> None:
+        """Create and verify an owner-private non-symlink directory.
+
+        Parameters
+        ----------
+        path : Path
+            path parameter.
+        """
         if path.is_symlink():
             raise ValueError("secure-store base directory must not be a symlink")
         path.mkdir(parents=True, exist_ok=True, mode=_DIR_MODE)
@@ -408,8 +515,16 @@ class SecureStore:
                 raise PermissionError("secure-store base directory is not mode 0700")
 
     @staticmethod
-    def _ensure_private_file(path: Path) -> None:
-        """Reject symlinks/non-files and enforce owner-only permissions."""
+    def _ensure_private_file(
+        path: Path,
+    ) -> None:
+        """Reject symlinks/non-files and enforce owner-only permissions.
+
+        Parameters
+        ----------
+        path : Path
+            path parameter.
+        """
         if path.is_symlink():
             raise ValueError(f"private path must not be a symlink: {path.name}")
         info = os.stat(path, follow_symlinks=False)
@@ -424,8 +539,16 @@ class SecureStore:
                 raise PermissionError(f"private file is not mode 0600: {path.name}")
 
     @classmethod
-    def _prepare_private_database(cls, path: Path) -> None:
-        """Create the SQLite file without a world-readable creation window."""
+    def _prepare_private_database(cls,
+        path: Path,
+    ) -> None:
+        """Create the SQLite file without a world-readable creation window.
+
+        Parameters
+        ----------
+        path : Path
+            path parameter.
+        """
         if path.is_symlink():
             raise ValueError("secure-store database path must not be a symlink")
         if not path.exists():
@@ -443,8 +566,21 @@ class SecureStore:
         cls._ensure_private_file(path)
 
     @classmethod
-    def _read_private(cls, path: Path) -> bytes:
-        """Read key material through the descriptor that was type-checked."""
+    def _read_private(cls,
+        path: Path,
+    ) -> bytes:
+        """Read key material through the descriptor that was type-checked.
+
+        Parameters
+        ----------
+        path : Path
+            path parameter.
+
+        Returns
+        -------
+        bytes
+            The result of the operation.
+        """
         if path.is_symlink():
             raise ValueError(f"private path must not be a symlink: {path.name}")
         flags = os.O_RDONLY
@@ -469,7 +605,21 @@ class SecureStore:
                 os.close(descriptor)
 
     @staticmethod
-    def _validate_secret_name(value: str) -> str:
+    def _validate_secret_name(
+        value: str,
+    ) -> str:
+        """_validate_secret_name() function.
+
+        Parameters
+        ----------
+        value : str
+            value parameter.
+
+        Returns
+        -------
+        str
+            The result of the operation.
+        """
         if (
             not isinstance(value, str)
             or not value.strip()
@@ -484,7 +634,25 @@ class SecureStore:
         return value
 
     @staticmethod
-    def _validate_identity(value: str, *, field: str) -> str:
+    def _validate_identity(
+        value: str,
+        *,
+        field: str,
+    ) -> str:
+        """_validate_identity() function.
+
+        Parameters
+        ----------
+        value : str
+            value parameter.
+        field : str
+            field parameter.
+
+        Returns
+        -------
+        str
+            The result of the operation.
+        """
         if (
             not isinstance(value, str)
             or not value.strip()
@@ -498,7 +666,21 @@ class SecureStore:
         return value
 
     @classmethod
-    def _normalize_acl(cls, acl: list[str] | None) -> list[str] | None:
+    def _normalize_acl(cls,
+        acl: list[str] | None,
+    ) -> list[str] | None:
+        """_normalize_acl() function.
+
+        Parameters
+        ----------
+        acl : list[str] | None
+            acl parameter.
+
+        Returns
+        -------
+        list[str] | None
+            The result of the operation.
+        """
         if acl is None:
             return None
         if not isinstance(acl, list):
@@ -513,8 +695,19 @@ class SecureStore:
         return normalized
 
     @staticmethod
-    def _write_private(path: Path, data: bytes) -> None:
-        """Create or replace a private file without a world-readable window."""
+    def _write_private(
+        path: Path,
+        data: bytes,
+    ) -> None:
+        """Create or replace a private file without a world-readable window.
+
+        Parameters
+        ----------
+        path : Path
+            path parameter.
+        data : bytes
+            data parameter.
+        """
         descriptor, temporary_name = tempfile.mkstemp(
             dir=path.parent,
             prefix=f".{path.name}.",
@@ -547,10 +740,18 @@ class SecureStore:
                 os.close(descriptor)
 
     def _cleanup_pending_key_material(self) -> None:
+        """_cleanup_pending_key_material() function.
+
+        No parameters and no return value.
+        """
         self._pending_key_path.unlink(missing_ok=True)
         self._pending_salt_path.unlink(missing_ok=True)
 
     def _fsync_base_dir(self) -> None:
+        """_fsync_base_dir() function.
+
+        No parameters and no return value.
+        """
         if not hasattr(os, "O_DIRECTORY"):
             return
         descriptor = os.open(
@@ -562,7 +763,17 @@ class SecureStore:
         finally:
             os.close(descriptor)
 
-    def _promote_pending_key_material(self, *, passphrase_mode: bool) -> None:
+    def _promote_pending_key_material(self,
+        *,
+        passphrase_mode: bool,
+    ) -> None:
+        """_promote_pending_key_material() function.
+
+        Parameters
+        ----------
+        passphrase_mode : bool
+            passphrase_mode parameter.
+        """
         if passphrase_mode:
             os.replace(self._pending_salt_path, self._salt_path)
             self._master_key_path.unlink(missing_ok=True)
@@ -573,8 +784,21 @@ class SecureStore:
             self._pending_salt_path.unlink(missing_ok=True)
         self._fsync_base_dir()
 
-    def _read_record_policy(self, fernet: Fernet) -> bool:
-        """Verify authenticated policy and its persisted format marker."""
+    def _read_record_policy(self,
+        fernet: Fernet,
+    ) -> bool:
+        """Verify authenticated policy and its persisted format marker.
+
+        Parameters
+        ----------
+        fernet : Fernet
+            fernet parameter.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         check = self._conn.execute(
             "SELECT value FROM store_meta WHERE key = 'key_check'"
         ).fetchone()
@@ -597,8 +821,20 @@ class SecureStore:
             )
         return policy == _KEY_CHECK_STRICT
 
-    def _write_record_policy(self, fernet: Fernet, *, strict: bool) -> None:
-        """Write policy and authenticated check within the caller's transaction."""
+    def _write_record_policy(self,
+        fernet: Fernet,
+        *,
+        strict: bool,
+    ) -> None:
+        """Write policy and authenticated check within the caller's transaction.
+
+        Parameters
+        ----------
+        fernet : Fernet
+            fernet parameter.
+        strict : bool
+            strict parameter.
+        """
         self._conn.execute(
             "INSERT OR REPLACE INTO store_meta(key, value) VALUES ('key_check', ?)",
             (fernet.encrypt(_KEY_CHECK_STRICT if strict else _KEY_CHECK_MIGRATION),),
@@ -608,10 +844,20 @@ class SecureStore:
             (_RECORD_FORMAT_STRICT if strict else _RECORD_FORMAT_LEGACY,),
         )
 
-    def _verify_or_initialize_key(
-        self, fernet: Fernet, *, allow_legacy: bool = False
+    def _verify_or_initialize_key(self,
+        fernet: Fernet,
+        *,
+        allow_legacy: bool = False,
     ) -> None:
-        """Verify key/policy or explicitly upgrade legacy metadata under both locks."""
+        """Verify key/policy or explicitly upgrade legacy metadata under both locks.
+
+        Parameters
+        ----------
+        fernet : Fernet
+            fernet parameter.
+        allow_legacy : bool
+            allow_legacy parameter.
+        """
         row = self._conn.execute(
             "SELECT value FROM store_meta WHERE key = 'key_check'"
         ).fetchone()
@@ -619,7 +865,7 @@ class SecureStore:
         if policy in (_KEY_CHECK_STRICT, _KEY_CHECK_MIGRATION):
             self._read_record_policy(fernet)
             generation = self._read_generation()
-            if generation is None:  # Kept explicit for the optional return annotation.
+            if generation is None:  #? Kept explicit for the optional return annotation.
                 raise RuntimeError("Store generation metadata is missing")
             self._key_generation = generation
             return
@@ -642,8 +888,8 @@ class SecureStore:
         generation = self._read_generation(missing_ok=True)
         if generation is None:
             generation = 1
-        # Seal the upgrade atomically: an interrupted unlock must not publish
-        # an authenticated policy without its corresponding format/generation.
+        #? Seal the upgrade atomically: an interrupted unlock must not publish
+        #? an authenticated policy without its corresponding format/generation.
         self._conn.execute("BEGIN IMMEDIATE")
         try:
             self._write_record_policy(fernet, strict=strict or secret is None)
@@ -661,8 +907,22 @@ class SecureStore:
             raise
         self._key_generation = generation
 
-    def _read_generation(self, *, missing_ok: bool = False) -> int | None:
-        """Return the persisted key generation, rejecting malformed metadata."""
+    def _read_generation(self,
+        *,
+        missing_ok: bool = False,
+    ) -> int | None:
+        """Return the persisted key generation, rejecting malformed metadata.
+
+        Parameters
+        ----------
+        missing_ok : bool
+            missing_ok parameter.
+
+        Returns
+        -------
+        int | None
+            The result of the operation.
+        """
         row = self._conn.execute(
             "SELECT value FROM store_meta WHERE key = 'key_generation'"
         ).fetchone()
@@ -685,20 +945,31 @@ class SecureStore:
         return int(raw)
 
     def _verify_key_generation(self) -> None:
-        """Verify this store instance's key matches current database key generation."""
+        """Verify this store instance's key matches current database key generation.
+
+        No parameters and no return value.
+        """
         if self._read_generation() != self._key_generation:
             raise RuntimeError(
                 "Store key is stale; master key was rotated. Call unlock() again."
             )
 
     def _records_strict(self) -> bool:
-        """Require a valid authenticated strict or trusted migration policy."""
+        """Require a valid authenticated strict or trusted migration policy.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         if self._fernet is None:
             raise RuntimeError("Store is locked. Call unlock() first.")
         return self._read_record_policy(self._fernet)
 
-    def unlock(
-        self, passphrase: str | None = None, *, allow_legacy: bool = False
+    def unlock(self,
+        passphrase: str | None = None,
+        *,
+        allow_legacy: bool = False,
     ) -> None:
         """Unlock the store, recovering interrupted key publication if needed.
 
@@ -792,7 +1063,24 @@ class SecureStore:
             raise InvalidToken
 
     @staticmethod
-    def _derive_key(passphrase: str, salt: bytes) -> bytes:
+    def _derive_key(
+        passphrase: str,
+        salt: bytes,
+    ) -> bytes:
+        """_derive_key() function.
+
+        Parameters
+        ----------
+        passphrase : str
+            passphrase parameter.
+        salt : bytes
+            salt parameter.
+
+        Returns
+        -------
+        bytes
+            The result of the operation.
+        """
         if not isinstance(passphrase, str) or not passphrase:
             raise ValueError("passphrase must be a non-empty string")
         kdf = PBKDF2HMAC(
@@ -803,13 +1091,25 @@ class SecureStore:
         )
         return base64.urlsafe_b64encode(kdf.derive(passphrase.encode()))
 
-    def _audit(
-        self,
+    def _audit(self,
         caller: str,
         action: str,
         secret_name: str | None,
         allowed: bool,
     ) -> None:
+        """_audit() function.
+
+        Parameters
+        ----------
+        caller : str
+            caller parameter.
+        action : str
+            action parameter.
+        secret_name : str | None
+            secret_name parameter.
+        allowed : bool
+            allowed parameter.
+        """
         with self._lock:
             self._conn.execute(
                 """
@@ -821,7 +1121,13 @@ class SecureStore:
 
     @contextmanager
     def _transaction_locked(self) -> Iterator[None]:
-        """Join an active transaction or own one for this mutation."""
+        """Join an active transaction or own one for this mutation.
+
+        Returns
+        -------
+        Iterator[None]
+            The result of the operation.
+        """
         with self._coordination_lock:
             self._verify_key_generation()
             started = not self._conn.in_transaction
@@ -850,15 +1156,26 @@ class SecureStore:
                             self._reconnect_database()
                         raise
 
-    def set(
-        self,
+    def set(self,
         name: str,
         value: str | bytes,
         *,
         caller: str = "library",
         acl: list[str] | None = None,
     ) -> None:
-        """Encrypt and store a secret, preserving an existing ACL by default."""
+        """Encrypt and store a secret, preserving an existing ACL by default.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+        value : str | bytes
+            value parameter.
+        caller : str
+            caller parameter.
+        acl : list[str] | None
+            acl parameter.
+        """
         name = self._validate_secret_name(name)
         caller = self._validate_identity(caller, field="caller")
         acl = self._normalize_acl(acl)
@@ -926,8 +1243,25 @@ class SecureStore:
                     self._audit(caller, "set", name, False)
                 raise
 
-    def get_bytes(self, name: str, *, caller: str = "library") -> bytes | None:
-        """Decrypt and return raw secret bytes, or None if not found."""
+    def get_bytes(self,
+        name: str,
+        *,
+        caller: str = "library",
+    ) -> bytes | None:
+        """Decrypt and return raw secret bytes, or None if not found.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+        caller : str
+            caller parameter.
+
+        Returns
+        -------
+        bytes | None
+            The result of the operation.
+        """
         name = self._validate_secret_name(name)
         caller = self._validate_identity(caller, field="caller")
         with self._lock:
@@ -962,13 +1296,47 @@ class SecureStore:
             self._audit(caller, "get", name, True)
             return plaintext
 
-    def get(self, name: str, *, caller: str = "library") -> str | None:
-        """Decrypt and UTF-8 decode a text secret, or None if not found."""
+    def get(self,
+        name: str,
+        *,
+        caller: str = "library",
+    ) -> str | None:
+        """Decrypt and UTF-8 decode a text secret, or None if not found.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+        caller : str
+            caller parameter.
+
+        Returns
+        -------
+        str | None
+            The result of the operation.
+        """
         value = self.get_bytes(name, caller=caller)
         return None if value is None else value.decode("utf-8")
 
-    def delete(self, name: str, *, caller: str = "library") -> bool:
-        """Delete an authorized secret. The store must be unlocked."""
+    def delete(self,
+        name: str,
+        *,
+        caller: str = "library",
+    ) -> bool:
+        """Delete an authorized secret. The store must be unlocked.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+        caller : str
+            caller parameter.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         name = self._validate_secret_name(name)
         caller = self._validate_identity(caller, field="caller")
         with self._lock:
@@ -1017,14 +1385,23 @@ class SecureStore:
                     self._audit(caller, "delete", name, False)
                 raise
 
-    def set_many(
-        self,
+    def set_many(self,
         values: dict[str, str | bytes],
         *,
         caller: str = "library",
         acl: list[str] | None = None,
     ) -> None:
-        """Store multiple values and their audit events in one transaction."""
+        """Store multiple values and their audit events in one transaction.
+
+        Parameters
+        ----------
+        values : dict[str, str | bytes]
+            values parameter.
+        caller : str
+            caller parameter.
+        acl : list[str] | None
+            acl parameter.
+        """
         if not isinstance(values, dict):
             raise ValueError("values must be a dict")
         caller = self._validate_identity(caller, field="caller")
@@ -1058,20 +1435,50 @@ class SecureStore:
                         pass
                 raise
 
-    def get_many(
-        self, names: list[str], *, caller: str = "library"
+    def get_many(self,
+        names: list[str],
+        *,
+        caller: str = "library",
     ) -> dict[str, str | None]:
-        """Retrieve multiple UTF-8 text secrets."""
+        """Retrieve multiple UTF-8 text secrets.
+
+        Parameters
+        ----------
+        names : list[str]
+            names parameter.
+        caller : str
+            caller parameter.
+
+        Returns
+        -------
+        dict[str, str | None]
+            The result of the operation.
+        """
         if not isinstance(names, list):
             raise ValueError("names must be a list")
         caller = self._validate_identity(caller, field="caller")
         validated = [self._validate_secret_name(name) for name in names]
         return {name: self.get(name, caller=caller) for name in validated}
 
-    def list_keys(
-        self, *, caller: str = "library", acl_filter: bool = True
+    def list_keys(self,
+        *,
+        caller: str = "library",
+        acl_filter: bool = True,
     ) -> list[SecretMetadata]:
-        """List secret names with metadata. Respects ACL by default."""
+        """List secret names with metadata. Respects ACL by default.
+
+        Parameters
+        ----------
+        caller : str
+            caller parameter.
+        acl_filter : bool
+            acl_filter parameter.
+
+        Returns
+        -------
+        list[SecretMetadata]
+            The result of the operation.
+        """
         caller = self._validate_identity(caller, field="caller")
         if not isinstance(acl_filter, bool):
             raise ValueError("acl_filter must be bool")
@@ -1096,8 +1503,7 @@ class SecureStore:
             )
         return out
 
-    def rotate_master_key(
-        self,
+    def rotate_master_key(self,
         new_passphrase: str | None = None,
         *,
         allow_mode_switch: bool = False,
@@ -1153,8 +1559,8 @@ class SecureStore:
                 self._verify_key_generation()
                 self._records_strict()
                 if self._pending_key_path.exists() or self._pending_salt_path.exists():
-                    # A prior rotation may have committed without publishing.
-                    # Preserve its only durable key before staging another one.
+                    #? A prior rotation may have committed without publishing.
+                    #? Preserve its only durable key before staging another one.
                     self._promote_pending_key_material(
                         passphrase_mode=self._passphrase_mode,
                     )
@@ -1225,8 +1631,7 @@ class SecureStore:
                     passphrase_mode=target_is_passphrase,
                 )
 
-    def _recover_failed_rotation(
-        self,
+    def _recover_failed_rotation(self,
         failure: BaseException,
         *,
         old_fernet: Fernet,
@@ -1235,14 +1640,30 @@ class SecureStore:
         new_generation: int,
         passphrase_mode: bool,
     ) -> None:
-        """Reconcile durable state without losing the original rotation failure."""
+        """Reconcile durable state without losing the original rotation failure.
+
+        Parameters
+        ----------
+        failure : BaseException
+            failure parameter.
+        old_fernet : Fernet
+            old_fernet parameter.
+        new_fernet : Fernet
+            new_fernet parameter.
+        old_generation : int
+            old_generation parameter.
+        new_generation : int
+            new_generation parameter.
+        passphrase_mode : bool
+            passphrase_mode parameter.
+        """
         try:
             if self._conn.in_transaction:
                 try:
                     self._conn.execute("ROLLBACK")
                 except BaseException:
-                    # Closing the connection drops an uncommitted transaction.
-                    # COMMIT may also have succeeded before its wrapper failed.
+                    #? Closing the connection drops an uncommitted transaction.
+                    #? COMMIT may also have succeeded before its wrapper failed.
                     pass
             self._reconnect_database()
             generation = self._read_generation()
@@ -1256,8 +1677,8 @@ class SecureStore:
                 self._fernet = new_fernet
                 self._key_generation = new_generation
                 self._passphrase_mode = passphrase_mode
-                # Keep pending material: the database is committed but key
-                # publication still needs recovery by coordinated unlock.
+                #? Keep pending material: the database is committed but key
+                #? publication still needs recovery by coordinated unlock.
             else:
                 raise RuntimeError("Unexpected durable key generation")
         except BaseException:
@@ -1339,12 +1760,29 @@ class SecureStore:
             return True
 
     def lock(self) -> None:
-        """Atomically clear the Fernet instance. Thread-safe."""
+        """Atomically clear the Fernet instance. Thread-safe.
+
+        No parameters and no return value.
+        """
         with self._fernet_lock:
             self._fernet = None
 
-    def audit_events(self, *, limit: int = 100) -> list[dict[str, object]]:
-        """Return the newest audit events without secret values."""
+    def audit_events(self,
+        *,
+        limit: int = 100,
+    ) -> list[dict[str, object]]:
+        """Return the newest audit events without secret values.
+
+        Parameters
+        ----------
+        limit : int
+            limit parameter.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            The result of the operation.
+        """
         if (
             isinstance(limit, bool)
             or not isinstance(limit, int)
@@ -1363,17 +1801,31 @@ class SecureStore:
     def __enter__(self) -> SecureStore:
         return self
 
-    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+    def __exit__(self,
+        exc_type: object,
+        exc: object,
+        tb: object,
+    ) -> None:
         self.close()
 
     def close(self) -> None:
+        """close() function.
+
+        No parameters and no return value.
+        """
         with self._lock:
             self._conn.close()
             self._fernet = None
 
 
 def main_unlock_interactive() -> SecureStore:
-    """Convenience helper for CLI: prompts for passphrase if needed."""
+    """Convenience helper for CLI: prompts for passphrase if needed.
+
+    Returns
+    -------
+    SecureStore
+        The result of the operation.
+    """
     store = SecureStore()
     if store._salt_path.exists():
         import getpass

@@ -1,12 +1,24 @@
 """Lifetime counter accounting for sampled process trees."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import os
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.benchmark.process as process_module
 

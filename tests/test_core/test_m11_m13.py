@@ -1,7 +1,15 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.instrumentation import Counter, Timer
 from gunz_utils.pipeline import worker_map
@@ -10,7 +18,9 @@ from gunz_utils.typed_config import convert, parse_bool
 
 class TestM11M13(unittest.IsolatedAsyncioTestCase):
     async def test_worker_map(self) -> None:
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             await asyncio.sleep(0)
             return value * 2
 

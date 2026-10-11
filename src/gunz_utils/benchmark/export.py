@@ -1,5 +1,9 @@
 """CSV and HTML export for process profiles."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import base64
@@ -8,6 +12,9 @@ import io
 from pathlib import Path
 from typing import Protocol
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .plot import plot_process_samples
 from .process import ProcessProfile
 from .report import format_process_profile
@@ -16,11 +23,34 @@ from .report import format_process_profile
 class _Figure(Protocol):
     """Minimal matplotlib Figure surface used for PNG rendering."""
 
-    def savefig(self, fname: object, **kwargs: object) -> None: ...
+    def savefig(self,
+        fname: object,
+        **kwargs: object,
+    ) -> None:
+        """Save the current figure to the given destination.
+
+        Parameters
+        ----------
+        fname : object
+            The output filename or file-like object.
+        **kwargs : object
+            Additional keyword arguments passed to the backend.
+        """
 
 
-def save_process_csv(profile: ProcessProfile, path: str | Path) -> None:
-    """Write aggregate process-tree samples as portable CSV."""
+def save_process_csv(
+    profile: ProcessProfile,
+    path: str | Path,
+) -> None:
+    """Write aggregate process-tree samples as portable CSV.
+
+    Parameters
+    ----------
+    profile : ProcessProfile
+        profile parameter.
+    path : str | Path
+        path parameter.
+    """
     fields = [
         "elapsed",
         "process_count",
@@ -44,14 +74,39 @@ def save_process_csv(profile: ProcessProfile, path: str | Path) -> None:
             writer.writerow({field: getattr(sample, field) for field in fields})
 
 
-def _figure_data_uri(figure: _Figure) -> str:
+def _figure_data_uri(
+    figure: _Figure,
+) -> str:
+    """_figure_data_uri() function.
+
+    Parameters
+    ----------
+    figure : _Figure
+        figure parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     buffer = io.BytesIO()
     figure.savefig(buffer, format="png", bbox_inches="tight")
     return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
-def save_process_html(profile: ProcessProfile, path: str | Path) -> None:
-    """Write a self-contained HTML profile report with embedded plots."""
+def save_process_html(
+    profile: ProcessProfile,
+    path: str | Path,
+) -> None:
+    """Write a self-contained HTML profile report with embedded plots.
+
+    Parameters
+    ----------
+    profile : ProcessProfile
+        profile parameter.
+    path : str | Path
+        path parameter.
+    """
     metrics = ["rss_bytes", "cpu_cores", "process_count", "threads"]
     images = []
     for metric in metrics:

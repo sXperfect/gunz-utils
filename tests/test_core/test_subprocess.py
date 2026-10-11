@@ -1,3 +1,7 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -12,6 +16,10 @@ try:
 except ImportError:
     pytest = None  # type: ignore[assignment]
 
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.subprocess import (
     CommandError,

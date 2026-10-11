@@ -1,3 +1,7 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -9,6 +13,10 @@ import time
 import unittest
 from pathlib import Path
 from typing import Any
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.io import atomic_json_write, atomic_write
 from gunz_utils.retry import (
@@ -24,7 +32,9 @@ from gunz_utils.streaming import (
 
 
 class PartialWriter(io.BytesIO):
-    def write(self, data: Any) -> int:
+    def write(self,
+        data: Any,
+    ) -> int:
         return super().write(bytes(data[:1]))
 
 

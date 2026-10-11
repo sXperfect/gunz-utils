@@ -1,5 +1,9 @@
 """Isolated benchmark worker execution using the Python standard library."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import json
@@ -8,6 +12,9 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ..subprocess import run_command
 
 
@@ -28,7 +35,26 @@ def run_python_worker(
     timeout: float | None = None,
     max_output_bytes: int | None = 8 * 1024 * 1024,
 ) -> WorkerResult:
-    """Execute a trusted benchmark module with bounded captured output."""
+    """Execute a trusted benchmark module with bounded captured output.
+
+    Parameters
+    ----------
+    module : str
+        module parameter.
+    args : Sequence[str]
+        args parameter.
+    python : str
+        python parameter.
+    timeout : float | None
+        timeout parameter.
+    max_output_bytes : int | None
+        max_output_bytes parameter.
+
+    Returns
+    -------
+    WorkerResult
+        The result of the operation.
+    """
     if not isinstance(module, str) or not module:
         raise ValueError("module must be a non-empty string")
     if not isinstance(python, str) or not python:
@@ -61,12 +87,39 @@ def run_python_worker(
     )
 
 
-def _reject_json_constant(value: str) -> object:
+def _reject_json_constant(
+    value: str,
+) -> object:
+    """_reject_json_constant() function.
+
+    Parameters
+    ----------
+    value : str
+        value parameter.
+
+    Returns
+    -------
+    object
+        The result of the operation.
+    """
     raise ValueError(f"non-standard JSON constant: {value}")
 
 
-def worker_json(result: WorkerResult) -> object:
-    """Decode a successful worker's stdout as strict JSON."""
+def worker_json(
+    result: WorkerResult,
+) -> object:
+    """Decode a successful worker's stdout as strict JSON.
+
+    Parameters
+    ----------
+    result : WorkerResult
+        result parameter.
+
+    Returns
+    -------
+    object
+        The result of the operation.
+    """
     if result.returncode:
         raise RuntimeError(
             f"benchmark worker failed with exit code {result.returncode}"

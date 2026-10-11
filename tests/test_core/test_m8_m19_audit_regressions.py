@@ -1,8 +1,16 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import tempfile
 import unittest
 from pathlib import Path
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.benchmark import (
     PerformanceArtifact,
@@ -18,7 +26,9 @@ from gunz_utils.pipeline import worker_map
 
 class TestAuditRegressions(unittest.IsolatedAsyncioTestCase):
     async def test_worker_map_completes_without_deadlock(self) -> None:
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             return value
 
         result = [
@@ -28,7 +38,9 @@ class TestAuditRegressions(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sorted(result), list(range(5)))
 
     async def test_worker_map_propagates_error(self) -> None:
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             if value == 2:
                 raise OSError("boom")
             return value

@@ -1,5 +1,9 @@
 """Backend-neutral renewable lease heartbeat coordination."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -56,7 +60,13 @@ class LeaseTiming:
 async def _renew_once(
     renew: Callable[[], Awaitable[bool]],
 ) -> None:
-    """Perform one renewal and require an explicit ownership decision."""
+    """Perform one renewal and require an explicit ownership decision.
+
+    Parameters
+    ----------
+    renew : Callable[[], Awaitable[bool]]
+        renew parameter.
+    """
     owned = await renew()
     if not isinstance(owned, bool):
         raise TypeError("renew callback must return bool")
@@ -70,10 +80,24 @@ async def _heartbeat_loop(
     interval: float,
     renew_immediately: bool,
 ) -> None:
-    """Renew forever until cancelled or ownership is lost."""
+    """Renew forever until cancelled or ownership is lost.
+
+    Parameters
+    ----------
+    renew : Callable[[], Awaitable[bool]]
+        renew parameter.
+    interval : float
+        interval parameter.
+    renew_immediately : bool
+        renew_immediately parameter.
+    """
     if renew_immediately:
         await _renew_once(renew)
 
+    #? Heartbeat loop runs until the task is cancelled or ``_renew_once``
+    #? raises ``LeaseLostError`` when ownership is lost, so it is not a
+    #? non-terminating loop.
+    # gunz-style: ignore[GS033]
     while True:
         await asyncio.sleep(interval)
         await _renew_once(renew)
@@ -143,9 +167,9 @@ async def run_with_lease_heartbeat(
     operation_task: asyncio.Future[T] | None = None
     heartbeat_task: asyncio.Task[None] | None = None
     try:
-        # ensure_future accepts any Awaitable promised by the public contract,
-        # including an already-created Future. Task creation is inside the
-        # cleanup scope so a later setup failure cannot orphan the operation.
+        #? ensure_future accepts any Awaitable promised by the public contract,
+        #? including an already-created Future. Task creation is inside the
+        #? cleanup scope so a later setup failure cannot orphan the operation.
         operation_task = asyncio.ensure_future(operation())
         heartbeat_coroutine = _heartbeat_loop(
             renew,
@@ -163,8 +187,8 @@ async def run_with_lease_heartbeat(
             return_when=asyncio.FIRST_COMPLETED,
         )
 
-        # Lease loss wins if both tasks become ready in the same event-loop
-        # turn. A worker that no longer owns the lease must not publish success.
+        #? Lease loss wins if both tasks become ready in the same event-loop
+        #? turn. A worker that no longer owns the lease must not publish success.
         if heartbeat_task in done:
             heartbeat_error = heartbeat_task.exception()
             if not operation_task.done():

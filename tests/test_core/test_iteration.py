@@ -1,8 +1,16 @@
 """Tests for lazy iteration helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.iteration import batched, chunked, first, flatten
 

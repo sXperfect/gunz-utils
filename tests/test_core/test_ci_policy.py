@@ -1,5 +1,9 @@
 """Static contract tests for the hosted CI policy."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import re

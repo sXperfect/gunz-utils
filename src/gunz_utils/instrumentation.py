@@ -1,5 +1,9 @@
 """Dependency-free instrumentation primitives."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import copy
@@ -16,7 +20,21 @@ class Counter:
     value: int = 0
     _lock: Lock = field(default_factory=Lock, repr=False)
 
-    def add(self, amount: int = 1) -> int:
+    def add(self,
+        amount: int = 1,
+    ) -> int:
+        """add() function.
+
+        Parameters
+        ----------
+        amount : int
+            amount parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         with self._lock:
             self.value += amount
             return self.value
@@ -30,7 +48,9 @@ class Timing:
 
 
 class Timer:
-    def __init__(self, name: str) -> None:
+    def __init__(self,
+        name: str,
+    ) -> None:
         self.name = name
         self.started = 0.0
         self.result: Timing | None = None
@@ -39,7 +59,11 @@ class Timer:
         self.started = time.perf_counter()
         return self
 
-    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+    def __exit__(self,
+        exc_type: object,
+        exc: object,
+        tb: object,
+    ) -> None:
         self.result = Timing(
             self.name,
             time.perf_counter() - self.started,
@@ -89,8 +113,7 @@ class Trace:
     _lock: Lock = field(default_factory=Lock, repr=False)
 
     @contextmanager
-    def span(
-        self,
+    def span(self,
         name: str,
         **metadata: Any,
     ) -> Iterator[None]:
@@ -130,8 +153,7 @@ class Trace:
             with self._lock:
                 self.events.append(event)
 
-    def slowest(
-        self,
+    def slowest(self,
         n: int = 10,
     ) -> list[TraceEvent]:
         """Return up to n slowest completed spans.

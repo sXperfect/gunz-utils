@@ -1,8 +1,16 @@
 """Deterministic process sampling checks for exit races and memory cadence."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.benchmark.process import (
     ProcessSample,
@@ -12,7 +20,9 @@ from gunz_utils.benchmark.process import (
 )
 
 
-def _sample(process_count: int = 1) -> ProcessSample:
+def _sample(
+    process_count: int = 1,
+) -> ProcessSample:
     return ProcessSample(
         elapsed=0.1,
         process_count=process_count,

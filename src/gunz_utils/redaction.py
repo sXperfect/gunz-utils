@@ -8,8 +8,15 @@ recursively walking a nested configuration structure and masking only the
 values whose keys match a known secret pattern.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
@@ -46,7 +53,16 @@ SECRET_PATTERNS: frozenset[str] = frozenset(
 _MASK = "****"
 
 
-def _validate_show_chars(show_chars: int) -> None:
+def _validate_show_chars(
+    show_chars: int,
+) -> None:
+    """_validate_show_chars() function.
+
+    Parameters
+    ----------
+    show_chars : int
+        show_chars parameter.
+    """
     if (
         isinstance(show_chars, bool)
         or not isinstance(show_chars, int)
@@ -55,7 +71,11 @@ def _validate_show_chars(show_chars: int) -> None:
         raise ValueError("show_chars must be a non-negative integer")
 
 
-def redact(value: object, *, show_chars: int = 2) -> object:
+def redact(
+    value: object,
+    *,
+    show_chars: int = 2,
+) -> object:
     """Mask a string value, preserving ``show_chars`` characters on each end.
 
     The default ``show_chars=2`` exposes only a small prefix/suffix while
@@ -103,7 +123,10 @@ def redact(value: object, *, show_chars: int = 2) -> object:
     return f"{value[:show_chars]}{_MASK}{value[-show_chars:]}"
 
 
-def _is_secret_key(key: object, patterns: frozenset[str]) -> bool:
+def _is_secret_key(
+    key: object,
+    patterns: frozenset[str],
+) -> bool:
     """Return True if ``key`` (case-insensitively) contains any pattern.
 
     Parameters
@@ -165,7 +188,24 @@ def redact_dict(
     if show_chars < 0:
         raise ValueError("show_chars must be non-negative")
 
-    def _walk(value: object, secret_context: bool = False) -> object:
+    def _walk(
+        value: object,
+        secret_context: bool = False,
+    ) -> object:
+        """_walk() function.
+
+        Parameters
+        ----------
+        value : object
+            value parameter.
+        secret_context : bool
+            secret_context parameter.
+
+        Returns
+        -------
+        object
+            The result of the operation.
+        """
         if secret_context:
             if isinstance(value, dict):
                 return {key: _walk(item, True) for key, item in value.items()}

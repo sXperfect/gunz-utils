@@ -1,5 +1,9 @@
 """Repository-level package, typing, and documentation contract tests."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import ast
@@ -25,7 +29,9 @@ README = PROJECT_ROOT / "README.md"
 INSTALLATION = PROJECT_ROOT / "docs" / "source" / "installation.md"
 
 
-def _declares_public_all(path: Path) -> bool:
+def _declares_public_all(
+    path: Path,
+) -> bool:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for node in tree.body:
         if isinstance(node, ast.Assign):

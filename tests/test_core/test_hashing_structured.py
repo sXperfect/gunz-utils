@@ -1,10 +1,22 @@
 """Structured and directory fingerprint tests."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.hashing import (
     directory_hash,
@@ -39,7 +51,9 @@ def test_structured_hash_supports_path_and_set_via_canonical_serialization() -> 
     assert structured_hash(left) == structured_hash(right)
 
 
-def test_directory_manifest_uses_sorted_posix_relative_paths(tmp_path: Path) -> None:
+def test_directory_manifest_uses_sorted_posix_relative_paths(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "nested").mkdir()
     (tmp_path / "z.txt").write_text("z", encoding="utf-8")
     (tmp_path / "nested" / "a.txt").write_text("a", encoding="utf-8")
@@ -52,7 +66,9 @@ def test_directory_manifest_uses_sorted_posix_relative_paths(tmp_path: Path) -> 
     ]
 
 
-def test_directory_hash_changes_with_content_and_path(tmp_path: Path) -> None:
+def test_directory_hash_changes_with_content_and_path(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "a.txt"
     source.write_text("first", encoding="utf-8")
     first = directory_hash(tmp_path)
@@ -67,7 +83,9 @@ def test_directory_hash_changes_with_content_and_path(tmp_path: Path) -> None:
     assert third != second
 
 
-def test_directory_manifest_rejects_non_directory(tmp_path: Path) -> None:
+def test_directory_manifest_rejects_non_directory(
+    tmp_path: Path,
+) -> None:
     file_path = tmp_path / "file.txt"
     file_path.write_text("x", encoding="utf-8")
 
@@ -76,7 +94,9 @@ def test_directory_manifest_rejects_non_directory(tmp_path: Path) -> None:
 
 
 
-def test_directory_manifest_excludes_symlinked_files(tmp_path: Path) -> None:
+def test_directory_manifest_excludes_symlinked_files(
+    tmp_path: Path,
+) -> None:
     outside = tmp_path.parent / f"{tmp_path.name}-outside.txt"
     outside.write_text("outside", encoding="utf-8")
     link = tmp_path / "outside-link.txt"

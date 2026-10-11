@@ -1,10 +1,17 @@
 """Optional Pydantic-backed runtime validation helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import functools
 import typing as t
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 from pydantic import ValidationError, validate_call
 
 __author__ = "Yeremia Gunawan Adhisantoso"
@@ -12,14 +19,61 @@ __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 
 
-def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
-    """Wrap pydantic.validate_call with value-redacted public errors."""
+def type_checked(
+    func: t.Callable | None = None,
+    **kwargs: t.Any,
+) -> t.Callable:
+    """Wrap pydantic.validate_call with value-redacted public errors.
 
-    def decorator(f: t.Callable) -> t.Callable:
+    Parameters
+    ----------
+    func : t.Callable | None
+        func parameter.
+    kwargs : t.Any
+        kwargs parameter.
+
+    Returns
+    -------
+    t.Callable
+        The result of the operation.
+    """
+
+    def decorator(
+        f: t.Callable,
+    ) -> t.Callable:
+        """decorator() function.
+
+        Parameters
+        ----------
+        f : t.Callable
+            f parameter.
+
+        Returns
+        -------
+        t.Callable
+            The result of the operation.
+        """
         validated_func = validate_call(f, **kwargs)
 
         @functools.wraps(f)
-        def wrapper(*args: t.Any, **kw: t.Any) -> t.Any:
+        def wrapper(
+            *args: t.Any,
+            **kw: t.Any,
+        ) -> t.Any:
+            """wrapper() function.
+
+            Parameters
+            ----------
+            args : t.Any
+                args parameter.
+            kw : t.Any
+                kw parameter.
+
+            Returns
+            -------
+            t.Any
+                The result of the operation.
+            """
             try:
                 return validated_func(*args, **kw)
             except ValidationError as exc:
@@ -36,10 +90,10 @@ def type_checked(func: t.Callable | None = None, **kwargs: t.Any) -> t.Callable:
                     ]
                     loc_str = " -> ".join(clean_loc) if clean_loc else "input"
 
-                    # Human-readable Pydantic messages can include arbitrary
-                    # custom-validator text. Expose only the stable error code
-                    # and input type so secret-bearing validator messages cannot
-                    # leak into the public TypeError.
+                    #? Human-readable Pydantic messages can include arbitrary
+                    #? custom-validator text. Expose only the stable error code
+                    #? and input type so secret-bearing validator messages cannot
+                    #? leak into the public TypeError.
                     input_type = type(input_val).__name__
                     errors.append(
                         f"Argument '{loc_str}': validation failed "

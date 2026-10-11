@@ -1,6 +1,14 @@
 """Tests for typed deep structural differences."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.structures import DeepDifference, deep_diff
 

@@ -1,3 +1,7 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -5,7 +9,16 @@ import gc
 import unittest
 from typing import Any
 
-from gunz_utils.concurrency import gather_limited, map_concurrent, map_unordered
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+
+from gunz_utils.concurrency import (
+    gather_limited,
+    map_concurrent,
+    map_unordered,
+    process_map,
+)
 
 
 class TestConcurrency(unittest.IsolatedAsyncioTestCase):
@@ -13,7 +26,9 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
         active = 0
         peak = 0
 
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             nonlocal active, peak
             active += 1
             peak = max(peak, active)
@@ -52,7 +67,9 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
     async def test_map_unordered_yields_as_tasks_complete(self) -> None:
         first_yielded = asyncio.Event()
 
-        async def work(item_id: int) -> int:
+        async def work(
+            item_id: int,
+        ) -> int:
             if item_id == 0:
                 await first_yielded.wait()
                 return 0
@@ -70,7 +87,9 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
         active = 0
         peak = 0
 
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             nonlocal active, peak
             active += 1
             peak = max(peak, active)
@@ -86,7 +105,9 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(peak, 2)
 
     async def test_map_unordered_invalid_limit(self) -> None:
-        async def dummy(x: int) -> int:
+        async def dummy(
+            x: int,
+        ) -> int:
             return x
 
         with self.assertRaises(ValueError):
@@ -113,7 +134,9 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.005)
             raise RuntimeError("boom")
 
-        async def dispatcher(kind: str) -> int:
+        async def dispatcher(
+            kind: str,
+        ) -> int:
             if kind == "slow":
                 return await slow_work()
             return await fail_work()
@@ -132,14 +155,17 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
         captured_contexts: list[dict[str, Any]] = []
 
         def custom_handler(
-            _loop: asyncio.AbstractEventLoop, context: dict[str, Any]
+            _loop: asyncio.AbstractEventLoop,
+            context: dict[str, Any],
         ) -> None:
             captured_contexts.append(context)
 
         loop.set_exception_handler(custom_handler)
         barrier = asyncio.Event()
 
-        async def fail_together(val: int) -> int:
+        async def fail_together(
+            val: int,
+        ) -> int:
             await barrier.wait()
             raise RuntimeError(f"error_{val}")
 
@@ -167,7 +193,9 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
     async def test_map_unordered_early_break_cancels_active(self) -> None:
         cancelled = False
 
-        async def slow_work(val: int) -> int:
+        async def slow_work(
+            val: int,
+        ) -> int:
             nonlocal cancelled
             if val == 1:
                 return 1
@@ -184,3 +212,47 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
 
         await asyncio.sleep(0.01)
         self.assertTrue(cancelled)
+
+
+def _multiprocess_test_square(
+    val: int,
+) -> int:
+    return val * val
+
+
+class TestProcessMap(unittest.TestCase):
+    def test_process_map_empty(self) -> None:
+        self.assertEqual(process_map(_multiprocess_test_square, []), [])
+
+    def test_process_map_serial_under_threshold(self) -> None:
+        results = process_map(_multiprocess_test_square, [1, 2, 3], threshold=5)
+        self.assertEqual(results, [1, 4, 9])
+
+    def test_process_map_parallel_over_threshold(self) -> None:
+        results = process_map(
+            _multiprocess_test_square,
+            range(10),
+            threshold=2,
+            workers=2,
+        )
+        self.assertEqual(results, [i * i for i in range(10)])
+
+    def test_process_map_invalid_workers(self) -> None:
+        with self.assertRaises(ValueError):
+            process_map(_multiprocess_test_square, [1, 2], workers=0)
+
+    def test_process_map_invalid_chunksize(self) -> None:
+        with self.assertRaises(ValueError):
+            process_map(_multiprocess_test_square, [1, 2], chunksize=-1)
+
+    def test_process_map_fallback_on_unpicklable(self) -> None:
+        unpicklable_func = lambda x: x + 10  # noqa: E731
+        results = process_map(
+            unpicklable_func,
+            range(12),
+            threshold=2,
+            workers=2,
+            fallback_serial=True,
+        )
+        self.assertEqual(results, [i + 10 for i in range(12)])
+

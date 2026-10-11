@@ -1,8 +1,20 @@
 """Comprehensive contract, equivalence, and fallback tests for varint acceleration."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import binary
 from gunz_utils.binary import ByteReader, encode_uvarint
@@ -50,18 +62,20 @@ def test_varint_encode_keyword_argument_parity() -> None:
         (1 << 64) - 1,
     ],
 )
-def test_varint_encode_decode_roundtrip_equivalence(val: int) -> None:
+def test_varint_encode_decode_roundtrip_equivalence(
+    val: int,
+) -> None:
     """Test roundtrip equivalence across canonical boundary values."""
     if binary._accel_encode is None:
         pytest.skip("Native C extension is required for native differential test")
 
-    # Pure Python
+    #? Pure Python
     py_encoded = binary._py_encode_uvarint(val)
-    # Native / Dispatched
+    #? Native / Dispatched
     c_encoded = encode_uvarint(val)
     assert c_encoded == py_encoded
 
-    # Decode with dispatched ByteReader
+    #? Decode with dispatched ByteReader
     reader = ByteReader(c_encoded)
     decoded = reader.read_uvarint()
     assert decoded == val
@@ -73,12 +87,13 @@ def test_varint_encode_decode_roundtrip_equivalence(val: int) -> None:
     [0, 1, 127, 128, 255, 256, (1 << 32) - 1, (1 << 64) - 1],
 )
 def test_pure_python_varint_roundtrip(
-    val: int, monkeypatch: pytest.MonkeyPatch
+    val: int,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test reference Python encoder and decoder roundtrip independently."""
     monkeypatch.setattr(binary, "_accel_decode", None)
     encoded = binary._py_encode_uvarint(val)
-    # Read using python fallback ByteReader logic
+    #? Read using python fallback ByteReader logic
     reader = ByteReader(encoded)
     assert reader.read_uvarint() == val
 
@@ -103,12 +118,12 @@ def test_varint_decode_truncated_raises_eof() -> None:
     reader = ByteReader(b"\x80")
     with pytest.raises(EOFError, match="binary read exceeds available data"):
         reader.read_uvarint()
-    # Transactional invariant: offset must remain unchanged on failure
+    #? Transactional invariant: offset must remain unchanged on failure
     assert reader.offset == 0
 
 
 def test_varint_decode_non_canonical_zero_raises_value_error() -> None:
-    # 0x80 followed by 0x00 is non-canonical representation of 0
+    #? 0x80 followed by 0x00 is non-canonical representation of 0
     reader = ByteReader(b"\x80\x00")
     with pytest.raises(ValueError, match="non-canonical varint"):
         reader.read_uvarint()
@@ -116,7 +131,7 @@ def test_varint_decode_non_canonical_zero_raises_value_error() -> None:
 
 
 def test_varint_decode_exceeds_64_bits_raises_value_error() -> None:
-    # 9 bytes of 0x80 followed by 0x02 exceeds 64 bits
+    #? 9 bytes of 0x80 followed by 0x02 exceeds 64 bits
     reader = ByteReader(b"\x80" * 9 + b"\x02")
     with pytest.raises(ValueError, match="varint exceeds 64 bits"):
         reader.read_uvarint()
@@ -181,21 +196,21 @@ def test_byte_reader_invalid_size_leaves_state_unmutated() -> None:
     assert reader.offset == 0
     assert reader.remaining == 6
 
-    # Fractional, boolean, non-int types must raise TypeError without mutating offset
+    #? Fractional, boolean, non-int types must raise TypeError without mutating offset
     for invalid in [0.5, 1.2, True, False, "1", None]:
         with pytest.raises(TypeError, match="read size must be an integer"):
             reader.read(invalid)  # type: ignore[arg-type]
         assert reader.offset == 0
         assert reader.remaining == 6
 
-    # Out of bounds must raise EOFError without mutating offset
+    #? Out of bounds must raise EOFError without mutating offset
     for oob in [-1, -5, 7, 100]:
         with pytest.raises(EOFError, match="binary read exceeds available data"):
             reader.read(oob)
         assert reader.offset == 0
         assert reader.remaining == 6
 
-    # Valid read advances offset
+    #? Valid read advances offset
     chunk = reader.read(3)
     assert bytes(chunk) == b"abc"
     assert reader.offset == 3

@@ -1,8 +1,16 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
 import time
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.retry import async_retry, retry
 
@@ -58,7 +66,11 @@ class TestAsyncRetry(unittest.IsolatedAsyncioTestCase):
     async def test_async_retry_aborts_when_timeout_expires_during_hook(self) -> None:
         calls = 0
 
-        def slow_hook(exc: BaseException, attempt: int, delay: float) -> None:
+        def slow_hook(
+            exc: BaseException,
+            attempt: int,
+            delay: float,
+        ) -> None:
             time.sleep(0.02)
 
         @async_retry(
@@ -78,7 +90,11 @@ class TestAsyncRetry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, 1)
 
 
-def slow_hook_sync(exc: BaseException, attempt: int, delay: float) -> None:
+def slow_hook_sync(
+    exc: BaseException,
+    attempt: int,
+    delay: float,
+) -> None:
     time.sleep(0.02)
 
 

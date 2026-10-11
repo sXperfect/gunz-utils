@@ -1,13 +1,26 @@
 """Shared low-level python utilities for the Gunz ecosystem."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .async_utils import cancel_and_wait, with_timeout
 from .cache import CacheInfo, SingleFlight, async_ttl_cache, ttl_cache
 from .collections import group_by, index_by, partition, unique
-from .concurrency import gather_limited, map_concurrent, map_unordered
+from .concurrency import (
+    gather_limited,
+    map_concurrent,
+    map_unordered,
+    process_imap,
+    process_map,
+)
 from .config import env_overrides, merge_configs
 from .context import correlation_id, ensure_correlation_id, operation_context
 from .deprecation import GunzDeprecationWarning, deprecated
@@ -64,7 +77,13 @@ from .upstream_protocol import (
 
 
 def _resolve_package_version() -> str:
-    """Return the shared installed-distribution version."""
+    """Return the shared installed-distribution version.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     from ._version import __version__
 
     return __version__
@@ -87,12 +106,17 @@ _LAZY: dict[str, str] = {
 }
 
 
-def __getattr__(name: str) -> Any:
+def __getattr__(
+    name: str,
+) -> Any:
     """Resolve lazily imported optional package attributes."""
     if name not in _LAZY:
         raise AttributeError(f"module 'gunz_utils' has no attribute {name!r}")
     import importlib
 
+    #? _LAZY is a static allowlist of literal module names, so this lazy
+    #? import is not an arbitrary dynamic import (GS045 is a false positive).
+    # gunz-style: ignore[GS045]
     return getattr(importlib.import_module(_LAZY[name], __name__), name)
 
 
@@ -140,6 +164,8 @@ __all__ = [
     "gather_limited",
     "map_concurrent",
     "map_unordered",
+    "process_imap",
+    "process_map",
     "retry",
     "async_retry",
     "canonical_json",

@@ -21,10 +21,11 @@ import stat
 from pathlib import Path
 from typing import IO, Any
 
-# Pre-compile the regex for invalid characters (anything not alphanumeric, dot, or dash)
-# We use + to collapse multiple invalid characters in one go
+#? Pre-compile the regex for invalid characters (anything not alphanumeric,
+#? dot, or dash)
+#? We use + to collapse multiple invalid characters in one go
 _INVALID_CHARS_PATTERN = re.compile(r"[^\w\.\-]+")
-_MAX_FILENAME_INPUT_LENGTH = 4096  # Security: limit input size to prevent DoS
+_MAX_FILENAME_INPUT_LENGTH = 4096  #? Security: limit input size to prevent DoS
 
 __all__ = [
     "NameAccessPolicy",
@@ -35,14 +36,30 @@ __all__ = [
 
 
 @functools.lru_cache(maxsize=16)
-def _get_replacement_pattern(replacement: str) -> re.Pattern:
-    """Cache compiled patterns for collapsing multiple replacements."""
+def _get_replacement_pattern(
+    replacement: str,
+) -> re.Pattern:
+    """Cache compiled patterns for collapsing multiple replacements.
+
+    Parameters
+    ----------
+    replacement : str
+        replacement parameter.
+
+    Returns
+    -------
+    re.Pattern
+        The result of the operation.
+    """
     #? Replacement alphabets are tiny in practice, so a bounded cache avoids
     #? repeated compilation without allowing user input to grow memory forever.
     return re.compile(f"{re.escape(replacement)}+")
 
 
-def sanitize_filename(filename: str, replacement: str = "_") -> str:
+def sanitize_filename(
+    filename: str,
+    replacement: str = "_",
+) -> str:
     """
     Sanitize a filename to prevent path traversal and remove dangerous characters.
 
@@ -75,14 +92,14 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
         If the filename is empty after sanitization, if the input is too long,
         or if the replacement string contains path separators.
     """
-    # 0. Check input length to prevent DoS via excessive string processing
+    #? 0. Check input length to prevent DoS via excessive string processing
     # ? Long inputs can cause regex backtracking, leading to CPU exhaustion
     if len(filename) > _MAX_FILENAME_INPUT_LENGTH:
         raise ValueError(
             f"Input filename too long (max {_MAX_FILENAME_INPUT_LENGTH} chars)"
         )
 
-    # 1. Check for unsafe replacement characters
+    #? 1. Check for unsafe replacement characters
     # ? We must disallow path separators in the replacement string to
     # ? prevent accidental introduction of path traversal or directory
     # ? creation.
@@ -90,23 +107,23 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
     # ? across platforms.
     if "/" in replacement or "\\" in replacement or "\0" in replacement:
         raise ValueError("Replacement string contains unsafe path characters")
-    # Security (VULN-2026-003): bound replacement length and reject
-    # control characters to limit cache churn and string-allocation abuse.
+    #? Security (VULN-2026-003): bound replacement length and reject
+    #? control characters to limit cache churn and string-allocation abuse.
     if len(replacement) > 16:
         raise ValueError("Replacement string is too long (max 16 chars)")
     if any(ord(c) < 0x20 for c in replacement):
         raise ValueError("Replacement string contains control characters")
 
-    # 2. Get base name to avoid directories/path traversal via slashes
+    #? 2. Get base name to avoid directories/path traversal via slashes
     # ? os.path.basename strips any directory components, neutralizing ".." attacks
     filename = os.path.basename(filename)
 
-    # 3. Replace dangerous characters
+    #? 3. Replace dangerous characters
     # ? Keep only alphanumeric, ., -, _ using negated character class
     # ? The + in the regex collapses multiple invalid chars into one replacement
     filename = _INVALID_CHARS_PATTERN.sub(replacement, filename)
 
-    # 4. Collapse multiple replacements
+    #? 4. Collapse multiple replacements
     if replacement:
         # ? Optimization: Only run regex if we actually have consecutive
         # ? replacements
@@ -117,18 +134,18 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
             pattern = _get_replacement_pattern(replacement)
             filename = pattern.sub(replacement, filename)
 
-    # 5. Strip leading/trailing replacements, dots, or dashes
+    #? 5. Strip leading/trailing replacements, dots, or dashes
     # ? Dots at boundaries can be dangerous (e.g., ".hidden" or "file..")
-    # Security (VULN-2026-001): leading dashes can be parsed as options
-    # when a sanitized filename is later passed to a command-line program.
-    # Strip them so the returned basename is not option-shaped.
+    #? Security (VULN-2026-001): leading dashes can be parsed as options
+    #? when a sanitized filename is later passed to a command-line program.
+    #? Strip them so the returned basename is not option-shaped.
     filename = filename.strip(replacement + ".-")
 
-    # 6. Check empty
+    #? 6. Check empty
     if not filename:
         raise ValueError("Filename is empty after sanitization")
 
-    # 7. Check length (common filesystem limit)
+    #? 7. Check length (common filesystem limit)
     encoded = filename.encode("utf-8")
     if len(encoded) > 255:
         encoded = encoded[:255]
@@ -142,7 +159,7 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
         if not filename:
             raise ValueError("Filename is empty after byte-length truncation")
 
-    # 8. Check for Windows reserved filenames
+    #? 8. Check for Windows reserved filenames
     # ? CON, PRN, AUX, NUL, COM1-9, LPT1-9 are reserved on Windows
     # ? See: https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
     # ? Windows checks the "base" name up to the first dot.
@@ -182,14 +199,17 @@ def sanitize_filename(filename: str, replacement: str = "_") -> str:
         "LPT8",
         "LPT9",
     }:
-        # Ensure we actually modify the filename even if replacement is empty
+        #? Ensure we actually modify the filename even if replacement is empty
         prefix = replacement if replacement else "_"
         filename = prefix + filename
 
     return filename
 
 
-def safe_path_join(base_dir: str, *paths: str) -> str:
+def safe_path_join(
+    base_dir: str,
+    *paths: str,
+) -> str:
     """
     Safely join paths to a base directory, preventing path traversal.
 
@@ -213,39 +233,39 @@ def safe_path_join(base_dir: str, *paths: str) -> str:
     ValueError
         If the resulting path is outside the base directory.
     """
-    # Resolve the base directory to its absolute path
-    # Use realpath to resolve symlinks, preventing symlink attacks
+    #? Resolve the base directory to its absolute path
+    #? Use realpath to resolve symlinks, preventing symlink attacks
     base_path = os.path.realpath(base_dir)
 
-    # Join the paths
-    # Note: os.path.join will discard previous components if a component is absolute.
-    # We must check for this.
+    #? Join the paths
+    #? Note: os.path.join will discard previous components if a component is absolute.
+    #? We must check for this.
     final_path = base_path
     for p in paths:
-        # Prevent null byte injection
+        #? Prevent null byte injection
         if "\0" in p:
             raise ValueError("Null byte found in path component")
 
-        # Determine if the component is absolute
-        # If it is, we treat it as relative to the base (stripping root)
-        # OR we just reject it. os.path.join behavior with absolute paths is
-        # often a source of bugs.
-        # Here we will reject it if it resets the root, OR we can strip the
-        # leading slash.
-        # Safest is to strip leading slashes/drive letters to force relative
-        # join.
+        #? Determine if the component is absolute
+        #? If it is, we treat it as relative to the base (stripping root)
+        #? OR we just reject it. os.path.join behavior with absolute paths is
+        #? often a source of bugs.
+        #? Here we will reject it if it resets the root, OR we can strip the
+        #? leading slash.
+        #? Safest is to strip leading slashes/drive letters to force relative
+        #? join.
         drive, _ = os.path.splitdrive(p)
         if os.path.isabs(p) or drive:
             raise ValueError("Absolute path components are not allowed")
 
         final_path = os.path.join(final_path, p)
 
-    # Resolve the final path
+    #? Resolve the final path
     resolved_path = os.path.realpath(final_path)
 
-    # Check if the resolved path starts with the base path
-    # We use commonprefix to ensure we don't match partial folder names
-    # e.g. /var/www matching /var/www-secret
+    #? Check if the resolved path starts with the base path
+    #? We use commonprefix to ensure we don't match partial folder names
+    #? e.g. /var/www matching /var/www-secret
     if os.path.commonpath([base_path, resolved_path]) != base_path:
         raise ValueError("Path traversal detected: path is outside base directory")
 
@@ -271,9 +291,9 @@ def open_path_under_base(
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         return open(resolved, mode)
 
-    # Use the caller's lexical components for descriptor-relative opening.
-    # The containment check above resolves symlinks, while this path preserves
-    # them so O_NOFOLLOW can reject both intermediate and final components.
+    #? Use the caller's lexical components for descriptor-relative opening.
+    #? The containment check above resolves symlinks, while this path preserves
+    #? them so O_NOFOLLOW can reject both intermediate and final components.
     relative = os.path.join(*paths) if paths else "."
     parts = Path(relative).parts
     if not parts or parts == (".",):
@@ -326,8 +346,7 @@ class NameAccessPolicy:
     stable identifiers.
     """
 
-    def __init__(
-        self,
+    def __init__(self,
         *,
         allowed: frozenset[str] | None = None,
         denied: frozenset[str] = frozenset(),
@@ -351,8 +370,7 @@ class NameAccessPolicy:
         self.allowed = normalized_allowed
         self.denied = normalized_denied
 
-    def allows(
-        self,
+    def allows(self,
         name: str,
     ) -> bool:
         """Return whether a name is permitted without raising.
@@ -377,8 +395,7 @@ class NameAccessPolicy:
             return False
         return self.allowed is None or normalized in self.allowed
 
-    def check(
-        self,
+    def check(self,
         name: str,
     ) -> bool:
         """Require a name to be permitted.
@@ -415,7 +432,18 @@ class NameAccessPolicy:
     def _validate_name(
         name: str,
     ) -> str:
-        """Validate one policy identifier."""
+        """Validate one policy identifier.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+
+        Returns
+        -------
+        str
+            The result of the operation.
+        """
         if not isinstance(name, str) or not name:
             raise ValueError("name must be a non-empty string")
         return name

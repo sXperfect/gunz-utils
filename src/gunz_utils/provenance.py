@@ -1,5 +1,9 @@
 """Runtime and execution provenance with explicit environment allowlisting."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -14,6 +18,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .benchmark.io import GitInfo, capture_git_info
 from .io import atomic_json_write
 from .redaction import SECRET_PATTERNS, redact
@@ -41,8 +48,24 @@ class RuntimeProvenance:
         )
 
 
-def _redact_environment_value(name: str, value: str) -> str:
-    """Redact secret-named values and passwords embedded in URI user-info."""
+def _redact_environment_value(
+    name: str,
+    value: str,
+) -> str:
+    """Redact secret-named values and passwords embedded in URI user-info.
+
+    Parameters
+    ----------
+    name : str
+        name parameter.
+    value : str
+        value parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     normalized_name = name.casefold()
     if any(pattern in normalized_name for pattern in SECRET_PATTERNS):
         return str(redact(value, show_chars=0))
@@ -68,7 +91,18 @@ def capture_runtime_provenance(
     *,
     environment_allowlist: Iterable[str] = (),
 ) -> RuntimeProvenance:
-    """Capture runtime metadata without leaking arbitrary environment values."""
+    """Capture runtime metadata without leaking arbitrary environment values.
+
+    Parameters
+    ----------
+    environment_allowlist : Iterable[str]
+        environment_allowlist parameter.
+
+    Returns
+    -------
+    RuntimeProvenance
+        The result of the operation.
+    """
     requested = tuple(environment_allowlist)
     if any(
         not isinstance(name, str) or not name
@@ -297,7 +331,22 @@ def write_execution_manifest(
     *,
     durable: bool = False,
 ) -> Path:
-    """Atomically persist an execution manifest as deterministic JSON."""
+    """Atomically persist an execution manifest as deterministic JSON.
+
+    Parameters
+    ----------
+    manifest : ExecutionManifest
+        manifest parameter.
+    path : str | Path
+        path parameter.
+    durable : bool
+        durable parameter.
+
+    Returns
+    -------
+    Path
+        The result of the operation.
+    """
     target = Path(path)
     atomic_json_write(
         target,

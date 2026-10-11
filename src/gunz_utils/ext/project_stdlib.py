@@ -4,6 +4,10 @@ Walks up from `anchor` looking for `.git` / `pyproject.toml`; falls back
 to `subprocess.run(["git", "rev-parse", "--show-toplevel"], timeout=5)`.
 No gitpython import, no loguru import.
 """
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 # =============================================================================
@@ -17,6 +21,9 @@ import pathlib
 import subprocess
 import sys
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .._version import __version__ as __version__
 from ..subprocess import CommandError, CommandOutputLimitError, run_command
 
@@ -27,7 +34,9 @@ _PROJECT_ANCHOR: pathlib.Path | None = None
 
 
 @functools.lru_cache(maxsize=1)
-def _git_rev_parse_toplevel(anchor: str) -> pathlib.Path | None:
+def _git_rev_parse_toplevel(
+    anchor: str,
+) -> pathlib.Path | None:
     try:
         result = run_command(
             ["git", "rev-parse", "--show-toplevel"],
@@ -47,7 +56,9 @@ def _git_rev_parse_toplevel(anchor: str) -> pathlib.Path | None:
         return None
 
 
-def _walk_up_for_marker(start: pathlib.Path) -> pathlib.Path | None:
+def _walk_up_for_marker(
+    start: pathlib.Path,
+) -> pathlib.Path | None:
     for candidate in (start, *start.parents):
         if (candidate / ".git").exists() or (candidate / "pyproject.toml").exists():
             return candidate.resolve()
@@ -79,6 +90,9 @@ def resolve_project_root(
         if inject_to_sys_path:
             root_str = str(_PROJECT_ROOT)
             if root_str not in sys.path:
+                #? Intentional, documented, opt-in side effect of
+                #? ``inject_to_sys_path`` (tested); not a hidden mutation.
+                # gunz-style: ignore[GS007]
                 sys.path.insert(0, root_str)
         return _PROJECT_ROOT
     root = _walk_up_for_marker(start) or _git_rev_parse_toplevel(str(start))
@@ -97,6 +111,9 @@ def resolve_project_root(
     if inject_to_sys_path:
         root_str = str(root)
         if root_str not in sys.path:
+            #? Intentional, documented, opt-in side effect of
+            #? ``inject_to_sys_path`` (tested); not a hidden mutation.
+            # gunz-style: ignore[GS007]
             sys.path.insert(0, root_str)
 
     return _PROJECT_ROOT

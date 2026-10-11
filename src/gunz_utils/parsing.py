@@ -4,11 +4,18 @@ These functions provide consistent, non-throwing parsing for callers that need
 safe defaults, plus a strict boolean parser for validation boundaries.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
@@ -20,8 +27,21 @@ _TRUE_STRINGS = frozenset({"1", "true", "t", "yes", "y", "on"})
 _FALSE_STRINGS = frozenset({"0", "false", "f", "no", "n", "off"})
 
 
-def _stripped(value: Any) -> Any:
-    """Strip surrounding whitespace from strings while preserving other types."""
+def _stripped(
+    value: Any,
+) -> Any:
+    """Strip surrounding whitespace from strings while preserving other types.
+
+    Parameters
+    ----------
+    value : Any
+        value parameter.
+
+    Returns
+    -------
+    Any
+        The result of the operation.
+    """
     if isinstance(value, str):
         return value.strip()
     return value
@@ -116,7 +136,10 @@ def safe_float(
     return result
 
 
-def safe_bool(value: Any, default: bool | None = None) -> bool | None:
+def safe_bool(
+    value: Any,
+    default: bool | None = None,
+) -> bool | None:
     """Parse common boolean representations and return a fallback if unknown.
 
     Parameters
@@ -147,7 +170,9 @@ def safe_bool(value: Any, default: bool | None = None) -> bool | None:
     return default
 
 
-def parse_bool(value: Any) -> bool:
+def parse_bool(
+    value: Any,
+) -> bool:
     """Parse a canonical boolean representation or raise ``ValueError``.
 
     Parameters

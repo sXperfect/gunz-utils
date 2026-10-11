@@ -1,5 +1,9 @@
 """Timezone-safe time and deadline helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -8,12 +12,31 @@ from datetime import UTC, datetime
 
 
 def utc_now() -> datetime:
-    """Return an aware current UTC datetime."""
+    """Return an aware current UTC datetime.
+
+    Returns
+    -------
+    datetime
+        The result of the operation.
+    """
     return datetime.now(UTC)
 
 
-def monotonic_deadline(timeout: float) -> float:
-    """Return a monotonic-clock deadline timeout seconds from now."""
+def monotonic_deadline(
+    timeout: float,
+) -> float:
+    """Return a monotonic-clock deadline timeout seconds from now.
+
+    Parameters
+    ----------
+    timeout : float
+        timeout parameter.
+
+    Returns
+    -------
+    float
+        The result of the operation.
+    """
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
@@ -24,8 +47,21 @@ def monotonic_deadline(timeout: float) -> float:
     return time.monotonic() + float(timeout)
 
 
-def remaining(deadline: float) -> float:
-    """Return non-negative seconds remaining before a monotonic deadline."""
+def remaining(
+    deadline: float,
+) -> float:
+    """Return non-negative seconds remaining before a monotonic deadline.
+
+    Parameters
+    ----------
+    deadline : float
+        deadline parameter.
+
+    Returns
+    -------
+    float
+        The result of the operation.
+    """
     if (
         isinstance(deadline, bool)
         or not isinstance(deadline, (int, float))
@@ -35,9 +71,22 @@ def remaining(deadline: float) -> float:
     return max(0.0, float(deadline) - time.monotonic())
 
 
-def expired(deadline: float) -> bool:
-    """Return whether a monotonic deadline has elapsed."""
-    return remaining(deadline) == 0.0
+def expired(
+    deadline: float,
+) -> bool:
+    """Return whether a monotonic deadline has elapsed.
+
+    Parameters
+    ----------
+    deadline : float
+        deadline parameter.
+
+    Returns
+    -------
+    bool
+        The result of the operation.
+    """
+    return remaining(deadline) <= 0.0
 
 
 __all__ = ["expired", "monotonic_deadline", "remaining", "utc_now"]

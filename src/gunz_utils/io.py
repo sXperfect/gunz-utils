@@ -1,5 +1,9 @@
 """Crash-safe file writing utilities for the Gunz ecosystem."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import os
@@ -7,6 +11,9 @@ import pathlib
 import tempfile
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ._version import __version__ as __version__
 from .serialization import json_dumps
 
@@ -55,8 +62,8 @@ def atomic_write(
 
     target = pathlib.Path(path)
     if mkdir:
-        # Security (VULN-2026-002): when the target is owner-private,
-        # create missing parent directories with owner-private permissions too.
+        #? Security (VULN-2026-002): when the target is owner-private,
+        #? create missing parent directories with owner-private permissions too.
         private_target = (
             permissions is not None
             and (permissions & 0o077) == 0
@@ -87,8 +94,8 @@ def atomic_write(
             fd, mode, encoding=None if is_binary else encoding or "utf-8",
             closefd=False,
         )
-        # Keep raw ownership even if wrapper construction closes an incomplete
-        # wrapper before raising (for example for an unknown text encoding).
+        #? Keep raw ownership even if wrapper construction closes an incomplete
+        #? wrapper before raising (for example for an unknown text encoding).
         if is_binary:
             with file_handle as file:
                 file.write(content)

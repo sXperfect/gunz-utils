@@ -1,5 +1,9 @@
 """Versioned benchmark result data structures."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import os
@@ -23,6 +27,13 @@ class SystemInfo:
 
     @classmethod
     def capture(cls) -> SystemInfo:
+        """capture() function.
+
+        Returns
+        -------
+        SystemInfo
+            The result of the operation.
+        """
         return cls(
             python=sys.version.split()[0],
             platform=platform.platform(),
@@ -60,7 +71,13 @@ class BenchmarkResult:
     schema_version: int = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible result mapping."""
+        """Return a JSON-compatible result mapping.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of the operation.
+        """
         return asdict(self)
 
 

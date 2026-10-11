@@ -1,18 +1,32 @@
 """Authenticated migration policy and durable rotation outcome regressions."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
 from typing import Any
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
 from cryptography.fernet import InvalidToken
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.ext.secure_store import SecureStore
 
 
-def _legacy_store(base: Path) -> tuple[SecureStore, bytes]:
+def _legacy_store(
+    base: Path,
+) -> tuple[SecureStore, bytes]:
     store = SecureStore(base_dir=base)
     store.unlock()
     fernet = store.fernet
@@ -34,7 +48,9 @@ def _legacy_store(base: Path) -> tuple[SecureStore, bytes]:
 @pytest.mark.parametrize("marker", [None, b"invalid", b"legacy"])
 @pytest.mark.parametrize("operation", ["get", "set", "delete", "verify_integrity"])
 def test_migrated_legacy_replay_cannot_downgrade_policy(
-    tmp_path: Path, marker: bytes | None, operation: str
+    tmp_path: Path,
+    marker: bytes | None,
+    operation: str,
 ) -> None:
     store, token = _legacy_store(tmp_path)
     try:
@@ -63,7 +79,8 @@ def test_migrated_legacy_replay_cannot_downgrade_policy(
 
 @pytest.mark.parametrize("allow_legacy", [False, True])
 def test_modern_policy_corruption_rejected_on_reopen(
-    tmp_path: Path, allow_legacy: bool
+    tmp_path: Path,
+    allow_legacy: bool,
 ) -> None:
     with SecureStore(base_dir=tmp_path) as store:
         store.unlock()
@@ -74,7 +91,9 @@ def test_modern_policy_corruption_rejected_on_reopen(
             reopened.unlock(allow_legacy=allow_legacy)
 
 
-def test_trusted_legacy_upgrade_requires_explicit_opt_in(tmp_path: Path) -> None:
+def test_trusted_legacy_upgrade_requires_explicit_opt_in(
+    tmp_path: Path,
+) -> None:
     store, _ = _legacy_store(tmp_path)
     try:
         with pytest.raises(InvalidToken, match="explicit trusted"):
@@ -92,7 +111,9 @@ def test_trusted_legacy_upgrade_requires_explicit_opt_in(tmp_path: Path) -> None
         assert reopened.get("secret", caller="admin") == "synthetic legacy value"
 
 
-def test_v1_strict_store_upgrades_without_legacy_opt_in(tmp_path: Path) -> None:
+def test_v1_strict_store_upgrades_without_legacy_opt_in(
+    tmp_path: Path,
+) -> None:
     with SecureStore(base_dir=tmp_path) as store:
         store.unlock()
         store.set("secret", "value")
@@ -108,18 +129,26 @@ def test_v1_strict_store_upgrades_without_legacy_opt_in(tmp_path: Path) -> None:
 
 
 class _RotationFailureConnection:
-    def __init__(
-        self, conn: sqlite3.Connection, *, durable_commit: bool, fail_body: bool = False
+    def __init__(self,
+        conn: sqlite3.Connection,
+        *,
+        durable_commit: bool,
+        fail_body: bool = False,
     ) -> None:
         self.conn = conn
         self.durable_commit = durable_commit
         self.fail_body = fail_body
         self.rollback_attempted = False
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self,
+        name: str,
+    ) -> Any:
         return getattr(self.conn, name)
 
-    def execute(self, sql: str, *args: Any) -> Any:
+    def execute(self,
+        sql: str,
+        *args: Any,
+    ) -> Any:
         if sql == "ROLLBACK":
             self.rollback_attempted = True
             raise sqlite3.OperationalError("secondary rollback failure")
@@ -129,7 +158,10 @@ class _RotationFailureConnection:
             raise sqlite3.OperationalError("original commit failure")
         return self.conn.execute(sql, *args)
 
-    def executemany(self, sql: str, values: Any) -> Any:
+    def executemany(self,
+        sql: str,
+        values: Any,
+    ) -> Any:
         if self.fail_body:
             raise sqlite3.OperationalError("original body failure")
         return self.conn.executemany(sql, values)
@@ -139,7 +171,9 @@ class _RotationFailureConnection:
     "durable_commit,fail_body", [(False, False), (True, False), (False, True)]
 )
 def test_rotation_recovers_durable_state_and_preserves_original_error(
-    tmp_path: Path, durable_commit: bool, fail_body: bool
+    tmp_path: Path,
+    durable_commit: bool,
+    fail_body: bool,
 ) -> None:
     store = SecureStore(base_dir=tmp_path)
     try:
@@ -169,7 +203,8 @@ def test_rotation_recovers_durable_state_and_preserves_original_error(
 
 
 def test_unknown_recovery_state_locks_store_and_keeps_pending_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with SecureStore(base_dir=tmp_path) as store:
         store.unlock()
@@ -189,7 +224,9 @@ def test_unknown_recovery_state_locks_store_and_keeps_pending_key(
         assert "pending key material retained" in error.value.__notes__[0]
 
 
-def test_second_rotation_preserves_committed_unpublished_key(tmp_path: Path) -> None:
+def test_second_rotation_preserves_committed_unpublished_key(
+    tmp_path: Path,
+) -> None:
     with SecureStore(base_dir=tmp_path) as store:
         store.unlock()
         store.set("secret", "value")

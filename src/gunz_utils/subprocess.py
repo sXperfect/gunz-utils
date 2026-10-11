@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+__author__ = "Yeremia Gunawan Adhisantoso"
+__email__ = "yeremiag@gmail.com"
+__license__ = "Clear BSD"
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
@@ -165,7 +169,27 @@ def _read_bounded_pipe(
     errors: list[BaseException],
     stop: threading.Event,
 ) -> None:
-    """Drain one pipe while retaining at most the shared output limit."""
+    """Drain one pipe while retaining at most the shared output limit.
+
+    Parameters
+    ----------
+    stream : BinaryIO
+        stream parameter.
+    target : bytearray
+        target parameter.
+    process : subprocess.Popen[bytes]
+        process parameter.
+    max_output_bytes : int
+        max_output_bytes parameter.
+    state : _CaptureState
+        state parameter.
+    lock : threading.Lock
+        lock parameter.
+    errors : list[BaseException]
+        errors parameter.
+    stop : threading.Event
+        stop parameter.
+    """
     try:
         read_chunk = getattr(stream, "read1", stream.read)
         #? POSIX pipe readiness lets cleanup interrupt a silent inherited pipe
@@ -212,7 +236,26 @@ def _run_command_bounded(
     env: Mapping[str, str] | None,
     max_output_bytes: int,
 ) -> tuple[int, bytes, bytes]:
-    """Run a command while streaming stdout/stderr into bounded buffers."""
+    """Run a command while streaming stdout/stderr into bounded buffers.
+
+    Parameters
+    ----------
+    args : Sequence[str]
+        args parameter.
+    timeout : float | None
+        timeout parameter.
+    cwd : str | None
+        cwd parameter.
+    env : Mapping[str, str] | None
+        env parameter.
+    max_output_bytes : int
+        max_output_bytes parameter.
+
+    Returns
+    -------
+    tuple[int, bytes, bytes]
+        The result of the operation.
+    """
     deadline = None if timeout is None else time.monotonic() + timeout
     stdout = bytearray()
     stderr = bytearray()
@@ -224,6 +267,13 @@ def _run_command_bounded(
     started_threads: list[threading.Thread] = []
 
     def remaining_timeout() -> float | None:
+        """remaining_timeout() function.
+
+        Returns
+        -------
+        float | None
+            The result of the operation.
+        """
         return None if deadline is None else max(0.0, deadline - time.monotonic())
 
     process = subprocess.Popen(
@@ -316,7 +366,32 @@ def run_command(
     errors: str = "strict",
     max_output_bytes: int | None = None,
 ) -> CommandResult:
-    """Run a command without a shell and capture optionally bounded text output."""
+    """Run a command without a shell and capture optionally bounded text output.
+
+    Parameters
+    ----------
+    args : Sequence[str]
+        args parameter.
+    timeout : float | None
+        timeout parameter.
+    check : bool
+        check parameter.
+    cwd : str | None
+        cwd parameter.
+    env : Mapping[str, str] | None
+        env parameter.
+    encoding : str
+        encoding parameter.
+    errors : str
+        errors parameter.
+    max_output_bytes : int | None
+        max_output_bytes parameter.
+
+    Returns
+    -------
+    CommandResult
+        The result of the operation.
+    """
     if not args:
         raise ValueError("args must not be empty")
     timeout = _validate_timeout_value(timeout, name="timeout")
@@ -362,6 +437,15 @@ async def _stop_process(
     *,
     terminate_grace: float,
 ) -> None:
+    """_stop_process() function.
+
+    Parameters
+    ----------
+    process : asyncio.subprocess.Process
+        process parameter.
+    terminate_grace : float
+        terminate_grace parameter.
+    """
     if os.name == "posix":
         try:
             os.killpg(process.pid, signal.SIGTERM)
@@ -390,6 +474,21 @@ async def _read_bounded_async_pipe(
     max_output_bytes: int,
     state: _CaptureState,
 ) -> None:
+    """_read_bounded_async_pipe() function.
+
+    Parameters
+    ----------
+    stream : asyncio.StreamReader
+        stream parameter.
+    target : bytearray
+        target parameter.
+    process : asyncio.subprocess.Process
+        process parameter.
+    max_output_bytes : int
+        max_output_bytes parameter.
+    state : _CaptureState
+        state parameter.
+    """
     while True:
         chunk = await stream.read(64 * 1024)
         if not chunk:
@@ -423,6 +522,24 @@ async def _communicate_bounded(
     max_output_bytes: int,
     terminate_grace: float,
 ) -> tuple[bytes, bytes]:
+    """_communicate_bounded() function.
+
+    Parameters
+    ----------
+    process : asyncio.subprocess.Process
+        process parameter.
+    timeout : float | None
+        timeout parameter.
+    max_output_bytes : int
+        max_output_bytes parameter.
+    terminate_grace : float
+        terminate_grace parameter.
+
+    Returns
+    -------
+    tuple[bytes, bytes]
+        The result of the operation.
+    """
     stdout_pipe = process.stdout
     stderr_pipe = process.stderr
     if stdout_pipe is None or stderr_pipe is None:
@@ -485,7 +602,34 @@ async def run_command_async(
     max_output_bytes: int | None = None,
     terminate_grace: float = 1.0,
 ) -> CommandResult:
-    """Run a subprocess with graceful cleanup and optionally bounded output."""
+    """Run a subprocess with graceful cleanup and optionally bounded output.
+
+    Parameters
+    ----------
+    args : Sequence[str]
+        args parameter.
+    timeout : float | None
+        timeout parameter.
+    check : bool
+        check parameter.
+    cwd : str | None
+        cwd parameter.
+    env : Mapping[str, str] | None
+        env parameter.
+    encoding : str
+        encoding parameter.
+    errors : str
+        errors parameter.
+    max_output_bytes : int | None
+        max_output_bytes parameter.
+    terminate_grace : float
+        terminate_grace parameter.
+
+    Returns
+    -------
+    CommandResult
+        The result of the operation.
+    """
     if not args:
         raise ValueError("args must not be empty")
     timeout = _validate_timeout_value(timeout, name="timeout")

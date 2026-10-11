@@ -1,5 +1,9 @@
 """Standardized optional Loguru logging integration."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import os
@@ -7,8 +11,14 @@ import re
 import sys
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 from loguru import logger
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
@@ -19,8 +29,21 @@ _LOG_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _MAX_SESSION_ID_CHARS = 128
 
 
-def _safe_session_id(value: str) -> str:
-    """Bound and neutralize control characters in log-context text."""
+def _safe_session_id(
+    value: str,
+) -> str:
+    """Bound and neutralize control characters in log-context text.
+
+    Parameters
+    ----------
+    value : str
+        value parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     if not isinstance(value, str):
         return "GLOBAL"
     safe = "".join(
@@ -32,8 +55,21 @@ def _safe_session_id(value: str) -> str:
     return safe or "GLOBAL"
 
 
-def _validate_log_name(log_name: str) -> str:
-    """Require a simple filename stem so logs cannot escape logs/."""
+def _validate_log_name(
+    log_name: str,
+) -> str:
+    """Require a simple filename stem so logs cannot escape logs/.
+
+    Parameters
+    ----------
+    log_name : str
+        log_name parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     if (
         not isinstance(log_name, str)
         or log_name in {".", ".."}
@@ -51,7 +87,17 @@ def setup_logging(
     verbose: bool = False,
     project_root: Path | None = None,
 ) -> None:
-    """Configure console logging and an optional contained log file."""
+    """Configure console logging and an optional contained log file.
+
+    Parameters
+    ----------
+    log_name : str
+        log_name parameter.
+    verbose : bool
+        verbose parameter.
+    project_root : Path | None
+        project_root parameter.
+    """
     log_name = _validate_log_name(log_name)
     logger.remove()
     log_level = "DEBUG" if verbose else "INFO"

@@ -1,3 +1,7 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -6,6 +10,10 @@ import unittest
 from importlib import import_module
 from typing import Any, cast
 from unittest.mock import patch
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.io as io_module
 import gunz_utils.limits as limits_module
@@ -41,8 +49,7 @@ class TestSharedModuleAPI(unittest.TestCase):
             self.assertEqual(missing, [], module.__name__)
 
 class FakeEntryPoint:
-    def __init__(
-        self,
+    def __init__(self,
         name: str,
         value: str,
         loaded: object,

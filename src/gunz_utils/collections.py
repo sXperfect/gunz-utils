@@ -1,5 +1,9 @@
 """General-purpose collection transformations."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
@@ -9,8 +13,25 @@ T = TypeVar("T")
 K = TypeVar("K")
 
 
-def unique(items: Iterable[T], *, key: Callable[[T], K] | None = None) -> list[T]:
-    """Return first occurrences while preserving input order."""
+def unique(
+    items: Iterable[T],
+    *,
+    key: Callable[[T], K] | None = None,
+) -> list[T]:
+    """Return first occurrences while preserving input order.
+
+    Parameters
+    ----------
+    items : Iterable[T]
+        items parameter.
+    key : Callable[[T], K] | None
+        key parameter.
+
+    Returns
+    -------
+    list[T]
+        The result of the operation.
+    """
     seen: set[object] = set()
     seen_unhashable: list[object] = []
     out: list[T] = []
@@ -28,16 +49,48 @@ def unique(items: Iterable[T], *, key: Callable[[T], K] | None = None) -> list[T
     return out
 
 
-def group_by(items: Iterable[T], key: Callable[[T], K]) -> dict[K, list[T]]:
-    """Group items by a derived key while preserving item order."""
+def group_by(
+    items: Iterable[T],
+    key: Callable[[T], K],
+) -> dict[K, list[T]]:
+    """Group items by a derived key while preserving item order.
+
+    Parameters
+    ----------
+    items : Iterable[T]
+        items parameter.
+    key : Callable[[T], K]
+        key parameter.
+
+    Returns
+    -------
+    dict[K, list[T]]
+        The result of the operation.
+    """
     out: dict[K, list[T]] = {}
     for item in items:
         out.setdefault(key(item), []).append(item)
     return out
 
 
-def index_by(items: Iterable[T], key: Callable[[T], K]) -> dict[K, T]:
-    """Index items by key; later items replace earlier duplicate keys."""
+def index_by(
+    items: Iterable[T],
+    key: Callable[[T], K],
+) -> dict[K, T]:
+    """Index items by key; later items replace earlier duplicate keys.
+
+    Parameters
+    ----------
+    items : Iterable[T]
+        items parameter.
+    key : Callable[[T], K]
+        key parameter.
+
+    Returns
+    -------
+    dict[K, T]
+        The result of the operation.
+    """
     return {key(item): item for item in items}
 
 
@@ -45,7 +98,20 @@ def partition(
     items: Iterable[T],
     predicate: Callable[[T], bool],
 ) -> tuple[list[T], list[T]]:
-    """Split items into matching and non-matching lists."""
+    """Split items into matching and non-matching lists.
+
+    Parameters
+    ----------
+    items : Iterable[T]
+        items parameter.
+    predicate : Callable[[T], bool]
+        predicate parameter.
+
+    Returns
+    -------
+    tuple[list[T], list[T]]
+        The result of the operation.
+    """
     yes: list[T] = []
     no: list[T] = []
     for item in items:

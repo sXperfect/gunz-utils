@@ -1,6 +1,14 @@
 """Public namespace contract for reusable runtime modules."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils
 import gunz_utils.content_store as content_store

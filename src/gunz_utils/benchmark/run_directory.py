@@ -1,5 +1,9 @@
 """Portable self-contained performance-run directories."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import json
@@ -8,12 +12,28 @@ import shutil
 import stat
 from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ..io import atomic_write
 from .artifacts import register_artifact
 from .performance import PerformanceRun
 
 
-def _ensure_directory(path: Path, *, label: str) -> None:
+def _ensure_directory(
+    path: Path,
+    *,
+    label: str,
+) -> None:
+    """_ensure_directory() function.
+
+    Parameters
+    ----------
+    path : Path
+        path parameter.
+    label : str
+        label parameter.
+    """
     if path.is_symlink():
         raise ValueError(f"{label} must not be a symlink")
     path.mkdir(parents=True, exist_ok=True)
@@ -21,7 +41,21 @@ def _ensure_directory(path: Path, *, label: str) -> None:
         raise ValueError(f"{label} must be a directory")
 
 
-def _open_regular_source(path: Path) -> tuple[int, os.stat_result]:
+def _open_regular_source(
+    path: Path,
+) -> tuple[int, os.stat_result]:
+    """_open_regular_source() function.
+
+    Parameters
+    ----------
+    path : Path
+        path parameter.
+
+    Returns
+    -------
+    tuple[int, os.stat_result]
+        The result of the operation.
+    """
     flags = os.O_RDONLY
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
@@ -56,6 +90,20 @@ def _copy_regular_source(
     source: Path,
     artifacts_dir: Path,
 ) -> tuple[Path, bool]:
+    """_copy_regular_source() function.
+
+    Parameters
+    ----------
+    source : Path
+        source parameter.
+    artifacts_dir : Path
+        artifacts_dir parameter.
+
+    Returns
+    -------
+    tuple[Path, bool]
+        The result of the operation.
+    """
     source_fd, source_info = _open_regular_source(source)
     output_fd = -1
     target: Path | None = None
@@ -122,7 +170,22 @@ def save_run_directory(
     *,
     copy_artifacts: bool = True,
 ) -> PerformanceRun:
-    """Write run.json and optionally copy registered artifacts safely."""
+    """Write run.json and optionally copy registered artifacts safely.
+
+    Parameters
+    ----------
+    run : PerformanceRun
+        run parameter.
+    directory : str | Path
+        directory parameter.
+    copy_artifacts : bool
+        copy_artifacts parameter.
+
+    Returns
+    -------
+    PerformanceRun
+        The result of the operation.
+    """
     root = Path(directory)
     root_preexisting = root.exists()
     _ensure_directory(root, label="run directory")

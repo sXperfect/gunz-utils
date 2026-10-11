@@ -1,6 +1,14 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils
 
@@ -13,7 +21,7 @@ class TestPublicAPI(unittest.TestCase):
                 if not hasattr(gunz_utils, name):
                     missing.append(name)
             except (ImportError, ModuleNotFoundError):
-                # Optional extra not installed in current environment
+                #? Optional extra not installed in current environment
                 continue
         self.assertEqual(missing, [])
 

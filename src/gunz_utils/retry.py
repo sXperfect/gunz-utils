@@ -1,5 +1,9 @@
 """Retry policies for synchronous and asynchronous callables."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -24,6 +28,24 @@ def _delay(
     max_delay: float,
     jitter: bool,
 ) -> float:
+    """_delay() function.
+
+    Parameters
+    ----------
+    attempt : int
+        attempt parameter.
+    base_delay : float
+        base_delay parameter.
+    max_delay : float
+        max_delay parameter.
+    jitter : bool
+        jitter parameter.
+
+    Returns
+    -------
+    float
+        The result of the operation.
+    """
     if base_delay == 0 or max_delay == 0:
         delay = 0.0
     elif base_delay >= max_delay:
@@ -47,6 +69,19 @@ def _validate(
     max_delay: float,
     timeout: float | None,
 ) -> None:
+    """_validate() function.
+
+    Parameters
+    ----------
+    attempts : int
+        attempts parameter.
+    base_delay : float
+        base_delay parameter.
+    max_delay : float
+        max_delay parameter.
+    timeout : float | None
+        timeout parameter.
+    """
     if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
         raise ValueError("attempts must be a positive integer")
     for name, value in (("base_delay", base_delay), ("max_delay", max_delay)):
@@ -91,8 +126,7 @@ class RetryPolicy(Generic[T]):
         if not self.exceptions:
             raise ValueError("exceptions must not be empty")
 
-    def delay(
-        self,
+    def delay(self,
         attempt: int,
         *,
         result: T | None = None,
@@ -147,11 +181,42 @@ class RetryEvent(Generic[T]):
     error: BaseException | None = None
 
 
-def _deadline(timeout: float | None) -> float | None:
+def _deadline(
+    timeout: float | None,
+) -> float | None:
+    """_deadline() function.
+
+    Parameters
+    ----------
+    timeout : float | None
+        timeout parameter.
+
+    Returns
+    -------
+    float | None
+        The result of the operation.
+    """
     return None if timeout is None else time.monotonic() + timeout
 
 
-def _has_wait_budget(deadline: float | None, delay: float) -> bool:
+def _has_wait_budget(
+    deadline: float | None,
+    delay: float,
+) -> bool:
+    """_has_wait_budget() function.
+
+    Parameters
+    ----------
+    deadline : float | None
+        deadline parameter.
+    delay : float
+        delay parameter.
+
+    Returns
+    -------
+    bool
+        The result of the operation.
+    """
     if deadline is None:
         return True
     remaining = deadline - time.monotonic()
@@ -164,7 +229,22 @@ def run_with_retry(
     *,
     on_retry: Callable[[RetryEvent[T]], None] | None = None,
 ) -> T:
-    """Run a synchronous operation under an explicit retry policy."""
+    """Run a synchronous operation under an explicit retry policy.
+
+    Parameters
+    ----------
+    operation : Callable[[], T]
+        operation parameter.
+    policy : RetryPolicy[T]
+        policy parameter.
+    on_retry : Callable[[RetryEvent[T]], None] | None
+        on_retry parameter.
+
+    Returns
+    -------
+    T
+        The result of the operation.
+    """
     deadline = _deadline(policy.timeout)
     for attempt in range(1, policy.attempts + 1):
         try:
@@ -232,7 +312,22 @@ async def async_run_with_retry(
     *,
     on_retry: Callable[[RetryEvent[T]], None] | None = None,
 ) -> T:
-    """Run an async operation under an explicit retry policy."""
+    """Run an async operation under an explicit retry policy.
+
+    Parameters
+    ----------
+    operation : Callable[[], Awaitable[T]]
+        operation parameter.
+    policy : RetryPolicy[T]
+        policy parameter.
+    on_retry : Callable[[RetryEvent[T]], None] | None
+        on_retry parameter.
+
+    Returns
+    -------
+    T
+        The result of the operation.
+    """
     deadline = _deadline(policy.timeout)
     for attempt in range(1, policy.attempts + 1):
         try:
@@ -307,12 +402,68 @@ def retry(
     on_retry: RetryHook | None = None,
     timeout: float | None = None,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]:
-    """Retry a synchronous callable within attempt and time budgets."""
+    """Retry a synchronous callable within attempt and time budgets.
+
+    Parameters
+    ----------
+    attempts : int
+        attempts parameter.
+    exceptions : tuple[type[BaseException], ...]
+        exceptions parameter.
+    base_delay : float
+        base_delay parameter.
+    max_delay : float
+        max_delay parameter.
+    jitter : bool
+        jitter parameter.
+    retry_if : RetryPredicate | None
+        retry_if parameter.
+    on_retry : RetryHook | None
+        on_retry parameter.
+    timeout : float | None
+        timeout parameter.
+
+    Returns
+    -------
+    Callable[[Callable[P, T]], Callable[P, T]]
+        The result of the operation.
+    """
     _validate(attempts, base_delay, max_delay, timeout)
 
-    def decorate(func: Callable[P, T]) -> Callable[P, T]:
+    def decorate(
+        func: Callable[P, T],
+    ) -> Callable[P, T]:
+        """decorate() function.
+
+        Parameters
+        ----------
+        func : Callable[P, T]
+            func parameter.
+
+        Returns
+        -------
+        Callable[P, T]
+            The result of the operation.
+        """
         @functools.wraps(func)
-        def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+        def wrapped(
+            *args: P.args,
+            **kwargs: P.kwargs,
+        ) -> T:
+            """wrapped() function.
+
+            Parameters
+            ----------
+            args : P.args
+                args parameter.
+            kwargs : P.kwargs
+                kwargs parameter.
+
+            Returns
+            -------
+            T
+                The result of the operation.
+            """
             deadline = _deadline(timeout)
             for attempt in range(1, attempts + 1):
                 try:
@@ -355,12 +506,68 @@ def async_retry(
     on_retry: RetryHook | None = None,
     timeout: float | None = None,
 ) -> Callable[[Callable[P, Any]], Callable[P, Any]]:
-    """Retry an async callable within attempt and time budgets."""
+    """Retry an async callable within attempt and time budgets.
+
+    Parameters
+    ----------
+    attempts : int
+        attempts parameter.
+    exceptions : tuple[type[BaseException], ...]
+        exceptions parameter.
+    base_delay : float
+        base_delay parameter.
+    max_delay : float
+        max_delay parameter.
+    jitter : bool
+        jitter parameter.
+    retry_if : RetryPredicate | None
+        retry_if parameter.
+    on_retry : RetryHook | None
+        on_retry parameter.
+    timeout : float | None
+        timeout parameter.
+
+    Returns
+    -------
+    Callable[[Callable[P, Any]], Callable[P, Any]]
+        The result of the operation.
+    """
     _validate(attempts, base_delay, max_delay, timeout)
 
-    def decorate(func: Callable[P, Any]) -> Callable[P, Any]:
+    def decorate(
+        func: Callable[P, Any],
+    ) -> Callable[P, Any]:
+        """decorate() function.
+
+        Parameters
+        ----------
+        func : Callable[P, Any]
+            func parameter.
+
+        Returns
+        -------
+        Callable[P, Any]
+            The result of the operation.
+        """
         @functools.wraps(func)
-        async def wrapped(*args: P.args, **kwargs: P.kwargs) -> Any:
+        async def wrapped(
+            *args: P.args,
+            **kwargs: P.kwargs,
+        ) -> Any:
+            """wrapped() function.
+
+            Parameters
+            ----------
+            args : P.args
+                args parameter.
+            kwargs : P.kwargs
+                kwargs parameter.
+
+            Returns
+            -------
+            Any
+                The result of the operation.
+            """
             deadline = _deadline(timeout)
             for attempt in range(1, attempts + 1):
                 try:

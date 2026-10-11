@@ -1,5 +1,9 @@
 """Versioned benchmark worker protocol."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
@@ -17,6 +21,13 @@ class WorkerRequest:
     protocol_version: int = WORKER_PROTOCOL_VERSION
 
     def to_dict(self) -> dict[str, Any]:
+        """to_dict() function.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of the operation.
+        """
         return asdict(self)
 
 
@@ -29,6 +40,13 @@ class WorkerResponse:
     protocol_version: int = WORKER_PROTOCOL_VERSION
 
     def to_dict(self) -> dict[str, Any]:
+        """to_dict() function.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of the operation.
+        """
         return asdict(self)
 
 

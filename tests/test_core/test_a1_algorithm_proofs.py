@@ -1,5 +1,9 @@
 """Adversarial proof tests for families that entered the audit at A1."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +14,15 @@ from contextlib import AbstractAsyncContextManager, AbstractContextManager
 from pathlib import Path
 from unittest.mock import patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.content_store as content_store_module
 import gunz_utils.leases as leases_module
@@ -38,7 +50,9 @@ class _PartialThenStop:
         self.data = bytearray()
         self.calls = 0
 
-    def write(self, data: object) -> int:
+    def write(self,
+        data: object,
+    ) -> int:
         view = memoryview(data)
         self.calls += 1
         if self.calls == 1:
@@ -48,7 +62,9 @@ class _PartialThenStop:
 
 
 class _OverReportingWriter:
-    def write(self, data: object) -> int:
+    def write(self,
+        data: object,
+    ) -> int:
         return len(memoryview(data)) + 1
 
 
@@ -97,7 +113,9 @@ def test_streaming_rejects_invalid_write_counts_and_size_domains() -> None:
             )
 
 
-def _subset(mask: int) -> tuple[str, ...]:
+def _subset(
+    mask: int,
+) -> tuple[str, ...]:
     universe = ("x", "y", "z")
     return tuple(
         value
@@ -135,11 +153,15 @@ def test_version_migration_runs_each_step_once_and_preserves_metadata() -> None:
     calls: list[int] = []
     migrator = SchemaMigrator()
 
-    def to_v2(payload: dict[str, int]) -> dict[str, int]:
+    def to_v2(
+        payload: dict[str, int],
+    ) -> dict[str, int]:
         calls.append(1)
         return {**payload, "v": 2}
 
-    def to_v3(payload: dict[str, int]) -> dict[str, int]:
+    def to_v3(
+        payload: dict[str, int],
+    ) -> dict[str, int]:
         calls.append(2)
         return {**payload, "v": 3}
 
@@ -175,7 +197,9 @@ def test_versioning_rejects_whitespace_schema_and_duplicate_step() -> None:
 
 def test_stdlib_validator_enforces_pep604_union() -> None:
     @type_checked
-    def accepts_optional(value: int | None) -> int | None:
+    def accepts_optional(
+        value: int | None,
+    ) -> int | None:
         return value
 
     assert accepts_optional(3) == 3
@@ -293,7 +317,10 @@ def test_lease_outer_cancellation_cleans_operation_and_heartbeat(
         operation_cancelled = asyncio.Event()
         heartbeat_cancelled = asyncio.Event()
 
-        async def fake_heartbeat(*_args: object, **_kwargs: object) -> None:
+        async def fake_heartbeat(
+            *_args: object,
+            **_kwargs: object,
+        ) -> None:
             try:
                 await asyncio.Event().wait()
             finally:
@@ -408,7 +435,9 @@ def test_map_unordered_close_cancels_pending_tasks() -> None:
         all_started = asyncio.Event()
         never = asyncio.Event()
 
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             nonlocal started
             started += 1
             if started == 3:
@@ -440,7 +469,9 @@ def test_worker_pipeline_is_bounded_and_cleans_on_early_close() -> None:
         two_started = asyncio.Event()
         never = asyncio.Event()
 
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             nonlocal active, peak, started, cancelled
             active += 1
             peak = max(peak, active)
@@ -493,7 +524,10 @@ def test_worker_pipeline_is_bounded_and_cleans_on_early_close() -> None:
 
 
 class _SyncResource(AbstractContextManager[str]):
-    def __init__(self, name: str, events: list[str]) -> None:
+    def __init__(self,
+        name: str,
+        events: list[str],
+    ) -> None:
         self.name = name
         self.events = events
 
@@ -501,12 +535,17 @@ class _SyncResource(AbstractContextManager[str]):
         self.events.append(f"enter:{self.name}")
         return self.name
 
-    def __exit__(self, *_args: object) -> None:
+    def __exit__(self,
+        *_args: object,
+    ) -> None:
         self.events.append(f"exit:{self.name}")
 
 
 class _AsyncResource(AbstractAsyncContextManager[str]):
-    def __init__(self, name: str, events: list[str]) -> None:
+    def __init__(self,
+        name: str,
+        events: list[str],
+    ) -> None:
         self.name = name
         self.events = events
 
@@ -514,7 +553,9 @@ class _AsyncResource(AbstractAsyncContextManager[str]):
         self.events.append(f"enter:{self.name}")
         return self.name
 
-    async def __aexit__(self, *_args: object) -> None:
+    async def __aexit__(self,
+        *_args: object,
+    ) -> None:
         self.events.append(f"exit:{self.name}")
 
 
@@ -584,7 +625,9 @@ def test_map_unordered_iterator_failure_cleans_initial_tasks() -> None:
     async def scenario() -> None:
         baseline = set(asyncio.all_tasks())
 
-        async def idle(_value: int) -> int:
+        async def idle(
+            _value: int,
+        ) -> int:
             await asyncio.Event().wait()
             return 0
 
@@ -605,7 +648,9 @@ def test_map_unordered_iterator_failure_cleans_initial_tasks() -> None:
 
 def test_worker_pipeline_producer_failure_propagates_without_deadlock() -> None:
     async def scenario() -> None:
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             return value
 
         def broken():

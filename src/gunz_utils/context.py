@@ -1,5 +1,9 @@
 """Dependency-free operation context and correlation identifiers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import uuid
@@ -14,12 +18,24 @@ _correlation_id: ContextVar[str | None] = ContextVar(
 
 
 def correlation_id() -> str | None:
-    """Return the correlation identifier for the current execution context."""
+    """Return the correlation identifier for the current execution context.
+
+    Returns
+    -------
+    str | None
+        The result of the operation.
+    """
     return _correlation_id.get()
 
 
 def ensure_correlation_id() -> str:
-    """Return the current identifier, creating one when absent."""
+    """Return the current identifier, creating one when absent.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     current = _correlation_id.get()
     if current is not None:
         return current
@@ -29,8 +45,21 @@ def ensure_correlation_id() -> str:
 
 
 @contextmanager
-def operation_context(value: str | None = None) -> Iterator[str]:
-    """Temporarily establish a correlation identifier for nested operations."""
+def operation_context(
+    value: str | None = None,
+) -> Iterator[str]:
+    """Temporarily establish a correlation identifier for nested operations.
+
+    Parameters
+    ----------
+    value : str | None
+        value parameter.
+
+    Returns
+    -------
+    Iterator[str]
+        The result of the operation.
+    """
     correlation = value or str(uuid.uuid4())
     token: Token[str | None] = _correlation_id.set(correlation)
     try:

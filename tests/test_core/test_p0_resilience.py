@@ -1,7 +1,15 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.cache import CacheInfo, async_ttl_cache, ttl_cache
 from gunz_utils.concurrency import gather_limited
@@ -14,7 +22,9 @@ class TestBoundedConcurrency(unittest.IsolatedAsyncioTestCase):
         consumed = 0
         gate = asyncio.Event()
 
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             await gate.wait()
             return value
 
@@ -35,7 +45,9 @@ class TestBoundedConcurrency(unittest.IsolatedAsyncioTestCase):
 class TestCacheP0(unittest.TestCase):
     def test_typed_cache_info(self) -> None:
         @ttl_cache(ttl=60)
-        def work(value: int) -> int:
+        def work(
+            value: int,
+        ) -> int:
             return value
 
         work(1)
@@ -50,7 +62,9 @@ class TestAsyncCache(unittest.IsolatedAsyncioTestCase):
         calls = 0
 
         @async_ttl_cache(ttl=60)
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             nonlocal calls
             calls += 1
             await asyncio.sleep(0.01)

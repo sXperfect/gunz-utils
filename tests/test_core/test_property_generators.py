@@ -1,11 +1,19 @@
 """Unit and property-based invariant tests for clean-room testkit generators."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import copy
 import json
 import math
 from typing import Any
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.cache import ttl_cache
 from gunz_utils.hashing import structured_hash
@@ -27,7 +35,7 @@ def test_fuzz_integers_contract() -> None:
     samples = list(fuzz_integers(seed=123, count=50, minimum=10, maximum=20))
     assert len(samples) == 50
     assert all(10 <= x <= 20 for x in samples)
-    # Determinism
+    #? Determinism
     samples2 = list(fuzz_integers(seed=123, count=50, minimum=10, maximum=20))
     assert samples == samples2
 
@@ -37,7 +45,7 @@ def test_fuzz_floats_contract() -> None:
     assert len(samples) == 100
     assert all(-5.0 <= x <= 5.0 for x in samples)
 
-    # Special values
+    #? Special values
     specials = list(
         fuzz_floats(
             seed=42,
@@ -69,7 +77,7 @@ def test_fuzz_primitives_contract() -> None:
     samples = list(fuzz_primitives(seed=101, count=100))
     assert len(samples) == 100
     types = {type(s) for s in samples}
-    # Should include int, float, str, bool, and NoneType
+    #? Should include int, float, str, bool, and NoneType
     assert type(None) in types
     assert bool in types
     assert str in types
@@ -80,14 +88,16 @@ def test_fuzz_json_objects_validity() -> None:
     assert len(samples) == 30
     for obj in samples:
         assert isinstance(obj, (dict, list))
-        # Ensure it is standard JSON serializable
+        #? Ensure it is standard JSON serializable
         serialized = json.dumps(obj)
         deserialized = json.loads(serialized)
         assert isinstance(deserialized, (dict, list))
 
 
 def test_check_property_success() -> None:
-    def is_even(n: int) -> bool:
+    def is_even(
+        n: int,
+    ) -> bool:
         return n % 2 == 0
 
     evens = (i * 2 for i in range(100))
@@ -96,7 +106,9 @@ def test_check_property_success() -> None:
 
 
 def test_check_property_failure_handling() -> None:
-    def reject_fives(n: int) -> bool:
+    def reject_fives(
+        n: int,
+    ) -> bool:
         return n != 5
 
     numbers = range(10)
@@ -110,7 +122,9 @@ def test_check_property_failure_handling() -> None:
 
 
 def test_check_property_exception_handling() -> None:
-    def boom_on_zero(n: int) -> None:
+    def boom_on_zero(
+        n: int,
+    ) -> None:
         if n == 0:
             raise ValueError("zero not allowed")
 
@@ -129,7 +143,9 @@ def test_invariant_deep_diff_reflexivity() -> None:
     seed = 888
     generator = fuzz_json_objects(seed=seed, count=50, max_depth=3, max_breadth=4)
 
-    def assert_reflexive(obj: Any) -> None:
+    def assert_reflexive(
+        obj: Any,
+    ) -> None:
         diff = deep_diff(obj, obj)
         assert diff == [], f"Reflexivity violated for sample: {diff}"
 
@@ -142,7 +158,9 @@ def test_invariant_structured_hash_stability() -> None:
     seed = 999
     generator = fuzz_json_objects(seed=seed, count=50, max_depth=3, max_breadth=3)
 
-    def assert_deterministic_hash(obj: Any) -> None:
+    def assert_deterministic_hash(
+        obj: Any,
+    ) -> None:
         h1 = structured_hash(obj)
         h2 = structured_hash(copy.deepcopy(obj))
         assert h1 == h2
@@ -159,7 +177,9 @@ def test_invariant_redact_containment() -> None:
     seed = 1234
     generator = fuzz_strings(seed=seed, count=50, min_length=8, max_length=32)
 
-    def assert_secret_redacted(secret: str) -> None:
+    def assert_secret_redacted(
+        secret: str,
+    ) -> None:
         masked = redact(secret, show_chars=0)
         assert isinstance(masked, str)
         assert secret not in masked
@@ -176,7 +196,9 @@ def test_invariant_ttl_cache_capacity_bound() -> None:
     maxsize = 10
 
     @ttl_cache(ttl=60.0, maxsize=maxsize)
-    def compute(key: str) -> int:
+    def compute(
+        key: str,
+    ) -> int:
         return len(key)
 
     seed = 5678

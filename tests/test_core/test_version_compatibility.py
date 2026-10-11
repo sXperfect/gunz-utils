@@ -1,11 +1,19 @@
 """Regression tests for package/module version and maintainer metadata compatibility."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import importlib
 import importlib.metadata
 import tomllib
 from pathlib import Path
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils
 

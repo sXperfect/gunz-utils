@@ -1,5 +1,9 @@
 """Identifier helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import hashlib
@@ -7,20 +11,59 @@ import uuid
 
 
 def new_id() -> str:
-    """Return a random UUID4 identifier as canonical text."""
+    """Return a random UUID4 identifier as canonical text.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     return str(uuid.uuid4())
 
 
-def deterministic_id(namespace: str, value: str) -> str:
-    """Return a stable UUID5 identifier for a namespace/value pair."""
+def deterministic_id(
+    namespace: str,
+    value: str,
+) -> str:
+    """Return a stable UUID5 identifier for a namespace/value pair.
+
+    Parameters
+    ----------
+    namespace : str
+        namespace parameter.
+    value : str
+        value parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     if not isinstance(namespace, str) or not isinstance(value, str):
         raise TypeError("namespace and value must be strings")
     ns = uuid.uuid5(uuid.NAMESPACE_URL, namespace)
     return str(uuid.uuid5(ns, value))
 
 
-def short_id(value: str, *, length: int = 12) -> str:
-    """Return a deterministic compact identifier for display and keys."""
+def short_id(
+    value: str,
+    *,
+    length: int = 12,
+) -> str:
+    """Return a deterministic compact identifier for display and keys.
+
+    Parameters
+    ----------
+    value : str
+        value parameter.
+    length : int
+        length parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     if not isinstance(value, str):
         raise TypeError("value must be a string")
     if (

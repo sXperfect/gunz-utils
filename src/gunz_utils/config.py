@@ -1,15 +1,35 @@
 """Layered configuration helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .dict_utils import deep_merge
 
 
-def merge_configs(*configs: Mapping[str, Any]) -> dict[str, Any]:
-    """Merge configuration layers from lowest to highest precedence."""
+def merge_configs(
+    *configs: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Merge configuration layers from lowest to highest precedence.
+
+    Parameters
+    ----------
+    configs : Mapping[str, Any]
+        configs parameter.
+
+    Returns
+    -------
+    dict[str, Any]
+        The result of the operation.
+    """
     result: dict[str, Any] = {}
     for config in configs:
         result = deep_merge(result, config)
@@ -22,7 +42,22 @@ def env_overrides(
     prefix: str,
     separator: str = "__",
 ) -> dict[str, Any]:
-    """Convert prefixed environment names into a nested config mapping."""
+    """Convert prefixed environment names into a nested config mapping.
+
+    Parameters
+    ----------
+    environ : Mapping[str, str]
+        environ parameter.
+    prefix : str
+        prefix parameter.
+    separator : str
+        separator parameter.
+
+    Returns
+    -------
+    dict[str, Any]
+        The result of the operation.
+    """
     if not isinstance(prefix, str) or not prefix.strip("_"):
         raise ValueError("prefix must be a non-empty string")
     if not isinstance(separator, str) or not separator:

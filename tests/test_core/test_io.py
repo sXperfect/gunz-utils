@@ -1,9 +1,17 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import pathlib
 import tempfile
 import unittest
 from unittest.mock import patch
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import atomic_write
 

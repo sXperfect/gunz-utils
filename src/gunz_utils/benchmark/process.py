@@ -1,5 +1,9 @@
 """Linux process-tree resource profiling for arbitrary executables."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -11,6 +15,9 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ..subprocess import _kill_process
 
 
@@ -70,10 +77,24 @@ class ProcessProfile:
 
     @property
     def average_cpu_cores(self) -> float:
+        """average_cpu_cores() function.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         cpu = self.cpu_user_seconds + self.cpu_system_seconds
         return 0.0 if self.wall_seconds == 0 else cpu / self.wall_seconds
 
     def to_dict(self) -> dict[str, Any]:
+        """to_dict() function.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of the operation.
+        """
         return asdict(self)
 
 
@@ -98,7 +119,20 @@ def _merge_process_counters(
     previous: _ProcessCounters | None,
     current: _ProcessCounters,
 ) -> _ProcessCounters:
-    """Keep the greatest observed monotonic value for one process lifetime."""
+    """Keep the greatest observed monotonic value for one process lifetime.
+
+    Parameters
+    ----------
+    previous : _ProcessCounters | None
+        previous parameter.
+    current : _ProcessCounters
+        current parameter.
+
+    Returns
+    -------
+    _ProcessCounters
+        The result of the operation.
+    """
     if previous is None:
         return current
     return _ProcessCounters(
@@ -119,7 +153,21 @@ def _merge_process_counters(
     )
 
 
-def _memory_rollup(path: Path) -> tuple[int | None, int | None]:
+def _memory_rollup(
+    path: Path,
+) -> tuple[int | None, int | None]:
+    """_memory_rollup() function.
+
+    Parameters
+    ----------
+    path : Path
+        path parameter.
+
+    Returns
+    -------
+    tuple[int | None, int | None]
+        The result of the operation.
+    """
     try:
         values: dict[str, int] = {}
         for line in path.read_text().splitlines():
@@ -139,8 +187,21 @@ def _memory_rollup(path: Path) -> tuple[int | None, int | None]:
         return None, None
 
 
-def _parse_proc_stat(text: str) -> tuple[int, str, list[str]]:
-    """Parse /proc/<pid>/stat without splitting spaces inside comm."""
+def _parse_proc_stat(
+    text: str,
+) -> tuple[int, str, list[str]]:
+    """Parse /proc/<pid>/stat without splitting spaces inside comm.
+
+    Parameters
+    ----------
+    text : str
+        text parameter.
+
+    Returns
+    -------
+    tuple[int, str, list[str]]
+        The result of the operation.
+    """
     first_space = text.find(" ")
     close_paren = text.rfind(")")
     if first_space <= 0 or close_paren <= first_space + 1:
@@ -157,7 +218,13 @@ def _parse_proc_stat(text: str) -> tuple[int, str, list[str]]:
 
 
 def _require_compatible_procfs() -> Path:
-    """Reject procfs mounts whose PID numbers address a different namespace."""
+    """Reject procfs mounts whose PID numbers address a different namespace.
+
+    Returns
+    -------
+    Path
+        The result of the operation.
+    """
     proc = Path("/proc")
     try:
         proc_pid, _command, _fields = _parse_proc_stat(
@@ -182,6 +249,24 @@ def _linux_snapshot(
     memory_detail: str = "pss",
     lifetime_counters: dict[_ProcessIdentity, _ProcessCounters] | None = None,
 ) -> ProcessSample:
+    """_linux_snapshot() function.
+
+    Parameters
+    ----------
+    root_pid : int
+        root_pid parameter.
+    started : float
+        started parameter.
+    memory_detail : str
+        memory_detail parameter.
+    lifetime_counters : dict[_ProcessIdentity, _ProcessCounters] | None
+        lifetime_counters parameter.
+
+    Returns
+    -------
+    ProcessSample
+        The result of the operation.
+    """
     if memory_detail not in {"rss", "pss", "full"}:
         raise ValueError("memory_detail must be rss, pss, or full")
     proc = _require_compatible_procfs()
@@ -421,9 +506,9 @@ def profile_command(
             snapshot_index += 1
             time.sleep(float(interval))
     except BaseException as error:
-        # A sampling failure owns the whole launched command, including children
-        # still alive after the root exits. Preserve the original failure even
-        # if the process disappears during signaling or cannot be reaped.
+        #? A sampling failure owns the whole launched command, including children
+        #? still alive after the root exits. Preserve the original failure even
+        #? if the process disappears during signaling or cannot be reaped.
         try:
             _kill_process(process)
         except BaseException as cleanup_error:
@@ -437,15 +522,60 @@ def profile_command(
     if check and process.returncode:
         raise subprocess.CalledProcessError(process.returncode, list(args))
 
-    def peak(name: str) -> int:
+    def peak(
+        name: str,
+    ) -> int:
+        """peak() function.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         return max((int(getattr(sample, name)) for sample in samples), default=0)
 
-    def optional_peak(name: str) -> int | None:
+    def optional_peak(
+        name: str,
+    ) -> int | None:
+        """optional_peak() function.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+
+        Returns
+        -------
+        int | None
+            The result of the operation.
+        """
         values = [getattr(sample, name) for sample in samples]
         known = [int(value) for value in values if value is not None]
         return max(known) if known else None
 
-    def lifetime_float(name: str, sample_name: str) -> float:
+    def lifetime_float(
+        name: str,
+        sample_name: str,
+    ) -> float:
+        """lifetime_float() function.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+        sample_name : str
+            sample_name parameter.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         if lifetime_counters:
             return sum(
                 float(getattr(item, name)) for item in lifetime_counters.values()
@@ -455,7 +585,24 @@ def profile_command(
             default=0.0,
         )
 
-    def lifetime_int(name: str, sample_name: str) -> int:
+    def lifetime_int(
+        name: str,
+        sample_name: str,
+    ) -> int:
+        """lifetime_int() function.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+        sample_name : str
+            sample_name parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         if lifetime_counters:
             return sum(int(getattr(item, name)) for item in lifetime_counters.values())
         return peak(sample_name)

@@ -1,5 +1,9 @@
 """Streaming serialization, bounded writers, and deterministic fingerprints."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import hashlib
@@ -8,22 +12,68 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import Any, BinaryIO, TextIO
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .serialization import canonical_json
 
 
-def _reject_json_constant(value: str) -> object:
+def _reject_json_constant(
+    value: str,
+) -> object:
+    """_reject_json_constant() function.
+
+    Parameters
+    ----------
+    value : str
+        value parameter.
+
+    Returns
+    -------
+    object
+        The result of the operation.
+    """
     raise ValueError(f"non-standard JSON constant: {value}")
 
 
-def iter_jsonl(handle: TextIO) -> Iterator[Any]:
-    """Decode non-empty JSON Lines records lazily."""
+def iter_jsonl(
+    handle: TextIO,
+) -> Iterator[Any]:
+    """Decode non-empty JSON Lines records lazily.
+
+    Parameters
+    ----------
+    handle : TextIO
+        handle parameter.
+
+    Returns
+    -------
+    Iterator[Any]
+        The result of the operation.
+    """
     for line in handle:
         if line.strip():
             yield json.loads(line, parse_constant=_reject_json_constant)
 
 
-def write_jsonl(handle: TextIO, records: Iterable[Any]) -> int:
-    """Write compact JSON Lines records and return the record count."""
+def write_jsonl(
+    handle: TextIO,
+    records: Iterable[Any],
+) -> int:
+    """Write compact JSON Lines records and return the record count.
+
+    Parameters
+    ----------
+    handle : TextIO
+        handle parameter.
+    records : Iterable[Any]
+        records parameter.
+
+    Returns
+    -------
+    int
+        The result of the operation.
+    """
     count = 0
     buffer: list[str] = []
     for record in records:
@@ -45,8 +95,24 @@ def write_jsonl(handle: TextIO, records: Iterable[Any]) -> int:
 
 
 
-def fingerprint(value: Any, algorithm: str = "sha256") -> str:
-    """Hash canonical JSON without representation-order differences."""
+def fingerprint(
+    value: Any,
+    algorithm: str = "sha256",
+) -> str:
+    """Hash canonical JSON without representation-order differences.
+
+    Parameters
+    ----------
+    value : Any
+        value parameter.
+    algorithm : str
+        algorithm parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     digest = hashlib.new(algorithm)
     digest.update(canonical_json(value).encode("utf-8"))
     return digest.hexdigest()
@@ -58,7 +124,22 @@ def hash_stream(
     algorithm: str = "sha256",
     chunk_size: int = 1 << 20,
 ) -> str:
-    """Hash a binary stream with bounded memory."""
+    """Hash a binary stream with bounded memory.
+
+    Parameters
+    ----------
+    handle : BinaryIO
+        handle parameter.
+    algorithm : str
+        algorithm parameter.
+    chunk_size : int
+        chunk_size parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     if (
         isinstance(chunk_size, bool)
         or not isinstance(chunk_size, int)
@@ -74,7 +155,11 @@ def hash_stream(
 class BoundedWriter:
     """Binary writer that rejects writes exceeding a cumulative byte limit."""
 
-    def __init__(self, handle: BinaryIO, *, max_bytes: int) -> None:
+    def __init__(self,
+        handle: BinaryIO,
+        *,
+        max_bytes: int,
+    ) -> None:
         if (
             isinstance(max_bytes, bool)
             or not isinstance(max_bytes, int)
@@ -85,8 +170,21 @@ class BoundedWriter:
         self.max_bytes = max_bytes
         self.bytes_written = 0
 
-    def write(self, data: bytes) -> int:
-        """Write all bytes without exceeding the configured limit."""
+    def write(self,
+        data: bytes,
+    ) -> int:
+        """Write all bytes without exceeding the configured limit.
+
+        Parameters
+        ----------
+        data : bytes
+            data parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         if self.bytes_written + len(data) > self.max_bytes:
             raise ValueError("write exceeds byte limit")
         view = memoryview(data)
@@ -105,8 +203,7 @@ class BoundedWriter:
 class DigestWriter:
     """Binary writer that hashes written bytes and can enforce a byte limit."""
 
-    def __init__(
-        self,
+    def __init__(self,
         handle: BinaryIO,
         *,
         algorithm: str = "sha256",
@@ -124,8 +221,21 @@ class DigestWriter:
         self.bytes_written = 0
         self._digest = hashlib.new(algorithm)
 
-    def write(self, data: bytes) -> int:
-        """Write and hash all bytes, handling partial underlying writes."""
+    def write(self,
+        data: bytes,
+    ) -> int:
+        """Write and hash all bytes, handling partial underlying writes.
+
+        Parameters
+        ----------
+        data : bytes
+            data parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         if (
             self.max_bytes is not None
             and self.bytes_written + len(data) > self.max_bytes
@@ -146,7 +256,13 @@ class DigestWriter:
 
     @property
     def hexdigest(self) -> str:
-        """Return the digest for bytes successfully written so far."""
+        """Return the digest for bytes successfully written so far.
+
+        Returns
+        -------
+        str
+            The result of the operation.
+        """
         return self._digest.hexdigest()
 
 
@@ -166,7 +282,26 @@ def copy_and_hash(
     chunk_size: int = 1 << 20,
     max_bytes: int | None = None,
 ) -> StreamCopyResult:
-    """Copy a binary stream while hashing and optionally bounding output size."""
+    """Copy a binary stream while hashing and optionally bounding output size.
+
+    Parameters
+    ----------
+    source : BinaryIO
+        source parameter.
+    destination : BinaryIO
+        destination parameter.
+    algorithm : str
+        algorithm parameter.
+    chunk_size : int
+        chunk_size parameter.
+    max_bytes : int | None
+        max_bytes parameter.
+
+    Returns
+    -------
+    StreamCopyResult
+        The result of the operation.
+    """
     if (
         isinstance(chunk_size, bool)
         or not isinstance(chunk_size, int)

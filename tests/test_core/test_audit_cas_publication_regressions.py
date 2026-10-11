@@ -1,5 +1,9 @@
 """Adversarial publication tests for the CAS descriptor boundary."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import errno
@@ -8,14 +12,25 @@ import os
 from pathlib import Path
 from typing import Any
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.content_store as cas
 from gunz_utils.content_store import ContentAddressedStore
 
 
 @pytest.mark.parametrize("prefix", [" ", "-", "+", "_", "\t", "０"])
-def test_digest_rejects_non_ascii_hex(tmp_path: Path, prefix: str) -> None:
+def test_digest_rejects_non_ascii_hex(
+    tmp_path: Path,
+    prefix: str,
+) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     with pytest.raises(ValueError, match="hexadecimal"):
         store.path_for(prefix + "a" * (store.digest_chars - len(prefix)))
@@ -27,7 +42,8 @@ def test_digest_rejects_non_ascii_hex(tmp_path: Path, prefix: str) -> None:
     "algorithm", ["sha256", "sha512", "sha3_256", "blake2b", "blake2s"]
 )
 def test_supported_digest_lengths_normalize_uppercase(
-    tmp_path: Path, algorithm: str
+    tmp_path: Path,
+    algorithm: str,
 ) -> None:
     store = ContentAddressedStore(tmp_path / algorithm, algo=algorithm)
     artifact = store.put_bytes(b"normalization")
@@ -40,7 +56,9 @@ def test_supported_digest_lengths_normalize_uppercase(
 )
 @pytest.mark.parametrize("fallback", [False, True])
 def test_fanout_swap_cannot_redirect_publication(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fallback: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fallback: bool,
 ) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     outside = tmp_path / "outside"
@@ -54,13 +72,19 @@ def test_fanout_swap_cannot_redirect_publication(
         parent.rename(detached)
         parent.symlink_to(outside, target_is_directory=True)
 
-    def link(*args: Any, **kwargs: Any) -> None:
+    def link(
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         if fallback:
             raise OSError(errno.EOPNOTSUPP, "hard links unsupported")
         swap()
         real_link(*args, **kwargs)
 
-    def replace(*args: Any, **kwargs: Any) -> None:
+    def replace(
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         swap()
         real_replace(*args, **kwargs)
 
@@ -75,7 +99,8 @@ def test_fanout_swap_cannot_redirect_publication(
 
 
 def test_copy_staging_substitution_preserves_outside_victim(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     artifact = store.put_bytes(b"artifact")
@@ -84,7 +109,10 @@ def test_copy_staging_substitution_preserves_outside_victim(
     target = tmp_path / "output"
     real_copy = cas.shutil.copyfileobj
 
-    def copy(*args: Any, **kwargs: Any) -> None:
+    def copy(
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         temporary = next(tmp_path.glob(".output.*.tmp"))
         temporary.unlink()
         temporary.symlink_to(victim)
@@ -99,13 +127,17 @@ def test_copy_staging_substitution_preserves_outside_victim(
 
 
 def test_copy_pins_verified_source_identity(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     artifact = store.put_bytes(b"original artifact")
     real_copy = cas.shutil.copyfileobj
 
-    def copy(*args: Any, **kwargs: Any) -> None:
+    def copy(
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         artifact.path.unlink()
         artifact.path.write_bytes(b"substituted source")
         real_copy(*args, **kwargs)
@@ -118,7 +150,8 @@ def test_copy_pins_verified_source_identity(
 
 @pytest.mark.skipif(not cas._ANCHORED_IO, reason="no-follow hard links required")
 def test_hardlink_source_substitution_is_rejected(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     artifact = store.put_bytes(b"artifact")
@@ -126,7 +159,10 @@ def test_hardlink_source_substitution_is_rejected(
     victim.write_bytes(b"original")
     real_link = os.link
 
-    def link(*args: Any, **kwargs: Any) -> None:
+    def link(
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         if str(args[1]).endswith(".link"):
             artifact.path.unlink()
             artifact.path.symlink_to(victim)
@@ -142,7 +178,9 @@ def test_hardlink_source_substitution_is_rejected(
 
 @pytest.mark.parametrize("operation", ["copy", "link", "replace"])
 def test_materialize_failure_preserves_target_and_cleans_staging(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
 ) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     artifact = store.put_bytes(b"artifact")
@@ -151,7 +189,10 @@ def test_materialize_failure_preserves_target_and_cleans_staging(
     if replace:
         target.write_bytes(b"existing")
 
-    def fail(*args: Any, **kwargs: Any) -> None:
+    def fail(
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         raise OSError("injected failure")
 
     if operation == "copy":
@@ -169,14 +210,18 @@ def test_materialize_failure_preserves_target_and_cleans_staging(
 
 
 def test_materialize_destination_competitor_is_not_overwritten(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     artifact = store.put_bytes(b"artifact")
     target = tmp_path / "output"
     real_link = os.link
 
-    def link(*args: Any, **kwargs: Any) -> None:
+    def link(
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         target.write_bytes(b"winner")
         real_link(*args, **kwargs)
 
@@ -188,7 +233,8 @@ def test_materialize_destination_competitor_is_not_overwritten(
 
 
 def test_trusted_tree_fallback_materialization(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(cas, "_ANCHORED_IO", False)
     store = ContentAddressedStore(tmp_path / "store")
@@ -199,18 +245,24 @@ def test_trusted_tree_fallback_materialization(
 
 
 def test_fdopen_setup_failure_closes_duplicate_and_staging(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     captured: list[int] = []
     original_dup = os.dup
 
-    def duplicate(descriptor: int) -> int:
+    def duplicate(
+        descriptor: int,
+    ) -> int:
         result = original_dup(descriptor)
         captured.append(result)
         return result
 
-    def fail(*args: Any, **kwargs: Any) -> None:
+    def fail(
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         raise OSError("fdopen failed")
 
     monkeypatch.setattr(cas.os, "dup", duplicate)
@@ -226,7 +278,8 @@ def test_fdopen_setup_failure_closes_duplicate_and_staging(
 
 
 def test_hardlink_name_collision_does_not_delete_competitor(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ContentAddressedStore(tmp_path / "store")
     artifact = store.put_bytes(b"artifact")
@@ -241,7 +294,8 @@ def test_hardlink_name_collision_does_not_delete_competitor(
 
 
 def test_copy_fallback_without_descriptor_permissions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(cas, "_ANCHORED_IO", False)
     store = ContentAddressedStore(tmp_path / "store")
@@ -253,7 +307,9 @@ def test_copy_fallback_without_descriptor_permissions(
 
 @pytest.mark.parametrize("replace", [False, True])
 def test_final_staging_substitution_is_detected_without_outside_write(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replace: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    replace: bool,
 ) -> None:
     """Portable name publication detects a swap but cannot undo an attacker entry."""
     store = ContentAddressedStore(tmp_path / "store")
@@ -263,7 +319,10 @@ def test_final_staging_substitution_is_detected_without_outside_write(
     target = tmp_path / "output"
     real_publish = os.replace if replace else os.link
 
-    def publish(*args: Any, **kwargs: Any) -> None:
+    def publish(
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         temporary = next(tmp_path.glob(".output.*.tmp"))
         temporary.unlink()
         temporary.symlink_to(victim)

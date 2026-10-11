@@ -9,6 +9,10 @@ Run from the project root:
     python -m pytest tests/test_core/test_ci_cli.py -q
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import importlib.util
@@ -28,7 +32,9 @@ def _load_ci():
     return module
 
 
-def _run_cli(*args: str) -> subprocess.CompletedProcess:
+def _run_cli(
+    *args: str,
+) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(CI_PY), *args],
         cwd=PROJECT_ROOT,
@@ -56,24 +62,31 @@ def test_cli_no_command_is_nonzero() -> None:
     assert result.returncode == 2
 
 
-def test_packaging_gate_runs_all_cases_without_network(monkeypatch) -> None:
-    # The packaging gate is a fresh-venv isolation matrix (zero-dep, stdlib,
-    # per-extra validation/project/observability/secure, plot, wheel/sdist).
-    # Running it for real creates several venvs and downloads packages, so this unit
-    # test stubs every heavy case function to a no-op success and asserts the
-    # runner invokes the full matrix and returns 0. Real proof of each case is
-    # `python scripts/ci.py packaging` (exit 0, 8/8), not this unit test.
+def test_packaging_gate_runs_all_cases_without_network(
+    monkeypatch,
+) -> None:
+    #? The packaging gate is a fresh-venv isolation matrix (zero-dep, stdlib,
+    #? per-extra validation/project/observability/secure, plot, wheel/sdist).
+    #? Running it for real creates several venvs and downloads packages, so this unit
+    #? test stubs every heavy case function to a no-op success and asserts the
+    #? runner invokes the full matrix and returns 0. Real proof of each case is
+    #? `python scripts/ci.py packaging` (exit 0, 8/8), not this unit test.
     ci = _load_ci()
     invoked: dict[str, int] = {}
 
-    def make_fake(key: str):
-        def fake(*_args, **_kwargs):
+    def make_fake(
+        key: str,
+    ):
+        def fake(
+            *_args,
+            **_kwargs,
+        ):
             invoked[key] = invoked.get(key, 0) + 1
             return 0
 
         return fake
 
-    # The four per-extra cases all route through _case_extra.
+    #? The four per-extra cases all route through _case_extra.
     monkeypatch.setattr(ci, "_case_zero_dep", make_fake("zero-dep"))
     monkeypatch.setattr(ci, "_case_stdlib", make_fake("stdlib"))
     monkeypatch.setattr(ci, "_case_extra", make_fake("extra"))
@@ -117,7 +130,9 @@ def test_run_passes_clean_command() -> None:
     assert ci._run(passing) == 0
 
 
-def test_all_stops_on_first_failure(monkeypatch) -> None:
+def test_all_stops_on_first_failure(
+    monkeypatch,
+) -> None:
     ci = _load_ci()
     calls: list[str] = []
 

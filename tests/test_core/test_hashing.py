@@ -1,11 +1,19 @@
 """Tests for hashing utilities."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import hashlib
 import pathlib
 import tempfile
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.hashing import (
     DEFAULT_ALGO,

@@ -1,11 +1,23 @@
 """Tests for reversible signal-handler registration."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import signal
 from unittest.mock import patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.signals import (
     install_async_signal_handlers,
@@ -69,8 +81,7 @@ def test_termination_handler_rejects_non_callable_callback() -> None:
 
 
 class _FakeLoop:
-    def __init__(
-        self,
+    def __init__(self,
         *,
         fail_on: int | None = None,
     ) -> None:
@@ -80,8 +91,7 @@ class _FakeLoop:
         ] = []
         self.removed: list[int] = []
 
-    def add_signal_handler(
-        self,
+    def add_signal_handler(self,
         signum: int,
         callback: object,
         *args: object,
@@ -96,8 +106,7 @@ class _FakeLoop:
             )
         )
 
-    def remove_signal_handler(
-        self,
+    def remove_signal_handler(self,
         signum: int,
     ) -> bool:
         self.removed.append(signum)

@@ -1,5 +1,9 @@
 """Cross-platform process-sampling backend contracts."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import sys
@@ -25,12 +29,26 @@ class ProcessSampler(ABC):
     @property
     @abstractmethod
     def capabilities(self) -> SamplerCapabilities:
+        """capabilities() function.
+
+        Returns
+        -------
+        SamplerCapabilities
+            The result of the operation.
+        """
         raise NotImplementedError
 
 
 class LinuxProcSampler(ProcessSampler):
     @property
     def capabilities(self) -> SamplerCapabilities:
+        """capabilities() function.
+
+        Returns
+        -------
+        SamplerCapabilities
+            The result of the operation.
+        """
         return SamplerCapabilities(True, True, True, True, True, True, True, True)
 
 
@@ -39,13 +57,26 @@ class PortableSampler(ProcessSampler):
 
     @property
     def capabilities(self) -> SamplerCapabilities:
+        """capabilities() function.
+
+        Returns
+        -------
+        SamplerCapabilities
+            The result of the operation.
+        """
         return SamplerCapabilities(
             False, False, False, False, False, False, False, False
         )
 
 
 def default_sampler() -> ProcessSampler:
-    """Return the best built-in process sampler for the current platform."""
+    """Return the best built-in process sampler for the current platform.
+
+    Returns
+    -------
+    ProcessSampler
+        The result of the operation.
+    """
     return LinuxProcSampler() if sys.platform.startswith("linux") else PortableSampler()
 
 

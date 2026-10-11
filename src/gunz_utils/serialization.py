@@ -1,6 +1,10 @@
 """Deterministic JSON serialization helpers."""
 from __future__ import annotations
 
+__author__ = "Yeremia Gunawan Adhisantoso"
+__email__ = "yeremiag@gmail.com"
+__license__ = "Clear BSD"
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================

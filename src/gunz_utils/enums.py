@@ -30,7 +30,7 @@ T = TypeVar("T", bound="BaseStrEnum")
 # ? Default security limit on input string length. Subclasses may override
 # ? this class attribute (e.g. for long-context models that need larger
 # ? lookup keys) via `__init_subclass__` or direct attribute override.
-DEFAULT_MAX_INPUT_LENGTH = 1024  # Security: Prevent DoS via long strings
+DEFAULT_MAX_INPUT_LENGTH = 1024  #? Security: Prevent DoS via long strings
 
 # ? Backward-compat alias for the module-level constant. New code should
 # ? reference `cls.DEFAULT_MAX_INPUT_LENGTH` (the class attribute).
@@ -110,18 +110,18 @@ class BaseStrEnum(enum.StrEnum):
             return existing
         lookup_map: dict[str, Self] = {}
         for member in cls:
-            # Add normalized value
+            #? Add normalized value
             val_lower = member.value.lower()
             val_norm = val_lower.replace("-", "_").replace(" ", "_")
             if val_norm not in lookup_map:
                 lookup_map[val_norm] = member
 
-            # Add raw lowercase value
-            # (optimization for inputs matching value but with separators)
+            #? Add raw lowercase value
+            #? (optimization for inputs matching value but with separators)
             if val_lower not in lookup_map:
                 lookup_map[val_lower] = member
 
-            # Add lowercase name
+            #? Add lowercase name
             name_lower = member.name.lower()
             if name_lower not in lookup_map:
                 lookup_map[name_lower] = member
@@ -130,13 +130,15 @@ class BaseStrEnum(enum.StrEnum):
         return lookup_map
 
     @classmethod
-    def from_fuzzy_string(cls, value_str: str) -> Self:
+    def from_fuzzy_string(cls,
+        value_str: str,
+    ) -> Self:
         """
         Attempts to find a member by alias, normalized value, or case-insensitive name.
         Raises ValueError if no match is found.
         """
-        # Security check to prevent DoS via excessive string processing.
-        # Uses the class attribute so subclasses can override the limit.
+        #? Security check to prevent DoS via excessive string processing.
+        #? Uses the class attribute so subclasses can override the limit.
         max_len = _max_input_length(cls)
         if len(value_str) > max_len:
             raise ValueError(f"Input string too long (max {max_len} chars)")
@@ -144,17 +146,17 @@ class BaseStrEnum(enum.StrEnum):
         value_lower = value_str.lower()
         _aliases = cls.__ALIASES__
 
-        # 1. Check for defined aliases (string -> target_string_value)
+        #? 1. Check for defined aliases (string -> target_string_value)
         if value_lower in _aliases:
             alias_target_value = _aliases[value_lower]
 
-            # Check internal map first
+            #? Check internal map first
             if alias_target_value in cls._value2member_map_:
                 #? mypy's enum stubs type _value2member_map_ as dict[Any, Any];
                 #? the runtime value is Self, so cast at the boundary.
                 return cast(Self, cls._value2member_map_[alias_target_value])
 
-            # Fallback to instantiation (should work if valid member)
+            #? Fallback to instantiation (should work if valid member)
             try:
                 return cls(alias_target_value)
             except ValueError as exc:
@@ -163,16 +165,16 @@ class BaseStrEnum(enum.StrEnum):
                     f"member value for {cls.__name__}"
                 ) from exc
 
-        # 2. Check for matches in the fuzzy map
-        # Optimization: Use cached lookup map instead of iterating
+        #? 2. Check for matches in the fuzzy map
+        #? Optimization: Use cached lookup map instead of iterating
         fuzzy_map = cls._get_fuzzy_map()
 
-        # Check raw lowercase input first (avoids normalization if unnecessary)
-        # This catches direct name matches or values that are already normalized
+        #? Check raw lowercase input first (avoids normalization if unnecessary)
+        #? This catches direct name matches or values that are already normalized
         if value_lower in fuzzy_map:
             return fuzzy_map[value_lower]
 
-        # 3. Normalize separators and case for fuzzy matching
+        #? 3. Normalize separators and case for fuzzy matching
         normalized_value_input = value_lower.replace("-", "_").replace(" ", "_")
 
         if normalized_value_input in fuzzy_map:
@@ -186,23 +188,52 @@ class BaseStrEnum(enum.StrEnum):
 
     @classmethod
     def names(cls) -> list[str]:
-        """Returns a list of all member names."""
+        """Returns a list of all member names.
+
+        Returns
+        -------
+        list[str]
+            The result of the operation.
+        """
         return [member.name for member in cls]
 
     @classmethod
     def values(cls) -> list[str]:
-        """Returns a list of all member values."""
+        """Returns a list of all member values.
+
+        Returns
+        -------
+        list[str]
+            The result of the operation.
+        """
         return [member.value for member in cls]
 
     @classmethod
     def items(cls) -> list[tuple[str, str]]:
-        """Returns a list of (name, value) tuples."""
+        """Returns a list of (name, value) tuples.
+
+        Returns
+        -------
+        list[tuple[str, str]]
+            The result of the operation.
+        """
         return [(member.name, member.value) for member in cls]
 
     @classmethod
-    def get_or_none(cls, value: object) -> Self | None:
-        """
-        Safely attempts to get an enum member. Returns None if invalid.
+    def get_or_none(cls,
+        value: object,
+    ) -> Self | None:
+        """Safely attempts to get an enum member. Returns None if invalid.
+
+        Parameters
+        ----------
+        value : object
+            value parameter.
+
+        Returns
+        -------
+        Self | None
+            The result of the operation.
         """
         if isinstance(value, cls):
             return value
@@ -224,6 +255,13 @@ class BaseStrEnum(enum.StrEnum):
 
     @classmethod
     def choices(cls) -> list[str]:
+        """choices() function.
+
+        Returns
+        -------
+        list[str]
+            The result of the operation.
+        """
         return cls.values()
 
 
@@ -253,7 +291,9 @@ class OptionalBaseStrEnum(BaseStrEnum):
     #? Declared so mypy recognises `cls.NONE` in `_missing_`.
     NONE: ClassVar[Self]
 
-    def __init_subclass__(cls, **kwargs: Any) -> None:
+    def __init_subclass__(cls,
+        **kwargs: Any,
+    ) -> None:
         super().__init_subclass__(**kwargs)
         if "NONE" not in cls.__members__:
             raise TypeError(
@@ -262,16 +302,30 @@ class OptionalBaseStrEnum(BaseStrEnum):
             )
 
     @classmethod
-    def _missing_(cls, value: object) -> Self:
+    def _missing_(cls,
+        value: object,
+    ) -> Self:
+        """_missing_() function.
+
+        Parameters
+        ----------
+        value : object
+            value parameter.
+
+        Returns
+        -------
+        Self
+            The result of the operation.
+        """
         if value is None:
             return cls.__members__["NONE"]
 
-        # Try fuzzy match via helper, but do NOT retry cls(value) to avoid recursion
+        #? Try fuzzy match via helper, but do NOT retry cls(value) to avoid recursion
         if isinstance(value, str):
             try:
                 return cls.from_fuzzy_string(value)
             except ValueError:
-                pass  # let super raise
+                pass  #? let super raise
 
         #? Enum._missing_ returns Self | None in stubs but the protocol
         #? guarantees a member on success or raises. Cast to Self since
@@ -303,8 +357,12 @@ class BaseIntEnum(enum.IntEnum):
 
     @classmethod
     def _get_name_lookup_map(cls) -> dict[str, Self]:
-        """
-        Lazily builds and returns a mapping from lowercase name to enum member.
+        """Lazily builds and returns a mapping from lowercase name to enum member.
+
+        Returns
+        -------
+        dict[str, Self]
+            The result of the operation.
         """
         existing = _NAME_LOOKUP_MAPS.get(cls)
         if existing is not None:
@@ -318,13 +376,15 @@ class BaseIntEnum(enum.IntEnum):
         return lookup_map
 
     @classmethod
-    def from_fuzzy_int_string(cls, value_str: str) -> Self:
+    def from_fuzzy_int_string(cls,
+        value_str: str,
+    ) -> Self:
         """
         Attempts to find a member by alias (string->int), case-insensitive name, or
         string-to-int conversion.
         """
-        # Security check to prevent DoS via excessive string processing.
-        # Uses the class attribute so subclasses can override the limit.
+        #? Security check to prevent DoS via excessive string processing.
+        #? Uses the class attribute so subclasses can override the limit.
         max_len = _max_input_length(cls)
         if len(value_str) > max_len:
             raise ValueError(f"Input string too long (max {max_len} chars)")
@@ -332,7 +392,7 @@ class BaseIntEnum(enum.IntEnum):
         value_lower = value_str.lower()
         _aliases = cls.__ALIASES__
 
-        # 1. Check for aliases (string -> int_value)
+        #? 1. Check for aliases (string -> int_value)
         if value_lower in _aliases:
             int_target_value = _aliases[value_lower]
 
@@ -349,13 +409,13 @@ class BaseIntEnum(enum.IntEnum):
                     f"member value for {cls.__name__}"
                 ) from exc
 
-        # 2. Check for member name matches (case-insensitive)
-        # Optimization: Use cached lookup map instead of iterating
+        #? 2. Check for member name matches (case-insensitive)
+        #? Optimization: Use cached lookup map instead of iterating
         name_map = cls._get_name_lookup_map()
         if value_lower in name_map:
             return name_map[value_lower]
 
-        # 3. Try to convert to int if it's a string representation of a number
+        #? 3. Try to convert to int if it's a string representation of a number
         try:
             int_value = int(value_str)
             if int_value in cls._value2member_map_:
@@ -376,18 +436,53 @@ class BaseIntEnum(enum.IntEnum):
 
     @classmethod
     def names(cls) -> list[str]:
+        """names() function.
+
+        Returns
+        -------
+        list[str]
+            The result of the operation.
+        """
         return [member.name for member in cls]
 
     @classmethod
     def values(cls) -> list[int]:
+        """values() function.
+
+        Returns
+        -------
+        list[int]
+            The result of the operation.
+        """
         return [member.value for member in cls]
 
     @classmethod
     def items(cls) -> list[tuple[str, int]]:
+        """items() function.
+
+        Returns
+        -------
+        list[tuple[str, int]]
+            The result of the operation.
+        """
         return [(member.name, member.value) for member in cls]
 
     @classmethod
-    def get_or_none(cls, value: object) -> Self | None:
+    def get_or_none(cls,
+        value: object,
+    ) -> Self | None:
+        """get_or_none() function.
+
+        Parameters
+        ----------
+        value : object
+            value parameter.
+
+        Returns
+        -------
+        Self | None
+            The result of the operation.
+        """
         if isinstance(value, cls):
             return value
 
@@ -410,6 +505,13 @@ class BaseIntEnum(enum.IntEnum):
 
     @classmethod
     def choices(cls) -> list[Any]:
+        """choices() function.
+
+        Returns
+        -------
+        list[Any]
+            The result of the operation.
+        """
         return cls.values()
 
 

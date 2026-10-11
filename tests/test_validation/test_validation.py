@@ -1,4 +1,12 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import type_checked
 
@@ -6,7 +14,10 @@ from gunz_utils import type_checked
 class TestTypeChecked(unittest.TestCase):
     def test_basic_validation(self):
         @type_checked
-        def add(a: int, b: int) -> int:
+        def add(
+            a: int,
+            b: int,
+        ) -> int:
             return a + b
 
         self.assertEqual(add(1, 2), 3)
@@ -19,7 +30,10 @@ class TestTypeChecked(unittest.TestCase):
 
     def test_optional_args(self):
         @type_checked
-        def greet(name: str, age: int = 18):
+        def greet(
+            name: str,
+            age: int = 18,
+        ):
             return f"Hello {name}, {age}"
 
         self.assertEqual(greet("Alice"), "Hello Alice, 18")
@@ -32,7 +46,11 @@ class TestTypeChecked(unittest.TestCase):
 
     def test_multiple_validation_failures(self):
         @type_checked
-        def multi(a: int, b: str, c: float) -> str:
+        def multi(
+            a: int,
+            b: str,
+            c: float,
+        ) -> str:
             return f"{a}-{b}-{c}"
 
         with self.assertRaises(TypeError) as cm:
@@ -52,7 +70,10 @@ class TestTypeChecked(unittest.TestCase):
 
     def test_all_optional_missing(self):
         @type_checked
-        def all_optional(a: int = 1, b: str = "default") -> str:
+        def all_optional(
+            a: int = 1,
+            b: str = "default",
+        ) -> str:
             return f"{a}-{b}"
 
         self.assertEqual(all_optional(), "1-default")
@@ -60,7 +81,9 @@ class TestTypeChecked(unittest.TestCase):
 
     def test_error_message_format(self):
         @type_checked
-        def typed_func(x: int) -> int:
+        def typed_func(
+            x: int,
+        ) -> int:
             return x
 
         with self.assertRaises(TypeError) as cm:
@@ -73,7 +96,9 @@ class TestTypeChecked(unittest.TestCase):
 
     def test_varargs(self):
         @type_checked
-        def varargs_func(*args: int) -> int:
+        def varargs_func(
+            *args: int,
+        ) -> int:
             return sum(args)
 
         self.assertEqual(varargs_func(1, 2, 3), 6)
@@ -83,7 +108,9 @@ class TestTypeChecked(unittest.TestCase):
 
     def test_kwargs(self):
         @type_checked
-        def kwargs_func(**kwargs: str) -> int:
+        def kwargs_func(
+            **kwargs: str,
+        ) -> int:
             return len(kwargs)
 
         self.assertEqual(kwargs_func(a="x", b="y"), 2)

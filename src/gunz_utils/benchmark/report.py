@@ -1,13 +1,33 @@
 """Human-readable benchmark reports."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .compare import BenchmarkComparison
 from .process import ProcessProfile
 
 
-def format_comparison(comparison: BenchmarkComparison) -> str:
-    """Format benchmark changes as a compact Markdown table."""
+def format_comparison(
+    comparison: BenchmarkComparison,
+) -> str:
+    """Format benchmark changes as a compact Markdown table.
+
+    Parameters
+    ----------
+    comparison : BenchmarkComparison
+        comparison parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     rows = [
         ("Median", comparison.median_change),
         ("P95", comparison.p95_change),
@@ -20,8 +40,21 @@ def format_comparison(comparison: BenchmarkComparison) -> str:
     return "\n".join(lines)
 
 
-def format_process_profile(profile: ProcessProfile) -> str:
-    """Format key process-tree resource measurements as Markdown."""
+def format_process_profile(
+    profile: ProcessProfile,
+) -> str:
+    """Format key process-tree resource measurements as Markdown.
+
+    Parameters
+    ----------
+    profile : ProcessProfile
+        profile parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     cpu = profile.cpu_user_seconds + profile.cpu_system_seconds
     cpu_util = 0.0 if profile.wall_seconds == 0 else cpu / profile.wall_seconds
     rows = [

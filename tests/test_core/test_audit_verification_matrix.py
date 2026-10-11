@@ -1,5 +1,9 @@
 """Fail-closed native activation and source-distribution artifact checks."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import importlib.util
@@ -12,12 +16,18 @@ import zipfile
 from pathlib import Path
 from types import ModuleType
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _script(name: str) -> ModuleType:
+def _script(
+    name: str,
+) -> ModuleType:
     spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}.py")
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -30,7 +40,10 @@ native = _script("verify_native")
 
 
 def _archives(
-    tmp_path: Path, *, missing: str = "", compiled: bool = False
+    tmp_path: Path,
+    *,
+    missing: str = "",
+    compiled: bool = False,
 ) -> tuple[Path, Path]:
     wheel = tmp_path / "package.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
@@ -66,7 +79,8 @@ def test_distribution_inventory_requires_optional_native_support(
 
 @pytest.mark.parametrize("missing", ["native/src/_accel.c", "scripts/build_native.py"])
 def test_sdist_inventory_rejects_missing_native_support(
-    tmp_path: Path, missing: str
+    tmp_path: Path,
+    missing: str,
 ) -> None:
     wheel, sdist = _archives(tmp_path, missing=missing)
     with pytest.raises(ValueError, match="sdist missing"):
@@ -83,7 +97,9 @@ def test_pure_wheel_rejects_accidental_compiled_checkout_artifact(
 
 @pytest.mark.parametrize("name,symlink", [("../victim", False), ("package/link", True)])
 def test_sdist_extract_rejects_escaping_or_redirecting_members(
-    tmp_path: Path, name: str, symlink: bool
+    tmp_path: Path,
+    name: str,
+    symlink: bool,
 ) -> None:
     sdist = tmp_path / "unsafe.tar.gz"
     with tarfile.open(sdist, "w:gz") as archive:
@@ -97,7 +113,9 @@ def test_sdist_extract_rejects_escaping_or_redirecting_members(
     assert not (tmp_path / "victim").exists()
 
 
-def test_native_activation_cannot_report_fallback_as_native(tmp_path: Path) -> None:
+def test_native_activation_cannot_report_fallback_as_native(
+    tmp_path: Path,
+) -> None:
     package = tmp_path / "gunz_utils"
     package.mkdir()
     (package / "__init__.py").write_text("")

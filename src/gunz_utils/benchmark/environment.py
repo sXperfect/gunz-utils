@@ -1,5 +1,9 @@
 """Host environment and benchmark-noise metadata."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import os
@@ -18,7 +22,13 @@ class NoiseInfo:
 
 
 def capture_noise_info() -> NoiseInfo:
-    """Capture inexpensive environment state relevant to benchmark noise."""
+    """Capture inexpensive environment state relevant to benchmark noise.
+
+    Returns
+    -------
+    NoiseInfo
+        The result of the operation.
+    """
     try:
         load: tuple[float | None, float | None, float | None] = os.getloadavg()
     except (AttributeError, OSError):

@@ -8,9 +8,17 @@ Covers:
 These tests live in ``test_core/`` because the protocol + exception
 hierarchy are zero-dependency (stdlib only).
 """
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import asyncio
 import math
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.upstream_protocol import (
     BaseUpstream,
@@ -24,7 +32,7 @@ from gunz_utils.upstream_protocol import (
 )
 
 # ---------------------------------------------------------------------------
-# Exception hierarchy
+#? Exception hierarchy
 # ---------------------------------------------------------------------------
 
 
@@ -85,7 +93,7 @@ class TestUpstreamErrorSubclasses(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# UpstreamClient Protocol (runtime_checkable)
+#? UpstreamClient Protocol (runtime_checkable)
 # ---------------------------------------------------------------------------
 
 
@@ -94,7 +102,10 @@ class _ValidImpl:
 
     name = "demo"
 
-    async def call(self, tool_name, arguments):
+    async def call(self,
+        tool_name,
+        arguments,
+    ):
         return {"tool": tool_name, "echo": arguments}
 
     async def health_check(self):
@@ -109,7 +120,10 @@ class _MissingMethodImpl:
 
     name = "broken"
 
-    async def call(self, tool_name, arguments):
+    async def call(self,
+        tool_name,
+        arguments,
+    ):
         return {}
 
     async def health_check(self):
@@ -133,7 +147,7 @@ class TestUpstreamClientProtocol(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# BaseUpstream convenience base class
+#? BaseUpstream convenience base class
 # ---------------------------------------------------------------------------
 
 
@@ -142,7 +156,10 @@ class _ConcreteUpstream(BaseUpstream):
 
     name = "concrete"
 
-    async def _invoke(self, tool_name, arguments):
+    async def _invoke(self,
+        tool_name,
+        arguments,
+    ):
         return {"name": self.name, "tool": tool_name, "args": arguments}
 
 
@@ -156,7 +173,10 @@ class TestBaseUpstream(unittest.TestCase):
 
     def test_default_name_is_unnamed(self):
         class _Anon(BaseUpstream):
-            async def _invoke(self, tool_name, arguments):
+            async def _invoke(self,
+                tool_name,
+                arguments,
+            ):
                 return {}
 
         self.assertEqual(_Anon().name, "unnamed")
@@ -188,7 +208,10 @@ class TestBaseUpstream(unittest.TestCase):
 
     def test_subclass_can_override_health_check(self):
         class _Flaky(BaseUpstream):
-            async def _invoke(self, tool_name, arguments):
+            async def _invoke(self,
+                tool_name,
+                arguments,
+            ):
                 return {}
 
             async def health_check(self):
@@ -219,7 +242,10 @@ class TestPolicyUpstream(unittest.IsolatedAsyncioTestCase):
         class Slow:
             name = "slow"
 
-            async def call(self, tool_name, arguments):
+            async def call(self,
+                tool_name,
+                arguments,
+            ):
                 await asyncio.sleep(0.05)
                 return {}
 
@@ -240,7 +266,10 @@ class TestPolicyUpstream(unittest.IsolatedAsyncioTestCase):
             def __init__(self):
                 self.calls = 0
 
-            async def call(self, tool_name, arguments):
+            async def call(self,
+                tool_name,
+                arguments,
+            ):
                 self.calls += 1
                 if self.calls == 1:
                     raise UpstreamUnavailableError("retry", upstream=self.name)

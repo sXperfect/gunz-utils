@@ -1,5 +1,9 @@
 """Experiment matrices and repeated benchmark orchestration."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import itertools
@@ -7,6 +11,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .result import BenchmarkResult
 from .runner import benchmark
 
@@ -27,7 +34,28 @@ def run_experiment(
     iterations: int = 20,
     name: str | None = None,
 ) -> list[ExperimentResult]:
-    """Run a Cartesian parameter matrix with explicit repetitions."""
+    """Run a Cartesian parameter matrix with explicit repetitions.
+
+    Parameters
+    ----------
+    func : Callable[..., Any]
+        func parameter.
+    parameters : dict[str, list[Any]]
+        parameters parameter.
+    repetitions : int
+        repetitions parameter.
+    warmup : int
+        warmup parameter.
+    iterations : int
+        iterations parameter.
+    name : str | None
+        name parameter.
+
+    Returns
+    -------
+    list[ExperimentResult]
+        The result of the operation.
+    """
     if (
         isinstance(repetitions, bool)
         or not isinstance(repetitions, int)

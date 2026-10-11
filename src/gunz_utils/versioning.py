@@ -1,5 +1,9 @@
 """Small versioned-envelope and schema-migration primitives."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -11,7 +15,25 @@ class SchemaMigrationError(ValueError):
     """Raised when a versioned payload cannot be validated or migrated."""
 
 
-def _validate_version(value: object, *, name: str) -> int:
+def _validate_version(
+    value: object,
+    *,
+    name: str,
+) -> int:
+    """_validate_version() function.
+
+    Parameters
+    ----------
+    value : object
+        value parameter.
+    name : str
+        name parameter.
+
+    Returns
+    -------
+    int
+        The result of the operation.
+    """
     if not isinstance(value, int) or isinstance(value, bool):
         raise ValueError(f"{name} must be an integer")
     if value < 1:
@@ -39,7 +61,13 @@ class VersionedEnvelope:
         object.__setattr__(self, "metadata", dict(self.metadata))
 
     def to_dict(self) -> dict[str, Any]:
-        """Return an envelope mapping suitable for JSON normalization."""
+        """Return an envelope mapping suitable for JSON normalization.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of the operation.
+        """
         return {
             "schema": self.schema,
             "version": self.version,
@@ -48,8 +76,21 @@ class VersionedEnvelope:
         }
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> VersionedEnvelope:
-        """Validate and reconstruct an envelope from a mapping."""
+    def from_dict(cls,
+        value: Mapping[str, Any],
+    ) -> VersionedEnvelope:
+        """Validate and reconstruct an envelope from a mapping.
+
+        Parameters
+        ----------
+        value : Mapping[str, Any]
+            value parameter.
+
+        Returns
+        -------
+        VersionedEnvelope
+            The result of the operation.
+        """
         if not isinstance(value, Mapping):
             raise SchemaMigrationError("envelope must be a mapping")
         try:
@@ -83,13 +124,22 @@ class SchemaMigrator:
     def __init__(self) -> None:
         self._migrations: dict[tuple[str, int], Migration] = {}
 
-    def register(
-        self,
+    def register(self,
         schema: str,
         from_version: int,
         migration: Migration,
     ) -> None:
-        """Register a migration from version N to N+1."""
+        """Register a migration from version N to N+1.
+
+        Parameters
+        ----------
+        schema : str
+            schema parameter.
+        from_version : int
+            from_version parameter.
+        migration : Migration
+            migration parameter.
+        """
         if not isinstance(schema, str):
             raise TypeError("schema must be a string")
         if not schema.strip():
@@ -105,13 +155,25 @@ class SchemaMigrator:
             )
         self._migrations[key] = migration
 
-    def migrate(
-        self,
+    def migrate(self,
         envelope: VersionedEnvelope,
         *,
         target_version: int,
     ) -> VersionedEnvelope:
-        """Migrate an envelope forward to target_version."""
+        """Migrate an envelope forward to target_version.
+
+        Parameters
+        ----------
+        envelope : VersionedEnvelope
+            envelope parameter.
+        target_version : int
+            target_version parameter.
+
+        Returns
+        -------
+        VersionedEnvelope
+            The result of the operation.
+        """
         if not isinstance(envelope, VersionedEnvelope):
             raise TypeError("envelope must be a VersionedEnvelope")
         _validate_version(target_version, name="target_version")

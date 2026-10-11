@@ -1,11 +1,18 @@
 """Generic provenance graph for artifacts, datasets, jobs, and derived outputs."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .structures import freeze_structure
 
 
@@ -74,8 +81,7 @@ class ProvenanceGraph:
     later, cycle validation is performed against the complete known graph.
     """
 
-    def __init__(
-        self,
+    def __init__(self,
         nodes: tuple[ProvenanceNode, ...] | list[ProvenanceNode] = (),
     ) -> None:
         self._nodes: dict[str, ProvenanceNode] = {}
@@ -84,13 +90,18 @@ class ProvenanceGraph:
 
     @property
     def nodes(self) -> Mapping[str, ProvenanceNode]:
-        """Return a read-only snapshot of known nodes."""
+        """Return a read-only snapshot of known nodes.
+
+        Returns
+        -------
+        Mapping[str, ProvenanceNode]
+            The result of the operation.
+        """
         from types import MappingProxyType
 
         return MappingProxyType(dict(self._nodes))
 
-    def add(
-        self,
+    def add(self,
         node: ProvenanceNode,
         *,
         replace: bool = False,
@@ -135,15 +146,24 @@ class ProvenanceGraph:
             raise
         return node
 
-    def get(
-        self,
+    def get(self,
         identifier: str,
     ) -> ProvenanceNode:
-        """Return a known node or raise KeyError."""
+        """Return a known node or raise KeyError.
+
+        Parameters
+        ----------
+        identifier : str
+            identifier parameter.
+
+        Returns
+        -------
+        ProvenanceNode
+            The result of the operation.
+        """
         return self._nodes[identifier]
 
-    def missing_inputs(
-        self,
+    def missing_inputs(self,
         identifier: str | None = None,
     ) -> tuple[str, ...]:
         """Return unresolved parent identifiers.
@@ -173,18 +193,37 @@ class ProvenanceGraph:
         }
         return tuple(sorted(missing))
 
-    def ancestors(
-        self,
+    def ancestors(self,
         identifier: str,
     ) -> tuple[str, ...]:
-        """Return known transitive parent identifiers in stable traversal order."""
+        """Return known transitive parent identifiers in stable traversal order.
+
+        Parameters
+        ----------
+        identifier : str
+            identifier parameter.
+
+        Returns
+        -------
+        tuple[str, ...]
+            The result of the operation.
+        """
         if identifier not in self._nodes:
             raise KeyError(identifier)
 
         result: list[str] = []
         seen: set[str] = set()
 
-        def walk(current: str) -> None:
+        def walk(
+            current: str,
+        ) -> None:
+            """walk() function.
+
+            Parameters
+            ----------
+            current : str
+                current parameter.
+            """
             node = self._nodes[current]
             for parent in node.inputs:
                 if parent in seen or parent not in self._nodes:
@@ -196,11 +235,21 @@ class ProvenanceGraph:
         walk(identifier)
         return tuple(result)
 
-    def lineage(
-        self,
+    def lineage(self,
         identifier: str,
     ) -> tuple[ProvenanceNode, ...]:
-        """Return the target node followed by its known ancestors."""
+        """Return the target node followed by its known ancestors.
+
+        Parameters
+        ----------
+        identifier : str
+            identifier parameter.
+
+        Returns
+        -------
+        tuple[ProvenanceNode, ...]
+            The result of the operation.
+        """
         return tuple(
             self._nodes[item]
             for item in (
@@ -210,11 +259,23 @@ class ProvenanceGraph:
         )
 
     def _validate_acyclic(self) -> None:
-        """Reject cycles among currently known nodes."""
+        """Reject cycles among currently known nodes.
+
+        No parameters and no return value.
+        """
         visiting: set[str] = set()
         visited: set[str] = set()
 
-        def visit(identifier: str) -> None:
+        def visit(
+            identifier: str,
+        ) -> None:
+            """visit() function.
+
+            Parameters
+            ----------
+            identifier : str
+                identifier parameter.
+            """
             if identifier in visited:
                 return
             if identifier in visiting:

@@ -1,5 +1,9 @@
 """Bounded structured async worker pipelines."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -18,7 +22,24 @@ async def worker_map(
     workers: int,
     queue_size: int | None = None,
 ) -> AsyncIterator[R]:
-    """Map work through bounded queues, propagating failures and cancellation."""
+    """Map work through bounded queues, propagating failures and cancellation.
+
+    Parameters
+    ----------
+    func : Callable[[T], Awaitable[R]]
+        func parameter.
+    items : Iterable[T]
+        items parameter.
+    workers : int
+        workers parameter.
+    queue_size : int | None
+        queue_size parameter.
+
+    Returns
+    -------
+    AsyncIterator[R]
+        The result of the operation.
+    """
     if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
         raise ValueError("workers must be a positive integer")
     if queue_size is not None and (
@@ -35,11 +56,27 @@ async def worker_map(
     wake = asyncio.Event()
     started = asyncio.Event()
 
-    async def publish(ok: bool, value: R | BaseException | object) -> None:
+    async def publish(
+        ok: bool,
+        value: R | BaseException | object,
+    ) -> None:
+        """publish() function.
+
+        Parameters
+        ----------
+        ok : bool
+            ok parameter.
+        value : R | BaseException | object
+            value parameter.
+        """
         await outgoing.put((ok, value))
         wake.set()
 
     async def producer() -> None:
+        """producer() function.
+
+        No parameters and no return value.
+        """
         await started.wait()
         try:
             for item in items:
@@ -53,6 +90,10 @@ async def worker_map(
                 await incoming.put(_DONE)
 
     async def worker() -> None:
+        """worker() function.
+
+        No parameters and no return value.
+        """
         await started.wait()
         while True:
             item = await incoming.get()
@@ -70,7 +111,21 @@ async def worker_map(
 
     tasks: list[asyncio.Task[None]] = []
 
-    def submit(coroutine: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+    def submit(
+        coroutine: Coroutine[Any, Any, None],
+    ) -> asyncio.Task[None]:
+        """submit() function.
+
+        Parameters
+        ----------
+        coroutine : Coroutine[Any, Any, None]
+            coroutine parameter.
+
+        Returns
+        -------
+        asyncio.Task[None]
+            The result of the operation.
+        """
         try:
             task = asyncio.create_task(coroutine)
         except BaseException:
@@ -89,9 +144,9 @@ async def worker_map(
         started.set()
         while completed < workers:
             wake.clear()
-            # Child cancellation has no queue message. Observe terminal task
-            # outcomes before awaiting another result, including simultaneous
-            # cancellation and result publication.
+            #? Child cancellation has no queue message. Observe terminal task
+            #? outcomes before awaiting another result, including simultaneous
+            #? cancellation and result publication.
             for task in tasks:
                 if task.done():
                     task.result()

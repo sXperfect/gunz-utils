@@ -1,5 +1,9 @@
 """Deterministic fault-injection helpers for robustness testing."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -20,7 +24,18 @@ class InjectedFault(RuntimeError):
 def _named_fault(
     name: str,
 ) -> BaseException:
-    """Build the default exception for one named checkpoint."""
+    """Build the default exception for one named checkpoint.
+
+    Parameters
+    ----------
+    name : str
+        name parameter.
+
+    Returns
+    -------
+    BaseException
+        The result of the operation.
+    """
     return InjectedFault(f"Injected failure at {name}")
 
 
@@ -88,11 +103,16 @@ class FaultSequence:
             raise ValueError("calls must be a non-negative integer")
         self.failures = frozen
 
-    def check(
-        self,
+    def check(self,
         exception_factory: Callable[[], BaseException],
     ) -> None:
-        """Raise on configured one-based call indices."""
+        """Raise on configured one-based call indices.
+
+        Parameters
+        ----------
+        exception_factory : Callable[[], BaseException]
+            exception_factory parameter.
+        """
         if not callable(exception_factory):
             raise TypeError("exception_factory must be callable")
         self.calls += 1
@@ -138,11 +158,16 @@ class NamedFaultInjector:
             frozen,
         )
 
-    def checkpoint(
-        self,
+    def checkpoint(self,
         name: str,
     ) -> None:
-        """Raise the configured failure when name is selected."""
+        """Raise the configured failure when name is selected.
+
+        Parameters
+        ----------
+        name : str
+            name parameter.
+        """
         if not isinstance(name, str):
             raise TypeError("checkpoint name must be a string")
         if not name:
@@ -159,7 +184,9 @@ class NamedFaultInjector:
 class VirtualClock:
     """Deterministic controllable monotonic clock for resilience testing."""
 
-    def __init__(self, start_time: float = 1000.0) -> None:
+    def __init__(self,
+        start_time: float = 1000.0,
+    ) -> None:
         if (
             isinstance(start_time, bool)
             or not isinstance(start_time, (int, float))
@@ -170,17 +197,42 @@ class VirtualClock:
         self._current: float = float(start_time)
 
     def now(self) -> float:
-        """Return current virtual time in seconds."""
+        """Return current virtual time in seconds.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         return self._current
 
     def now_ns(self) -> int:
-        """Return current virtual time in nanoseconds."""
+        """Return current virtual time in nanoseconds.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         whole = int(self._current)
         fraction = self._current - whole
         return whole * 1_000_000_000 + int(round(fraction * 1_000_000_000))
 
-    def advance(self, seconds: float) -> float:
-        """Advance the virtual clock by seconds."""
+    def advance(self,
+        seconds: float,
+    ) -> float:
+        """Advance the virtual clock by seconds.
+
+        Parameters
+        ----------
+        seconds : float
+            seconds parameter.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         if (
             isinstance(seconds, bool)
             or not isinstance(seconds, (int, float))
@@ -198,8 +250,7 @@ class VirtualClock:
 class FaultyStream:
     """Binary stream wrapper that injects short writes or I/O faults."""
 
-    def __init__(
-        self,
+    def __init__(self,
         wrapped: BinaryIO,
         *,
         max_read_bytes: int | None = None,
@@ -238,7 +289,21 @@ class FaultyStream:
         self.read_calls = 0
         self.write_calls = 0
 
-    def read(self, size: int = -1) -> bytes:
+    def read(self,
+        size: int = -1,
+    ) -> bytes:
+        """read() function.
+
+        Parameters
+        ----------
+        size : int
+            size parameter.
+
+        Returns
+        -------
+        bytes
+            The result of the operation.
+        """
         self.read_calls += 1
         if self.fail_read_after is not None and self.read_calls > self.fail_read_after:
             raise self.read_error()
@@ -246,7 +311,21 @@ class FaultyStream:
             size = self.max_read_bytes
         return self.wrapped.read(size)
 
-    def write(self, data: bytes) -> int:
+    def write(self,
+        data: bytes,
+    ) -> int:
+        """write() function.
+
+        Parameters
+        ----------
+        data : bytes
+            data parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         self.write_calls += 1
         if (
             self.fail_write_after is not None
@@ -259,23 +338,54 @@ class FaultyStream:
         return self.wrapped.write(to_write)
 
     def flush(self) -> None:
+        """flush() function.
+
+        No parameters and no return value.
+        """
         self.wrapped.flush()
 
     def close(self) -> None:
+        """close() function.
+
+        No parameters and no return value.
+        """
         self.wrapped.close()
 
-    def seek(self, offset: int, whence: int = 0) -> int:
+    def seek(self,
+        offset: int,
+        whence: int = 0,
+    ) -> int:
+        """seek() function.
+
+        Parameters
+        ----------
+        offset : int
+            offset parameter.
+        whence : int
+            whence parameter.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         return self.wrapped.seek(offset, whence)
 
     def tell(self) -> int:
+        """tell() function.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         return self.wrapped.tell()
 
 
 class AwaitBoundaryChaos:
     """Cooperative await interceptor injecting cancellation or errors."""
 
-    def __init__(
-        self,
+    def __init__(self,
         *,
         cancel_at_step: int | None = None,
         fail_at_step: int | None = None,
@@ -300,7 +410,10 @@ class AwaitBoundaryChaos:
         self.step_count = 0
 
     async def step(self) -> None:
-        """Cooperative checkpoint simulating an await boundary."""
+        """Cooperative checkpoint simulating an await boundary.
+
+        No parameters and no return value.
+        """
         self.step_count += 1
         if self.cancel_at_step is not None and self.step_count == self.cancel_at_step:
             raise asyncio.CancelledError("Injected await cancellation")

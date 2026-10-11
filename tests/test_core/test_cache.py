@@ -1,3 +1,7 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -5,6 +9,10 @@ import math
 import unittest
 import weakref
 from datetime import UTC, datetime, timedelta
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.cache import (
     RecencyTTLPolicy,
@@ -29,7 +37,9 @@ class TestTTLCache(unittest.TestCase):
         calls = 0
 
         @ttl_cache(ttl=60)
-        def work(value: int) -> int:
+        def work(
+            value: int,
+        ) -> int:
             nonlocal calls
             calls += 1
             return value * 2
@@ -43,7 +53,9 @@ class TestTTLCache(unittest.TestCase):
         calls = 0
 
         @ttl_cache(ttl=60)
-        def work(value: list[int]) -> int:
+        def work(
+            value: list[int],
+        ) -> int:
             nonlocal calls
             calls += 1
             return len(value)
@@ -152,11 +164,16 @@ class TestRecencyTTLPolicy(unittest.TestCase):
 class TestAsyncTTLCache(unittest.IsolatedAsyncioTestCase):
     async def test_all_callers_cancel_releases_in_flight_and_payload(self) -> None:
         class Payload:
-            def __init__(self, size: int) -> None:
+            def __init__(self,
+                size: int,
+            ) -> None:
                 self.data = bytearray(size)
 
         @async_ttl_cache(ttl=60.0, maxsize=1)
-        async def compute(key: str, payload: Payload) -> Payload:
+        async def compute(
+            key: str,
+            payload: Payload,
+        ) -> Payload:
             await asyncio.sleep(0.05)
             return payload
 
@@ -172,16 +189,16 @@ class TestAsyncTTLCache(unittest.IsolatedAsyncioTestCase):
             except asyncio.CancelledError:
                 pass
 
-        # Wait for all background producer tasks to finish
+        #? Wait for all background producer tasks to finish
         await asyncio.sleep(0.1)
 
-        # In-flight dictionary should be completely empty
+        #? In-flight dictionary should be completely empty
         self.assertEqual(len(compute._in_flight), 0)
-        # Because maxsize=1, at most 1 payload is retained in cache
+        #? Because maxsize=1, at most 1 payload is retained in cache
         alive = sum(1 for r in weak_refs if r() is not None)
         self.assertLessEqual(alive, 1)
 
-        # cache_clear should drop the remaining entry
+        #? cache_clear should drop the remaining entry
         await compute.cache_clear()
         self.assertEqual(len(compute._cache), 0)
         self.assertEqual(len(compute._in_flight), 0)
@@ -208,31 +225,43 @@ class TestAsyncTTLCache(unittest.IsolatedAsyncioTestCase):
 class TestCacheMethodBinding(unittest.IsolatedAsyncioTestCase):
     def test_sync_ttl_cache_method_binding(self) -> None:
         class Service:
-            def __init__(self, multiplier: int) -> None:
+            def __init__(self,
+                multiplier: int,
+            ) -> None:
                 self.multiplier = multiplier
 
             @ttl_cache(ttl=60)
-            def compute(self, x: int) -> int:
+            def compute(self,
+                x: int,
+            ) -> int:
                 return self.multiplier * x
 
             @classmethod
             @ttl_cache(ttl=60)
-            def class_method_first(cls, x: int) -> str:
+            def class_method_first(cls,
+                x: int,
+            ) -> str:
                 return f"{cls.__name__}:{x}"
 
             @ttl_cache(ttl=60)
             @classmethod
-            def cache_first_class(cls, x: int) -> str:
+            def cache_first_class(cls,
+                x: int,
+            ) -> str:
                 return f"{cls.__name__}:{x}"
 
             @staticmethod
             @ttl_cache(ttl=60)
-            def static_method_first(x: int) -> int:
+            def static_method_first(
+                x: int,
+            ) -> int:
                 return x * 10
 
             @ttl_cache(ttl=60)
             @staticmethod
-            def cache_first_static(x: int) -> int:
+            def cache_first_static(
+                x: int,
+            ) -> int:
                 return x * 20
 
         s1 = Service(2)
@@ -253,7 +282,7 @@ class TestCacheMethodBinding(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(s1.cache_first_static(3), 60)
         self.assertEqual(Service.cache_first_static(3), 60)
 
-        # Test cache_clear and cache_info on bound methods
+        #? Test cache_clear and cache_info on bound methods
         info = s1.compute.cache_info()
         self.assertEqual(info.hits, 0)
         s1.compute(5)
@@ -263,31 +292,43 @@ class TestCacheMethodBinding(unittest.IsolatedAsyncioTestCase):
 
     async def test_async_ttl_cache_method_binding(self) -> None:
         class AsyncService:
-            def __init__(self, multiplier: int) -> None:
+            def __init__(self,
+                multiplier: int,
+            ) -> None:
                 self.multiplier = multiplier
 
             @async_ttl_cache(ttl=60)
-            async def compute(self, x: int) -> int:
+            async def compute(self,
+                x: int,
+            ) -> int:
                 return self.multiplier * x
 
             @classmethod
             @async_ttl_cache(ttl=60)
-            async def class_method_first(cls, x: int) -> str:
+            async def class_method_first(cls,
+                x: int,
+            ) -> str:
                 return f"{cls.__name__}:{x}"
 
             @async_ttl_cache(ttl=60)
             @classmethod
-            async def cache_first_class(cls, x: int) -> str:
+            async def cache_first_class(cls,
+                x: int,
+            ) -> str:
                 return f"{cls.__name__}:{x}"
 
             @staticmethod
             @async_ttl_cache(ttl=60)
-            async def static_method_first(x: int) -> int:
+            async def static_method_first(
+                x: int,
+            ) -> int:
                 return x * 10
 
             @async_ttl_cache(ttl=60)
             @staticmethod
-            async def cache_first_static(x: int) -> int:
+            async def cache_first_static(
+                x: int,
+            ) -> int:
                 return x * 20
 
         s = AsyncService(5)

@@ -1,9 +1,17 @@
 """Security regression tests for numeric resource/budget validation."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.cache import async_ttl_cache, ttl_cache
 from gunz_utils.limits import Limits, ResourceBudget
@@ -16,7 +24,10 @@ from gunz_utils.upstream_protocol import PolicyUpstream
 class _Upstream:
     name = "test"
 
-    async def call(self, tool_name, arguments):
+    async def call(self,
+        tool_name,
+        arguments,
+    ):
         return {}
 
     async def health_check(self):

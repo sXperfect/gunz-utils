@@ -456,7 +456,7 @@ def _case_wheel_sdist() -> int:
 
 
 def run_lint() -> int:
-    """Ruff (src tests benchmarks) then mypy; propagate the first failure."""
+    """Ruff, mypy, then the style linter; propagate the first failure."""
     status = _run(
         [
             sys.executable,
@@ -472,6 +472,9 @@ def run_lint() -> int:
     mypy_status = _run([sys.executable, "-m", "mypy", "src/gunz_utils"])
     if status == 0:
         status = mypy_status
+    style_status = _run([sys.executable, "-m", "gunz_style.cli"])
+    if status == 0:
+        status = style_status
     return status
 
 

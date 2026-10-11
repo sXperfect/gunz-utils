@@ -10,6 +10,9 @@ import time
 from collections.abc import Iterator
 from typing import Literal
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ._version import __version__ as __version__
 
 __author__ = "Yeremia Gunawan Adhisantoso"
@@ -29,8 +32,7 @@ class Timer:
         Start timing immediately when ``True``. Defaults to ``True``.
     """
 
-    def __init__(
-        self,
+    def __init__(self,
         label: str | None = None,
         *,
         auto_start: bool = True,
@@ -43,19 +45,31 @@ class Timer:
             self.start()
 
     def start(self) -> None:
-        """Start or restart the timer and clear any previous stop time."""
+        """Start or restart the timer and clear any previous stop time.
+
+        No parameters and no return value.
+        """
         #? Monotonic high-resolution timing avoids wall-clock adjustments.
         self._start_time = time.perf_counter()
         self._end_time = None
 
     def stop(self) -> None:
-        """Stop the timer, preserving the first stop time for idempotence."""
+        """Stop the timer, preserving the first stop time for idempotence.
+
+        No parameters and no return value.
+        """
         if self._end_time is None:
             self._end_time = time.perf_counter()
 
     @property
     def elapsed(self) -> float:
-        """Return elapsed seconds, or ``0.0`` when timing has not started."""
+        """Return elapsed seconds, or ``0.0`` when timing has not started.
+
+        Returns
+        -------
+        float
+            The result of the operation.
+        """
         if self._start_time is None:
             return 0.0
         end_time = (
@@ -69,8 +83,7 @@ class Timer:
             self.start()
         return self
 
-    def __exit__(
-        self,
+    def __exit__(self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: object | None,
@@ -81,7 +94,9 @@ class Timer:
 
 
 @contextlib.contextmanager
-def timer(label: str | None = None) -> Iterator[Timer]:
+def timer(
+    label: str | None = None,
+) -> Iterator[Timer]:
     """Yield a started :class:`Timer` and stop it when the context exits.
 
     Parameters

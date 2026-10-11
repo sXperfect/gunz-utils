@@ -1,5 +1,9 @@
 """Proof tests for benchmark/storage families that entered the audit as A0."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import json
@@ -7,7 +11,15 @@ import math
 from pathlib import Path
 from types import SimpleNamespace
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.benchmark.overhead as overhead_module
 import gunz_utils.benchmark.perf as perf_module
@@ -108,7 +120,9 @@ def _profile() -> ProcessProfile:
     )
 
 
-def test_safe_result_loader_round_trips_valid_result(tmp_path: Path) -> None:
+def test_safe_result_loader_round_trips_valid_result(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "result.json"
     expected = _result()
     save_result(expected, path)
@@ -153,7 +167,9 @@ def test_safe_result_loader_rejects_boolean_schema_and_iteration_fields(
             load_result_checked(path)
 
 
-def test_artifact_registry_detects_tampering(tmp_path: Path) -> None:
+def test_artifact_registry_detects_tampering(
+    tmp_path: Path,
+) -> None:
     artifact = tmp_path / "artifact.bin"
     artifact.write_bytes(b"original")
     run = register_artifact(
@@ -167,7 +183,9 @@ def test_artifact_registry_detects_tampering(tmp_path: Path) -> None:
     assert not verify_artifact(registered)
 
 
-def test_artifact_registry_rejects_symlink(tmp_path: Path) -> None:
+def test_artifact_registry_rejects_symlink(
+    tmp_path: Path,
+) -> None:
     target = tmp_path / "target.bin"
     target.write_bytes(b"value")
     link = tmp_path / "link.bin"
@@ -184,7 +202,9 @@ def test_artifact_registry_rejects_symlink(tmp_path: Path) -> None:
         )
 
 
-def test_run_directory_resolves_artifact_name_collisions(tmp_path: Path) -> None:
+def test_run_directory_resolves_artifact_name_collisions(
+    tmp_path: Path,
+) -> None:
     left = tmp_path / "left"
     right = tmp_path / "right"
     left.mkdir()
@@ -210,7 +230,10 @@ def test_perf_stat_parses_non_finite_counter_as_unknown(
 ) -> None:
     monkeypatch.setattr(perf_module, "perf_available", lambda: True)
 
-    def fake_run(command: list[str], **_kwargs: object) -> SimpleNamespace:
+    def fake_run(
+        command: list[str],
+        **_kwargs: object,
+    ) -> SimpleNamespace:
         output = Path(command[command.index("-o") + 1])
         output.write_text("nan,,cycles\n123,,instructions\n", encoding="utf-8")
         return SimpleNamespace(returncode=0)
@@ -223,7 +246,9 @@ def test_perf_stat_parses_non_finite_counter_as_unknown(
 
 
 @pytest.mark.parametrize("events", [("",), (1,)])
-def test_perf_stat_rejects_invalid_event_names(events: object) -> None:
+def test_perf_stat_rejects_invalid_event_names(
+    events: object,
+) -> None:
     with pytest.raises(ValueError):
         perf_stat(["command"], events=events)  # type: ignore[arg-type]
 
@@ -242,7 +267,9 @@ def test_perf_record_rejects_invalid_frequency(
 
 
 @pytest.mark.parametrize("timeout", [0, -1, math.nan, math.inf, True])
-def test_worker_rejects_invalid_timeout(timeout: object) -> None:
+def test_worker_rejects_invalid_timeout(
+    timeout: object,
+) -> None:
     with pytest.raises(ValueError):
         run_python_worker("module", timeout=timeout)  # type: ignore[arg-type]
 
@@ -255,7 +282,9 @@ def test_worker_protocol_requires_strict_json_and_success() -> None:
         worker_json(WorkerResult(2, "", "failed"))
 
 
-def test_reporting_export_and_process_plot_transform(tmp_path: Path) -> None:
+def test_reporting_export_and_process_plot_transform(
+    tmp_path: Path,
+) -> None:
     profile = _profile()
     report = format_process_profile(profile)
     assert "Average CPU cores" in report

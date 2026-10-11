@@ -1,5 +1,9 @@
 """Reversible process and asyncio signal-handler utilities."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -23,7 +27,10 @@ class SignalRegistration:
     _restored: bool = False
 
     def restore(self) -> None:
-        """Restore the handler that was active before registration."""
+        """Restore the handler that was active before registration.
+
+        No parameters and no return value.
+        """
         if self._restored:
             return
         signal.signal(
@@ -36,8 +43,7 @@ class SignalRegistration:
         """Return the active registration."""
         return self
 
-    def __exit__(
-        self,
+    def __exit__(self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: object | None,
@@ -57,7 +63,10 @@ class AsyncSignalRegistration:
     _restored: bool = False
 
     def restore(self) -> None:
-        """Remove loop handlers and restore previous process handlers."""
+        """Remove loop handlers and restore previous process handlers.
+
+        No parameters and no return value.
+        """
         if self._restored:
             return
         for signum in reversed(self.signums):
@@ -75,8 +84,7 @@ class AsyncSignalRegistration:
         """Return the active registration."""
         return self
 
-    def __exit__(
-        self,
+    def __exit__(self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: object | None,
@@ -221,6 +229,15 @@ def install_termination_handler(
         received: int,
         _frame: FrameType | None,
     ) -> None:
+        """handler() function.
+
+        Parameters
+        ----------
+        received : int
+            received parameter.
+        _frame : FrameType | None
+            _frame parameter.
+        """
         callback(received)
         if exit_after:
             raise SystemExit(128 + received)
@@ -249,8 +266,7 @@ class GracefulShutdown:
         Target event loop.
     """
 
-    def __init__(
-        self,
+    def __init__(self,
         *,
         signums: tuple[int, ...] = (signal.SIGINT, signal.SIGTERM),
         timeout: float = 10.0,
@@ -272,37 +288,84 @@ class GracefulShutdown:
 
     @property
     def is_shutting_down(self) -> bool:
-        """Whether shutdown has been triggered."""
+        """Whether shutdown has been triggered.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         return self._shutdown_event is not None and self._shutdown_event.is_set()
 
     @property
     def signal_received(self) -> int | None:
-        """Return the signal number that triggered shutdown, if any."""
+        """Return the signal number that triggered shutdown, if any.
+
+        Returns
+        -------
+        int | None
+            The result of the operation.
+        """
         return self._signal_received
 
     def _get_event(self) -> asyncio.Event:
+        """_get_event() function.
+
+        Returns
+        -------
+        asyncio.Event
+            The result of the operation.
+        """
         if self._shutdown_event is None:
             self._shutdown_event = asyncio.Event()
         return self._shutdown_event
 
-    def add_callback(self, callback: Callable[[], Any]) -> None:
-        """Register a sync or async cleanup callback invoked on shutdown."""
+    def add_callback(self,
+        callback: Callable[[], Any],
+    ) -> None:
+        """Register a sync or async cleanup callback invoked on shutdown.
+
+        Parameters
+        ----------
+        callback : Callable[[], Any]
+            callback parameter.
+        """
         if not callable(callback):
             raise TypeError("callback must be callable")
         self._callbacks.append(callback)
 
-    def trigger_shutdown(self, signum: int | None = None) -> None:
-        """Programmatically trigger shutdown."""
+    def trigger_shutdown(self,
+        signum: int | None = None,
+    ) -> None:
+        """Programmatically trigger shutdown.
+
+        Parameters
+        ----------
+        signum : int | None
+            signum parameter.
+        """
         self._signal_received = signum
         self._get_event().set()
 
     async def wait_for_shutdown(self) -> int | None:
-        """Wait until a shutdown signal is received or triggered."""
+        """Wait until a shutdown signal is received or triggered.
+
+        Returns
+        -------
+        int | None
+            The result of the operation.
+        """
         await self._get_event().wait()
         return self._signal_received
 
     async def run_cleanup(self) -> list[tuple[Callable[[], Any], BaseException]]:
-        """Run all registered callbacks in LIFO order within the timeout."""
+        """Run all registered callbacks in LIFO order within the timeout.
+
+        Returns
+        -------
+        list[tuple[Callable[[], Any], BaseException]]
+            The result of the operation.
+        """
         errors: list[tuple[Callable[[], Any], BaseException]] = []
         for cb in reversed(self._callbacks):
             try:
@@ -326,8 +389,7 @@ class GracefulShutdown:
             self._registration = None
         return self
 
-    async def __aexit__(
-        self,
+    async def __aexit__(self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: object | None,

@@ -6,11 +6,19 @@ The SecureStore implementation was promoted from
 ``hyperhedron_google.secure_store`` to ``gunz_utils.secure_store``;
 this test file followed.
 """
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import os
 import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import SecureStore
 from gunz_utils.ext.secure_store import default_base_dir

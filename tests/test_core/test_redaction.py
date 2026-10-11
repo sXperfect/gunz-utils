@@ -1,8 +1,16 @@
 """Tests for ``gunz_utils.redaction`` secret-masking helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import SECRET_PATTERNS, redact, redact_dict
 from gunz_utils.redaction import _is_secret_key
@@ -18,18 +26,18 @@ class TestRedact(unittest.TestCase):
         first two and last two characters, hiding the middle three.
         """
         self.assertEqual(redact("hunter2"), "hu****r2")
-        # 'sk-1234567890abcdef' has length 18 -> prefix 'sk', suffix 'ef'.
+        #? 'sk-1234567890abcdef' has length 18 -> prefix 'sk', suffix 'ef'.
         self.assertEqual(redact("sk-1234567890abcdef"), "sk****ef")
 
     def test_short_string_fully_masked(self):
         """Strings at or below the reveal threshold collapse to ``****``."""
-        # Default show_chars=2 -> threshold is 4 -> length-4 strings are masked.
+        #? Default show_chars=2 -> threshold is 4 -> length-4 strings are masked.
         self.assertEqual(redact("abcd"), "****")
-        # Length 1 -> fully masked.
+        #? Length 1 -> fully masked.
         self.assertEqual(redact("x"), "****")
-        # Length 2 == 2 * show_chars -> fully masked.
+        #? Length 2 == 2 * show_chars -> fully masked.
         self.assertEqual(redact("ab"), "****")
-        # Length 5 > 2 * show_chars -> partial mask (not "short" test, sorry).
+        #? Length 5 > 2 * show_chars -> partial mask (not "short" test, sorry).
         self.assertEqual(redact("abcde"), "ab****de")
 
     def test_empty_string_returns_empty_string(self):
@@ -42,7 +50,7 @@ class TestRedact(unittest.TestCase):
 
     def test_show_chars_zero_yields_full_mask(self):
         """``show_chars=0`` reveals nothing on either side."""
-        # Threshold 0 -> any non-empty string is fully masked.
+        #? Threshold 0 -> any non-empty string is fully masked.
         self.assertEqual(redact("hunter2", show_chars=0), "****")
         self.assertEqual(redact("a", show_chars=0), "****")
 
@@ -61,17 +69,17 @@ class TestRedact(unittest.TestCase):
     def test_show_chars_one(self):
         """``show_chars=1`` exposes a single character at each end."""
         self.assertEqual(redact("hunter2", show_chars=1), "h****2")
-        # 2 chars total <= 2 * 1 -> fully masked.
+        #? 2 chars total <= 2 * 1 -> fully masked.
         self.assertEqual(redact("ab", show_chars=1), "****")
-        # 3 chars total > 2 -> partial mask.
+        #? 3 chars total > 2 -> partial mask.
         self.assertEqual(redact("abc", show_chars=1), "a****c")
 
     def test_show_chars_four(self):
         """Larger ``show_chars`` reveal more of the value."""
         self.assertEqual(redact("hunter2!!", show_chars=4), "hunt****r2!!")
-        # Length 8 == 2 * 4 -> fully masked.
+        #? Length 8 == 2 * 4 -> fully masked.
         self.assertEqual(redact("hunter22", show_chars=4), "****")
-        # Length 7 < 2 * 4 -> fully masked (threshold catches it).
+        #? Length 7 < 2 * 4 -> fully masked (threshold catches it).
         self.assertEqual(redact("hunter2", show_chars=4), "****")
 
     def test_non_string_inputs_pass_through(self):
@@ -93,7 +101,7 @@ class TestRedactDict(unittest.TestCase):
         cfg = {"host": "api.example.com", "password": "hunter2"}
         out = redact_dict(cfg)
         self.assertEqual(out["host"], "api.example.com")
-        # 'hunter2' -> default show_chars=2 -> 'hu****r2'.
+        #? 'hunter2' -> default show_chars=2 -> 'hu****r2'.
         self.assertEqual(out["password"], "hu****r2")
 
     def test_non_secret_keys_are_untouched(self):
@@ -108,7 +116,7 @@ class TestRedactDict(unittest.TestCase):
         """Dicts nested inside other dicts are walked recursively."""
         cfg = {"auth": {"token": "abc123xyz", "expires": 1234567890}}
         out = redact_dict(cfg)
-        # 'abc123xyz' length 9 > 4 -> 'ab****yz'.
+        #? 'abc123xyz' length 9 > 4 -> 'ab****yz'.
         self.assertEqual(out["auth"]["token"], "****")
         self.assertEqual(out["auth"]["expires"], 1234567890)
 
@@ -117,7 +125,7 @@ class TestRedactDict(unittest.TestCase):
         cfg = {"checks": [{"name": "db", "password": "secret123"}]}
         out = redact_dict(cfg)
         self.assertEqual(out["checks"][0]["name"], "db")
-        # 'secret123' length 9 > 4 -> 'se****23'.
+        #? 'secret123' length 9 > 4 -> 'se****23'.
         self.assertEqual(out["checks"][0]["password"], "se****23")
 
     def test_mixed_case_keys_are_detected(self):
@@ -131,36 +139,36 @@ class TestRedactDict(unittest.TestCase):
         out = redact_dict(cfg)
         self.assertEqual(out["Password"], "hu****r2")
         self.assertEqual(out["API_KEY"], "sk****ef")
-        # 'Bearer xyz' length 10 > 4 -> 'Be****yz'.
+        #? 'Bearer xyz' length 10 > 4 -> 'Be****yz'.
         self.assertEqual(out["Auth"], "Be****yz")
-        # 'Token abc' length 9 > 4 -> 'To****bc'.
+        #? 'Token abc' length 9 > 4 -> 'To****bc'.
         self.assertEqual(out["AUTHORIZATION"], "To****bc")
 
     def test_substring_keys_are_detected(self):
         """Keys containing the pattern as a substring also match."""
         cfg = {"user_password_hash": "value", "db_password": "secret"}
         out = redact_dict(cfg)
-        # 'value' length 5 > 4 -> 'va****ue'.
+        #? 'value' length 5 > 4 -> 'va****ue'.
         self.assertEqual(out["user_password_hash"], "va****ue")
-        # 'secret' length 6 > 4 -> 'se****et'.
+        #? 'secret' length 6 > 4 -> 'se****et'.
         self.assertEqual(out["db_password"], "se****et")
 
     def test_custom_patterns_restrict_masking(self):
         """Supplying ``patterns`` limits which keys are considered secret."""
         cfg = {"api_key": "sk-1234567890abcdef", "password": "hunter2"}
         out = redact_dict(cfg, patterns=frozenset({"api_key"}))
-        # Only api_key masked.
+        #? Only api_key masked.
         self.assertEqual(out["api_key"], "sk****ef")
-        # password is no longer a secret under the custom set.
+        #? password is no longer a secret under the custom set.
         self.assertEqual(out["password"], "hunter2")
 
     def test_custom_patterns_can_introduce_new_names(self):
         """Custom patterns can target keys not in the default set."""
         cfg = {"ssn": "123-45-6789", "phone": "555-1234"}
         out = redact_dict(cfg, patterns=frozenset({"ssn", "phone"}))
-        # '123-45-6789' length 11 > 4 -> '12****89'.
+        #? '123-45-6789' length 11 > 4 -> '12****89'.
         self.assertEqual(out["ssn"], "12****89")
-        # '555-1234' length 8 > 4 -> '55****34'.
+        #? '555-1234' length 8 > 4 -> '55****34'.
         self.assertEqual(out["phone"], "55****34")
 
     def test_secret_container_masks_descendants(self):
@@ -194,9 +202,9 @@ class TestRedactDict(unittest.TestCase):
         self.assertEqual(redact_dict("just a string"), "just a string")
         self.assertEqual(redact_dict(42), 42)
         self.assertIsNone(redact_dict(None))
-        # A bare list without dicts also passes through unchanged because
-        # its elements are not dicts/lists and so the recursion returns
-        # them verbatim.
+        #? A bare list without dicts also passes through unchanged because
+        #? its elements are not dicts/lists and so the recursion returns
+        #? them verbatim.
         self.assertEqual(redact_dict([1, 2, 3]), [1, 2, 3])
 
     def test_empty_dict_returns_empty_dict(self):
@@ -214,9 +222,9 @@ class TestRedactDict(unittest.TestCase):
         """``show_chars`` is forwarded into every recursive :func:`redact` call."""
         cfg = {"password": "hunter2", "auth": {"token": "abc123xyz"}}
         out = redact_dict(cfg, show_chars=4)
-        # 'hunter2' length 7 <= 2 * 4 -> fully masked.
+        #? 'hunter2' length 7 <= 2 * 4 -> fully masked.
         self.assertEqual(out["password"], "****")
-        # 'abc123xyz' length 9 > 2 * 4 -> partial mask: 'abc1****3xyz'.
+        #? 'abc123xyz' length 9 > 2 * 4 -> partial mask: 'abc1****3xyz'.
         self.assertEqual(out["auth"]["token"], "****")
 
 

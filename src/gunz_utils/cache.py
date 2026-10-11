@@ -1,5 +1,9 @@
 """Small TTL caches and asynchronous single-flight coordination."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -28,7 +32,24 @@ class CacheInfo:
     maxsize: int
 
 
-def _cache_key(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Hashable | None:
+def _cache_key(
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+) -> Hashable | None:
+    """_cache_key() function.
+
+    Parameters
+    ----------
+    args : tuple[Any, ...]
+        args parameter.
+    kwargs : dict[str, Any]
+        kwargs parameter.
+
+    Returns
+    -------
+    Hashable | None
+        The result of the operation.
+    """
     key: Hashable = (args, tuple(sorted(kwargs.items())))
     try:
         hash(key)
@@ -37,7 +58,20 @@ def _cache_key(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Hashable | None
     return key
 
 
-def _validate_cache_bounds(*, ttl: float, maxsize: int) -> None:
+def _validate_cache_bounds(
+    *,
+    ttl: float,
+    maxsize: int,
+) -> None:
+    """_validate_cache_bounds() function.
+
+    Parameters
+    ----------
+    ttl : float
+        ttl parameter.
+    maxsize : int
+        maxsize parameter.
+    """
     if (
         isinstance(ttl, bool)
         or not isinstance(ttl, (int, float))
@@ -64,8 +98,7 @@ class _TTLCache(Generic[P, T]):
     plain function cannot declare them without ``setattr`` or a cast).
     """
 
-    def __init__(
-        self,
+    def __init__(self,
         func: Callable[P, T],
         *,
         ttl: float,
@@ -80,7 +113,10 @@ class _TTLCache(Generic[P, T]):
         self._hits = 0
         self._misses = 0
 
-    def __get__(self, instance: Any, owner: Any = None) -> Any:
+    def __get__(self,
+        instance: Any,
+        owner: Any = None,
+    ) -> Any:
         if isinstance(self._func, staticmethod):
             return self
         if isinstance(self._func, classmethod):
@@ -90,7 +126,10 @@ class _TTLCache(Generic[P, T]):
             return self
         return types.MethodType(self, instance)
 
-    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
+    def __call__(self,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> T:
         func = self._func
         if isinstance(func, (staticmethod, classmethod)):
             func = func.__func__
@@ -116,14 +155,23 @@ class _TTLCache(Generic[P, T]):
         return value
 
     def cache_clear(self) -> None:
-        """Drop all cached entries and reset the hit/miss counters."""
+        """Drop all cached entries and reset the hit/miss counters.
+
+        No parameters and no return value.
+        """
         with self._lock:
             self._cache.clear()
             self._hits = 0
             self._misses = 0
 
     def cache_info(self) -> CacheInfo:
-        """Return a snapshot of cache activity and capacity."""
+        """Return a snapshot of cache activity and capacity.
+
+        Returns
+        -------
+        CacheInfo
+            The result of the operation.
+        """
         with self._lock:
             return CacheInfo(
                 self._hits, self._misses, len(self._cache), self._maxsize
@@ -135,10 +183,37 @@ def ttl_cache(
     ttl: float,
     maxsize: int = 128,
 ) -> Callable[[Callable[P, T]], _TTLCache[P, T]]:
-    """Cache synchronous function results for a bounded amount of time."""
+    """Cache synchronous function results for a bounded amount of time.
+
+    Parameters
+    ----------
+    ttl : float
+        ttl parameter.
+    maxsize : int
+        maxsize parameter.
+
+    Returns
+    -------
+    Callable[[Callable[P, T]], _TTLCache[P, T]]
+        The result of the operation.
+    """
     _validate_cache_bounds(ttl=ttl, maxsize=maxsize)
 
-    def decorate(func: Callable[P, T]) -> _TTLCache[P, T]:
+    def decorate(
+        func: Callable[P, T],
+    ) -> _TTLCache[P, T]:
+        """decorate() function.
+
+        Parameters
+        ----------
+        func : Callable[P, T]
+            func parameter.
+
+        Returns
+        -------
+        _TTLCache[P, T]
+            The result of the operation.
+        """
         return _TTLCache(func, ttl=ttl, maxsize=maxsize)
 
     return decorate
@@ -156,8 +231,7 @@ class _AsyncTTLCache(Generic[P, T]):
     type-checked attribute without ``setattr`` or a cast.
     """
 
-    def __init__(
-        self,
+    def __init__(self,
         func: Callable[P, Coroutine[Any, Any, T]],
         *,
         ttl: float,
@@ -171,7 +245,10 @@ class _AsyncTTLCache(Generic[P, T]):
         self._in_flight: dict[Hashable, asyncio.Task[T]] = {}
         self._lock = asyncio.Lock()
 
-    def __get__(self, instance: Any, owner: Any = None) -> Any:
+    def __get__(self,
+        instance: Any,
+        owner: Any = None,
+    ) -> Any:
         if isinstance(self._func, staticmethod):
             return self
         if isinstance(self._func, classmethod):
@@ -181,7 +258,10 @@ class _AsyncTTLCache(Generic[P, T]):
             return self
         return types.MethodType(self, instance)
 
-    async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
+    async def __call__(self,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> T:
         func = self._func
         if isinstance(func, (staticmethod, classmethod)):
             func = func.__func__
@@ -199,6 +279,13 @@ class _AsyncTTLCache(Generic[P, T]):
             task = self._in_flight.get(key)
             if task is None:
                 async def _producer() -> T:
+                    """_producer() function.
+
+                    Returns
+                    -------
+                    T
+                        The result of the operation.
+                    """
                     try:
                         val = await func(*args, **kwargs)
                         async with self._lock:
@@ -214,7 +301,16 @@ class _AsyncTTLCache(Generic[P, T]):
 
                 current_task = asyncio.create_task(_producer())
 
-                def _silence_unretrieved(t: asyncio.Task[Any]) -> None:
+                def _silence_unretrieved(
+                    t: asyncio.Task[Any],
+                ) -> None:
+                    """_silence_unretrieved() function.
+
+                    Parameters
+                    ----------
+                    t : asyncio.Task[Any]
+                        t parameter.
+                    """
                     if not t.cancelled():
                         t.exception()
 
@@ -225,7 +321,10 @@ class _AsyncTTLCache(Generic[P, T]):
         return await asyncio.shield(task)
 
     async def cache_clear(self) -> None:
-        """Drop all cached entries (awaitable, matching the async API)."""
+        """Drop all cached entries (awaitable, matching the async API).
+
+        No parameters and no return value.
+        """
         async with self._lock:
             self._cache.clear()
             for k in [k for k, t in self._in_flight.items() if t.done()]:
@@ -239,12 +338,37 @@ def async_ttl_cache(
 ) -> Callable[
     [Callable[P, Coroutine[Any, Any, T]]], _AsyncTTLCache[P, T]
 ]:
-    """Cache async results and coalesce concurrent misses for each key."""
+    """Cache async results and coalesce concurrent misses for each key.
+
+    Parameters
+    ----------
+    ttl : float
+        ttl parameter.
+    maxsize : int
+        maxsize parameter.
+
+    Returns
+    -------
+    Callable[[Callable[P, Coroutine[Any, Any, T]]], _AsyncTTLCache[P, T]]
+        The result of the operation.
+    """
     _validate_cache_bounds(ttl=ttl, maxsize=maxsize)
 
     def decorate(
         func: Callable[P, Coroutine[Any, Any, T]],
     ) -> _AsyncTTLCache[P, T]:
+        """decorate() function.
+
+        Parameters
+        ----------
+        func : Callable[P, Coroutine[Any, Any, T]]
+            func parameter.
+
+        Returns
+        -------
+        _AsyncTTLCache[P, T]
+            The result of the operation.
+        """
         return _AsyncTTLCache(func, ttl=ttl, maxsize=maxsize)
 
     return decorate
@@ -257,16 +381,35 @@ class SingleFlight:
         self._lock = asyncio.Lock()
         self._tasks: dict[Hashable, asyncio.Task[Any]] = {}
 
-    async def run(
-        self,
+    async def run(self,
         key: Hashable,
         factory: Callable[[], Coroutine[Any, Any, T]],
     ) -> T:
-        """Run one factory per key and share its result with concurrent callers."""
+        """Run one factory per key and share its result with concurrent callers.
+
+        Parameters
+        ----------
+        key : Hashable
+            key parameter.
+        factory : Callable[[], Coroutine[Any, Any, T]]
+            factory parameter.
+
+        Returns
+        -------
+        T
+            The result of the operation.
+        """
         async with self._lock:
             task = self._tasks.get(key)
             if task is None:
                 async def _worker() -> T:
+                    """_worker() function.
+
+                    Returns
+                    -------
+                    T
+                        The result of the operation.
+                    """
                     try:
                         return await factory()
                     finally:
@@ -276,7 +419,16 @@ class SingleFlight:
 
                 current_task = asyncio.create_task(_worker())
 
-                def _silence(t: asyncio.Task[Any]) -> None:
+                def _silence(
+                    t: asyncio.Task[Any],
+                ) -> None:
+                    """_silence() function.
+
+                    Parameters
+                    ----------
+                    t : asyncio.Task[Any]
+                        t parameter.
+                    """
                     if not t.cancelled():
                         t.exception()
 
@@ -340,8 +492,7 @@ class RecencyTTLPolicy:
             if value < timedelta(0):
                 raise ValueError(f"{name} must be non-negative")
 
-    def ttl_for(
-        self,
+    def ttl_for(self,
         observed_at: datetime,
         *,
         empty: bool = False,

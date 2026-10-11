@@ -1,8 +1,16 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import tempfile
 import unittest
 from pathlib import Path
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.benchmark as api
 from gunz_utils.benchmark import (
@@ -16,7 +24,11 @@ from gunz_utils.benchmark import (
 
 class TestM7Experiments(unittest.TestCase):
     def test_cartesian_repetitions(self) -> None:
-        def work(*, a: int, b: int) -> int:
+        def work(
+            *,
+            a: int,
+            b: int,
+        ) -> int:
             return a + b
 
         results = run_experiment(
@@ -29,7 +41,10 @@ class TestM7Experiments(unittest.TestCase):
         self.assertEqual(len(results), 8)
 
     def test_repetitions_reject_boolean_and_nonpositive_values(self) -> None:
-        def work(*, a: int) -> int:
+        def work(
+            *,
+            a: int,
+        ) -> int:
             return a
 
         for value in (True, 0, -1):

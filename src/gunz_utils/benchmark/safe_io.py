@@ -1,5 +1,9 @@
 """Safe benchmark-result JSON persistence."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import json
@@ -7,12 +11,36 @@ import math
 from pathlib import Path
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .result import BenchmarkResult, BenchmarkStats, SystemInfo
 
 DEFAULT_MAX_RESULT_BYTES = 16 * 1024 * 1024
 
 
-def _non_negative_int(value: object, *, name: str, positive: bool = False) -> int:
+def _non_negative_int(
+    value: object,
+    *,
+    name: str,
+    positive: bool = False,
+) -> int:
+    """_non_negative_int() function.
+
+    Parameters
+    ----------
+    value : object
+        value parameter.
+    name : str
+        name parameter.
+    positive : bool
+        positive parameter.
+
+    Returns
+    -------
+    int
+        The result of the operation.
+    """
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"{name} must be an integer")
     minimum = 1 if positive else 0
@@ -22,7 +50,25 @@ def _non_negative_int(value: object, *, name: str, positive: bool = False) -> in
     return value
 
 
-def _finite_non_negative(value: object, *, name: str) -> float:
+def _finite_non_negative(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    """_finite_non_negative() function.
+
+    Parameters
+    ----------
+    value : object
+        value parameter.
+    name : str
+        name parameter.
+
+    Returns
+    -------
+    float
+        The result of the operation.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} must be numeric")
     result = float(value)
@@ -36,7 +82,20 @@ def load_result_checked(
     *,
     max_bytes: int = DEFAULT_MAX_RESULT_BYTES,
 ) -> BenchmarkResult:
-    """Load a benchmark result with bounded reads and structural validation."""
+    """Load a benchmark result with bounded reads and structural validation.
+
+    Parameters
+    ----------
+    path : str | Path
+        path parameter.
+    max_bytes : int
+        max_bytes parameter.
+
+    Returns
+    -------
+    BenchmarkResult
+        The result of the operation.
+    """
     max_bytes = _non_negative_int(max_bytes, name="max_bytes", positive=True)
 
     item = Path(path)

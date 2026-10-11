@@ -6,6 +6,10 @@ hand-rolling its own convention.
 """
 from __future__ import annotations
 
+__author__ = "Yeremia Gunawan Adhisantoso"
+__email__ = "yeremiag@gmail.com"
+__license__ = "Clear BSD"
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
@@ -19,9 +23,6 @@ from decimal import Decimal
 #? backwards-compatible module-level access.
 from ._version import __version__ as __version__
 
-__author__ = "Yeremia Gunawan Adhisantoso"
-__email__ = "yeremiag@gmail.com"
-__license__ = "Clear BSD"
 __all__ = ["format_bytes", "format_duration", "format_count"]
 
 

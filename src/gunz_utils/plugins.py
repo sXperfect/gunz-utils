@@ -1,5 +1,9 @@
 """Failure-isolated entry-point plugin discovery."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -26,11 +30,34 @@ class PluginLoadResult:
 
     @property
     def ok(self) -> bool:
-        """Return whether the plugin loaded successfully."""
+        """Return whether the plugin loaded successfully.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         return self.error is None
 
 
-def _entry_point_info(entry_point: EntryPoint, group: str) -> PluginInfo:
+def _entry_point_info(
+    entry_point: EntryPoint,
+    group: str,
+) -> PluginInfo:
+    """_entry_point_info() function.
+
+    Parameters
+    ----------
+    entry_point : EntryPoint
+        entry_point parameter.
+    group : str
+        group parameter.
+
+    Returns
+    -------
+    PluginInfo
+        The result of the operation.
+    """
     return PluginInfo(entry_point.name, entry_point.value, group)
 
 

@@ -1,5 +1,9 @@
 """Static security invariants applied to every package source file."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import ast
@@ -20,7 +24,9 @@ _BANNED_CALLS = {
 }
 
 
-def _qualified_name(node: ast.AST) -> tuple[str, ...] | None:
+def _qualified_name(
+    node: ast.AST,
+) -> tuple[str, ...] | None:
     parts: list[str] = []
     current = node
     while isinstance(current, ast.Attribute):

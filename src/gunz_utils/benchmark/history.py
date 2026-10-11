@@ -1,5 +1,9 @@
 """Benchmark history and trend analysis across revisions."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -7,6 +11,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .io import load_result
 from .result import BenchmarkResult
 
@@ -35,22 +42,69 @@ class Trend:
 class BenchmarkHistory:
     """Ordered benchmark results, typically one per commit or release."""
 
-    def __init__(self, points: Iterable[HistoryPoint] = ()) -> None:
+    def __init__(self,
+        points: Iterable[HistoryPoint] = (),
+    ) -> None:
         self.points = list(points)
 
-    def add(self, label: str, result: BenchmarkResult) -> BenchmarkHistory:
+    def add(self,
+        label: str,
+        result: BenchmarkResult,
+    ) -> BenchmarkHistory:
+        """add() function.
+
+        Parameters
+        ----------
+        label : str
+            label parameter.
+        result : BenchmarkResult
+            result parameter.
+
+        Returns
+        -------
+        BenchmarkHistory
+            The result of the operation.
+        """
         self.points.append(HistoryPoint(label, result))
         return self
 
     @classmethod
-    def from_files(cls, paths: Iterable[str | Path]) -> BenchmarkHistory:
+    def from_files(cls,
+        paths: Iterable[str | Path],
+    ) -> BenchmarkHistory:
+        """from_files() function.
+
+        Parameters
+        ----------
+        paths : Iterable[str | Path]
+            paths parameter.
+
+        Returns
+        -------
+        BenchmarkHistory
+            The result of the operation.
+        """
         history = cls()
         for path in paths:
             item = Path(path)
             history.add(item.stem, load_result(item))
         return history
 
-    def trend(self, metric: str = "median") -> Trend:
+    def trend(self,
+        metric: str = "median",
+    ) -> Trend:
+        """trend() function.
+
+        Parameters
+        ----------
+        metric : str
+            metric parameter.
+
+        Returns
+        -------
+        Trend
+            The result of the operation.
+        """
         if not self.points:
             raise ValueError("benchmark history is empty")
         if not isinstance(metric, str) or not metric:

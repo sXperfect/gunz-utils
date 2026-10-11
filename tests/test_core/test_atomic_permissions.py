@@ -1,5 +1,9 @@
 """Explicit permission semantics for atomic file publication."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import json
@@ -7,7 +11,15 @@ import os
 import stat
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.io import atomic_json_write, atomic_write
 
@@ -32,7 +44,9 @@ def test_atomic_write_applies_permissions_before_publication(
     assert stat.S_IMODE(target.stat().st_mode) == 0o600
 
 
-def test_atomic_json_write_forwards_permissions(tmp_path: Path) -> None:
+def test_atomic_json_write_forwards_permissions(
+    tmp_path: Path,
+) -> None:
     target = tmp_path / "config.json"
 
     atomic_json_write(

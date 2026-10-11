@@ -1,5 +1,9 @@
 """Strict binary reading/writing primitives."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import importlib
@@ -26,15 +30,38 @@ class ByteReader:
     data: memoryview
     offset: int = 0
 
-    def __init__(self, data: bytes | bytearray | memoryview) -> None:
+    def __init__(self,
+        data: bytes | bytearray | memoryview,
+    ) -> None:
         self.data = memoryview(data).cast("B")
         self.offset = 0
 
     @property
     def remaining(self) -> int:
+        """remaining() function.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         return len(self.data) - self.offset
 
-    def read(self, size: int) -> memoryview:
+    def read(self,
+        size: int,
+    ) -> memoryview:
+        """read() function.
+
+        Parameters
+        ----------
+        size : int
+            size parameter.
+
+        Returns
+        -------
+        memoryview
+            The result of the operation.
+        """
         if isinstance(size, bool) or not isinstance(size, int):
             raise TypeError("read size must be an integer")
         if size < 0 or size > self.remaining:
@@ -46,7 +73,13 @@ class ByteReader:
         return chunk
 
     def read_uvarint(self) -> int:
-        """Read a canonical unsigned 64-bit varint transactionally."""
+        """Read a canonical unsigned 64-bit varint transactionally.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         if _accel_decode is not None:
             value, new_offset = _accel_decode(self.data, self.offset)
             self.offset = new_offset
@@ -71,7 +104,21 @@ class ByteReader:
             raise
 
 
-def _py_encode_uvarint(value: int) -> bytes:
+def _py_encode_uvarint(
+    value: int,
+) -> bytes:
+    """_py_encode_uvarint() function.
+
+    Parameters
+    ----------
+    value : int
+        value parameter.
+
+    Returns
+    -------
+    bytes
+        The result of the operation.
+    """
     if value < 0 or value > 2**64 - 1:
         raise ValueError("unsigned varint requires a 64-bit unsigned integer")
     output = bytearray()
@@ -83,8 +130,21 @@ def _py_encode_uvarint(value: int) -> bytes:
             return bytes(output)
 
 
-def encode_uvarint(value: int) -> bytes:
-    """Encode an unsigned 64-bit integer into a canonical varint."""
+def encode_uvarint(
+    value: int,
+) -> bytes:
+    """Encode an unsigned 64-bit integer into a canonical varint.
+
+    Parameters
+    ----------
+    value : int
+        value parameter.
+
+    Returns
+    -------
+    bytes
+        The result of the operation.
+    """
     if _accel_encode is not None:
         return _accel_encode(value)
     return _py_encode_uvarint(value)

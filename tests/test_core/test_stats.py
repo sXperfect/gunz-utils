@@ -1,10 +1,22 @@
 """Tests for dependency-free statistical helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.stats import (
     bootstrap_mean_ci,
@@ -50,7 +62,7 @@ def test_paired_effect_matches_known_differences() -> None:
         [1.0, 2.0, 4.0],
     )
 
-    # Pairwise differences are [1, 2, 3].
+    #? Pairwise differences are [1, 2, 3].
     assert result.mean_difference == pytest.approx(2.0)
     assert result.standard_deviation == pytest.approx(1.0)
     assert result.standardized_effect == pytest.approx(2.0)

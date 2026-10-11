@@ -1,5 +1,9 @@
 """Descriptor ownership across atomic-write setup failures."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import errno
@@ -7,14 +11,24 @@ import os
 from pathlib import Path
 from typing import Any
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import io
 
 
 @pytest.mark.parametrize("failure", ["fchmod", "fdopen"])
 def test_setup_failure_closes_reserved_descriptor(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
 ) -> None:
     if failure == "fchmod" and not hasattr(os, "fchmod"):
         pytest.skip("descriptor permissions unavailable")
@@ -23,14 +37,20 @@ def test_setup_failure_closes_reserved_descriptor(
     captured: list[int] = []
     real_mkstemp = io.tempfile.mkstemp
 
-    def capture(*args: Any, **kwargs: Any) -> tuple[int, str]:
+    def capture(
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[int, str]:
         fd, path = real_mkstemp(*args, **kwargs)
         captured.append(fd)
         return fd, path
 
     error = OSError(errno.EIO, "synthetic setup failure")
 
-    def fail(*args: Any, **kwargs: Any) -> Any:
+    def fail(
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         raise error
 
     monkeypatch.setattr(io.tempfile, "mkstemp", capture)
@@ -49,21 +69,26 @@ def test_setup_failure_closes_reserved_descriptor(
 
 
 def test_encoding_setup_failure_keeps_descriptor_ownership(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     target = tmp_path / "existing.txt"
     target.write_text("original", encoding="utf-8")
     captured: list[int] = []
     real_fdopen = io.os.fdopen
 
-    def inspect_wrapper(fd: int, *args: Any, **kwargs: Any) -> Any:
+    def inspect_wrapper(
+        fd: int,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         captured.append(fd)
         assert kwargs["closefd"] is False
         try:
             return real_fdopen(fd, *args, **kwargs)
         except LookupError:
-            # Wrapper failure must not release/reuse the raw fd before our
-            # cleanup executes. This uses actual CPython encoding setup.
+            #? Wrapper failure must not release/reuse the raw fd before our
+            #? cleanup executes. This uses actual CPython encoding setup.
             os.fstat(fd)
             raise
 

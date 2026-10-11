@@ -1,23 +1,39 @@
 """Competing directory publishers must not replace one another."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import fs
 
 
 def test_competing_empty_directory_keeps_its_inode(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     target = tmp_path / "published"
     real_publish = fs._rename_directory_noreplace
     competing_inode: list[int] = []
 
-    def interleave(source: Path, destination: Path) -> None:
+    def interleave(
+        source: Path,
+        destination: Path,
+    ) -> None:
         destination.mkdir()
         competing_inode.append(destination.stat().st_ino)
         real_publish(source, destination)
@@ -32,9 +48,13 @@ def test_competing_empty_directory_keeps_its_inode(
 
 
 def test_unsupported_publication_cleans_staging(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def unsupported(source: Path, target: Path) -> None:
+    def unsupported(
+        source: Path,
+        target: Path,
+    ) -> None:
         raise NotImplementedError("synthetic unsupported publication")
 
     monkeypatch.setattr(fs, "_rename_directory_noreplace", unsupported)
@@ -47,7 +67,9 @@ def test_unsupported_publication_cleans_staging(
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX symlinks required")
-def test_competing_dangling_symlink_is_preserved(tmp_path: Path) -> None:
+def test_competing_dangling_symlink_is_preserved(
+    tmp_path: Path,
+) -> None:
     target = tmp_path / "published"
     with pytest.raises(FileExistsError):
         with fs.transactional_directory(target) as staging:

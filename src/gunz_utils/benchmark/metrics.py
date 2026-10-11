@@ -1,19 +1,56 @@
 """Derived performance metrics shared by all measurement backends."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 from collections.abc import Sequence
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .perf import PerfStatResult
 from .process import ProcessProfile
 
 
-def perf_metrics(result: PerfStatResult) -> dict[str, float | None]:
-    """Derive common ratios from perf-stat counters."""
+def perf_metrics(
+    result: PerfStatResult,
+) -> dict[str, float | None]:
+    """Derive common ratios from perf-stat counters.
+
+    Parameters
+    ----------
+    result : PerfStatResult
+        result parameter.
+
+    Returns
+    -------
+    dict[str, float | None]
+        The result of the operation.
+    """
     values = {counter.event: counter.value for counter in result.counters}
 
-    def ratio(numerator: str, denominator: str) -> float | None:
+    def ratio(
+        numerator: str,
+        denominator: str,
+    ) -> float | None:
+        """ratio() function.
+
+        Parameters
+        ----------
+        numerator : str
+            numerator parameter.
+        denominator : str
+            denominator parameter.
+
+        Returns
+        -------
+        float | None
+            The result of the operation.
+        """
         top, bottom = values.get(numerator), values.get(denominator)
         if top is None or bottom is None or bottom == 0:
             return None
@@ -26,8 +63,21 @@ def perf_metrics(result: PerfStatResult) -> dict[str, float | None]:
     }
 
 
-def process_metrics(profile: ProcessProfile) -> dict[str, float | None]:
-    """Derive aggregate efficiency and bandwidth metrics."""
+def process_metrics(
+    profile: ProcessProfile,
+) -> dict[str, float | None]:
+    """Derive aggregate efficiency and bandwidth metrics.
+
+    Parameters
+    ----------
+    profile : ProcessProfile
+        profile parameter.
+
+    Returns
+    -------
+    dict[str, float | None]
+        The result of the operation.
+    """
     wall = profile.wall_seconds
     samples = profile.samples
     memory_time = 0.0
@@ -51,7 +101,20 @@ def scaling_efficiency(
     workers: Sequence[int],
     durations: Sequence[float],
 ) -> list[float | None]:
-    """Return efficiency relative to the first worker/duration observation."""
+    """Return efficiency relative to the first worker/duration observation.
+
+    Parameters
+    ----------
+    workers : Sequence[int]
+        workers parameter.
+    durations : Sequence[float]
+        durations parameter.
+
+    Returns
+    -------
+    list[float | None]
+        The result of the operation.
+    """
     if len(workers) != len(durations) or not workers:
         raise ValueError("workers and durations must be non-empty and equally sized")
     base_workers, base_duration = workers[0], durations[0]

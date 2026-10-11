@@ -1,17 +1,38 @@
 """Command-line interface for cross-project benchmark utilities."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .compare import compare_results
 from .io import load_result
 from .process import profile_command
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    """main() function.
+
+    Parameters
+    ----------
+    argv : list[str] | None
+        argv parameter.
+
+    Returns
+    -------
+    int
+        The result of the operation.
+    """
     parser = argparse.ArgumentParser(prog="gunz-benchmark")
     commands = parser.add_subparsers(dest="command", required=True)
 

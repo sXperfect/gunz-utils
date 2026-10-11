@@ -1,5 +1,9 @@
 """Bounded-capture deadlines include inherited pipe lifetime."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import os
@@ -11,7 +15,15 @@ import time
 from pathlib import Path
 from typing import Any
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.subprocess as command_module
 from gunz_utils.subprocess import CommandOutputLimitError, run_command
@@ -31,7 +43,10 @@ def test_deadline_and_overflow_cleanup_with_inherited_pipe_holder(
     pid_file = tmp_path / "descendant.pid"
     baseline_threads = set(threading.enumerate())
 
-    def record_popen(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+    def record_popen(
+        *args: Any,
+        **kwargs: Any,
+    ) -> subprocess.Popen[bytes]:
         process = original_popen(*args, **kwargs)
         captured.append(process)
         return process
@@ -64,7 +79,7 @@ def test_deadline_and_overflow_cleanup_with_inherited_pipe_holder(
             os.waitpid(captured[0].pid, os.WNOHANG)
         assert set(threading.enumerate()) == baseline_threads
     finally:
-        # Escaped descendants are outside helper process-group ownership.
+        #? Escaped descendants are outside helper process-group ownership.
         if pid_file.exists():
             try:
                 os.kill(int(pid_file.read_text()), signal.SIGKILL)
@@ -111,19 +126,27 @@ def test_reader_setup_failure_closes_pipes_and_reaps_process(
     submissions = 0
     failure = RuntimeError(f"reader {phase} rejected")
 
-    def record_popen(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+    def record_popen(
+        *args: Any,
+        **kwargs: Any,
+    ) -> subprocess.Popen[bytes]:
         process = original_popen(*args, **kwargs)
         captured.append(process)
         return process
 
-    def fail_start(thread: threading.Thread) -> None:
+    def fail_start(
+        thread: threading.Thread,
+    ) -> None:
         nonlocal submissions
         submissions += 1
         if submissions == rejected_reader:
             raise failure
         original_start(thread)
 
-    def fail_constructor(*args: Any, **kwargs: Any) -> threading.Thread:
+    def fail_constructor(
+        *args: Any,
+        **kwargs: Any,
+    ) -> threading.Thread:
         nonlocal submissions
         submissions += 1
         if submissions == rejected_reader:

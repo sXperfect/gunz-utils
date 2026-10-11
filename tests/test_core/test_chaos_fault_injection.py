@@ -1,11 +1,23 @@
 """Tests for chaos and fault-injection primitives."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
 import io
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.faults import (
     AwaitBoundaryChaos,
@@ -112,11 +124,11 @@ def test_await_boundary_chaos_cancellation() -> None:
     async def scenario() -> None:
         chaos = AwaitBoundaryChaos(cancel_at_step=3)
 
-        await chaos.step()  # 1
-        await chaos.step()  # 2
+        await chaos.step()  #? 1
+        await chaos.step()  #? 2
 
         with pytest.raises(asyncio.CancelledError, match="Injected await cancellation"):
-            await chaos.step()  # 3
+            await chaos.step()  #? 3
 
     asyncio.run(scenario())
 
@@ -128,10 +140,10 @@ def test_await_boundary_chaos_custom_fault() -> None:
             exception_factory=lambda: InjectedFault("custom failure"),
         )
 
-        await chaos.step()  # 1
+        await chaos.step()  #? 1
 
         with pytest.raises(InjectedFault, match="custom failure"):
-            await chaos.step()  # 2
+            await chaos.step()  #? 2
 
     asyncio.run(scenario())
 

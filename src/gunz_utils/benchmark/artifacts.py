@@ -1,5 +1,9 @@
 """Portable performance-run artifact registry."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import hashlib
@@ -8,6 +12,9 @@ import stat
 from dataclasses import replace
 from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .performance import PerformanceArtifact, PerformanceRun
 
 
@@ -15,7 +22,20 @@ def _hash_regular_file(
     path: Path,
     chunk_size: int = 1 << 20,
 ) -> tuple[str, int]:
-    """Hash an opened regular file without following a final symlink."""
+    """Hash an opened regular file without following a final symlink.
+
+    Parameters
+    ----------
+    path : Path
+        path parameter.
+    chunk_size : int
+        chunk_size parameter.
+
+    Returns
+    -------
+    tuple[str, int]
+        The result of the operation.
+    """
     if path.is_symlink():
         raise ValueError("artifact must be a non-symlink regular file")
     flags = os.O_RDONLY
@@ -59,7 +79,26 @@ def register_artifact(
     media_type: str | None = None,
     description: str | None = None,
 ) -> PerformanceRun:
-    """Attach a checksummed non-symlink regular-file artifact to a run."""
+    """Attach a checksummed non-symlink regular-file artifact to a run.
+
+    Parameters
+    ----------
+    run : PerformanceRun
+        run parameter.
+    path : str | Path
+        path parameter.
+    kind : str
+        kind parameter.
+    media_type : str | None
+        media_type parameter.
+    description : str | None
+        description parameter.
+
+    Returns
+    -------
+    PerformanceRun
+        The result of the operation.
+    """
     item = Path(path)
     checksum, size_bytes = _hash_regular_file(item)
     artifact = PerformanceArtifact(
@@ -73,8 +112,21 @@ def register_artifact(
     return replace(run, artifacts=(*run.artifacts, artifact))
 
 
-def verify_artifact(artifact: PerformanceArtifact) -> bool:
-    """Verify artifact type, size, and SHA-256 checksum with bounded memory."""
+def verify_artifact(
+    artifact: PerformanceArtifact,
+) -> bool:
+    """Verify artifact type, size, and SHA-256 checksum with bounded memory.
+
+    Parameters
+    ----------
+    artifact : PerformanceArtifact
+        artifact parameter.
+
+    Returns
+    -------
+    bool
+        The result of the operation.
+    """
     if artifact.checksum_sha256 is None or artifact.size_bytes is None:
         return False
     try:

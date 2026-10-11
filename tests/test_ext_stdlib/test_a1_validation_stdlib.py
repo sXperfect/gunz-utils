@@ -1,18 +1,32 @@
 """Proof tests for the stdlib runtime-validation backend."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Annotated, Literal
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.ext.validation_stdlib import type_checked
 
 
 def test_pep604_union_is_enforced_recursively() -> None:
     @type_checked
-    def accepts(value: int | None) -> int | None:
+    def accepts(
+        value: int | None,
+    ) -> int | None:
         return value
 
     assert accepts(3) == 3
@@ -43,7 +57,9 @@ def test_nested_container_generics_validate_elements() -> None:
 
 def test_fixed_tuple_shape_is_enforced() -> None:
     @type_checked
-    def accepts(value: tuple[int, str]) -> tuple[int, str]:
+    def accepts(
+        value: tuple[int, str],
+    ) -> tuple[int, str]:
         return value
 
     assert accepts((1, "x")) == (1, "x")
@@ -57,7 +73,9 @@ def test_fixed_tuple_shape_is_enforced() -> None:
 
 def test_literal_comparison_is_type_strict() -> None:
     @type_checked
-    def accepts(value: Literal[1, "one"]) -> object:
+    def accepts(
+        value: Literal[1, "one"],
+    ) -> object:
         return value
 
     assert accepts(1) == 1
@@ -69,7 +87,9 @@ def test_literal_comparison_is_type_strict() -> None:
 
 def test_annotated_validates_underlying_type() -> None:
     @type_checked
-    def accepts(value: Annotated[int, "metadata"]) -> int:
+    def accepts(
+        value: Annotated[int, "metadata"],
+    ) -> int:
         return value
 
     assert accepts(4) == 4
@@ -79,7 +99,9 @@ def test_annotated_validates_underlying_type() -> None:
 
 def test_callable_outer_type_is_validated() -> None:
     @type_checked
-    def accepts(callback: Callable[[], None]) -> object:
+    def accepts(
+        callback: Callable[[], None],
+    ) -> object:
         return callback
 
     def function() -> None:
@@ -95,7 +117,9 @@ def test_backend_specific_decorator_options_are_rejected() -> None:
     with pytest.raises(TypeError, match="validator options"):
 
         @type_checked(config={"strict": True})
-        def configured(value: int) -> int:
+        def configured(
+            value: int,
+        ) -> int:
             return value
 
 
@@ -103,7 +127,9 @@ def test_sensitive_nested_values_are_not_rendered_in_error() -> None:
     sensitive = "nested-secret-value"
 
     @type_checked
-    def accepts(value: dict[str, list[int]]) -> int:
+    def accepts(
+        value: dict[str, list[int]],
+    ) -> int:
         return len(value)
 
     with pytest.raises(TypeError) as captured:

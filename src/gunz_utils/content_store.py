@@ -1,5 +1,9 @@
 """Dependency-free content-addressed local file storage."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import errno
@@ -16,6 +20,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Literal, cast
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .hashing import DEFAULT_ALGO, SUPPORTED_ALGOS
 from .streaming import copy_and_hash
 
@@ -32,8 +39,21 @@ _CONTENT_ID_ALGOS = frozenset({"sha256", "sha512", "sha3_256", "blake2b", "blake
 
 
 @contextmanager
-def _publication_lock(path: Path) -> Iterator[None]:
-    """Serialize cooperating publishers through a symlink-safe file lock."""
+def _publication_lock(
+    path: Path,
+) -> Iterator[None]:
+    """Serialize cooperating publishers through a symlink-safe file lock.
+
+    Parameters
+    ----------
+    path : Path
+        path parameter.
+
+    Returns
+    -------
+    Iterator[None]
+        The result of the operation.
+    """
     if path.is_symlink():
         raise ValueError("content-addressed publication lock must not be a symlink")
     flags = os.O_CREAT | os.O_RDWR
@@ -165,14 +185,30 @@ class ContentAddressedStore:
 
     @property
     def digest_chars(self) -> int:
-        """Return hexadecimal digest length for the configured algorithm."""
+        """Return hexadecimal digest length for the configured algorithm.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         return hashlib.new(self.algo).digest_size * 2
 
-    def _validate_digest(
-        self,
+    def _validate_digest(self,
         digest: str,
     ) -> str:
-        """Validate and normalize a hexadecimal digest."""
+        """Validate and normalize a hexadecimal digest.
+
+        Parameters
+        ----------
+        digest : str
+            digest parameter.
+
+        Returns
+        -------
+        str
+            The result of the operation.
+        """
         if not isinstance(digest, str):
             raise TypeError("digest must be a string")
         normalized = digest.casefold()
@@ -184,11 +220,21 @@ class ContentAddressedStore:
             raise ValueError("digest must be hexadecimal")
         return normalized
 
-    def path_for(
-        self,
+    def path_for(self,
         digest: str,
     ) -> Path:
-        """Return the canonical store path for a validated digest."""
+        """Return the canonical store path for a validated digest.
+
+        Parameters
+        ----------
+        digest : str
+            digest parameter.
+
+        Returns
+        -------
+        Path
+            The result of the operation.
+        """
         normalized = self._validate_digest(digest)
         target = self.root
         for level in range(self.fanout_levels):
@@ -198,8 +244,25 @@ class ContentAddressedStore:
         return target / normalized
 
     @contextmanager
-    def _parent_handle(self, target: Path, *, create: bool) -> Iterator[int | None]:
-        """Anchor fanout traversal; root ancestors must be trusted."""
+    def _parent_handle(self,
+        target: Path,
+        *,
+        create: bool,
+    ) -> Iterator[int | None]:
+        """Anchor fanout traversal; root ancestors must be trusted.
+
+        Parameters
+        ----------
+        target : Path
+            target parameter.
+        create : bool
+            create parameter.
+
+        Returns
+        -------
+        Iterator[int | None]
+            The result of the operation.
+        """
         if not _ANCHORED_IO:
             self._check_prefix_path(target, create=create)
             yield None
@@ -232,7 +295,19 @@ class ContentAddressedStore:
             os.close(descriptor)
 
     @staticmethod
-    def _check_directory_identity(path: Path, descriptor: int | None) -> None:
+    def _check_directory_identity(
+        path: Path,
+        descriptor: int | None,
+    ) -> None:
+        """_check_directory_identity() function.
+
+        Parameters
+        ----------
+        path : Path
+            path parameter.
+        descriptor : int | None
+            descriptor parameter.
+        """
         if descriptor is not None:
             info = os.stat(path, follow_symlinks=False)
             if not stat.S_ISDIR(info.st_mode) or not os.path.samestat(
@@ -242,8 +317,21 @@ class ContentAddressedStore:
 
     @staticmethod
     def _check_file_identity(
-        path: Path, descriptor: int, parent_fd: int | None
+        path: Path,
+        descriptor: int,
+        parent_fd: int | None,
     ) -> None:
+        """_check_file_identity() function.
+
+        Parameters
+        ----------
+        path : Path
+            path parameter.
+        descriptor : int
+            descriptor parameter.
+        parent_fd : int | None
+            parent_fd parameter.
+        """
         info = os.stat(
             path.name if parent_fd is not None else path,
             dir_fd=parent_fd,
@@ -256,8 +344,26 @@ class ContentAddressedStore:
 
     @staticmethod
     def _temporary_file(
-        parent: Path, parent_fd: int | None, prefix: str
+        parent: Path,
+        parent_fd: int | None,
+        prefix: str,
     ) -> tuple[int, Path]:
+        """_temporary_file() function.
+
+        Parameters
+        ----------
+        parent : Path
+            parent parameter.
+        parent_fd : int | None
+            parent_fd parameter.
+        prefix : str
+            prefix parameter.
+
+        Returns
+        -------
+        tuple[int, Path]
+            The result of the operation.
+        """
         if parent_fd is None:
             descriptor, name = tempfile.mkstemp(
                 dir=parent, prefix=prefix, suffix=".tmp"
@@ -277,7 +383,19 @@ class ContentAddressedStore:
             return descriptor, parent / name
 
     @staticmethod
-    def _unlink(path: Path, parent_fd: int | None) -> None:
+    def _unlink(
+        path: Path,
+        parent_fd: int | None,
+    ) -> None:
+        """_unlink() function.
+
+        Parameters
+        ----------
+        path : Path
+            path parameter.
+        parent_fd : int | None
+            parent_fd parameter.
+        """
         try:
             os.unlink(path.name if parent_fd is not None else path, dir_fd=parent_fd)
         except FileNotFoundError:
@@ -285,7 +403,24 @@ class ContentAddressedStore:
 
     @staticmethod
     @contextmanager
-    def _duplicate_handle(descriptor: int, mode: str) -> Iterator[BinaryIO]:
+    def _duplicate_handle(
+        descriptor: int,
+        mode: str,
+    ) -> Iterator[BinaryIO]:
+        """_duplicate_handle() function.
+
+        Parameters
+        ----------
+        descriptor : int
+            descriptor parameter.
+        mode : str
+            mode parameter.
+
+        Returns
+        -------
+        Iterator[BinaryIO]
+            The result of the operation.
+        """
         duplicate = os.dup(descriptor)
         try:
             handle = os.fdopen(duplicate, mode)
@@ -295,9 +430,22 @@ class ContentAddressedStore:
         with handle:
             yield cast(BinaryIO, handle)
 
-    def _verify_handle(
-        self, descriptor: int, digest: str, size_bytes: int | None = None
+    def _verify_handle(self,
+        descriptor: int,
+        digest: str,
+        size_bytes: int | None = None,
     ) -> None:
+        """_verify_handle() function.
+
+        Parameters
+        ----------
+        descriptor : int
+            descriptor parameter.
+        digest : str
+            digest parameter.
+        size_bytes : int | None
+            size_bytes parameter.
+        """
         info = os.fstat(descriptor)
         if not stat.S_ISREG(info.st_mode):
             raise ValueError("content-addressed target is not a regular file")
@@ -312,7 +460,24 @@ class ContentAddressedStore:
             raise ValueError(f"content-addressed artifact is corrupted: {digest}")
 
     @contextmanager
-    def _artifact_handle(self, target: Path, parent_fd: int | None) -> Iterator[int]:
+    def _artifact_handle(self,
+        target: Path,
+        parent_fd: int | None,
+    ) -> Iterator[int]:
+        """_artifact_handle() function.
+
+        Parameters
+        ----------
+        target : Path
+            target parameter.
+        parent_fd : int | None
+            parent_fd parameter.
+
+        Returns
+        -------
+        Iterator[int]
+            The result of the operation.
+        """
         if parent_fd is None and target.is_symlink():
             raise ValueError("content-addressed artifact path is a symlink")
         flags = (
@@ -337,23 +502,20 @@ class ContentAddressedStore:
         finally:
             os.close(descriptor)
 
-    def _verify_existing(
-        self, target: Path, digest: str, size_bytes: int | None = None
-    ) -> None:
-        with self._parent_handle(target, create=False) as parent_fd:
-            with self._artifact_handle(target, parent_fd) as descriptor:
-                self._verify_handle(descriptor, digest, size_bytes)
-                self._check_file_identity(target, descriptor, parent_fd)
-            self._check_prefix_path(target, create=False)
-            self._check_directory_identity(target.parent, parent_fd)
-
-    def _check_prefix_path(
-        self,
+    def _check_prefix_path(self,
         target: Path,
         *,
         create: bool,
     ) -> None:
-        """Reject symlinked/non-directory fanout components below the root."""
+        """Reject symlinked/non-directory fanout components below the root.
+
+        Parameters
+        ----------
+        target : Path
+            target parameter.
+        create : bool
+            create parameter.
+        """
         if self.root.is_symlink() or not self.root.is_dir():
             raise ValueError(
                 "content-addressed store root must be a non-symlink directory"
@@ -375,12 +537,7 @@ class ContentAddressedStore:
             if current.exists() and not current.is_dir():
                 raise ValueError("content-addressed prefix path must be a directory")
 
-    def _ensure_prefix_directory(self, target: Path) -> None:
-        """Create fanout directories without accepting symlink components."""
-        self._check_prefix_path(target, create=True)
-
-    def _publish_temporary(
-        self,
+    def _publish_temporary(self,
         temporary: Path,
         digest: str,
         size_bytes: int,
@@ -388,7 +545,26 @@ class ContentAddressedStore:
         temporary_fd: int | None = None,
         root_fd: int | None = None,
     ) -> StoredArtifact:
-        """Publish into an anchored fanout, retaining the verified staging inode."""
+        """Publish into an anchored fanout, retaining the verified staging inode.
+
+        Parameters
+        ----------
+        temporary : Path
+            temporary parameter.
+        digest : str
+            digest parameter.
+        size_bytes : int
+            size_bytes parameter.
+        temporary_fd : int | None
+            temporary_fd parameter.
+        root_fd : int | None
+            root_fd parameter.
+
+        Returns
+        -------
+        StoredArtifact
+            The result of the operation.
+        """
         target = self.path_for(digest)
         with self._parent_handle(target, create=True) as parent_fd:
             lock_path = target.parent / ".publish.lock"
@@ -411,8 +587,8 @@ class ContentAddressedStore:
                         with self._artifact_handle(target, parent_fd) as descriptor:
                             self._verify_handle(descriptor, digest, size_bytes)
                     except FileNotFoundError:
-                        # Same-digest cooperating writers may replace the winner inode;
-                        # fallback promises correct content, not inode preservation.
+                        #? Same-digest cooperating writers may replace the winner inode;
+                        #? fallback promises correct content, not inode preservation.
                         os.replace(
                             temporary.name if root_fd is not None else temporary,
                             target.name if parent_fd is not None else target,
@@ -425,8 +601,7 @@ class ContentAddressedStore:
                     self._verify_handle(descriptor, digest, size_bytes)
         return StoredArtifact(digest=digest, path=target, size_bytes=size_bytes)
 
-    def put_stream(
-        self,
+    def put_stream(self,
         source: BinaryIO,
     ) -> StoredArtifact:
         """Store bytes from the current position of a readable binary stream.
@@ -481,21 +656,41 @@ class ContentAddressedStore:
             if root_fd is not None:
                 os.close(root_fd)
 
-    def put_bytes(
-        self,
+    def put_bytes(self,
         data: bytes | bytearray | memoryview,
     ) -> StoredArtifact:
-        """Store an in-memory byte buffer without an intermediate source file."""
+        """Store an in-memory byte buffer without an intermediate source file.
+
+        Parameters
+        ----------
+        data : bytes | bytearray | memoryview
+            data parameter.
+
+        Returns
+        -------
+        StoredArtifact
+            The result of the operation.
+        """
         if not isinstance(data, bytes | bytearray | memoryview):
             raise TypeError("data must be bytes-like")
         with io.BytesIO(bytes(data)) as source:
             return self.put_stream(source)
 
-    def put(
-        self,
+    def put(self,
         source: str | Path,
     ) -> StoredArtifact:
-        """Store one regular file without following a final-component symlink."""
+        """Store one regular file without following a final-component symlink.
+
+        Parameters
+        ----------
+        source : str | Path
+            source parameter.
+
+        Returns
+        -------
+        StoredArtifact
+            The result of the operation.
+        """
         item = Path(source)
         flags = os.O_RDONLY
         if hasattr(os, "O_NOFOLLOW"):
@@ -516,8 +711,7 @@ class ContentAddressedStore:
             if descriptor >= 0:
                 os.close(descriptor)
 
-    def materialize(
-        self,
+    def materialize(self,
         digest: str,
         destination: str | Path,
         *,
@@ -609,8 +803,8 @@ class ContentAddressedStore:
                     try:
                         linked = False
                         if strategy == "hardlink":
-                            # Link to a fresh exclusive name; never reopen a removed
-                            # reservation for copying. Keep source descriptor pinned.
+                            #? Link to a fresh exclusive name; never reopen a removed
+                            #? reservation for copying. Keep source descriptor pinned.
                             link_path = target.parent / (
                                 f".{target.name}." + secrets.token_hex(16) + ".link"
                             )
@@ -656,8 +850,8 @@ class ContentAddressedStore:
                             if hasattr(os, "fchmod"):
                                 os.fchmod(descriptor, stat.S_IMODE(source_info.st_mode))
                             else:
-                                # Platforms without descriptor permissions require
-                                # the documented trusted destination tree.
+                                #? Platforms without descriptor permissions require
+                                #? the documented trusted destination tree.
                                 os.chmod(temporary, stat.S_IMODE(source_info.st_mode))
                             if os.utime in os.supports_fd:
                                 os.utime(
@@ -708,13 +902,25 @@ class ContentAddressedStore:
                 os.close(destination_fd)
         return target
 
-    def get(
-        self,
+    def get(self,
         digest: str,
         *,
         verify: bool = True,
     ) -> Path:
-        """Return a stored artifact path, optionally verifying its digest."""
+        """Return a stored artifact path, optionally verifying its digest.
+
+        Parameters
+        ----------
+        digest : str
+            digest parameter.
+        verify : bool
+            verify parameter.
+
+        Returns
+        -------
+        Path
+            The result of the operation.
+        """
         if not isinstance(verify, bool):
             raise ValueError("verify must be bool")
         normalized = self._validate_digest(digest)
@@ -731,11 +937,21 @@ class ContentAddressedStore:
             raise KeyError(normalized) from None
         return target
 
-    def verify(
-        self,
+    def verify(self,
         digest: str,
     ) -> bool:
-        """Return whether an artifact exists and matches its content digest."""
+        """Return whether an artifact exists and matches its content digest.
+
+        Parameters
+        ----------
+        digest : str
+            digest parameter.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         try:
             self.get(
                 digest,

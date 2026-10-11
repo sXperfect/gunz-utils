@@ -1,7 +1,14 @@
 """Build normalized PerformanceRun values from collected measurements."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .diagnostics import analyze_stability
 from .environment import capture_noise_info
 from .io import capture_git_info
@@ -18,7 +25,24 @@ def build_performance_run(
     process_profile: ProcessProfile | None = None,
     cwd: str | None = None,
 ) -> PerformanceRun:
-    """Assemble provenance, derived metrics and warnings automatically."""
+    """Assemble provenance, derived metrics and warnings automatically.
+
+    Parameters
+    ----------
+    name : str
+        name parameter.
+    benchmark : BenchmarkResult | None
+        benchmark parameter.
+    process_profile : ProcessProfile | None
+        process_profile parameter.
+    cwd : str | None
+        cwd parameter.
+
+    Returns
+    -------
+    PerformanceRun
+        The result of the operation.
+    """
     if benchmark is None and process_profile is None:
         raise ValueError("at least one measurement is required")
     system = benchmark.system if benchmark is not None else None

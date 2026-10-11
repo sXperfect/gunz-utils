@@ -16,6 +16,10 @@ Coverage:
 Unsupported constructs are treated as pass-through rather than guessed.
 Backend-specific decorator options are rejected explicitly.
 """
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 # =============================================================================
@@ -30,13 +34,32 @@ import types
 import typing as t
 from collections import abc as cabc
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .._version import __version__ as __version__
 
 __all__ = ["type_checked"]
 
 
-def _check_one(value: t.Any, annotation: t.Any) -> bool:
-    """Recursively validate the runtime subset promised by this backend."""
+def _check_one(
+    value: t.Any,
+    annotation: t.Any,
+) -> bool:
+    """Recursively validate the runtime subset promised by this backend.
+
+    Parameters
+    ----------
+    value : t.Any
+        value parameter.
+    annotation : t.Any
+        annotation parameter.
+
+    Returns
+    -------
+    bool
+        The result of the operation.
+    """
     if annotation is t.Any:
         return True
     if annotation is None or annotation is type(None):
@@ -103,12 +126,25 @@ def _check_one(value: t.Any, annotation: t.Any) -> bool:
     try:
         return isinstance(value, origin)
     except TypeError:
-        # Unsupported typing constructs intentionally remain pass-through.
+        #? Unsupported typing constructs intentionally remain pass-through.
         return True
 
 
-def _safe_args_repr(exc: Exception) -> str:
-    """Describe a bind failure without reproducing value-bearing details."""
+def _safe_args_repr(
+    exc: Exception,
+) -> str:
+    """Describe a bind failure without reproducing value-bearing details.
+
+    Parameters
+    ----------
+    exc : Exception
+        exc parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     return f"{type(exc).__name__}: argument binding failed"
 
 
@@ -116,6 +152,20 @@ def type_checked(
     func: t.Callable | None = None,
     **kwargs: t.Any,
 ) -> t.Callable:
+    """type_checked() function.
+
+    Parameters
+    ----------
+    func : t.Callable | None
+        func parameter.
+    kwargs : t.Any
+        kwargs parameter.
+
+    Returns
+    -------
+    t.Callable
+        The result of the operation.
+    """
     if kwargs:
         options = ", ".join(sorted(kwargs))
         raise TypeError(
@@ -123,7 +173,21 @@ def type_checked(
             f"{options}"
         )
 
-    def decorator(f: t.Callable) -> t.Callable:
+    def decorator(
+        f: t.Callable,
+    ) -> t.Callable:
+        """decorator() function.
+
+        Parameters
+        ----------
+        f : t.Callable
+            f parameter.
+
+        Returns
+        -------
+        t.Callable
+            The result of the operation.
+        """
         try:
             hints = t.get_type_hints(f)
         except Exception:
@@ -131,7 +195,24 @@ def type_checked(
         sig = inspect.signature(f)
 
         @functools.wraps(f)
-        def wrapper(*args: t.Any, **kw: t.Any) -> t.Any:
+        def wrapper(
+            *args: t.Any,
+            **kw: t.Any,
+        ) -> t.Any:
+            """wrapper() function.
+
+            Parameters
+            ----------
+            args : t.Any
+                args parameter.
+            kw : t.Any
+                kw parameter.
+
+            Returns
+            -------
+            t.Any
+                The result of the operation.
+            """
             try:
                 bound = sig.bind(*args, **kw)
             except TypeError as e:

@@ -9,13 +9,25 @@ Covers the shared strictness defaults exposed by :class:`GunzBaseModel`:
   - Public API re-export from ``gunz_utils``
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import unittest
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 
 import pytest
 
 pytest.importorskip("pydantic")
 
 from pydantic import ConfigDict, ValidationError
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import GunzBaseModel
 
@@ -51,7 +63,7 @@ class TestGunzBaseModelExtraForbid(unittest.TestCase):
 
         with self.assertRaises(ValidationError) as cm:
             Record(name="alice", extra_field=1)
-        # Pydantic reports the bad field name in the error
+        #? Pydantic reports the bad field name in the error
         self.assertIn("extra_field", str(cm.exception))
 
     def test_construction_without_extras_succeeds(self):
@@ -114,8 +126,8 @@ class TestGunzBaseModelValidateAssignment(unittest.TestCase):
             age: int
 
         r = Record(age=30)
-        # Pydantic's int field accepts negatives; this just confirms the
-        # assignment path runs the validator (no error here).
+        #? Pydantic's int field accepts negatives; this just confirms the
+        #? assignment path runs the validator (no error here).
         r.age = 40
         self.assertEqual(r.age, 40)
 
@@ -130,10 +142,10 @@ class TestGunzBaseModelSubclassOverride(unittest.TestCase):
             model_config = ConfigDict(extra="ignore")
             name: str
 
-        # Should NOT raise even with an extra field
+        #? Should NOT raise even with an extra field
         r = PermissiveRecord(name="alice", extra_field=1)
         self.assertEqual(r.name, "alice")
-        # Extra is silently ignored (Pydantic default for extra="ignore")
+        #? Extra is silently ignored (Pydantic default for extra="ignore")
         self.assertEqual(PermissiveRecord.model_config.get("extra"), "ignore")
 
     def test_subclass_inherits_unrelated_settings(self):
@@ -153,7 +165,7 @@ class TestGunzBaseModelPublicAPI(unittest.TestCase):
 
     def test_reexport_from_package(self):
         """``from gunz_utils import GunzBaseModel`` works."""
-        # Already imported at module scope, but assert identity for clarity.
+        #? Already imported at module scope, but assert identity for clarity.
         from gunz_utils import GunzBaseModel as Imported
 
         self.assertIs(Imported, GunzBaseModel)

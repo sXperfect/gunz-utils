@@ -1,5 +1,9 @@
 """Optional Linux perf integration for native profiling."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import csv
@@ -31,7 +35,13 @@ class PerfStatResult:
 
 
 def perf_available() -> bool:
-    """Return whether the Linux perf executable is available."""
+    """Return whether the Linux perf executable is available.
+
+    Returns
+    -------
+    bool
+        The result of the operation.
+    """
     return shutil.which("perf") is not None
 
 
@@ -51,7 +61,22 @@ def perf_stat(
     ),
     cwd: str | None = None,
 ) -> PerfStatResult:
-    """Run a command under perf stat and parse machine-readable counters."""
+    """Run a command under perf stat and parse machine-readable counters.
+
+    Parameters
+    ----------
+    args : Sequence[str]
+        args parameter.
+    events : Sequence[str]
+        events parameter.
+    cwd : str | None
+        cwd parameter.
+
+    Returns
+    -------
+    PerfStatResult
+        The result of the operation.
+    """
     if not args:
         raise ValueError("args must not be empty")
     if any(not isinstance(event, str) or not event for event in events):
@@ -102,7 +127,26 @@ def perf_record(
     call_graph: str = "dwarf",
     cwd: str | None = None,
 ) -> int:
-    """Record perf samples suitable for later perf-script/flamegraph use."""
+    """Record perf samples suitable for later perf-script/flamegraph use.
+
+    Parameters
+    ----------
+    args : Sequence[str]
+        args parameter.
+    output : str | Path
+        output parameter.
+    frequency : int
+        frequency parameter.
+    call_graph : str
+        call_graph parameter.
+    cwd : str | None
+        cwd parameter.
+
+    Returns
+    -------
+    int
+        The result of the operation.
+    """
     if not args:
         raise ValueError("args must not be empty")
     if isinstance(frequency, bool) or not isinstance(frequency, int) or frequency < 1:
@@ -136,7 +180,17 @@ def perf_script(
     *,
     cwd: str | None = None,
 ) -> None:
-    """Export perf.data into perf-script text for external flamegraph tooling."""
+    """Export perf.data into perf-script text for external flamegraph tooling.
+
+    Parameters
+    ----------
+    data : str | Path
+        data parameter.
+    output : str | Path
+        output parameter.
+    cwd : str | None
+        cwd parameter.
+    """
     if not perf_available():
         raise RuntimeError("Linux perf is not installed or not on PATH")
     with Path(output).open("w", encoding="utf-8") as handle:

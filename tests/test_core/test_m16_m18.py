@@ -1,6 +1,14 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.binary import ByteReader, encode_uvarint
 from gunz_utils.buffers import as_readonly_view, dispatch

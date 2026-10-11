@@ -1,10 +1,17 @@
 """Self-overhead probes for benchmark/profiling infrastructure."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .runner import benchmark
 
 
@@ -15,8 +22,22 @@ class OverheadProbe:
     ratio: float
 
 
-def measure_runner_overhead(*, iterations: int = 20) -> OverheadProbe:
-    """Estimate framework overhead using a no-op benchmark."""
+def measure_runner_overhead(
+    *,
+    iterations: int = 20,
+) -> OverheadProbe:
+    """Estimate framework overhead using a no-op benchmark.
+
+    Parameters
+    ----------
+    iterations : int
+        iterations parameter.
+
+    Returns
+    -------
+    OverheadProbe
+        The result of the operation.
+    """
     if (
         isinstance(iterations, bool)
         or not isinstance(iterations, int)

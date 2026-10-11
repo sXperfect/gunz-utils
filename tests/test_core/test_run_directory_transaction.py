@@ -1,11 +1,23 @@
 """Transactional publication regressions for benchmark run directories."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.benchmark.run_directory as run_directory_module
 from gunz_utils.benchmark import (
@@ -32,7 +44,10 @@ def test_later_copy_failure_rolls_back_new_run_directory(
     real_copy = run_directory_module._copy_regular_source
     calls = 0
 
-    def fail_second(source: Path, artifacts_dir: Path) -> tuple[Path, bool]:
+    def fail_second(
+        source: Path,
+        artifacts_dir: Path,
+    ) -> tuple[Path, bool]:
         nonlocal calls
         calls += 1
         if calls == 2:
@@ -105,7 +120,11 @@ def test_rollback_failure_does_not_replace_publication_error(
     )
     real_unlink = Path.unlink
 
-    def deny_artifact_unlink(path: Path, *args: object, **kwargs: object) -> None:
+    def deny_artifact_unlink(
+        path: Path,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
         if path.parent.name == "artifacts" and path.name == "artifact.bin":
             raise PermissionError("injected cleanup failure")
         real_unlink(path, *args, **kwargs)
@@ -135,7 +154,11 @@ def test_partial_copy_cleanup_failure_preserves_copy_error(
     )
     real_unlink = Path.unlink
 
-    def deny_partial_unlink(path: Path, *args: object, **kwargs: object) -> None:
+    def deny_partial_unlink(
+        path: Path,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
         if path.parent == artifacts_dir:
             raise PermissionError("injected partial cleanup failure")
         real_unlink(path, *args, **kwargs)

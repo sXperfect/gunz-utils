@@ -1,5 +1,9 @@
 """Lease task-submission ownership regression."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -9,7 +13,15 @@ from collections.abc import Coroutine
 from types import CoroutineType
 from typing import Any
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.leases import run_with_lease_heartbeat
 
@@ -22,7 +34,9 @@ def test_rejected_heartbeat_coroutine_is_closed_by_production(
         failure = RuntimeError("heartbeat rejected")
         rejected: list[Coroutine[Any, Any, None]] = []
 
-        def reject(coroutine: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+        def reject(
+            coroutine: Coroutine[Any, Any, None],
+        ) -> asyncio.Task[None]:
             rejected.append(coroutine)
             raise failure
 

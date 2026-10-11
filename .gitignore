@@ -13,6 +13,7 @@ build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.gunz_style_cache.json
 
 # Local editor / deploy caches
 .gemini/
@@ -27,3 +28,4 @@ docs/_build/
 
 # Transient data
 tmp/
+data/

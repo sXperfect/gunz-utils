@@ -1,5 +1,9 @@
 """Async lifecycle and cancellation helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -10,16 +14,40 @@ from typing import TypeVar
 T = TypeVar("T")
 
 
-async def cancel_and_wait(*tasks: asyncio.Task[object]) -> None:
-    """Cancel tasks and wait for their cleanup without leaking cancellation."""
+async def cancel_and_wait(
+    *tasks: asyncio.Task[object],
+) -> None:
+    """Cancel tasks and wait for their cleanup without leaking cancellation.
+
+    Parameters
+    ----------
+    tasks : asyncio.Task[object]
+        tasks parameter.
+    """
     for task in tasks:
         task.cancel()
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
-async def with_timeout(awaitable: Awaitable[T], timeout: float | None) -> T:
-    """Await work with an optional timeout using asyncio.timeout."""
+async def with_timeout(
+    awaitable: Awaitable[T],
+    timeout: float | None,
+) -> T:
+    """Await work with an optional timeout using asyncio.timeout.
+
+    Parameters
+    ----------
+    awaitable : Awaitable[T]
+        awaitable parameter.
+    timeout : float | None
+        timeout parameter.
+
+    Returns
+    -------
+    T
+        The result of the operation.
+    """
     if timeout is None:
         return await awaitable
     if (

@@ -12,6 +12,10 @@ If you want the stdlib fallback (no pydantic runtime cost):
 
 Same shape for project / observability / secure modules.
 """
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 __all__: list[str] = []

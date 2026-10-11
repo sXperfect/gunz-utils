@@ -1,5 +1,9 @@
 """Generic circuit-breaker and bulkhead resilience primitives."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -25,8 +29,7 @@ class CircuitOpenError(RuntimeError):
 class AsyncCircuitBreaker:
     """Protect async dependencies from repeated failing calls."""
 
-    def __init__(
-        self,
+    def __init__(self,
         *,
         failure_threshold: int = 5,
         recovery_timeout: float = 30.0,
@@ -56,15 +59,34 @@ class AsyncCircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
-        """Return the current breaker state."""
+        """Return the current breaker state.
+
+        Returns
+        -------
+        CircuitState
+            The result of the operation.
+        """
         if self._opened_at is None:
             return CircuitState.CLOSED
         if time.monotonic() - self._opened_at >= self.recovery_timeout:
             return CircuitState.HALF_OPEN
         return CircuitState.OPEN
 
-    async def call(self, operation: Callable[[], Awaitable[T]]) -> T:
-        """Execute work when allowed and update breaker state from its result."""
+    async def call(self,
+        operation: Callable[[], Awaitable[T]],
+    ) -> T:
+        """Execute work when allowed and update breaker state from its result.
+
+        Parameters
+        ----------
+        operation : Callable[[], Awaitable[T]]
+            operation parameter.
+
+        Returns
+        -------
+        T
+            The result of the operation.
+        """
         async with self._lock:
             state = self.state
             if state is CircuitState.OPEN:
@@ -131,7 +153,9 @@ class AsyncCircuitBreaker:
 class AsyncBulkhead:
     """Limit concurrent work for one dependency or resource class."""
 
-    def __init__(self, limit: int) -> None:
+    def __init__(self,
+        limit: int,
+    ) -> None:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
             raise ValueError("limit must be a positive integer")
         self.limit = limit
@@ -140,16 +164,34 @@ class AsyncBulkhead:
 
     @property
     def available(self) -> int:
-        """Return the currently available permit estimate."""
+        """Return the currently available permit estimate.
+
+        Returns
+        -------
+        int
+            The result of the operation.
+        """
         return self.limit - self._active
 
-    async def run(
-        self,
+    async def run(self,
         operation: Callable[[], Awaitable[T]],
         *,
         timeout: float | None = None,
     ) -> T:
-        """Execute one operation after bounded permit acquisition."""
+        """Execute one operation after bounded permit acquisition.
+
+        Parameters
+        ----------
+        operation : Callable[[], Awaitable[T]]
+            operation parameter.
+        timeout : float | None
+            timeout parameter.
+
+        Returns
+        -------
+        T
+            The result of the operation.
+        """
         if timeout is not None and (
             isinstance(timeout, bool)
             or not isinstance(timeout, (int, float))

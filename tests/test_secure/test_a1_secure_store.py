@@ -1,17 +1,31 @@
 """A1 transaction, concurrency, and recovery proofs for SecureStore."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.ext.secure_store import SecureStore
 
 
-def _store(path: Path) -> SecureStore:
+def _store(
+    path: Path,
+) -> SecureStore:
     store = SecureStore(base_dir=path)
     store.unlock()
     return store
@@ -111,7 +125,9 @@ def test_set_many_is_all_or_nothing_and_records_batch_denial(
         store.close()
 
 
-def test_set_many_validates_entire_batch_before_mutation(tmp_path: Path) -> None:
+def test_set_many_validates_entire_batch_before_mutation(
+    tmp_path: Path,
+) -> None:
     store = _store(tmp_path / "store")
     try:
         with pytest.raises(TypeError, match="str or bytes"):
@@ -132,7 +148,9 @@ def test_concurrent_threads_are_serialized_without_lost_updates(
 ) -> None:
     store = _store(tmp_path / "store")
     try:
-        def write(index: int) -> None:
+        def write(
+            index: int,
+        ) -> None:
             store.set(f"key-{index}", f"value-{index}")
 
         with ThreadPoolExecutor(max_workers=8) as executor:
@@ -159,7 +177,10 @@ def test_rotation_recovers_from_key_publication_failure(
     store = _store(base)
     store.set("key", "value")
 
-    def fail_publication(*, passphrase_mode: bool) -> None:
+    def fail_publication(
+        *,
+        passphrase_mode: bool,
+    ) -> None:
         assert not passphrase_mode
         raise OSError("publication failed")
 

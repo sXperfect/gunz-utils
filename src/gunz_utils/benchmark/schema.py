@@ -1,5 +1,9 @@
 """PerformanceRun schema validation and migration."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from typing import Any
@@ -11,8 +15,16 @@ class PerformanceSchemaError(ValueError):
     """Raised when serialized performance data violates the schema contract."""
 
 
-def validate_performance_run(data: dict[str, Any]) -> None:
-    """Validate required PerformanceRun fields and supported schema version."""
+def validate_performance_run(
+    data: dict[str, Any],
+) -> None:
+    """Validate required PerformanceRun fields and supported schema version.
+
+    Parameters
+    ----------
+    data : dict[str, Any]
+        data parameter.
+    """
     version = data.get("schema_version")
     if (
         isinstance(version, bool)
@@ -34,8 +46,21 @@ def validate_performance_run(data: dict[str, Any]) -> None:
         raise PerformanceSchemaError("PerformanceRun.artifacts must be an array")
 
 
-def migrate_performance_run(data: dict[str, Any]) -> dict[str, Any]:
-    """Migrate supported historical PerformanceRun mappings to current schema."""
+def migrate_performance_run(
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    """Migrate supported historical PerformanceRun mappings to current schema.
+
+    Parameters
+    ----------
+    data : dict[str, Any]
+        data parameter.
+
+    Returns
+    -------
+    dict[str, Any]
+        The result of the operation.
+    """
     version = data.get("schema_version", 1)
     migrated = dict(data)
     if (

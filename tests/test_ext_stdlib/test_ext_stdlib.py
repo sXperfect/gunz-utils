@@ -3,12 +3,20 @@
 These exercise the same public surface as the pydantic/gitpython
 backends but without those runtime dependencies.
 """
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import os
 import pathlib
 import subprocess
 import sys
 import tempfile
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.ext.project_stdlib import (
     resolve_project_root as stdlib_resolve_project_root,
@@ -19,7 +27,9 @@ from gunz_utils.ext.validation_stdlib import type_checked as stdlib_type_checked
 class TestStdlibTypeChecked(unittest.TestCase):
     def test_basic_validation(self):
         @stdlib_type_checked
-        def f(x: int):
+        def f(
+            x: int,
+        ):
             return x * 2
 
         self.assertEqual(f(3), 6)
@@ -28,7 +38,9 @@ class TestStdlibTypeChecked(unittest.TestCase):
 
     def test_error_message_format(self):
         @stdlib_type_checked
-        def my_func(a: int):
+        def my_func(
+            a: int,
+        ):
             return a
 
         with self.assertRaises(TypeError) as cm:
@@ -42,7 +54,10 @@ class TestStdlibTypeChecked(unittest.TestCase):
         sensitive_password = "P@ssw0rd!12345"
 
         @stdlib_type_checked
-        def login(username: str, age: int):
+        def login(
+            username: str,
+            age: int,
+        ):
             pass
 
         with self.assertRaises(TypeError) as cm:
@@ -54,7 +69,9 @@ class TestStdlibTypeChecked(unittest.TestCase):
 
     def test_binding_error_does_not_echo_unexpected_keyword(self):
         @stdlib_type_checked
-        def f(value: int):
+        def f(
+            value: int,
+        ):
             return value
 
         secret_name = "token_super_secret"
@@ -65,7 +82,9 @@ class TestStdlibTypeChecked(unittest.TestCase):
 
     def test_varargs(self):
         @stdlib_type_checked
-        def f(*args: int):
+        def f(
+            *args: int,
+        ):
             return sum(args)
 
         self.assertEqual(f(1, 2, 3), 6)
@@ -74,7 +93,9 @@ class TestStdlibTypeChecked(unittest.TestCase):
 
     def test_kwargs(self):
         @stdlib_type_checked
-        def f(**kw: str):
+        def f(
+            **kw: str,
+        ):
             return ",".join(f"{k}={v}" for k, v in sorted(kw.items()))
 
         self.assertEqual(f(a="1", b="2"), "a=1,b=2")
@@ -97,7 +118,9 @@ class TestStdlibResolveProjectRoot(unittest.TestCase):
         project_stdlib._PROJECT_ROOT = None
         project_stdlib._PROJECT_ANCHOR = None
 
-    def _make_repo(self, with_pyproject: bool = False) -> pathlib.Path:
+    def _make_repo(self,
+        with_pyproject: bool = False,
+    ) -> pathlib.Path:
         repo = pathlib.Path(self._tmpdir) / "myproj"
         repo.mkdir()
         subprocess.run(["git", "init", "-q", str(repo)], check=True)

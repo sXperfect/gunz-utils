@@ -57,6 +57,10 @@ with no error wrapping. Upstream-specific error translation (e.g.
 the subclass.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 # =============================================================================
@@ -70,10 +74,13 @@ import asyncio
 import math
 from typing import Any, Protocol, runtime_checkable
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from ._version import __version__ as __version__
 
 # ---------------------------------------------------------------------------
-# Exception hierarchy
+#? Exception hierarchy
 # ---------------------------------------------------------------------------
 
 
@@ -90,8 +97,7 @@ class UpstreamError(Exception):
         The MCP tool name that triggered the failure, if applicable.
     """
 
-    def __init__(
-        self,
+    def __init__(self,
         message: str,
         *,
         upstream: str,
@@ -105,6 +111,13 @@ class UpstreamError(Exception):
     def to_dict(self) -> dict[str, Any]:
         #? A stable, JSON-safe envelope lets brokers expose failures without
         #? leaking exception internals or requiring upstream-specific serializers.
+        """to_dict() function.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of the operation.
+        """
         return {
             "error": self.message,
             "upstream": self.upstream,
@@ -130,7 +143,7 @@ class UpstreamUnavailableError(UpstreamError):
 
 
 # ---------------------------------------------------------------------------
-# Protocol — the contract any upstream wrapper must satisfy
+#? Protocol — the contract any upstream wrapper must satisfy
 # ---------------------------------------------------------------------------
 
 
@@ -158,9 +171,12 @@ class UpstreamClient(Protocol):
             Called by the Broker at shutdown.
     """
 
-    name: str  # e.g., "jules", "wikijs", "docs", ...
+    name: str  #? e.g., "jules", "wikijs", "docs", ...
 
-    async def call(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    async def call(self,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
         """Invoke ``tool_name`` on this upstream with ``arguments``.
 
         Args:
@@ -179,16 +195,25 @@ class UpstreamClient(Protocol):
         ...
 
     async def health_check(self) -> bool:
-        """Return True if the upstream is reachable and credentials are valid."""
+        """Return True if the upstream is reachable and credentials are valid.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         ...
 
     async def close(self) -> None:
-        """Release any held resources (HTTP clients, connection pools, etc.)."""
+        """Release any held resources (HTTP clients, connection pools, etc.).
+
+        No parameters and no return value.
+        """
         ...
 
 
 # ---------------------------------------------------------------------------
-# Optional convenience base class (NOT required by the Protocol)
+#? Optional convenience base class (NOT required by the Protocol)
 # ---------------------------------------------------------------------------
 
 
@@ -210,15 +235,30 @@ class BaseUpstream(abc.ABC):
     name: str = "unnamed"
 
     @abc.abstractmethod
-    async def _invoke(
-        self,
+    async def _invoke(self,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> dict[str, Any]:
-        """Tool-name-keyed dispatch to the underlying client. Implement me."""
+        """Tool-name-keyed dispatch to the underlying client. Implement me.
+
+        Parameters
+        ----------
+        tool_name : str
+            tool_name parameter.
+        arguments : dict[str, Any]
+            arguments parameter.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of the operation.
+        """
         raise NotImplementedError
 
-    async def call(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    async def call(self,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
         """Default call() that delegates to ``_invoke``.
 
         Subclasses can override for custom behaviour (e.g. adding
@@ -227,19 +267,27 @@ class BaseUpstream(abc.ABC):
         return await self._invoke(tool_name, arguments)
 
     async def health_check(self) -> bool:
-        """Default health check returns True. Override for real probes."""
+        """Default health check returns True. Override for real probes.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         return True
 
     async def close(self) -> None:
-        """Default close is a no-op. Override for real cleanup."""
+        """Default close is a no-op. Override for real cleanup.
+
+        No parameters and no return value.
+        """
         return None
 
 
 class PolicyUpstream:
     """Opt-in timeout, concurrency, and idempotent retry policy wrapper."""
 
-    def __init__(
-        self,
+    def __init__(self,
         client: UpstreamClient,
         *,
         timeout_seconds: float = 30.0,
@@ -283,13 +331,33 @@ class PolicyUpstream:
 
     @property
     def stats(self) -> dict[str, int]:
-        """Return a snapshot of policy counters."""
+        """Return a snapshot of policy counters.
+
+        Returns
+        -------
+        dict[str, int]
+            The result of the operation.
+        """
         return dict(self._stats)
 
-    async def call(
-        self, tool_name: str, arguments: dict[str, Any]
+    async def call(self,
+        tool_name: str,
+        arguments: dict[str, Any],
     ) -> dict[str, Any]:
-        """Call an upstream with bounded concurrency and explicit retry safety."""
+        """Call an upstream with bounded concurrency and explicit retry safety.
+
+        Parameters
+        ----------
+        tool_name : str
+            tool_name parameter.
+        arguments : dict[str, Any]
+            arguments parameter.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of the operation.
+        """
         attempts = self._max_attempts if tool_name in self._idempotent_tools else 1
         self._stats["calls"] += 1
         async with self._semaphore:
@@ -312,11 +380,20 @@ class PolicyUpstream:
         raise RuntimeError("unreachable retry state")
 
     async def health_check(self) -> bool:
-        """Delegate the liveness probe."""
+        """Delegate the liveness probe.
+
+        Returns
+        -------
+        bool
+            The result of the operation.
+        """
         return await self._client.health_check()
 
     async def close(self) -> None:
-        """Delegate resource cleanup."""
+        """Delegate resource cleanup.
+
+        No parameters and no return value.
+        """
         await self._client.close()
 
 

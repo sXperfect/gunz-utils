@@ -1,9 +1,17 @@
 """Tests for safe primitive parsing utilities."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import parse_bool, safe_bool, safe_float, safe_int
 

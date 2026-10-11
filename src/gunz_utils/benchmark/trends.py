@@ -1,11 +1,18 @@
 """History analysis beyond pairwise benchmark comparison."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 import statistics
 from dataclasses import dataclass
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .history import BenchmarkHistory
 
 
@@ -24,7 +31,22 @@ def summarize_history(
     metric: str = "median",
     baseline_window: int = 5,
 ) -> HistorySummary:
-    """Summarize trend slope and latest change from a moving baseline."""
+    """Summarize trend slope and latest change from a moving baseline.
+
+    Parameters
+    ----------
+    history : BenchmarkHistory
+        history parameter.
+    metric : str
+        metric parameter.
+    baseline_window : int
+        baseline_window parameter.
+
+    Returns
+    -------
+    HistorySummary
+        The result of the operation.
+    """
     if (
         isinstance(baseline_window, bool)
         or not isinstance(baseline_window, int)

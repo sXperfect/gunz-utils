@@ -1,5 +1,9 @@
 """Dependency-free URI construction and TCP reachability helpers."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import ipaddress
@@ -101,8 +105,8 @@ def build_network_uri(
             normalized_host = normalized_host.encode("idna").decode("ascii")
         except UnicodeError as exc:
             raise ValueError("host is not a valid DNS name") from exc
-        # IDNA can map Unicode characters into authority delimiters. Validate
-        # the actual encoded host before combining distinct URI components.
+        #? IDNA can map Unicode characters into authority delimiters. Validate
+        #? the actual encoded host before combining distinct URI components.
         if any(character in normalized_host for character in "@/?#%:[]"):
             raise ValueError("host contains invalid authority delimiters")
         if "\\" in normalized_host or any(
@@ -155,8 +159,21 @@ def build_network_uri(
     )
 
 
-def _is_non_public_address(address: str) -> bool:
-    """Return whether an IP address is unsafe for an external-only probe."""
+def _is_non_public_address(
+    address: str,
+) -> bool:
+    """Return whether an IP address is unsafe for an external-only probe.
+
+    Parameters
+    ----------
+    address : str
+        address parameter.
+
+    Returns
+    -------
+    bool
+        The result of the operation.
+    """
     normalized = address.split("%", 1)[0]
     ip = ipaddress.ip_address(normalized)
     return (

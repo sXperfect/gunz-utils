@@ -1,5 +1,9 @@
 """Tests for the optional Loguru observability backend."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import os
@@ -7,6 +11,10 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import setup_logging
 

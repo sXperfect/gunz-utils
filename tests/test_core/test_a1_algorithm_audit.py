@@ -1,5 +1,9 @@
 """Proof tests for algorithm families that entered this sweep at A1."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -11,7 +15,15 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.concurrency as concurrency_module
 import gunz_utils.content_store as content_store_module
@@ -66,12 +78,16 @@ def test_lease_setup_failure_cleans_created_operation(
         created: list[asyncio.Future[None]] = []
         original_ensure = leases_module.asyncio.ensure_future
 
-        def record_operation(awaitable: Any) -> asyncio.Future[None]:
+        def record_operation(
+            awaitable: Any,
+        ) -> asyncio.Future[None]:
             future = original_ensure(awaitable)
             created.append(future)
             return future
 
-        def fail_heartbeat(coroutine: Any) -> None:
+        def fail_heartbeat(
+            coroutine: Any,
+        ) -> None:
             raise RuntimeError("heartbeat setup failed")
 
         monkeypatch.setattr(
@@ -112,7 +128,9 @@ def test_gather_initial_iteration_failure_cleans_created_tasks(
         created: list[asyncio.Task[int]] = []
         original_create = concurrency_module.asyncio.create_task
 
-        def record_create(coroutine: Any) -> asyncio.Task[int]:
+        def record_create(
+            coroutine: Any,
+        ) -> asyncio.Task[int]:
             task = original_create(coroutine)
             created.append(task)
             return task
@@ -151,7 +169,9 @@ def test_map_unordered_initial_iteration_failure_cleans_tasks(
         created: list[asyncio.Task[int]] = []
         original_create = concurrency_module.asyncio.create_task
 
-        def record_create(coroutine: Any) -> asyncio.Task[int]:
+        def record_create(
+            coroutine: Any,
+        ) -> asyncio.Task[int]:
             task = original_create(coroutine)
             created.append(task)
             return task
@@ -166,7 +186,9 @@ def test_map_unordered_initial_iteration_failure_cleans_tasks(
             yield 1
             raise RuntimeError("items failed")
 
-        async def blocked(value: int) -> int:
+        async def blocked(
+            value: int,
+        ) -> int:
             await asyncio.Event().wait()
             return value
 
@@ -203,7 +225,9 @@ class _FailAfterPrefix(io.BytesIO):
         super().__init__()
         self._calls = 0
 
-    def write(self, data: Any) -> int:
+    def write(self,
+        data: Any,
+    ) -> int:
         self._calls += 1
         if self._calls == 1:
             return super().write(bytes(data[:2]))
@@ -211,7 +235,9 @@ class _FailAfterPrefix(io.BytesIO):
 
 
 @pytest.mark.parametrize("writer_type", [BoundedWriter, DigestWriter])
-def test_stream_writer_state_tracks_only_committed_prefix(writer_type: type) -> None:
+def test_stream_writer_state_tracks_only_committed_prefix(
+    writer_type: type,
+) -> None:
     output = _FailAfterPrefix()
     if writer_type is BoundedWriter:
         writer = writer_type(output, max_bytes=10)
@@ -279,15 +305,21 @@ def test_version_migration_stops_at_first_failure() -> None:
     calls: list[int] = []
     migrator = SchemaMigrator()
 
-    def first(payload: dict[str, int]) -> dict[str, int]:
+    def first(
+        payload: dict[str, int],
+    ) -> dict[str, int]:
         calls.append(1)
         return {**payload, "one": 1}
 
-    def fail(payload: dict[str, int]) -> dict[str, int]:
+    def fail(
+        payload: dict[str, int],
+    ) -> dict[str, int]:
         calls.append(2)
         raise RuntimeError("migration failed")
 
-    def never(payload: dict[str, int]) -> dict[str, int]:
+    def never(
+        payload: dict[str, int],
+    ) -> dict[str, int]:
         calls.append(3)
         return payload
 
@@ -305,7 +337,11 @@ def test_version_migration_stops_at_first_failure() -> None:
 
 
 class _EntryPoint:
-    def __init__(self, name: str, value: str, loaded: object) -> None:
+    def __init__(self,
+        name: str,
+        value: str,
+        loaded: object,
+    ) -> None:
         self.name = name
         self.value = value
         self._loaded = loaded
@@ -365,7 +401,9 @@ def test_content_store_rejects_symlinked_fanout_ancestor(
     assert list(outside.iterdir()) == []
 
 
-def test_content_store_rejects_symlink_root(tmp_path: Path) -> None:
+def test_content_store_rejects_symlink_root(
+    tmp_path: Path,
+) -> None:
     real = tmp_path / "real"
     real.mkdir()
     alias = tmp_path / "alias"
@@ -411,10 +449,18 @@ def test_content_store_fallback_publication_is_verified(
     original_replace = content_store_module.os.replace
     replaced: list[tuple[object, object]] = []
 
-    def no_hardlinks(_source: object, _target: object, **kwargs: Any) -> None:
+    def no_hardlinks(
+        _source: object,
+        _target: object,
+        **kwargs: Any,
+    ) -> None:
         raise OSError("hard links unavailable")
 
-    def record_replace(source: object, target: object, **kwargs: Any) -> None:
+    def record_replace(
+        source: object,
+        target: object,
+        **kwargs: Any,
+    ) -> None:
         replaced.append((source, target))
         original_replace(source, target, **kwargs)
 
@@ -434,7 +480,10 @@ def test_atomic_write_replace_failure_preserves_old_target_and_cleans_temp(
     target = tmp_path / "value.txt"
     target.write_text("old", encoding="utf-8")
 
-    def fail_replace(_source: object, _target: object) -> None:
+    def fail_replace(
+        _source: object,
+        _target: object,
+    ) -> None:
         raise OSError("replace failed")
 
     monkeypatch.setattr(io_module.os, "replace", fail_replace)
@@ -488,7 +537,9 @@ def test_worker_pipeline_respects_worker_bound() -> None:
         active = 0
         peak = 0
 
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             nonlocal active, peak
             active += 1
             peak = max(peak, active)
@@ -519,7 +570,9 @@ def test_worker_pipeline_failure_cancels_inflight_sibling() -> None:
         started = asyncio.Event()
         cancelled = asyncio.Event()
 
-        async def work(value: int) -> int:
+        async def work(
+            value: int,
+        ) -> int:
             if value == 0:
                 started.set()
                 try:
@@ -549,7 +602,9 @@ def test_resource_groups_release_in_reverse_order_on_failure() -> None:
     events: list[str] = []
 
     @contextmanager
-    def resource(name: str):
+    def resource(
+        name: str,
+    ):
         events.append(f"enter:{name}")
         try:
             yield name
@@ -570,7 +625,9 @@ def test_async_resource_groups_release_in_reverse_order() -> None:
         events: list[str] = []
 
         @asynccontextmanager
-        async def resource(name: str):
+        async def resource(
+            name: str,
+        ):
             events.append(f"enter:{name}")
             try:
                 yield name
@@ -604,8 +661,7 @@ class _FailingLoop:
         self.added: list[int] = []
         self.removed: list[int] = []
 
-    def add_signal_handler(
-        self,
+    def add_signal_handler(self,
         signum: int,
         _callback: Any,
         *_args: Any,
@@ -614,7 +670,9 @@ class _FailingLoop:
         if len(self.added) == 2:
             raise RuntimeError("registration failed")
 
-    def remove_signal_handler(self, signum: int) -> bool:
+    def remove_signal_handler(self,
+        signum: int,
+    ) -> bool:
         self.removed.append(signum)
         return True
 

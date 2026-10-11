@@ -1,5 +1,9 @@
 """Dependency-ordered workflow DAG execution with fingerprint caching."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -11,14 +15,16 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .hashing import structured_hash
 
 
 class WorkflowExecutionError(RuntimeError):
     """Raised when a workflow stage execution fails."""
 
-    def __init__(
-        self,
+    def __init__(self,
         message: str,
         *,
         stage_name: str,
@@ -96,7 +102,21 @@ class WorkflowStage:
         )
 
 
-def _validate_rollback_timeout(timeout: Any) -> float | None:
+def _validate_rollback_timeout(
+    timeout: Any,
+) -> float | None:
+    """_validate_rollback_timeout() function.
+
+    Parameters
+    ----------
+    timeout : Any
+        timeout parameter.
+
+    Returns
+    -------
+    float | None
+        The result of the operation.
+    """
     if timeout is None:
         return None
     if (
@@ -114,8 +134,7 @@ def _validate_rollback_timeout(timeout: Any) -> float | None:
 class WorkflowDAG:
     """Execute named stages in topological order with safe cache propagation."""
 
-    def __init__(
-        self,
+    def __init__(self,
         stages: list[WorkflowStage] | tuple[WorkflowStage, ...],
         *,
         rollback_timeout: float | None = None,
@@ -133,12 +152,27 @@ class WorkflowDAG:
         self._order = self._topological_order()
 
     def _topological_order(self) -> tuple[str, ...]:
-        """Validate dependencies/cycles and return deterministic execution order."""
+        """Validate dependencies/cycles and return deterministic execution order.
+
+        Returns
+        -------
+        tuple[str, ...]
+            The result of the operation.
+        """
         result: list[str] = []
         temporary: set[str] = set()
         permanent: set[str] = set()
 
-        def visit(name: str) -> None:
+        def visit(
+            name: str,
+        ) -> None:
+            """visit() function.
+
+            Parameters
+            ----------
+            name : str
+                name parameter.
+            """
             if name in permanent:
                 return
             if name in temporary:
@@ -161,11 +195,16 @@ class WorkflowDAG:
         return tuple(result)
 
     def order(self) -> tuple[str, ...]:
-        """Return validated topological execution order."""
+        """Return validated topological execution order.
+
+        Returns
+        -------
+        tuple[str, ...]
+            The result of the operation.
+        """
         return self._order
 
-    def effective_fingerprint(
-        self,
+    def effective_fingerprint(self,
         name: str,
     ) -> str | None:
         """Return cache fingerprint including all transitive dependencies.
@@ -178,7 +217,21 @@ class WorkflowDAG:
 
         memo: dict[str, str | None] = {}
 
-        def resolve(stage_name: str) -> str | None:
+        def resolve(
+            stage_name: str,
+        ) -> str | None:
+            """resolve() function.
+
+            Parameters
+            ----------
+            stage_name : str
+                stage_name parameter.
+
+            Returns
+            -------
+            str | None
+                The result of the operation.
+            """
             if stage_name in memo:
                 return memo[stage_name]
 
@@ -208,12 +261,24 @@ class WorkflowDAG:
 
         return resolve(name)
 
-    def _rollback_sync(
-        self,
+    def _rollback_sync(self,
         completed_order: list[str],
         outputs: Mapping[str, Any],
     ) -> list[tuple[str, BaseException]]:
-        """Roll back completed stages in reverse execution order synchronously."""
+        """Roll back completed stages in reverse execution order synchronously.
+
+        Parameters
+        ----------
+        completed_order : list[str]
+            completed_order parameter.
+        outputs : Mapping[str, Any]
+            outputs parameter.
+
+        Returns
+        -------
+        list[tuple[str, BaseException]]
+            The result of the operation.
+        """
         errors: list[tuple[str, BaseException]] = []
         for name in reversed(completed_order):
             stage = self.stages[name]
@@ -236,12 +301,24 @@ class WorkflowDAG:
                     errors.append((name, exc))
         return errors
 
-    async def _rollback_async(
-        self,
+    async def _rollback_async(self,
         completed_order: list[str],
         outputs: Mapping[str, Any],
     ) -> list[tuple[str, BaseException]]:
-        """Roll back completed stages in reverse execution order asynchronously."""
+        """Roll back completed stages in reverse execution order asynchronously.
+
+        Parameters
+        ----------
+        completed_order : list[str]
+            completed_order parameter.
+        outputs : Mapping[str, Any]
+            outputs parameter.
+
+        Returns
+        -------
+        list[tuple[str, BaseException]]
+            The result of the operation.
+        """
         errors: list[tuple[str, BaseException]] = []
         rev_order = list(reversed(completed_order))
         for idx, name in enumerate(rev_order):
@@ -286,8 +363,7 @@ class WorkflowDAG:
                     errors.append((name, exc))
         return errors
 
-    async def _safe_rollback_async(
-        self,
+    async def _safe_rollback_async(self,
         completed_order: list[str],
         outputs: Mapping[str, Any],
         *,
@@ -385,8 +461,7 @@ class WorkflowDAG:
         except BaseException as exc:
             return [("rollback_error", exc)]
 
-    def execute(
-        self,
+    def execute(self,
         *,
         cache: MutableMapping[tuple[str, str], Any] | None = None,
     ) -> dict[str, Any]:
@@ -468,8 +543,7 @@ class WorkflowDAG:
 
         return outputs
 
-    async def async_execute(
-        self,
+    async def async_execute(self,
         *,
         cache: MutableMapping[tuple[str, str], Any] | None = None,
         concurrency_limit: int | None = None,
@@ -510,7 +584,16 @@ class WorkflowDAG:
         failure_box: list[tuple[str, BaseException]] = []
         tasks: list[asyncio.Task[None]] = []
 
-        async def run_stage(name: str) -> None:
+        async def run_stage(
+            name: str,
+        ) -> None:
+            """run_stage() function.
+
+            Parameters
+            ----------
+            name : str
+                name parameter.
+            """
             stage = self.stages[name]
             try:
                 await start_barrier.wait()
@@ -613,6 +696,13 @@ class WorkflowDAG:
                     t.cancel()
 
             async def _drain() -> list[Any]:
+                """_drain() function.
+
+                Returns
+                -------
+                list[Any]
+                    The result of the operation.
+                """
                 return await asyncio.gather(*tasks, return_exceptions=True)
 
             drain_task = asyncio.create_task(_drain())

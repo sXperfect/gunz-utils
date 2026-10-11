@@ -1,5 +1,9 @@
 """Procfs identity, measurement, and owned-process cleanup regressions."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -11,12 +15,24 @@ import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 import gunz_utils.benchmark.process as process_module
 
 
-def _stat(pid: int, ppid: int = 1, command: bytes = b"worker") -> bytes:
+def _stat(
+    pid: int,
+    ppid: int = 1,
+    command: bytes = b"worker",
+) -> bytes:
     """A fixed Linux stat record with known CPU, thread, and RSS fields."""
     return (
         str(pid).encode()
@@ -29,7 +45,10 @@ def _stat(pid: int, ppid: int = 1, command: bytes = b"worker") -> bytes:
 
 
 @pytest.fixture
-def procfs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def procfs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Path:
     """Provide a deterministic procfs tree without depending on host PIDs."""
     proc = tmp_path / "proc"
     (proc / "self").mkdir(parents=True)
@@ -38,7 +57,9 @@ def procfs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return proc
 
 
-def test_procfs_namespace_mismatch_prevents_launch(procfs: Path) -> None:
+def test_procfs_namespace_mismatch_prevents_launch(
+    procfs: Path,
+) -> None:
     (procfs / "self" / "stat").write_bytes(_stat(os.getpid() + 1000))
     with patch.object(process_module.subprocess, "Popen") as launch:
         with pytest.raises(NotImplementedError, match="same PID namespace"):
@@ -58,7 +79,7 @@ def test_unavailable_procfs_prevents_launch(
         stat.write_bytes(b"not a stat record")
     else:
         stat.unlink()
-        # A directory fails to read without relying on root-sensitive chmod.
+        #? A directory fails to read without relying on root-sensitive chmod.
         stat.mkdir()
     with patch.object(process_module.subprocess, "Popen") as launch:
         with pytest.raises(NotImplementedError, match="readable Linux"):
@@ -66,13 +87,17 @@ def test_unavailable_procfs_prevents_launch(
     launch.assert_not_called()
 
 
-def test_snapshot_also_rejects_foreign_pid_namespace(procfs: Path) -> None:
+def test_snapshot_also_rejects_foreign_pid_namespace(
+    procfs: Path,
+) -> None:
     (procfs / "self" / "stat").write_bytes(_stat(os.getpid() + 1000))
     with pytest.raises(NotImplementedError, match="same PID namespace"):
         process_module._linux_snapshot(123, 0.0)
 
 
-def test_non_utf8_command_is_kept_in_process_tree(procfs: Path) -> None:
+def test_non_utf8_command_is_kept_in_process_tree(
+    procfs: Path,
+) -> None:
     for pid, ppid, command in (
         (9001, 1, b"root"),
         (9002, 9001, b"worker (\xff)"),
@@ -141,7 +166,9 @@ def test_sampling_failure_preserves_original_and_reaps_group(
     process.wait.assert_called_once_with(timeout=1.0)
 
 
-def test_sampling_error_survives_cleanup_errors(procfs: Path) -> None:
+def test_sampling_error_survives_cleanup_errors(
+    procfs: Path,
+) -> None:
     failure = RuntimeError("sampling failed")
     process = Mock(pid=12345, returncode=None)
     process.poll.return_value = None
@@ -162,7 +189,9 @@ def test_sampling_error_survives_cleanup_errors(procfs: Path) -> None:
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process-group signaling required")
-def test_process_exit_during_cleanup_preserves_failure(procfs: Path) -> None:
+def test_process_exit_during_cleanup_preserves_failure(
+    procfs: Path,
+) -> None:
     failure = RuntimeError("sampling failed")
     process = Mock(pid=12345, returncode=None)
     process.poll.return_value = None
@@ -180,23 +209,31 @@ def test_process_exit_during_cleanup_preserves_failure(procfs: Path) -> None:
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process-group signaling required")
-def test_failed_observation_kills_live_descendant(procfs: Path) -> None:
+def test_failed_observation_kills_live_descendant(
+    procfs: Path,
+) -> None:
     """Pipe EOF proves the actual child died without relying on procfs access."""
     failure = RuntimeError("injected sampling failure")
     popen = subprocess.Popen
     launched: list[subprocess.Popen[bytes]] = []
     requested_sessions: list[bool] = []
 
-    def launch(args: list[str], **kwargs: object) -> subprocess.Popen[bytes]:
+    def launch(
+        args: list[str],
+        **kwargs: object,
+    ) -> subprocess.Popen[bytes]:
         requested_sessions.append(bool(kwargs.get("start_new_session")))
-        # Keep cleanup safe even when testing an older implementation that did
-        # not request its own session. The requested flag is asserted below.
+        #? Keep cleanup safe even when testing an older implementation that did
+        #? not request its own session. The requested flag is asserted below.
         kwargs["start_new_session"] = True
         process = popen(args, stdout=subprocess.PIPE, **kwargs)
         launched.append(process)
         return process
 
-    def fail_when_child_ready(*_args: object, **_kwargs: object) -> None:
+    def fail_when_child_ready(
+        *_args: object,
+        **_kwargs: object,
+    ) -> None:
         stdout = launched[0].stdout
         assert stdout is not None
         assert select.select([stdout], [], [], 3.0)[0], "child failed to become ready"

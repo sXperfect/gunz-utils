@@ -1,5 +1,9 @@
 """Configurable performance-regression policy."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -52,7 +56,22 @@ def evaluate_metric(
     candidate: float,
     policy: MetricPolicy,
 ) -> MetricDecision:
-    """Evaluate one candidate metric against its regression policy."""
+    """Evaluate one candidate metric against its regression policy.
+
+    Parameters
+    ----------
+    baseline : float
+        baseline parameter.
+    candidate : float
+        candidate parameter.
+    policy : MetricPolicy
+        policy parameter.
+
+    Returns
+    -------
+    MetricDecision
+        The result of the operation.
+    """
     for name, value in (
         ("baseline", baseline),
         ("candidate", candidate),

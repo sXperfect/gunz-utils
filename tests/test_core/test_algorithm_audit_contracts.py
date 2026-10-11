@@ -1,11 +1,23 @@
 """Method-level proof tests for high-risk algorithm families."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterable
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.binary import ByteReader, encode_uvarint
 from gunz_utils.dag import WorkflowDAG, WorkflowStage
@@ -74,7 +86,9 @@ def test_workflow_dag_matches_exhaustive_four_node_cycle_oracle() -> None:
             assert positions[source] < positions[target]
 
 
-def _reference_uvarint(value: int) -> bytes:
+def _reference_uvarint(
+    value: int,
+) -> bytes:
     output = bytearray()
     remaining = value
     while remaining >= 128:
@@ -113,7 +127,9 @@ def test_uvarint_exhaustive_small_domain_matches_reference() -> None:
         2**64 - 1,
     ],
 )
-def test_uvarint_uint64_boundaries(value: int) -> None:
+def test_uvarint_uint64_boundaries(
+    value: int,
+) -> None:
     encoded = encode_uvarint(value)
     assert encoded == _reference_uvarint(value)
     assert ByteReader(encoded).read_uvarint() == value
@@ -128,7 +144,9 @@ def test_uvarint_uint64_boundaries(value: int) -> None:
         b"\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80",
     ],
 )
-def test_uvarint_malformed_input_rolls_back_reader(payload: bytes) -> None:
+def test_uvarint_malformed_input_rolls_back_reader(
+    payload: bytes,
+) -> None:
     reader = ByteReader(payload)
     with pytest.raises((EOFError, ValueError)):
         reader.read_uvarint()

@@ -1,15 +1,29 @@
 """Optional plotting helpers for benchmark and profiling results."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .history import BenchmarkHistory
 from .process import ProcessProfile
 from .result import BenchmarkResult
 
 
 def _pyplot() -> Any:
+    """_pyplot() function.
+
+    Returns
+    -------
+    Any
+        The result of the operation.
+    """
     try:
         import matplotlib.pyplot as plt
     except ImportError as exc:
@@ -19,8 +33,21 @@ def _pyplot() -> Any:
     return plt
 
 
-def plot_benchmark(result: BenchmarkResult) -> Any:
-    """Plot raw benchmark iteration durations and return the figure."""
+def plot_benchmark(
+    result: BenchmarkResult,
+) -> Any:
+    """Plot raw benchmark iteration durations and return the figure.
+
+    Parameters
+    ----------
+    result : BenchmarkResult
+        result parameter.
+
+    Returns
+    -------
+    Any
+        The result of the operation.
+    """
     plt = _pyplot()
     figure, axis = plt.subplots()
     axis.plot(range(1, len(result.samples) + 1), result.samples)
@@ -30,7 +57,10 @@ def plot_benchmark(result: BenchmarkResult) -> Any:
     return figure
 
 
-def plot_history(history: BenchmarkHistory, metric: str = "median") -> Any:
+def plot_history(
+    history: BenchmarkHistory,
+    metric: str = "median",
+) -> Any:
     """Plot ordered benchmark results to compare commits or releases.
 
     Args:
@@ -60,7 +90,21 @@ def plot_history(history: BenchmarkHistory, metric: str = "median") -> Any:
     return figure
 
 
-def _cpu_cores(profile: ProcessProfile) -> tuple[list[float], list[float]]:
+def _cpu_cores(
+    profile: ProcessProfile,
+) -> tuple[list[float], list[float]]:
+    """_cpu_cores() function.
+
+    Parameters
+    ----------
+    profile : ProcessProfile
+        profile parameter.
+
+    Returns
+    -------
+    tuple[list[float], list[float]]
+        The result of the operation.
+    """
     times: list[float] = []
     values: list[float] = []
     previous = None
@@ -76,8 +120,24 @@ def _cpu_cores(profile: ProcessProfile) -> tuple[list[float], list[float]]:
     return times, values
 
 
-def plot_process_samples(profile: ProcessProfile, metric: str = "rss_bytes") -> Any:
-    """Plot a process-tree resource metric over elapsed time."""
+def plot_process_samples(
+    profile: ProcessProfile,
+    metric: str = "rss_bytes",
+) -> Any:
+    """Plot a process-tree resource metric over elapsed time.
+
+    Parameters
+    ----------
+    profile : ProcessProfile
+        profile parameter.
+    metric : str
+        metric parameter.
+
+    Returns
+    -------
+    Any
+        The result of the operation.
+    """
     allowed = {
         "rss_bytes",
         "pss_bytes",

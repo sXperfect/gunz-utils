@@ -1,12 +1,24 @@
 """Proof tests for algorithm families that entered the audit as A0."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
 import os
 from pathlib import Path
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.benchmark.io import GitInfo
 from gunz_utils.buffers import as_readonly_view, dispatch
@@ -35,7 +47,9 @@ def test_collection_transforms_preserve_order_and_duplicate_semantics() -> None:
 
 
 @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf, True])
-def test_formatters_reject_non_finite_or_boolean_real_values(value: object) -> None:
+def test_formatters_reject_non_finite_or_boolean_real_values(
+    value: object,
+) -> None:
     with pytest.raises(ValueError):
         format_bytes(value)  # type: ignore[arg-type]
     with pytest.raises(ValueError):
@@ -43,7 +57,9 @@ def test_formatters_reject_non_finite_or_boolean_real_values(value: object) -> N
 
 
 @pytest.mark.parametrize("precision", [-1, 21, True, 1.5])
-def test_formatters_reject_invalid_precision(precision: object) -> None:
+def test_formatters_reject_invalid_precision(
+    precision: object,
+) -> None:
     with pytest.raises(ValueError):
         format_bytes(1_000, precision=precision)  # type: ignore[arg-type]
     with pytest.raises(ValueError):
@@ -191,7 +207,9 @@ def test_network_uri_handles_ipv6_idna_and_userinfo() -> None:
 
 
 @pytest.mark.parametrize("timeout", [math.nan, math.inf, -math.inf, True, 0])
-def test_tcp_reachability_rejects_invalid_timeout(timeout: object) -> None:
+def test_tcp_reachability_rejects_invalid_timeout(
+    timeout: object,
+) -> None:
     with pytest.raises(ValueError):
         tcp_reachable("localhost", 80, timeout=timeout)  # type: ignore[arg-type]
 
@@ -210,7 +228,9 @@ def test_name_policy_deny_precedence_and_allowlist() -> None:
         policy.check("admin")
 
 
-def test_safe_path_join_rejects_parent_escape(tmp_path: Path) -> None:
+def test_safe_path_join_rejects_parent_escape(
+    tmp_path: Path,
+) -> None:
     base = tmp_path / "base"
     base.mkdir()
     with pytest.raises(ValueError, match="outside"):
@@ -221,7 +241,9 @@ def test_safe_path_join_rejects_parent_escape(tmp_path: Path) -> None:
     os.name != "posix" or not hasattr(os, "O_NOFOLLOW"),
     reason="O_NOFOLLOW contract is POSIX-specific",
 )
-def test_open_path_under_base_rejects_final_symlink(tmp_path: Path) -> None:
+def test_open_path_under_base_rejects_final_symlink(
+    tmp_path: Path,
+) -> None:
     base = tmp_path / "base"
     base.mkdir()
     target = base / "target.txt"
@@ -259,7 +281,10 @@ def test_rsync_completion_marker_is_success_only(
     assert completed.completion_marker is not None
     assert completed.completion_marker.read_text(encoding="utf-8") == "complete\n"
 
-    def fail(*_args: object, **_kwargs: object) -> CommandResult:
+    def fail(
+        *_args: object,
+        **_kwargs: object,
+    ) -> CommandResult:
         raise RuntimeError("transfer failed")
 
     monkeypatch.setattr(sync_module, "run_command", fail)

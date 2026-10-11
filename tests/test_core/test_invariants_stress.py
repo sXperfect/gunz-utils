@@ -1,3 +1,7 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -10,6 +14,10 @@ try:
 except ImportError:
     pytest = None  # type: ignore[assignment]
 
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.cache import SingleFlight, ttl_cache
 from gunz_utils.faults import FailAfter, FaultSequence
@@ -26,7 +34,9 @@ class TestCoreInvariants(unittest.TestCase):
 
     def test_ttl_cache_never_exceeds_capacity(self) -> None:
         @ttl_cache(ttl=60, maxsize=3)
-        def identity(value: int) -> int:
+        def identity(
+            value: int,
+        ) -> int:
             return value
 
         for value in range(100):

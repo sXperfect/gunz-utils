@@ -1,6 +1,14 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import os
 import tempfile
 import unittest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.security import open_path_under_base, safe_path_join, sanitize_filename
 
@@ -14,10 +22,10 @@ class TestSecurity(unittest.TestCase):
 
     def test_sanitize_filename_path_traversal(self):
         """Test protection against path traversal."""
-        # os.path.basename handles the slashes, our regex handles the rest
+        #? os.path.basename handles the slashes, our regex handles the rest
         self.assertEqual(sanitize_filename("../../etc/passwd"), "passwd")
 
-        # ".." -> basename ".." -> strip dots -> empty -> ValueError
+        #? ".." -> basename ".." -> strip dots -> empty -> ValueError
         with self.assertRaisesRegex(ValueError, "Filename is empty"):
             sanitize_filename("..")
 
@@ -27,8 +35,8 @@ class TestSecurity(unittest.TestCase):
     def test_sanitize_filename_dangerous_chars(self):
         """Test removal of dangerous characters."""
         # ? -> _
-        # * -> _
-        # file?name*.txt -> file_name_.txt
+        #? * -> _
+        #? file?name*.txt -> file_name_.txt
         self.assertEqual(sanitize_filename("file?name*.txt"), "file_name_.txt")
         self.assertEqual(sanitize_filename("file<name>.txt"), "file_name_.txt")
         self.assertEqual(sanitize_filename("file|name.txt"), "file_name.txt")
@@ -83,12 +91,12 @@ class TestSecurity(unittest.TestCase):
         """Test handling of Windows reserved filenames."""
         reserved = ["CON", "PRN", "AUX", "NUL", "COM1", "LPT1"]
         for name in reserved:
-            # Should now be prefixed with underscore
+            #? Should now be prefixed with underscore
             self.assertEqual(sanitize_filename(name), f"_{name}")
             self.assertEqual(sanitize_filename(f"{name}.txt"), f"_{name}.txt")
             self.assertEqual(sanitize_filename(f"{name}.tar.gz"), f"_{name}.tar.gz")
 
-            # Case insensitive check
+            #? Case insensitive check
             self.assertEqual(sanitize_filename(name.lower()), f"_{name.lower()}")
 
     def test_sanitize_filename_unsafe_replacement(self):
@@ -104,12 +112,12 @@ class TestSecurity(unittest.TestCase):
 
     def test_sanitize_filename_input_too_long(self):
         """Test that extremely long inputs are rejected to prevent DoS."""
-        # 4096 is max, so 4097 should fail
+        #? 4096 is max, so 4097 should fail
         long_input = "a" * 4097
         with self.assertRaisesRegex(ValueError, "Input filename too long"):
             sanitize_filename(long_input)
 
-        # 4096 should pass (and be truncated to 255)
+        #? 4096 should pass (and be truncated to 255)
         acceptable_input = "a" * 4096
         result = sanitize_filename(acceptable_input)
         self.assertEqual(len(result), 255)
@@ -117,10 +125,10 @@ class TestSecurity(unittest.TestCase):
     def test_safe_path_join_valid(self):
         """Test valid path joins."""
         with tempfile.TemporaryDirectory() as tmp_path:
-            # Use tmp_path to ensure we have a valid, resolvable base directory
+            #? Use tmp_path to ensure we have a valid, resolvable base directory
             base = str(tmp_path)
-            # resolve base to handle any symlinks in tmp path itself
-            # (e.g. /var vs /private/var)
+            #? resolve base to handle any symlinks in tmp path itself
+            #? (e.g. /var vs /private/var)
             base = os.path.realpath(base)
 
             expected = os.path.join(base, "uploads", "image.png")
@@ -138,8 +146,8 @@ class TestSecurity(unittest.TestCase):
                 safe_path_join(base, "../etc/passwd")
 
             with self.assertRaisesRegex(ValueError, "Path traversal detected"):
-                # Note: we use os.path.join to construct the traversal string
-                # properly for the OS if needed, but ".." is standard.
+                #? Note: we use os.path.join to construct the traversal string
+                #? properly for the OS if needed, but ".." is standard.
                 safe_path_join(base, "uploads/../../etc/passwd")
 
     def test_safe_path_join_absolute_input(self):

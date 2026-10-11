@@ -3,15 +3,25 @@
 The wire format remains compatible with the HyperHedron TypeScript client.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import binascii
 import os
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .._version import __version__ as __version__
 from ..deprecation import deprecated
 
@@ -27,23 +37,45 @@ _FORMAT_PREFIX = "aes256:v2:"
     "material and now fails closed; provide an explicit high-entropy passphrase"
 )
 def get_system_passphrase() -> str:
-    """Reject the legacy predictable hostname/user passphrase derivation."""
+    """Reject the legacy predictable hostname/user passphrase derivation.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     raise RuntimeError(
         "predictable system-derived passphrases are disabled; "
         "provide an explicit high-entropy passphrase"
     )
 
 
-def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
-    """Derive an AES key from explicit secret material."""
+def get_derived_key(
+    salt: bytes,
+    passphrase: str | None = None,
+) -> bytes:
+    """Derive an AES key from explicit secret material.
+
+    Parameters
+    ----------
+    salt : bytes
+        salt parameter.
+    passphrase : str | None
+        passphrase parameter.
+
+    Returns
+    -------
+    bytes
+        The result of the operation.
+    """
     if not isinstance(salt, bytes) or len(salt) != SALT_LENGTH:
         raise ValueError(f"salt must be exactly {SALT_LENGTH} bytes")
     if not isinstance(passphrase, str) or not passphrase:
         raise ValueError("passphrase is required for encryption")
 
-    # Security (VULN-2026-012): keep passphrases out of process-wide caches.
-    # Callers exposing repeated decrypt attempts must additionally rate-limit
-    # those attempts; varying attacker-controlled salts defeats key caching.
+    #? Security (VULN-2026-012): keep passphrases out of process-wide caches.
+    #? Callers exposing repeated decrypt attempts must additionally rate-limit
+    #? those attempts; varying attacker-controlled salts defeats key caching.
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=KEY_LENGTH,
@@ -53,8 +85,24 @@ def get_derived_key(salt: bytes, passphrase: str | None = None) -> bytes:
     return kdf.derive(passphrase.encode("utf-8"))
 
 
-def encrypt(text: str, passphrase: str | None = None) -> str:
-    """Encrypt a UTF-8 string using AES-256-GCM."""
+def encrypt(
+    text: str,
+    passphrase: str | None = None,
+) -> str:
+    """Encrypt a UTF-8 string using AES-256-GCM.
+
+    Parameters
+    ----------
+    text : str
+        text parameter.
+    passphrase : str | None
+        passphrase parameter.
+
+    Returns
+    -------
+    str
+        The result of the operation.
+    """
     if not isinstance(text, str):
         raise TypeError("text must be a string")
     salt = os.urandom(SALT_LENGTH)

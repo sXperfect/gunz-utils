@@ -1,5 +1,9 @@
 """Native recursion safety and integer-subclass semantic regressions."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import importlib.util
@@ -8,23 +12,37 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils import binary, serialization
 
 
 class ComparisonInteger(int):
-    def __lt__(self, other: object) -> bool:
+    def __lt__(self,
+        other: object,
+    ) -> bool:
         return True
 
 
 class ArithmeticInteger(int):
-    def __and__(self, other: int) -> int:
+    def __and__(self,
+        other: int,
+    ) -> int:
         return 7
 
 
 @pytest.mark.parametrize("value", [ComparisonInteger(3), ArithmeticInteger(3)])
-def test_integer_subclass_preserves_reference_semantics(value: int) -> None:
+def test_integer_subclass_preserves_reference_semantics(
+    value: int,
+) -> None:
     try:
         expected = binary._py_encode_uvarint(value)
     except ValueError as error:
@@ -45,7 +63,9 @@ def test_default_depth_cycle_and_valid_tree_remain_bounded() -> None:
 
 
 @pytest.mark.parametrize("shape", ["cycle", "deep"])
-def test_expanded_depth_raises_safely_in_isolated_interpreter(shape: str) -> None:
+def test_expanded_depth_raises_safely_in_isolated_interpreter(
+    shape: str,
+) -> None:
     """Run actual active backend with core dumps disabled and a bounded stack."""
     native_spec = importlib.util.find_spec("gunz_utils._accel")
     native_path = native_spec.origin if native_spec is not None else None

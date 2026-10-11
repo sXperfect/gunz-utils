@@ -1,10 +1,17 @@
 """Unified performance-run model for normalized measurements and artifacts."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from .io import GitInfo
 from .process import ProcessProfile
 from .result import BenchmarkResult, SystemInfo
@@ -38,7 +45,13 @@ class PerformanceRun:
     schema_version: int = 1
 
     def to_dict(self) -> dict[str, Any]:
-        """Return an envelope whose array fields satisfy the persisted schema."""
+        """Return an envelope whose array fields satisfy the persisted schema.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of the operation.
+        """
         data = asdict(self)
         data["artifacts"] = list(data["artifacts"])
         data["warnings"] = list(data["warnings"])
