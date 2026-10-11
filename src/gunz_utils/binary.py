@@ -145,6 +145,8 @@ def encode_uvarint(
     bytes
         The result of the operation.
     """
+    if type(value) is not int:
+        raise TypeError("value must be an integer (not bool)")
     if _accel_encode is not None:
         return _accel_encode(value)
     return _py_encode_uvarint(value)
