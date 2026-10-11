@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import os
+import pickle
 from collections.abc import AsyncIterator, Callable, Coroutine, Iterable, Iterator
 from typing import Any, TypeVar
 
@@ -264,8 +265,6 @@ def process_map(
     """
     item_list = list(items) if not isinstance(items, list) else items
     total = len(item_list)
-    if total == 0:
-        return []
 
     if workers is not None:
         if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
@@ -279,6 +278,8 @@ def process_map(
         ):
             raise ValueError("chunksize must be a positive integer or None")
 
+    if total == 0:
+        return []
     if total <= threshold or workers == 1:
         return [func(item) for item in item_list]
 
@@ -293,15 +294,17 @@ def process_map(
     if calc_chunksize is None:
         calc_chunksize = max(1, total // (max_workers * 4))
 
-    try:
-        with concurrent.futures.ProcessPoolExecutor(
-            max_workers=max_workers
-        ) as executor:
-            return list(executor.map(func, item_list, chunksize=calc_chunksize))
-    except Exception:
-        if fallback_serial:
+    # Detect unsupported callables before any worker executes. Never replay
+    # a partially executed workload after a worker or pool failure.
+    if fallback_serial:
+        try:
+            pickle.dumps(func)
+        except (pickle.PickleError, AttributeError, TypeError):
             return [func(item) for item in item_list]
-        raise
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=max_workers
+    ) as executor:
+        return list(executor.map(func, item_list, chunksize=calc_chunksize))
 
 
 def process_imap(
@@ -340,9 +343,6 @@ def process_imap(
     """
     item_list = list(items) if not isinstance(items, list) else items
     total = len(item_list)
-    if total == 0:
-        return
-
     if workers is not None:
         if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
             raise ValueError("workers must be a positive integer or None")
@@ -355,6 +355,8 @@ def process_imap(
         ):
             raise ValueError("chunksize must be a positive integer or None")
 
+    if total == 0:
+        return
     if total <= threshold or workers == 1:
         for item in item_list:
             yield func(item)
@@ -373,17 +375,18 @@ def process_imap(
     if calc_chunksize is None:
         calc_chunksize = max(1, total // (max_workers * 4))
 
-    try:
-        with concurrent.futures.ProcessPoolExecutor(
-            max_workers=max_workers
-        ) as executor:
-            yield from executor.map(func, item_list, chunksize=calc_chunksize)
-    except Exception:
-        if fallback_serial:
+    # A streaming iterator must not restart after yielding results.
+    if fallback_serial:
+        try:
+            pickle.dumps(func)
+        except (pickle.PickleError, AttributeError, TypeError):
             for item in item_list:
                 yield func(item)
             return
-        raise
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=max_workers
+    ) as executor:
+        yield from executor.map(func, item_list, chunksize=calc_chunksize)
 
 
 __all__ = [
