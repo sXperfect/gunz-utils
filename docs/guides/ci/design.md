@@ -143,6 +143,13 @@ python scripts/ci.py all
 GitHub Actions should invoke these repository primitives where practical instead
 of reimplementing validation logic in YAML.
 
+`gunz-style` is a local development check. Install the sibling `libs/linter`
+from source after installing utils, then run `python scripts/ci.py lint` normally.
+The hosted aggregate step sets `GUNZ_STYLE_SKIP=1` to omit only this private
+workspace checker. Ruff, mypy, release metadata, Python tests, strict docs and
+packaging remain enabled. No private-repository credential or runtime dependency
+on gunz-style is required by utils CI.
+
 ## Required check
 
 Branch protection should require only:

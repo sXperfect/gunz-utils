@@ -50,6 +50,43 @@ def test_origin_guard_rejects_missing_origin() -> None:
     assert not _load_script("ci")._origin_ok(None)
 
 
+@pytest.mark.parametrize("skip_style", [False, True])
+@pytest.mark.parametrize(
+    "ruff_status,mypy_status,style_status",
+    [(0, 0, 0), (5, 7, 9), (0, 7, 9), (0, 0, 9)],
+)
+def test_style_skip_preserves_other_lint_gates_and_failure_precedence(
+    monkeypatch: pytest.MonkeyPatch,
+    skip_style: bool,
+    ruff_status: int,
+    mypy_status: int,
+    style_status: int,
+) -> None:
+    ci = _load_script("ci")
+    if skip_style:
+        monkeypatch.setenv("GUNZ_STYLE_SKIP", "1")
+    else:
+        monkeypatch.delenv("GUNZ_STYLE_SKIP", raising=False)
+    invoked: list[str] = []
+    statuses = {
+        "ruff": ruff_status,
+        "mypy": mypy_status,
+        "gunz_style.cli": style_status,
+    }
+
+    def run(
+        command: list[str],
+    ) -> int:
+        assert command[1] == "-m"
+        invoked.append(command[2])
+        return statuses[command[2]]
+
+    monkeypatch.setattr(ci, "_run", run)
+    expected = ruff_status or mypy_status or (0 if skip_style else style_status)
+    assert ci.run_lint() == expected
+    assert invoked == ["ruff", "mypy"] + ([] if skip_style else ["gunz_style.cli"])
+
+
 def test_import_origin_subprocess_rejects_symlink_outside_worktree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

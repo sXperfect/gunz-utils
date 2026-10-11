@@ -66,6 +66,8 @@ jobs:
           "${{ steps.py312.outputs.python-path }}" -m pip install ".[all]"
 
       - name: Run aggregate repository verification
+        env:
+          GUNZ_STYLE_SKIP: "1"
         run: |
           extra_args=()
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then

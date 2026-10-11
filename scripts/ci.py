@@ -456,7 +456,7 @@ def _case_wheel_sdist() -> int:
 
 
 def run_lint() -> int:
-    """Ruff, mypy, then the style linter; propagate the first failure."""
+    """Run Ruff/mypy and the local style checker; preserve the first failure."""
     status = _run(
         [
             sys.executable,
@@ -472,6 +472,9 @@ def run_lint() -> int:
     mypy_status = _run([sys.executable, "-m", "mypy", "src/gunz_utils"])
     if status == 0:
         status = mypy_status
+    if os.environ.get("GUNZ_STYLE_SKIP") == "1":
+        print("gunz-style: local-only check skipped by GUNZ_STYLE_SKIP=1")
+        return status
     style_status = _run([sys.executable, "-m", "gunz_style.cli"])
     if status == 0:
         status = style_status

@@ -54,6 +54,15 @@ def test_ci_has_one_verify_job() -> None:
     assert "name: verify" in jobs
 
 
+def test_hosted_style_skip_is_scoped_to_aggregate_verification() -> None:
+    text = _workflow_text()
+    aggregate = text.split("- name: Run aggregate repository verification", 1)[1]
+    assert 'env:\n          GUNZ_STYLE_SKIP: "1"' in aggregate
+    assert text.count("GUNZ_STYLE_SKIP") == 1
+    assert "python -m ruff check src tests benchmarks scripts" in text
+    assert "python scripts/audit_ci.py" in aggregate
+
+
 def test_ci_is_read_only_and_cancels_superseded_runs() -> None:
     text = _workflow_text()
     assert "permissions:\n  contents: read" in text
