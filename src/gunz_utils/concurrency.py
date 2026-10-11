@@ -360,6 +360,8 @@ def process_imap(
     # Look ahead only enough to select the serial fast path. In particular,
     # never materialize a generator just to discover its length.
     prefix = list(islice(iterator, threshold + 1))
+    if not prefix:
+        return
     if len(prefix) <= threshold:
         for item in prefix:
             yield func(item)
