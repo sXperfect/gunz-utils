@@ -113,6 +113,7 @@ class _TTLCache(Generic[P, T]):
         self._lock = threading.Lock()
         self._hits = 0
         self._misses = 0
+        self._generation = 0
 
     def __get__(self,
         instance: Any,
@@ -147,12 +148,14 @@ class _TTLCache(Generic[P, T]):
             if entry is not None:
                 self._cache.pop(key, None)
             self._misses += 1
+            generation = self._generation
         value = func(*args, **kwargs)
         with self._lock:
-            self._cache[key] = (time.monotonic(), value)
-            self._cache.move_to_end(key)
-            while len(self._cache) > self._maxsize:
-                self._cache.popitem(last=False)
+            if generation == self._generation:
+                self._cache[key] = (time.monotonic(), value)
+                self._cache.move_to_end(key)
+                while len(self._cache) > self._maxsize:
+                    self._cache.popitem(last=False)
         return value
 
     def cache_clear(self) -> None:
@@ -161,6 +164,7 @@ class _TTLCache(Generic[P, T]):
         No parameters and no return value.
         """
         with self._lock:
+            self._generation += 1
             self._cache.clear()
             self._hits = 0
             self._misses = 0
