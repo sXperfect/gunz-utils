@@ -21,6 +21,7 @@ from typing import Any
 # =============================================================================
 #? This core module has zero mandatory third-party runtime dependencies.
 
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
@@ -125,7 +126,18 @@ def to_jsonable(
             )
             for item in value
         ]
-        return sorted(items, key=lambda item: repr(item))
+        #? Ordering must normalize mapping keys too: repr(dict) retains insertion
+        #? order even though the final JSON encoder sorts those same keys.
+        #? default=repr only forms a sort key for existing passthrough objects;
+        #? the returned payload stays unchanged and canonical_json still rejects
+        #? values unsupported by the actual JSON encoder.
+        return sorted(
+            items,
+            key=lambda item: json.dumps(
+                item, ensure_ascii=False, sort_keys=True, allow_nan=False,
+                separators=(",", ":"), default=repr,
+            ),
+        )
     if isinstance(value, bytes):
         raise TypeError("bytes are not implicitly JSON serializable")
     if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):

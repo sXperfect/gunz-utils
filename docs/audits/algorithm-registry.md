@@ -488,3 +488,42 @@ publication schedules, full-suite/backend counts and exact rerun provenance.
 Serialized cooperating CAS publication preserves the winning inode on both
 paths; raw noncooperating replacement remains a reader snapshot risk. No actual
 Windows/macOS or hosted-CI claim is added.
+
+
+## Remote branch follow-up — 2026-10-11
+
+Scoped review starts at `fix/audit-bugs-20261011@672bfb1`.
+The [execution record](2026-10-11-comprehensive/local-verification.md) and
+[task hierarchy](../tasks/done/2026-10-11-remote-audit-repairs.md) retain
+baseline failures, independent finite probes and compatibility decisions.
+
+- ALG-012/076: supported integer subclasses keep reference arithmetic/comparison
+  semantics; booleans and nonintegers fail explicitly. Actual compiled and forced
+  fallback execution remains required.
+- ALG-025: clearing advances generation; older producers can finish for existing
+  callers but cannot publish into the new generation. Pending calls require one
+  live event loop; no cross-thread event-loop safety claim is made.
+- ALG-032: supported normalized JSON set elements are sorted by canonical JSON
+  keys, independent of mapping insertion order. Unsupported passthrough leaves
+  are still rejected by the actual encoder; no arbitrary-object canonicality claim.
+- ALG-033: traversal and file-opening errors propagate instead of returning a
+  partial directory fingerprint. Links are excluded; explicitly supplied root
+  aliases resolve as before. There is no atomic filesystem snapshot guarantee.
+- ALG-066/067: owned synchronization metadata is hidden from source payloads
+  and protected from deletion; rule reset/external rule sources that can erase
+  those protections are rejected before target or marker mutation. Real local
+  rsync and bounded spawn-process lock/crash schedules are required evidence.
+- ALG-048: containers and copyable leaves are isolated; leaves whose copy fails
+  retain identity under the existing tested compatibility contract.
+- Process mapping: options validate before source consumption; automatic worker
+  count is limited by observed finite work; arbitrary integer thresholds do not
+  overflow platform-sized slice arguments. Configured lookahead and window
+  budgets bound submission; they are not unconditional memory/deadline limits.
+  Callable preflight uses the executor encoder and preserves registered reducers;
+  exception-only imports do not enable any deserialization API. Existing strict
+  security-import guards remain unchanged.
+
+The frozen-source canonical local gate passes all six checks on input SHA256
+`bd23ab31df2a8fd7d15954cd61c79e7e6693775a189a8f398928daa4fc789cbe`. Scoped repaired/proven contracts have local A4 integration
+evidence within the linked packet; broader family and native-host limitations
+remain as recorded. Historical A4 evidence alone did not certify this branch.

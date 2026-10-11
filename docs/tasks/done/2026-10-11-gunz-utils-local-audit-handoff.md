@@ -1,6 +1,6 @@
 # Local-agent handoff: gunz-utils audit and verification
 
-Status: pending
+Status: superseded by completed scoped local execution
 Repository: sXperfect/gunz-utils
 Branch: fix/audit-bugs-20261011
 
@@ -42,3 +42,7 @@ Branch: fix/audit-bugs-20261011
 
 ## Evidence
 See `docs/audits/2026-10-11-comprehensive/README.md` and `verification-matrix.md`.
+
+## Execution successor
+[Parallel repair hierarchy](../done/2026-10-11-remote-audit-repairs.md) records
+actual local work and verification. This handoff remains the original scope.

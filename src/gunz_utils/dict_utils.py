@@ -15,6 +15,7 @@ from typing import Any, Literal, cast
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
+# isort: split
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
@@ -205,6 +206,12 @@ def deep_merge(
     - Both values are lists → apply ``list_strategy``.
     - Otherwise → ``override`` wins.
 
+    Mappings, lists and sets are copied. Other leaves follow their ``deepcopy``
+    protocol; a protocol may return the original object, and copying failures
+    retain its original identity. Such shared leaves retain any mutable state.
+    Mutating a shared leaf in the result also mutates that original leaf; callers
+    requiring full isolation must ensure their leaves support independent copies.
+
     Parameters
     ----------
     base : Mapping[str, Any]
@@ -223,7 +230,8 @@ def deep_merge(
     Returns
     -------
     dict[str, Any]
-        A new dict containing the merged result. Inputs are never mutated.
+        A new dict containing the merged result. The merge does not mutate
+        inputs; non-copyable leaf objects retain their original identity.
 
     Raises
     ------
@@ -263,8 +271,8 @@ def deep_merge(
         Returns
         -------
         Any
-            A copy sharing no mutable substructure with ``val``; scalars and
-            non-copyable values are returned as-is.
+            A cycle-safe copy of containers. Leaf identity follows its copy
+            protocol; failed copies retain the original object and mutable state.
         """
         val_id = id(val)
         if val_id in memo:

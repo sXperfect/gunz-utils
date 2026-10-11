@@ -10,6 +10,12 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [2026-10-11-remote-audit-repairs](tasks/done/2026-10-11-remote-audit-repairs.md)
+- [2026-10-11-remote-audit-concurrency](tasks/done/2026-10-11-remote-audit-concurrency.md)
+- [2026-10-11-remote-audit-serialization](tasks/done/2026-10-11-remote-audit-serialization.md)
+- [2026-10-11-remote-audit-filesystem](tasks/done/2026-10-11-remote-audit-filesystem.md)
+- [2026-10-11-gunz-utils-local-audit-handoff](tasks/done/2026-10-11-gunz-utils-local-audit-handoff.md)
+
 - [2026-10-11-main-audit-merge](tasks/done/2026-10-11-main-audit-merge.md)
 
 - [2026-10-08-resource-security-audit](tasks/done/2026-10-08-resource-security-audit.md)

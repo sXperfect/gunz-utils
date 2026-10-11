@@ -1,12 +1,21 @@
 """Regression coverage for audit fixes: replay, invalidation, and validation."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+# isort: split
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.binary import encode_uvarint
 from gunz_utils.cache import async_ttl_cache
@@ -15,21 +24,31 @@ from gunz_utils.config import env_overrides
 from gunz_utils.hashing import directory_manifest
 
 
-def _identity(value: int) -> int:
+def _identity(
+    value: int,
+) -> int:
     return value
 
 
 class _PartialFailureExecutor:
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self,
+        **kwargs: object,
+    ) -> None:
         pass
 
-    def __enter__(self) -> "_PartialFailureExecutor":
+    def __enter__(self) -> _PartialFailureExecutor:
         return self
 
-    def __exit__(self, *_args: object) -> None:
+    def __exit__(self,
+        *_args: object,
+    ) -> None:
         pass
 
-    def map(self, func: object, items: object, **kwargs: object):
+    def map(self,
+        func: object,
+        items: object,
+        **kwargs: object,
+    ):
         yield 1
         raise RuntimeError("worker failed after partial work")
 
@@ -67,7 +86,9 @@ class TestAsyncInvalidation(unittest.IsolatedAsyncioTestCase):
         calls = 0
 
         @async_ttl_cache(ttl=60)
-        async def fetch(key: int) -> int:
+        async def fetch(
+            key: int,
+        ) -> int:
             nonlocal calls
             calls += 1
             version = calls
@@ -127,16 +148,24 @@ class TestDirectoryManifest(unittest.TestCase):
 
 
 class _StreamingExecutor:
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self,
+        **kwargs: object,
+    ) -> None:
         pass
 
-    def __enter__(self) -> "_StreamingExecutor":
+    def __enter__(self) -> _StreamingExecutor:
         return self
 
-    def __exit__(self, *_args: object) -> None:
+    def __exit__(self,
+        *_args: object,
+    ) -> None:
         pass
 
-    def map(self, func, items, **kwargs):
+    def map(self,
+        func,
+        items,
+        **kwargs,
+    ):
         for item in items:
             yield func(item)
 
@@ -169,7 +198,9 @@ class TestEventLoopReuse(unittest.TestCase):
         calls = []
 
         @async_ttl_cache(ttl=60)
-        async def compute(value: int) -> int:
+        async def compute(
+            value: int,
+        ) -> int:
             calls.append(value)
             return value * 2
 

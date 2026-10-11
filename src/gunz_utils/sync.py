@@ -30,6 +30,8 @@ _FORBIDDEN_EXTRA_OPTIONS = frozenset(
         "-M",
         "--backup-dir",
         "--files-from",
+        "--include-from",
+        "--exclude-from",
         "--filter",
         "--log-file",
         "--only-write-batch",
@@ -64,10 +66,21 @@ def _unsafe_rsync_extra_argument(
         The result of the operation.
     """
     option = argument.split("=", 1)[0]
+    if option in {"--include", "--exclude"}:
+        #? Literal include/exclude patterns remain supported; a reset can erase
+        #? the helper's reserved control-file rules before a later inclusion.
+        return argument.partition("=")[2] == "!"
     if argument == "--" or argument.startswith("--delete"):
         return True
-    if argument.startswith(("-e", "-f", "-M")):
-        return True
+    if argument.startswith("-") and not argument.startswith("--"):
+        #? Short flags may be clustered. Stop at an argument-taking option so
+        #? attached payload letters are not mistaken for additional flags.
+        for flag in argument[1:]:
+            if flag in "efMT":
+                return True
+            if flag in "B@":
+                break
+        return False
     if not option.startswith("--"):
         return option in _FORBIDDEN_EXTRA_OPTIONS
     if option in _FORBIDDEN_LONG_OPTIONS:
@@ -202,6 +215,9 @@ def rsync_mirror(
     the same helper from observing a success marker while a newer synchronization
     is still running.
 
+    The active root lock and completion-marker names are reserved metadata:
+    they are excluded from source payloads and protected from rsync deletion.
+
     Parameters
     ----------
     source : str | Path
@@ -217,6 +233,8 @@ def rsync_mirror(
         Atomic marker filename written after success. None disables markers.
     extra_args : Sequence[str], optional
         Additional non-destructive rsync arguments inserted before source/target.
+        Filter resets and include/exclude-from rule files are rejected to protect
+        reserved metadata. Ordinary include/exclude patterns remain supported.
     delete : bool, optional
         Add --delete so destination files absent from source are removed.
         Defaults to False because deletion is destructive.
@@ -276,8 +294,13 @@ def rsync_mirror(
         raise ValueError("extra_args must contain non-empty strings")
     unsafe_arguments = [
         argument
-        for argument in extra_args
+        for index, argument in enumerate(extra_args)
         if _unsafe_rsync_extra_argument(argument)
+        or (
+            argument in {"--include", "--exclude"}
+            and index + 1 < len(extra_args)
+            and extra_args[index + 1] == "!"
+        )
     ]
     if unsafe_arguments:
         raise ValueError(
@@ -309,6 +332,17 @@ def rsync_mirror(
         "--partial",
         "--delay-updates",
     ]
+    reserved = [lock_path.name] if lock else []
+    if marker is not None:
+        reserved.append(marker.name)
+    for name in reserved:
+        #? Rooted literal rules hide owned metadata on the sender and preserve
+        #? its inode on the receiver, before any caller inclusion/exclusion rules.
+        pattern = "/" + "".join(
+            "\\" + character if character in "*?[]" else character
+            for character in name
+        )
+        rsync_args.extend(["--filter", f"P {pattern}", "--filter", f"H {pattern}"])
     if delete:
         rsync_args.append("--delete")
     rsync_args.extend(extra_args)

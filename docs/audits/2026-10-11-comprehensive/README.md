@@ -3,7 +3,10 @@
 Branch: `fix/audit-bugs-20261011`. Base: `main`.
 
 ## Scope and decision
-This is a source-inspection handoff, **not a passing test report**. Never assume commits are verified simply because they are present. No GitHub Actions required. Keep main unchanged until local verification passes.
+The original handoff below records source inspection. Actual local failures,
+repairs and verification are tracked in [local execution evidence](local-verification.md).
+Commits alone are not verification. Main remains unchanged; hosted CI is not
+used for this branch review.
 
 ## Current source-change inventory
 - BUG-001: process_map / process_imap no replay after execution errors; static pickle preflight does not guarantee every input is picklable.

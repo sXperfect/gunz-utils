@@ -3,15 +3,19 @@
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+# isort: split
 
 from __future__ import annotations
 
 import asyncio
 import concurrent.futures
 import os
-import pickle
-from itertools import chain, islice
+
+#? Import only the encoding failure type; no deserializer is used here.
+from _pickle import PicklingError
 from collections.abc import AsyncIterator, Callable, Coroutine, Iterable, Iterator
+from itertools import chain
+from multiprocessing.reduction import ForkingPickler
 from typing import Any, TypeVar
 
 T = TypeVar("T")
@@ -227,6 +231,20 @@ async def map_unordered(
             raise cancelled
 
 
+def _take(
+    iterator: Iterator[T],
+    count: int,
+) -> list[T]:
+    """Read a finite window without the platform-sized islice stop limit."""
+    values: list[T] = []
+    for _ in range(count):
+        try:
+            values.append(next(iterator))
+        except StopIteration:
+            break
+    return values
+
+
 def process_map(
     func: Callable[[T], R],
     items: Iterable[T],
@@ -241,7 +259,8 @@ def process_map(
     For small workloads (<= threshold items) or when workers <= 1, work runs
     serially in the current process to eliminate process spawning and IPC
     overhead. When workers > 1, tasks execute across worker processes with
-    graceful cleanup on interruption or cancellation.
+    graceful cleanup on interruption or cancellation. Executor shutdown waits
+    for already-running calls; this helper cannot forcibly interrupt a callable.
 
     Parameters
     ----------
@@ -256,17 +275,15 @@ def process_map(
     threshold : int, optional
         Minimum item count required to spawn worker processes. Defaults to 8.
     fallback_serial : bool, optional
-        If True, falls back to serial execution if process pool spawning
-        or pickling fails. Defaults to True.
+        If True, falls back to serial execution for callable pickling failures
+        detected before any worker executes. Only PicklingError, AttributeError and
+        TypeError trigger fallback; other preflight and worker/pool errors propagate.
 
     Returns
     -------
     list[R]
         Ordered results matching the input items.
     """
-    item_list = list(items) if not isinstance(items, list) else items
-    total = len(item_list)
-
     if workers is not None:
         if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
             raise ValueError("workers must be a positive integer or None")
@@ -278,6 +295,12 @@ def process_map(
             or chunksize < 1
         ):
             raise ValueError("chunksize must be a positive integer or None")
+
+    if isinstance(threshold, bool) or not isinstance(threshold, int) or threshold < 0:
+        raise ValueError("threshold must be a non-negative integer")
+
+    item_list = list(items) if not isinstance(items, list) else items
+    total = len(item_list)
 
     if total == 0:
         return []
@@ -295,12 +318,12 @@ def process_map(
     if calc_chunksize is None:
         calc_chunksize = max(1, total // (max_workers * 4))
 
-    # Detect unsupported callables before any worker executes. Never replay
-    # a partially executed workload after a worker or pool failure.
+    #? Detect unsupported callables before any worker executes. Never replay
+    #? a partially executed workload after a worker or pool failure.
     if fallback_serial:
         try:
-            pickle.dumps(func)
-        except (pickle.PickleError, AttributeError, TypeError):
+            ForkingPickler.dumps(func)
+        except (PicklingError, AttributeError, TypeError):
             return [func(item) for item in item_list]
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=max_workers
@@ -321,6 +344,11 @@ def process_imap(
 
     Results are yielded in input order as chunks finish. For small workloads
     (<= threshold) or when workers <= 1, items run lazily in the current process.
+    Initial lookahead consumes at most ``threshold + 1`` items, extended up to
+    the detected CPU count for automatic workers. Parallel input windows contain
+    at most ``2 * workers * (chunksize or 1)`` items. These are caller-configured
+    budgets, not hard memory limits. Closing the iterator waits for running worker
+    calls to finish; it cannot impose a deadline on an arbitrary callable.
 
     Parameters
     ----------
@@ -335,7 +363,8 @@ def process_imap(
     threshold : int, optional
         Threshold for multiprocessing. Defaults to 8.
     fallback_serial : bool, optional
-        Fallback to serial on pool errors. Defaults to True.
+        Fallback before execution for PicklingError, AttributeError or TypeError
+        from multiprocessing callable encoding. Other failures propagate.
 
     Yields
     ------
@@ -346,7 +375,11 @@ def process_imap(
         if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
             raise ValueError("workers must be a positive integer or None")
     if chunksize is not None:
-        if isinstance(chunksize, bool) or not isinstance(chunksize, int) or chunksize < 1:
+        if (
+            isinstance(chunksize, bool)
+            or not isinstance(chunksize, int)
+            or chunksize < 1
+        ):
             raise ValueError("chunksize must be a positive integer or None")
     if isinstance(threshold, bool) or not isinstance(threshold, int) or threshold < 0:
         raise ValueError("threshold must be a non-negative integer")
@@ -357,9 +390,9 @@ def process_imap(
             yield func(item)
         return
 
-    # Look ahead only enough to select the serial fast path. In particular,
-    # never materialize a generator just to discover its length.
-    prefix = list(islice(iterator, threshold + 1))
+    #? Look ahead only enough to select the serial fast path. In particular,
+    #? never materialize a generator just to discover its length.
+    prefix = _take(iterator, threshold + 1)
     if not prefix:
         return
     if len(prefix) <= threshold:
@@ -367,7 +400,14 @@ def process_imap(
             yield func(item)
         return
 
-    max_workers = workers or (os.cpu_count() or 1)
+    max_workers = workers
+    if max_workers is None:
+        cpu_count = os.cpu_count() or 1
+        #? Probe a CPU-sized finite window to avoid launching idle automatic
+        #? workers for a short input, without exhausting a streaming source.
+        if len(prefix) < cpu_count:
+            prefix.extend(_take(iterator, cpu_count - len(prefix)))
+        max_workers = min(cpu_count, len(prefix))
     if max_workers <= 1:
         for item in chain(prefix, iterator):
             yield func(item)
@@ -375,20 +415,20 @@ def process_imap(
 
     if fallback_serial:
         try:
-            pickle.dumps(func)
-        except (pickle.PickleError, AttributeError, TypeError):
+            ForkingPickler.dumps(func)
+        except (PicklingError, AttributeError, TypeError):
             for item in chain(prefix, iterator):
                 yield func(item)
             return
 
-    # Executor.map eagerly submits the supplied iterable in some Python
-    # versions. Feed finite windows to guarantee bounded submission on all
-    # supported interpreters, preserving ordering within and across windows.
+    #? Executor.map eagerly submits the supplied iterable in some Python
+    #? versions. Feed finite windows to guarantee bounded submission on all
+    #? supported interpreters, preserving ordering within and across windows.
     batch_size = chunksize or 1
     window_size = max_workers * batch_size * 2
     remaining = chain(prefix, iterator)
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-        while batch := list(islice(remaining, window_size)):
+        while batch := _take(remaining, window_size):
             yield from executor.map(func, batch, chunksize=batch_size)
 
 

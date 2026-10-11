@@ -1,0 +1,1 @@
+Preserve integer-subclass varint compatibility, make canonical set ordering independent of mapping insertion order, validate process-map inputs before consuming them, and keep directory fingerprints and synchronization metadata consistent on failure.

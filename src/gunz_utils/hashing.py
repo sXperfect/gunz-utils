@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import pathlib
+import stat
 from typing import BinaryIO, cast
 
 # =============================================================================
@@ -292,6 +294,10 @@ def directory_manifest(
     ------
     NotADirectoryError
         If root is not a directory.
+    OSError
+        If a directory cannot be enumerated or a file cannot be read.
+    ValueError
+        If a directory changes identity during traversal.
     """
     if algo not in SUPPORTED_ALGOS:
         raise ValueError(
@@ -310,22 +316,35 @@ def directory_manifest(
     if not base.is_dir():
         raise NotADirectoryError(str(base))
 
-    files = sorted(
-        (
-            path
-            for path in base.rglob("*")
-            if path.is_file() and not path.is_symlink()
-        ),
-        key=lambda path: path.relative_to(base).as_posix(),
-    )
+    #? pathlib.rglob suppresses enumeration errors, which can turn an unreadable
+    #? subtree into a seemingly complete empty manifest. Explicit scans propagate
+    #? errors and never classify entries by following symbolic links.
+    pending = [(base, base.stat())]
+    files: list[pathlib.Path] = []
+    while pending:
+        directory, expected = pending.pop()
+        current = directory.lstat()
+        if not stat.S_ISDIR(current.st_mode) or not os.path.samestat(current, expected):
+            raise ValueError("directory changed during manifest traversal")
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                info = entry.stat(follow_symlinks=False)
+                path = directory / entry.name
+                if stat.S_ISDIR(info.st_mode):
+                    pending.append((path, info))
+                elif stat.S_ISREG(info.st_mode):
+                    files.append(path)
+        if not os.path.samestat(directory.lstat(), expected):
+            raise ValueError("directory changed during manifest traversal")
+    files.sort(key=lambda path: path.relative_to(base).as_posix())
     from .security import open_path_under_base
 
     manifest: dict[str, str] = {}
     for path in files:
         relative = path.relative_to(base).as_posix()
-        # Do not silently produce a partial integrity manifest when a file
-        # changes or secure opening rejects a previously enumerated path.
-        # Symlinks are already excluded during enumeration.
+        #? Do not silently produce a partial integrity manifest when a file
+        #? changes or secure opening rejects a previously enumerated path.
+        #? Symlinks are already excluded during enumeration.
         with open_path_under_base(
             str(base),
             relative,

@@ -22,3 +22,6 @@ The repository-wide algorithm program remains active for documented deeper
 proof obligations; completed scoped repairs do not erase accepted limitations.
 
 The [cross-process storage proofs and approved mode-switch recovery repair](tasks/done/2026-10-08-storage-process-proofs.md) are also complete for the stated scope; all six canonical gates pass.
+
+The [2026-10-11 remote branch review](tasks/done/2026-10-11-remote-audit-repairs.md)
+is locally verified on its feature branch; integration into main remains separate.

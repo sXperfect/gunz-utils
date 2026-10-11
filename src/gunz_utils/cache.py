@@ -3,6 +3,7 @@
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+# isort: split
 
 from __future__ import annotations
 
@@ -228,7 +229,11 @@ class _AsyncTTLCache(Generic[P, T]):
         Drop all cached entries (awaitable, matching the async API).
 
     Carries the async cache/in-flight bookkeeping so ``cache_clear`` is a
-    type-checked attribute without ``setattr`` or a cast.
+    type-checked attribute without ``setattr`` or a cast. Concurrent calls and
+    pending producers must share one event loop; cross-thread independent loops
+    cannot await the same in-flight Task. Cancelling a waiter leaves its shared
+    producer running; ``cache_clear`` detaches old producers without cancelling
+    existing waiters.
     """
 
     def __init__(self,
@@ -338,8 +343,8 @@ class _AsyncTTLCache(Generic[P, T]):
         async with self._lock:
             self._generation += 1
             self._cache.clear()
-            # Detach old producers without cancelling callers already awaiting
-            # them. A subsequent lookup starts a fresh generation.
+            #? Detach old producers without cancelling callers already awaiting
+            #? them. A subsequent lookup starts a fresh generation.
             self._in_flight.clear()
 
 
@@ -351,6 +356,11 @@ def async_ttl_cache(
     [Callable[P, Coroutine[Any, Any, T]]], _AsyncTTLCache[P, T]
 ]:
     """Cache async results and coalesce concurrent misses for each key.
+
+    Concurrent calls with pending producers must share one event loop. Cancelling
+    a waiter leaves its shared producer running. Awaiting ``cache_clear`` detaches
+    old producers without cancelling their existing waiters; old results cannot
+    populate the fresh cache generation.
 
     Parameters
     ----------
@@ -387,7 +397,12 @@ def async_ttl_cache(
 
 
 class SingleFlight:
-    """Coalesce concurrent async work sharing the same key."""
+    """Coalesce concurrent async work sharing the same key.
+
+    Concurrent calls with pending work must share one event loop. A Task owned
+    by another live thread's loop cannot be awaited here. Cancelling a waiter
+    leaves the shared producer running for other callers.
+    """
 
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
