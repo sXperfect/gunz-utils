@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 from gunz_utils.binary import encode_uvarint
 from gunz_utils.cache import async_ttl_cache
 from gunz_utils.concurrency import process_imap, process_map
 from gunz_utils.config import env_overrides
+from gunz_utils.hashing import directory_manifest
 
 
 def _identity(value: int) -> int:
@@ -96,3 +99,28 @@ class TestValidation(unittest.TestCase):
             with self.subTest(value=value):
                 with self.assertRaises(TypeError):
                     encode_uvarint(value)
+
+
+class TestDirectoryManifest(unittest.TestCase):
+    def test_rejected_secure_open_fails_instead_of_omitting_file(self) -> None:
+        with tempfile.TemporaryDirectory() as location:
+            root = Path(location)
+            (root / "important.txt").write_text("data", encoding="utf-8")
+            with patch(
+                "gunz_utils.security.open_path_under_base",
+                side_effect=ValueError("unsafe path"),
+            ):
+                with self.assertRaisesRegex(ValueError, "unsafe path"):
+                    directory_manifest(root)
+
+    def test_directory_manifest_still_excludes_symlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as location:
+            root = Path(location)
+            outside = root / "outside.txt"
+            outside.write_text("outside", encoding="utf-8")
+            link = root / "link.txt"
+            try:
+                link.symlink_to(outside)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unsupported")
+            self.assertNotIn("link.txt", directory_manifest(root))
