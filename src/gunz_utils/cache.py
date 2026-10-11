@@ -190,6 +190,11 @@ def ttl_cache(
 ) -> Callable[[Callable[P, T]], _TTLCache[P, T]]:
     """Cache synchronous function results for a bounded amount of time.
 
+    Cache bookkeeping is protected by a lock; user functions run outside it.
+    Concurrent misses for one key may compute independently. Clearing invalidates
+    results from computations already running: their callers retain their own
+    result, but those computations cannot repopulate the cleared cache.
+
     Parameters
     ----------
     ttl : float

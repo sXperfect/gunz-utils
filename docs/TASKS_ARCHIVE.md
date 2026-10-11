@@ -10,6 +10,8 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [2026-10-11-round5-local-verification](tasks/done/2026-10-11-round5-local-verification.md)
+
 - [2026-10-11-remote-audit-repairs](tasks/done/2026-10-11-remote-audit-repairs.md)
 - [2026-10-11-remote-audit-concurrency](tasks/done/2026-10-11-remote-audit-concurrency.md)
 - [2026-10-11-remote-audit-serialization](tasks/done/2026-10-11-remote-audit-serialization.md)

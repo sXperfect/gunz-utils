@@ -527,3 +527,20 @@ The frozen-source canonical local gate passes all six checks on input SHA256
 `bd23ab31df2a8fd7d15954cd61c79e7e6693775a189a8f398928daa4fc789cbe`. Scoped repaired/proven contracts have local A4 integration
 evidence within the linked packet; broader family and native-host limitations
 remain as recorded. Historical A4 evidence alone did not certify this branch.
+
+
+## Round-five remote verification — 2026-10-11
+
+[The round-five record](2026-10-11-comprehensive/round-5-static-followup.md)
+verifies `d94adfe` plus local style, proof and contract-documentation corrections.
+ALG-025 synchronous clear now prevents earlier-generation producers from
+publishing; existing callers keep their return/error outcome. Independent
+concurrent misses remain permitted and run outside the cache bookkeeping lock.
+ALG-031 is explicitly single-owner or externally synchronized; deadline checks
+are cooperative and do not replace body exceptions with expiry failures.
+
+Independent before/after and finite lifecycle proofs plus all six canonical
+local gates pass (1716 tests per interpreter, actual native 91 each). Scoped
+contracts have local A4 evidence on input SHA256 `f7615473b8c32f494e89fc1f28ede57f138d1cf9c56f2a224d8d41c095a68f80`; this does not
+certify unexecuted hosts or invent budget thread safety. Existing family-wide
+levels and broader proof gaps remain as recorded.

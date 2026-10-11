@@ -74,7 +74,9 @@ class TestTTLCache(unittest.TestCase):
         failures: list[BaseException] = []
 
         @ttl_cache(ttl=60)
-        def work(value: int) -> int:
+        def work(
+            value: int,
+        ) -> int:
             nonlocal calls
             calls += 1
             version = calls

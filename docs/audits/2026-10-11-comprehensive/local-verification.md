@@ -156,3 +156,14 @@ This establishes scoped Linux integration evidence. Unexecuted host proofs,
 uncopyable-leaf aliases, live-tree snapshot limits, single-live-loop ownership,
 caller-selected budgets and measured streaming throughput costs remain explicit.
 Main is unchanged; no merge, push, PR, hosted run or release was performed.
+
+
+## Subsequent round-five fetch and verification
+The remote feature branch advanced from `2c04aa6` to `d94adfe` with synchronous
+TTL invalidation changes. [Round-five execution evidence](round-5-static-followup.md)
+records independent before/after proof, the repaired local style failure,
+additional lifecycle/cooperative-deadline cases, public contract clarifications,
+and the required release fragment. All six local gates pass on that corrected
+snapshot: **1716 tests per interpreter**, plus native/fallback and isolated
+packaging checks. Its distinct 304-file input SHA256 is `f7615473b8c32f494e89fc1f28ede57f138d1cf9c56f2a224d8d41c095a68f80`.
+The earlier 1710-pass results above remain evidence for the earlier snapshot.

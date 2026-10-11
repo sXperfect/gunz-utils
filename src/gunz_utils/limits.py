@@ -91,7 +91,13 @@ class Limits:
 
 
 class ResourceBudget:
-    """Track cumulative bytes/items, nesting depth, execution steps, and a deadline."""
+    """Track cumulative bytes/items, nesting depth, execution steps, and a deadline.
+
+    This mutable budget has a single owner; concurrent access requires external
+    synchronization. Deadline checks are cooperative and cannot interrupt a
+    running body. A step checks before entry and after a successful body; errors
+    from the body propagate unchanged.
+    """
 
     __slots__ = (
         "max_bytes",
@@ -238,7 +244,10 @@ class ResourceBudget:
     def step(self,
         amount: int = 1,
     ) -> Generator[None, None, None]:
-        """Context manager validating deadline and consuming steps on entry.
+        """Check the deadline and consume steps on entry and check again on success.
+
+        The body is not interrupted on expiration. Its own exceptions propagate
+        unchanged, without a post-body deadline check replacing them.
 
         Parameters
         ----------

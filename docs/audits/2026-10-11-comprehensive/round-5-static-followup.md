@@ -1,6 +1,8 @@
 # Round 5 — remote static follow-up (2026-10-11)
 
-Branch: `fix/audit-bugs-20261011`. Source inspection only: **no local execution** and no source modifications in this round. Previous Linux verification covers the earlier snapshot, not automatically any new repairs.
+Branch: `fix/audit-bugs-20261011`. The initial remote phase was source inspection
+without local execution. Subsequent local fetch, debugging and verification are
+recorded below. Earlier Linux results do not automatically certify new repairs.
 
 ## New finding R5-001 — synchronous TTL cache can resurrect an invalidated value (medium)
 
@@ -37,3 +39,62 @@ File: `src/gunz_utils/limits.py`, `ResourceBudget.consume_bytes/consume_items/co
 - Local execution and aggregate static gates **have not been run for these commits**. The prior 1710-pass result belongs to the preceding snapshot.
 - Next local checks: `python -m pytest tests/test_core/test_cache.py -q`, `python -m ruff check .`, `python -m mypy src/gunz_utils`, then the repository's canonical local audit gate on Python 3.11/3.12.
 - R5-002 through R5-004 remain explicit contract-review items, not newly fixed defects.
+
+
+## Local fetch and debugging
+
+Fetched `origin/fix/audit-bugs-20261011@d94adfec6b94f242d339bfdcc5d0914f511742da`
+and fast-forwarded the clean isolated feature checkout from `2c04aa6`. Main
+remains at `a375ed7`. Four remote commits added the synchronous invalidation
+fix, its thread regression, and the original static handoff above.
+
+An independent bounded before/after probe reads the trusted cache module from
+`2c04aa6` into a scratch-only source file: after clear and a fresh value 2, the
+old producer returns 1 and the old implementation incorrectly makes the next
+caller receive 1. The fetched fix still returns 1 to its old caller while the
+next caller receives 2. Evidence: `/tmp/gunz-utils-round5-before-after.json`.
+
+Local gunz-style initially failed the new test's one-line `work(value)`
+signature. It is corrected without changing test behavior. A required patch
+fragment now records the user-visible synchronous invalidation fix.
+
+| Item | Reviewed disposition |
+|---|---|
+| R5-001 | Fetched fix verified; repeated clears, old-producer failure, result identity and counter/capacity accounting are covered. |
+| R5-002 | Independent concurrent misses are the synchronous cache contract. A two-worker barrier proves both compute outside the cache lock; no single-flight behavior was added. |
+| R5-003 | No thread-safety promise exists. Public ResourceBudget documentation now states single ownership or external synchronization; counter code remains unchanged. |
+| R5-004 | Deadline checks are cooperative, before entry and after success. Injected-clock proofs establish that a completed body can overrun and that its own exception propagates unchanged. |
+
+Focused pytest on cache, shared foundation, numeric contracts, earlier process
+proofs, and the five new round-five cases: **80 passed plus 65 subtests** on
+Python 3.11 and Python 3.12. Local Ruff and mypy pass; private gunz-style has zero
+violations and three advisory warnings in these four files. Full frozen-source
+canonical verification passes all six gates as recorded below. No worker or thread leaks were observed
+in these finite schedules; this is not a whole-package memory-leak certificate.
+
+
+## Final local acceptance
+
+```bash
+PYTHONPATH=/tmp/gunz-utils-fix-audit-20261011-672bfb1/src \
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /tmp/gunz-utils-audit-20261008/bin/python \
+  scripts/audit_ci.py \
+  --compat-python /tmp/gunz-utils-audit-20261008-py312/bin/python \
+  --summary-json /tmp/gunz-utils-round5-final-summary.json
+```
+
+All six gates return zero: release, lint, test, strict docs, isolated packaging,
+and Python compatibility. Both interpreters have **1716 passed, 38 justified
+skips** (3.11: 80.61s; 3.12: 79.01s). Each additional asserted compiled-native
+leg has **91 passed**; each forced fallback has **60 passed, 31 native-only skips**.
+The ordinary skips comprise native-only cases exercised separately plus seven
+actual Windows/macOS cases still awaiting native hosts. Ruff and mypy pass;
+local private gunz-style reports zero violations and 99 advisory warnings.
+Minimal/extras imports, wheel/sdist installed origins and py.typed all pass.
+
+No source/test/configuration/fragment input changed during verification. Input
+SHA256 (304 files): `f7615473b8c32f494e89fc1f28ede57f138d1cf9c56f2a224d8d41c095a68f80`. Full log:
+`/tmp/gunz-utils-round5-final-gates.log`. Before/after and final JSON evidence
+remain under the documented /tmp paths. The source now documents each reviewed
+contract; no single-flight or multi-threaded budget promise was introduced, and
+no test was weakened. Main and hosted workflow configuration are unchanged.

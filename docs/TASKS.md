@@ -25,3 +25,6 @@ The [cross-process storage proofs and approved mode-switch recovery repair](task
 
 The [2026-10-11 remote branch review](tasks/done/2026-10-11-remote-audit-repairs.md)
 is locally verified on its feature branch; integration into main remains separate.
+
+The [round-five remote cache fix verification](tasks/done/2026-10-11-round5-local-verification.md)
+passes all six local gates on the subsequently fetched feature-branch snapshot.
