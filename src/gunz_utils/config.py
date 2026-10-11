@@ -76,7 +76,12 @@ def env_overrides(
             raise ValueError(f"environment key {name!r} contains an empty path segment")
         cursor = out
         for part in parts[:-1]:
-            cursor = cursor.setdefault(part, {})
+            existing = cursor.setdefault(part, {})
+            if not isinstance(existing, dict):
+                raise ValueError(f"environment key {name!r} conflicts with a scalar configuration")
+            cursor = existing
+        if isinstance(cursor.get(parts[-1]), dict):
+            raise ValueError(f"environment key {name!r} conflicts with a nested configuration")
         cursor[parts[-1]] = value
     return out
 
