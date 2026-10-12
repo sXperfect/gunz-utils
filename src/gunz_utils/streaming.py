@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import Any, BinaryIO, TextIO
@@ -36,6 +37,28 @@ def _reject_json_constant(
     raise ValueError(f"non-standard JSON constant: {value}")
 
 
+def _reject_nonfinite(value: Any) -> None:
+    """Raise ``ValueError`` if ``value`` decodes to a non-finite float.
+
+    ``parse_constant`` only intercepts the non-standard ``NaN``/``Infinity``
+    literals; an ordinary JSON numeric literal that overflows the float range
+    (e.g. ``1e400``) decodes to ``float('inf')``/``-inf`` without error. This
+    walker rejects any such record so the reader stays symmetric with the
+    ``allow_nan=False`` writer. It is iterative so deep records do not
+    overflow the interpreter stack.
+    """
+    stack: list[Any] = [value]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, float):
+            if not math.isfinite(node):
+                raise ValueError(f"non-finite JSON number: {node}")
+        elif isinstance(node, dict):
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+
+
 def iter_jsonl(
     handle: TextIO,
 ) -> Iterator[Any]:
@@ -50,10 +73,18 @@ def iter_jsonl(
     -------
     Iterator[Any]
         The result of the operation.
+
+    Raises
+    ------
+    ValueError
+        If a record uses a non-standard constant or decodes to a non-finite
+        float (e.g. an overflowing numeric literal).
     """
     for line in handle:
         if line.strip():
-            yield json.loads(line, parse_constant=_reject_json_constant)
+            record = json.loads(line, parse_constant=_reject_json_constant)
+            _reject_nonfinite(record)
+            yield record
 
 
 def write_jsonl(
@@ -201,7 +232,12 @@ class BoundedWriter:
 
 
 class DigestWriter:
-    """Binary writer that hashes written bytes and can enforce a byte limit."""
+    """Binary writer that hashes written bytes and truncates at a byte limit.
+
+    Unlike :class:`BoundedWriter`, which rejects writes that exceed its
+    limit, this writer silently truncates input at ``max_bytes`` so a bounded
+    copy-and-hash can complete on an oversized source.
+    """
 
     def __init__(self,
         handle: BinaryIO,
@@ -224,7 +260,8 @@ class DigestWriter:
     def write(self,
         data: bytes,
     ) -> int:
-        """Write and hash all bytes, handling partial underlying writes.
+        """Write and hash bytes, truncating at the configured limit, and
+        handle partial underlying writes.
 
         Parameters
         ----------
@@ -236,11 +273,12 @@ class DigestWriter:
         int
             The result of the operation.
         """
-        if (
-            self.max_bytes is not None
-            and self.bytes_written + len(data) > self.max_bytes
-        ):
-            raise ValueError("write exceeds byte limit")
+        if self.max_bytes is not None:
+            remaining = self.max_bytes - self.bytes_written
+            if remaining <= 0:
+                return 0
+            if len(data) > remaining:
+                data = data[:remaining]
         view = memoryview(data)
         offset = 0
         while offset < len(view):

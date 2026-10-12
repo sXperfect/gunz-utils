@@ -169,6 +169,15 @@ def partition_overlaps(
             raise ValueError(
                 "partition names must be non-empty strings"
             )
+        if isinstance(values, (str, bytes, bytearray)):
+            #? A plain-string partition would otherwise be split into
+            #? characters, producing spurious overlaps; reject it explicitly,
+            #? consistent with PartitionManifest's handling of string
+            #? identifiers.
+            raise ValueError(
+                f"partition {name!r} identifiers must be an iterable of "
+                "hashables, not one string"
+            )
         try:
             groups[name] = set(values)
         except TypeError as exc:

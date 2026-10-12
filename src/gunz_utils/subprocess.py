@@ -283,7 +283,7 @@ def _run_command_bounded(
         stderr=subprocess.PIPE,
         text=False,
         cwd=cwd,
-        env=None if env is None else {**os.environ, **env},
+        env=env,
         start_new_session=os.name == "posix",
     )
     stdout_pipe = process.stdout
@@ -406,7 +406,7 @@ def run_command(
             timeout=timeout,
             check=False,
             cwd=cwd,
-            env=None if env is None else {**os.environ, **env},
+            env=env,
         )
         returncode = completed.returncode
         stdout_b = completed.stdout
@@ -720,7 +720,7 @@ async def run_command_async(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=cwd,
-        env=None if env is None else {**os.environ, **env},
+        env=env,
         start_new_session=os.name == "posix",
     )
     if max_output_bytes is None:

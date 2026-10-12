@@ -75,7 +75,18 @@ def lexical_contained_path(
         raise ValueError("path must be relative")
     if any(part == ".." for part in supplied.parts):
         raise ValueError("path escapes configured root")
-    return Path(root) / supplied
+    candidate = Path(root) / supplied
+    #? Security: a lexical path can still escape root when an intermediate
+    #? component is a symlink pointing outside. Resolve and require containment
+    #? so callers are never handed a path that reads outside the configured root.
+    base = Path(root).resolve()
+    try:
+        resolved = candidate.resolve()
+    except OSError:
+        resolved = candidate.resolve(strict=False)
+    if not resolved.is_relative_to(base):
+        raise ValueError("path escapes configured root")
+    return candidate
 
 
 def atomic_write_bytes(
