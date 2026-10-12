@@ -1,1 +1,0 @@
-Reconcile the audited security/lifecycle repairs with newer main publication locking, process APIs and sectioned style checks; retain strict cross-process identity and serialized-publication regressions.

@@ -1,1 +1,0 @@
-Roll back artifact files and newly created run directories when benchmark run-directory publication fails before run.json commits, while preserving pre-existing artifacts and the initiating exception.\n

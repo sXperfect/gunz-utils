@@ -1,1 +1,0 @@
-Verify installed artifacts without pytest source shadowing, independently install source distributions, collect dispatcher regressions in the canonical suite, and include all package inputs in PR packaging checks.

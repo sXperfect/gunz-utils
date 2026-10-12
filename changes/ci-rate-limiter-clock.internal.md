@@ -1,1 +1,0 @@
-Make the rate-limiter wakeup deadline regression independent of host uptime by using one fake clock from construction onward, and verify that timeout follows the simulated sleep without consuming tokens.

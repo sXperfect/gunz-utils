@@ -9,6 +9,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Unreleased changes are collected as conflict-free fragments in `changes/`. Run `python scripts/release.py status` to inspect them.
 
+## [1.14.2] — 2026-10-12
+
+### Security
+
+- Anchor content-store fanout operations to directory descriptors on supported
+  POSIX platforms, verify and copy from opened regular-file handles, and retain
+  materialization staging files until publication. Reject non-ASCII hexadecimal
+  digest spellings. Platforms without descriptor-relative no-follow operations
+  require trusted directory trees; same-digest hard-link fallback preserves content
+  rather than the inode of a competing publisher.
+
+- Reject URI authority delimiters introduced by IDNA hostname normalization.
+
+- SecureStore now authenticates the current store policy when guarding reads and
+  mutations, rejects missing key material for previously initialized stores, and
+  can recover a verified pending rotation past a malformed primary key without
+  ignoring unsafe-file errors.
+
+- Authenticate SecureStore record-format policy and improve master-key rotation recovery after transaction failures. Trusted pre-envelope stores now require explicit `unlock(allow_legacy=True)` followed by `migrate_records()`; existing strict-envelope stores upgrade automatically.
+
+### Fixed
+
+- Apply asynchronous bounded-capture timeouts to process exit and pipe draining.
+  On timeout, cancellation, overflow or reader failure, cancel and join owned
+  capture tasks, close capture read ends, and reap the child without waiting for
+  foreign pipe writers. Preserve shared output limits and repeated cancellation
+  cleanup, including timeout/cancellation for unlimited capture.
+
+- Close atomic-write temporary descriptors when permission or file-wrapper setup fails.
+
+- Close rejected coroutine submissions in bounded concurrency helpers, SingleFlight
+  and async TTL caches. Preserve cooperative child cleanup through repeated caller
+  cancellation, including descriptor release and initiating error/cancellation signals.
+
+- Publish transactional directories with atomic no-replace OS operations; unsupported platforms or filesystems fail explicitly and clean staging.
+
+- Close rejected lease heartbeat coroutines while preserving operation task cleanup
+  and the original task submission failure.
+
+- Complete interrupted SecureStore key-mode publication during authenticated unlock, removing obsolete opposite-mode primary material and preserving later same-mode rotation.
+
+- Preserve Python reference values and depth errors for normalization budgets outside
+  the native classifier's C-integer range. Check depth with Python semantics first
+  and bound only the native optimization budget, retaining the caller's recursive
+  budget, default depth and existing native stack-safety cutoff.
+
+- Bound native JSON fast-path recursion independently of interpreter accounting,
+  delegating deeper inputs to the Python reference so expanded nesting limits and
+  cyclic objects remain safe on Python 3.11 and 3.12. Preserve Python integer-subclass
+  arithmetic and comparison semantics in native varint encoding by delegating those
+  subclasses to the reference implementation.
+
+- Fix bounded worker pipeline cleanup after partial task setup failure and propagate
+  worker or producer cancellation without leaving consumers waiting indefinitely.
+
+- Apply bounded synchronous command timeouts through output pipe draining and clean
+  up reader threads when descendants retain pipes after the direct process exits.
+  Release the child and capture pipes when reader construction or startup fails.
+
+- Reject nonfinite sync timeouts before creating directories or removing existing
+  completion markers.
+
+- Configure the optional Windows MSVC build with the running CPython import library, matching dynamic runtime and isolated intermediate outputs; add preparation checks and Windows-only native contract tests.
+
+- Handle deeply nested standard structures with iterative traversal, reject inconsistent Result variants and non-finite cleanup timeouts, and preserve direct cleanup cancellation.
+
+- Preserve integer-subclass varint compatibility, make canonical set ordering independent of mapping insertion order, validate process-map inputs before consuming them, and keep directory fingerprints and synchronization metadata consistent on failure.
+
+- Keep computations started before synchronous TTL cache clearing from repopulating invalidated entries, while preserving results for their existing callers.
+
+- Roll back artifact files and newly created run directories when benchmark run-directory publication fails before run.json commits, while preserving pre-existing artifacts and the initiating exception.\n
+
+- Serialize cooperating content-store publishers per fanout directory so hard-link fallback cannot overwrite a concurrent winner between the existence check and atomic replacement; publication locks are symlink-safe and work on POSIX and Windows.\n
+
+- Retain monotonic CPU, I/O, fault, and context-switch counters across observed process lifetimes using PID plus Linux start time, so exited children remain represented and PID reuse cannot merge distinct processes.\n
+
+- Reject mismatched procfs PID namespaces before profiling, preserve non-UTF-8 process names and unknown memory readings, and terminate the owned process group on sampling failure while preserving the original exception.
+
+- Enforce retry budgets after callbacks and at exact deadlines, validate large token requests before float rounding, and reject unrepresentable numeric parameters before work begins.
+
+### Documentation
+
+- Clarify that verified content-store reads may reject a concurrent pathname
+  replacement even when the replacement has the same digest. Callers may retry
+  after cooperating publication settles; returned paths remain snapshots.
+
 ## [1.14.1] — 2026-10-08
 
 ### Fixed

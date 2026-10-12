@@ -1,1 +1,0 @@
-Authenticate SecureStore record-format policy and improve master-key rotation recovery after transaction failures. Trusted pre-envelope stores now require explicit `unlock(allow_legacy=True)` followed by `migrate_records()`; existing strict-envelope stores upgrade automatically.
