@@ -138,7 +138,13 @@ def format_bytes(
     precision = _validated_precision(precision)
     n = _finite_float(n, name="n")
     if n < 0:
-        return f"-{format_bytes(-n, precision=precision, binary=binary)}"
+        magnitude = format_bytes(-n, precision=precision, binary=binary)
+        #? Suppress the sign when the magnitude truncates to zero so a
+        #? negative fractional byte count never renders as a meaningless
+        #? "-0 B" (matching the positive-zero form "0 B").
+        if magnitude.split(" ", 1)[0] == "0":
+            return magnitude
+        return f"-{magnitude}"
     base = 1024 if binary else 1000
     #? SI units are uppercase (KB, MB); IEC units use the canonical KiB/MiB
     #? suffix spelling to disambiguate powers of 2 from powers of 10.
@@ -193,7 +199,13 @@ def format_duration(
     precision = _validated_precision(precision)
     seconds = _finite_float(seconds, name="seconds")
     if seconds < 0:
-        return f"-{format_duration(-seconds, precision=precision)}"
+        magnitude = format_duration(-seconds, precision=precision)
+        #? Suppress the sign when the magnitude truncates to zero; "0ms" is
+        #? the only zero representation sub-second input can produce, so a
+        #? negative fractional duration never renders as "-0ms".
+        if magnitude == "0ms":
+            return magnitude
+        return f"-{magnitude}"
     #? Sub-second values are reported as whole milliseconds to avoid
     #? log lines like "0.0001s" that bury the signal in noise.
     if seconds < 1:

@@ -29,6 +29,7 @@ _FORBIDDEN_EXTRA_OPTIONS = frozenset(
         "-f",
         "-M",
         "--backup-dir",
+        "--delete",
         "--files-from",
         "--include-from",
         "--exclude-from",

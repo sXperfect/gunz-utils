@@ -273,54 +273,167 @@ def deep_merge(
         Any
             A cycle-safe copy of containers. Leaf identity follows its copy
             protocol; failed copies retain the original object and mutable state.
+
+        Notes
+        -----
+        This is an iterative, post-order traversal (unlike a recursive deep
+        copy) so that deeply nested or untrusted config trees cannot overflow
+        the interpreter stack with a ``RecursionError``. Mapping/list/set
+        shells are registered in ``memo`` before their children are filled,
+        which preserves cycle and shared-reference semantics exactly.
         """
         val_id = id(val)
         if val_id in memo:
             return memo[val_id]
+        if not isinstance(val, Mapping | list | set | tuple):
+            try:
+                copied = copy.deepcopy(val, memo)
+                memo[val_id] = copied
+            except Exception:
+                memo[val_id] = val
+            return memo[val_id]
 
-        if isinstance(val, Mapping):
-            res_dict: dict[Any, Any] = {}
-            memo[val_id] = res_dict
-            for k, v in val.items():
-                res_dict[k] = _isolate(v)
-            return res_dict
-        if isinstance(val, list):
-            res_list: list[Any] = []
-            memo[val_id] = res_list
-            for v in val:
-                res_list.append(_isolate(v))
-            return res_list
-        if isinstance(val, set):
-            res_set: set[Any] = set()
-            memo[val_id] = res_set
-            for v in val:
-                res_set.add(_isolate(v))
-            return res_set
-        if isinstance(val, tuple):
-            y = [_isolate(v) for v in val]
-            if val_id in memo:
-                return memo[val_id]
-            for k, j in zip(val, y, strict=True):
-                if k is not j:
-                    res_tuple = tuple(y)
-                    break
-            else:
-                res_tuple = val
-            memo[val_id] = res_tuple
-            return res_tuple
-        try:
-            copied = copy.deepcopy(val, memo)
-            memo[val_id] = copied
-            return copied
-        except Exception:
-            memo[val_id] = val
-            return val
+        def _key_sink(shell: dict[Any, Any], key: Any) -> Any:
+            def sink(value: Any) -> None:
+                shell[key] = value
+
+            return sink
+
+        def _append_sink(container: list[Any]) -> Any:
+            def sink(value: Any) -> None:
+                container.append(value)
+
+            return sink
+
+        def _add_sink(container: set[Any]) -> Any:
+            def sink(value: Any) -> None:
+                container.add(value)
+
+            return sink
+
+        root_box: list[Any] = []
+        #? Each frame: (action, node, slot, payload). ``slot`` is a sink that
+        #? receives the isolated child result (``None`` for the root); for a
+        #? tuple, ``payload`` accumulates its isolated children in order.
+        stack: list[tuple[str, Any, Any, Any]] = [("expand", val, None, None)]
+        while stack:
+            action, node, slot, payload = stack.pop()
+            node_id = id(node)
+            if action == "expand":
+                if node_id in memo:
+                    result = memo[node_id]
+                    if slot is None:
+                        root_box.append(result)
+                    else:
+                        slot(result)
+                    continue
+                if not isinstance(node, Mapping | list | set | tuple):
+                    try:
+                        copied = copy.deepcopy(node, memo)
+                        memo[node_id] = copied
+                    except Exception:
+                        memo[node_id] = node
+                    result = memo[node_id]
+                    if slot is None:
+                        root_box.append(result)
+                    else:
+                        slot(result)
+                    continue
+                if isinstance(node, Mapping):
+                    shell: dict[Any, Any] = {}
+                    memo[node_id] = shell
+                    if slot is None:
+                        root_box.append(shell)
+                    else:
+                        slot(shell)
+                    #? Push in reverse so LIFO pop order preserves key order.
+                    for key, child in reversed(list(node.items())):
+                        stack.append(("expand", child, _key_sink(shell, key), None))
+                elif isinstance(node, list):
+                    shell_list: list[Any] = []
+                    memo[node_id] = shell_list
+                    if slot is None:
+                        root_box.append(shell_list)
+                    else:
+                        slot(shell_list)
+                    #? Push in reverse so LIFO pop order preserves list order.
+                    for child in reversed(node):
+                        stack.append(("expand", child, _append_sink(shell_list), None))
+                elif isinstance(node, set):
+                    shell_set: set[Any] = set()
+                    memo[node_id] = shell_set
+                    if slot is None:
+                        root_box.append(shell_set)
+                    else:
+                        slot(shell_set)
+                    for child in node:
+                        stack.append(("expand", child, _add_sink(shell_set), None))
+                else:
+                    children: list[Any] = []
+                    stack.append(("tuple_finalize", node, slot, children))
+                    #? Push in reverse so LIFO pop order preserves tuple order.
+                    for child in reversed(node):
+                        stack.append(("expand", child, _append_sink(children), None))
+            else:  # tuple_finalize
+                if node_id in memo:
+                    result = memo[node_id]
+                else:
+                    #? Reuse the original tuple when no child changed identity;
+                    #? otherwise materialize a new tuple from isolated children.
+                    for k, j in zip(node, payload, strict=True):
+                        if k is not j:
+                            result = tuple(payload)
+                            break
+                    else:
+                        result = node
+                    memo[node_id] = result
+                if slot is None:
+                    root_box.append(result)
+                else:
+                    slot(result)
+
+        return root_box[0]
+
+    def _merge_lists(
+        a: list[Any],
+        b: list[Any],
+    ) -> list[Any]:
+        """Merge two lists under the configured ``list_strategy``."""
+        if list_strategy == "replace":
+            return cast(list[Any], _isolate(b))
+        if list_strategy == "concat":
+            return cast(list[Any], _isolate(a)) + cast(list[Any], _isolate(b))
+        #? dedup: first occurrence wins, order = base then override.
+        #? Unhashable items (e.g. dicts) fall through without being tracked;
+        #? that mirrors common stdlib semantics and avoids forcing the caller
+        #? to pre-normalize their data.
+        #? ``bool`` is a strict subtype of ``int`` in the package's numeric
+        #? contract, so boolean leaves must stay distinct from equal-valued
+        #? integers: ``True`` is not deduplicated against ``1``, ``False``
+        #? against ``0``. Keying booleans as ``(bool, value)`` keeps them out
+        #? of the integer keys while leaving every other hashable type
+        #? unchanged.
+        seen_hashable: set[Any] = set()
+        seen_unhashable: list[Any] = []
+        result: list[Any] = []
+        for item in (*a, *b):
+            try:
+                dedup_key: Any = (bool, item) if isinstance(item, bool) else item
+                if dedup_key in seen_hashable:
+                    continue
+                seen_hashable.add(dedup_key)
+            except TypeError:
+                if any(item == previous for previous in seen_unhashable):
+                    continue
+                seen_unhashable.append(item)
+            result.append(_isolate(item))
+        return result
 
     def _merge(
         a: Any,
         b: Any,
     ) -> Any:
-        """Merge two values recursively without mutating either input.
+        """Merge two values iteratively without mutating either input.
 
         Parameters
         ----------
@@ -334,44 +447,69 @@ def deep_merge(
         Any
             The merged value as a fresh, isolated structure.
         """
-        if isinstance(a, Mapping) and isinstance(b, Mapping):
-            pair_key = (id(a), id(b))
-            if pair_key in merge_memo:
-                return merge_memo[pair_key]
-            #? Build a new dict so neither input is mutated; recurse on each key.
-            out: dict[str, Any] = {}
-            merge_memo[pair_key] = out
-            for key in a:
-                out[key] = _merge(a[key], b[key]) if key in b else _isolate(a[key])
-            for key in b:
-                if key not in a:
-                    out[key] = _isolate(b[key])
-            return out
-        if isinstance(a, list) and isinstance(b, list):
-            if list_strategy == "replace":
-                return _isolate(b)
-            if list_strategy == "concat":
-                return _isolate(a) + _isolate(b)
-            #? dedup: first occurrence wins, order = base then override.
-            #? Unhashable items (e.g. dicts) fall through without being
-            #? tracked; that mirrors common stdlib semantics and avoids
-            #? forcing the caller to pre-normalize their data.
-            seen_hashable: set[Any] = set()
-            seen_unhashable: list[Any] = []
-            result: list[Any] = []
-            for item in (*a, *b):
-                try:
-                    if item in seen_hashable:
-                        continue
-                    seen_hashable.add(item)
-                except TypeError:
-                    if any(item == previous for previous in seen_unhashable):
-                        continue
-                    seen_unhashable.append(item)
-                result.append(_isolate(item))
-            return result
-        #? Non-dict / non-list: override wins. Plain scalars and mixed
-        #? type pairs all fall through here.
-        return _isolate(b)
+        #? An explicit work stack (rather than recursion) keeps the merge
+        #? bounded on deeply nested mappings: pairs are registered in
+        #? ``merge_memo`` before their children are scheduled, preserving
+        #? cycle and shared-reference semantics.
+        root_box: list[Any] = []
+        #? Frames: ("merge", a, b, target) or ("isolate", _, value, target),
+        #? where target is ``None`` (root) or ``(out_dict, key)``.
+        stack: list[tuple[str, Any, Any, Any]] = [("merge", a, b, None)]
+        while stack:
+            action, aa, bb, target = stack.pop()
+            if action == "isolate":
+                result = _isolate(bb)
+                if target is None:
+                    root_box.append(result)
+                else:
+                    parent, key = target
+                    parent[key] = result
+                continue
+            if isinstance(aa, Mapping) and isinstance(bb, Mapping):
+                pair_key = (id(aa), id(bb))
+                if pair_key in merge_memo:
+                    result = merge_memo[pair_key]
+                else:
+                    #? Build a new dict so neither input is mutated; fill
+                    #? children in place so the pair resolves to ``out`` on
+                    #? any back-reference (cycle safety).
+                    out: dict[Any, Any] = {}
+                    merge_memo[pair_key] = out
+                    result = out
+                    tasks: list[tuple[str, Any, Any, Any]] = []
+                    for key in aa:
+                        if key in bb:
+                            tasks.append(("merge", aa[key], bb[key], (out, key)))
+                        else:
+                            tasks.append(("isolate", None, aa[key], (out, key)))
+                    for key in bb:
+                        if key not in aa:
+                            tasks.append(("isolate", None, bb[key], (out, key)))
+                    #? Push reversed so LIFO pop order preserves key order.
+                    for task in reversed(tasks):
+                        stack.append(task)
+                if target is None:
+                    root_box.append(result)
+                else:
+                    parent, key = target
+                    parent[key] = result
+            elif isinstance(aa, list) and isinstance(bb, list):
+                result = _merge_lists(aa, bb)
+                if target is None:
+                    root_box.append(result)
+                else:
+                    parent, key = target
+                    parent[key] = result
+            else:
+                #? Non-dict / non-list: override wins. Plain scalars and
+                #? mixed type pairs all fall through here.
+                result = _isolate(bb)
+                if target is None:
+                    root_box.append(result)
+                else:
+                    parent, key = target
+                    parent[key] = result
+
+        return root_box[0]
 
     return cast(dict[str, Any], _merge(base, override))

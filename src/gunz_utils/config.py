@@ -63,6 +63,7 @@ def env_overrides(
     if not isinstance(separator, str) or not separator:
         raise ValueError("separator must be a non-empty string")
     out: dict[str, Any] = {}
+    seen_leaves: set[tuple[str, ...]] = set()
     prefix_value = prefix.upper().rstrip("_") + "_"
     for name, value in environ.items():
         upper = name.upper()
@@ -86,6 +87,13 @@ def env_overrides(
             raise ValueError(
                 f"environment key {name!r} conflicts with a nested configuration"
             )
+        path = tuple(parts)
+        if path in seen_leaves:
+            raise ValueError(
+                f"environment key {name!r} collides case-insensitively with "
+                "another key for the same configuration path"
+            )
+        seen_leaves.add(path)
         cursor[parts[-1]] = value
     return out
 
