@@ -51,6 +51,18 @@ def deprecated(
         Callable[P, T]
             The result of the operation.
         """
+        #? @deprecated may be applied *outside* @classmethod/@staticmethod, in
+        #? which case func is the descriptor object, not the underlying callable.
+        #? The descriptor is not callable, so unwrap to the real function and
+        #? re-apply the descriptor to the wrapper below.
+        descriptor: type[classmethod] | type[staticmethod] | None = None
+        if isinstance(func, classmethod):
+            descriptor = classmethod
+            func = func.__func__
+        elif isinstance(func, staticmethod):
+            descriptor = staticmethod
+            func = func.__func__
+
         if asyncio.iscoroutinefunction(func):
             #? Keep deprecated async functions recognizable as coroutine
             #? functions (asyncio.iscoroutinefunction/inspect.iscoroutinefunction
@@ -82,6 +94,8 @@ def deprecated(
                 )
                 return await func(*args, **kwargs)
 
+            if descriptor is not None:
+                return descriptor(wrapped)
             return wrapped
 
         if inspect.isasyncgenfunction(func):
@@ -117,6 +131,8 @@ def deprecated(
                 async for item in func(*args, **kwargs):
                     yield item
 
+            if descriptor is not None:
+                return descriptor(wrapped)
             return wrapped
 
         @functools.wraps(func)
@@ -145,6 +161,8 @@ def deprecated(
             )
             return func(*args, **kwargs)
 
+        if descriptor is not None:
+            return descriptor(wrapped)
         return wrapped
 
     return decorate

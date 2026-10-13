@@ -59,6 +59,28 @@ def _reject_nonfinite(value: Any) -> None:
             stack.extend(node)
 
 
+def _reject_excessive_nesting(value: Any) -> None:
+    """Raise ``ValueError`` if ``value`` nests deeper than the JSON depth bound.
+
+    The encode path must enforce the same ``_MAX_JSON_DEPTH`` bound the decode
+    path (``iter_jsonl``) enforces, so a record ``write_jsonl`` emits is always
+    readable back. Iterative so deep records do not overflow the interpreter
+    stack. The root container counts as depth 1, matching the JSON bracket
+    depth counted by ``_excessive_nesting_position``.
+    """
+    stack: list[tuple[Any, int]] = [(value, 1)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > _MAX_JSON_DEPTH:
+            raise ValueError(
+                f"JSON record is nested deeper than {_MAX_JSON_DEPTH} levels"
+            )
+        if isinstance(node, dict):
+            stack.extend((item, depth + 1) for item in node.values())
+        elif isinstance(node, (list, tuple)):
+            stack.extend((item, depth + 1) for item in node)
+
+
 def iter_jsonl(
     handle: TextIO,
 ) -> Iterator[Any]:
@@ -119,6 +141,10 @@ def write_jsonl(
     count = 0
     buffer: list[str] = []
     for record in records:
+        #? Enforce the shared JSON nesting-depth bound so a record nested
+        #? deeper than _MAX_JSON_DEPTH is rejected with ValueError, matching
+        #? iter_jsonl and serialization.json_dumps (VULN-2026-008 class).
+        _reject_excessive_nesting(record)
         buffer.append(
             json.dumps(
                 record,

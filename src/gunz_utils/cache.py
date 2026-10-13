@@ -41,8 +41,25 @@ def _normalize_cache_value(
     ``bool`` is a subtype of ``int``, so ``True == 1`` and ``False == 0`` with
     equal hashes; keying booleans as ``(bool, value)`` keeps them out of the
     integer keys, honoring the package's bool-is-subtype-of-int contract.
+
+    The normalization recurses into containers (tuples, lists, dicts) so a
+    bool nested inside a structure is also tagged, preventing a nested
+    ``(True,)`` from colliding with ``(1,)``. Lists and dicts stay their own
+    (unhashable) types so the caller's unhashable-key bypass is preserved;
+    only the nested values are normalized in place.
     """
-    return (bool, value) if isinstance(value, bool) else value
+    if isinstance(value, bool):
+        return (bool, value)
+    if isinstance(value, tuple):
+        return tuple(_normalize_cache_value(item) for item in value)
+    if isinstance(value, list):
+        return [_normalize_cache_value(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: _normalize_cache_value(item)
+            for key, item in value.items()
+        }
+    return value
 
 
 def _cache_key(

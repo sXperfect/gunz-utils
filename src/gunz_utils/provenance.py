@@ -61,8 +61,10 @@ _SECRET_KEY_VALUE_TOKEN = re.compile(
 #? scheme's ``scheme://`` colon, and the greedy password consumes every
 #? credential character up to the last ``@`` before the host — including a
 #? literal ``@`` or ``/`` inside the password — so no credential fragment (with
-#? or without ``@``/``/``) survives redaction.
-_USERINFO_PASSWORD = re.compile(r"([^@:/]+):(?!/)(.*)@")
+#? or without ``@``/``/``) survives redaction. The user part is ``*`` so the
+#? empty-user authority ``scheme://:password@host`` (e.g. redis-style) is also
+#? matched and its password masked.
+_USERINFO_PASSWORD = re.compile(r"([^@:/]*):(?!/)(.*)@")
 
 
 def _redact_userinfo_password(
