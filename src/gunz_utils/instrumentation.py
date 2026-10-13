@@ -60,9 +60,20 @@ class Timer:
     ) -> None:
         self.name = name
         self.started = 0.0
+        self._active = False
         self.result: Timing | None = None
 
     def __enter__(self) -> Timer:
+        if self._active:
+            #? The Timer is not reentrant: a nested __enter__ on the same
+            #? object would overwrite `started` and silently corrupt the outer
+            #? block's elapsed, so fail loudly instead of returning a wrong
+            #? measurement. Sequential reuse (enter/exit/enter/exit) is fine.
+            raise RuntimeError(
+                f"Timer {self.name!r} is not reentrant; nested re-entry would "
+                "corrupt the outer measurement"
+            )
+        self._active = True
         self.started = time.perf_counter()
         return self
 
@@ -76,6 +87,7 @@ class Timer:
             time.perf_counter() - self.started,
             exc is None,
         )
+        self._active = False
 
 
 __all__ = ["Counter", "Timer", "Timing", "Trace", "TraceEvent"]

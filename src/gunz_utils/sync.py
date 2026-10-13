@@ -278,10 +278,20 @@ def rsync_mirror(
     if timeout is not None and (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
-        or not math.isfinite(float(timeout))
         or timeout <= 0
     ):
         raise ValueError("timeout must be a finite positive number or None")
+    if timeout is not None:
+        try:
+            timeout_float = float(timeout)
+        except OverflowError:
+            #? An int too large to convert to float must surface as the
+            #? documented ValueError, not leak an internal OverflowError.
+            raise ValueError(
+                "timeout must be a finite positive number or None"
+            ) from None
+        if not math.isfinite(timeout_float):
+            raise ValueError("timeout must be a finite positive number or None")
     if max_output_bytes is not None and (
         isinstance(max_output_bytes, bool)
         or not isinstance(max_output_bytes, int)

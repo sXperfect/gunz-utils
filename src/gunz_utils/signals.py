@@ -426,7 +426,17 @@ class GracefulShutdown:
                 try:
                     await asyncio.shield(cleanup_task)
                 except asyncio.CancelledError:
-                    pass
+                    #? A CancelledError here is either the OUTER task being
+                    #? re-cancelled while cleanup drains (absorb it so cleanup
+                    #? can finish) or the cleanup task itself finishing with a
+                    #? CancelledError/BaseException from a callback (which must
+                    #? propagate per run_cleanup's contract, not be discarded).
+                    if cleanup_task.done():
+                        if cleanup_task.cancelled():
+                            raise
+                        exc = cleanup_task.exception()
+                        if exc is not None:
+                            raise exc from None
         return False
 
 
