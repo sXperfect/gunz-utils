@@ -114,10 +114,20 @@ def __getattr__(
         raise AttributeError(f"module 'gunz_utils' has no attribute {name!r}")
     import importlib
 
-    #? _LAZY is a static allowlist of literal module names, so this lazy
-    #? import is not an arbitrary dynamic import (GS045 is a false positive).
-    # gunz-style: ignore[GS045]
-    return getattr(importlib.import_module(_LAZY[name], __name__), name)
+    try:
+        #? _LAZY is a static allowlist of literal module names, so this lazy
+        #? import is not an arbitrary dynamic import (GS045 is a false positive).
+        # gunz-style: ignore[GS045]
+        module = importlib.import_module(_LAZY[name], __name__)
+    except ImportError as exc:
+        #? A missing optional dependency surfaces as AttributeError so that
+        #? hasattr() returns False and getattr(..., default) returns the default,
+        #? matching the standard attribute-introspection contract.
+        raise AttributeError(
+            f"module 'gunz_utils' has no attribute {name!r} "
+            "(optional dependency unavailable)"
+        ) from exc
+    return getattr(module, name)
 
 
 def __dir__() -> list[str]:

@@ -17,11 +17,16 @@ from .result import BenchmarkResult
 
 @dataclass(frozen=True)
 class BenchmarkComparison:
-    """Relative change between baseline and candidate timing statistics."""
+    """Relative change between baseline and candidate timing statistics.
 
-    median_change: float
-    p95_change: float
-    mean_change: float
+    A change of ``None`` represents an effectively infinite increase (a
+    non-zero candidate over a zero baseline), which serializes to ``null``
+    in JSON rather than a non-standard ``Infinity`` token.
+    """
+
+    median_change: float | None
+    p95_change: float | None
+    mean_change: float | None
     regressed: bool
 
 
@@ -58,7 +63,7 @@ def _finite_non_negative(
 def _change(
     before: float,
     after: float,
-) -> float:
+) -> float | None:
     """_change() function.
 
     Parameters
@@ -70,12 +75,26 @@ def _change(
 
     Returns
     -------
-    float
-        The result of the operation.
+    float | None
+        The relative change, or ``None`` when it is effectively infinite (a
+        non-zero ``after`` over a zero ``before``). ``None`` serializes to
+        ``null`` in JSON, keeping CLI output standards-compliant.
     """
     if before == 0:
-        return 0.0 if after == 0 else float("inf")
+        return 0.0 if after == 0 else None
     return (after - before) / before
+
+
+def _exceeds_threshold(
+    change: float | None,
+    threshold: float,
+) -> bool:
+    """Whether a relative change counts as a regression.
+
+    An infinite change (``None``) is an unbounded increase and always counts
+    as a regression.
+    """
+    return change is None or change > threshold
 
 
 def compare_results(
@@ -142,7 +161,8 @@ def compare_results(
         median_change=median,
         p95_change=p95,
         mean_change=mean,
-        regressed=median > median_threshold or p95 > p95_threshold,
+        regressed=_exceeds_threshold(median, median_threshold)
+        or _exceeds_threshold(p95, p95_threshold),
     )
 
 

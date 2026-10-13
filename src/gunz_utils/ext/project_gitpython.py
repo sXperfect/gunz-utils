@@ -83,41 +83,45 @@ def resolve_project_root(
     try:
         # ? Search upwards for the .git directory
         repo = Repo(start, search_parent_directories=True)
-        #? working_tree_dir is typed as str | os.PathLike[str] | None by GitPython;
-        #? bare repos expose None here, so guard explicitly.
-        working_dir = repo.working_tree_dir
-        if working_dir is None:
-            raise RuntimeError(
-                "Resolved repo has no working tree (bare repository)."
-            )
-        root_path = pathlib.Path(working_dir).resolve()
-
-        # ? Validate it's actually a directory
-        if not root_path.is_dir():
-            raise RuntimeError(f"Resolved root is not a directory: {root_path}")
-
-        _PROJECT_ROOT = root_path
-        _PROJECT_ANCHOR = start
-
-        if inject_to_sys_path:
-            root_str = str(root_path)
-            if root_str not in sys.path:
-                #? Intentional, documented, opt-in side effect of
-                #? ``inject_to_sys_path`` (tested); not a hidden mutation.
-                #? Insert at position 0 to prioritize local source over
-                #? installed packages
-                # gunz-style: ignore[GS007]
-                sys.path.insert(0, root_str)
-                logger.debug(f"Added project root to sys.path: {root_str}")
-
-        return _PROJECT_ROOT
-
     except InvalidGitRepositoryError as exc:
         raise RuntimeError(
             "Could not find project root. "
             "Ensure you are running inside a git repository."
         ) from exc
     except Exception as exc:
+        #? Unexpected errors from GitPython (which may carry secrets) are masked
+        #? behind a generic message so they never leak into diagnostics.
         raise RuntimeError(
             f"Unexpected {type(exc).__name__} while resolving project root"
         ) from exc
+
+    #? working_tree_dir is typed as str | os.PathLike[str] | None by GitPython;
+    #? bare repos expose None here, so guard explicitly. These specific
+    #? diagnostics are raised outside the broad handler so their messages
+    #? propagate unchanged.
+    working_dir = repo.working_tree_dir
+    if working_dir is None:
+        raise RuntimeError(
+            "Resolved repo has no working tree (bare repository)."
+        )
+    root_path = pathlib.Path(working_dir).resolve()
+
+    # ? Validate it's actually a directory
+    if not root_path.is_dir():
+        raise RuntimeError(f"Resolved root is not a directory: {root_path}")
+
+    _PROJECT_ROOT = root_path
+    _PROJECT_ANCHOR = start
+
+    if inject_to_sys_path:
+        root_str = str(root_path)
+        if root_str not in sys.path:
+            #? Intentional, documented, opt-in side effect of
+            #? ``inject_to_sys_path`` (tested); not a hidden mutation.
+            #? Insert at position 0 to prioritize local source over
+            #? installed packages
+            # gunz-style: ignore[GS007]
+            sys.path.insert(0, root_str)
+            logger.debug(f"Added project root to sys.path: {root_str}")
+
+    return _PROJECT_ROOT

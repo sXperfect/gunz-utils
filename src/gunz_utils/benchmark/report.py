@@ -33,8 +33,14 @@ def format_comparison(
         ("P95", comparison.p95_change),
         ("Mean", comparison.mean_change),
     ]
+
+    def _fmt_change(change: float | None) -> str:
+        if change is None:
+            return "+inf%"
+        return f"{change:+.2%}"
+
     lines = ["| Metric | Change |", "|---|---:|"]
-    lines.extend(f"| {name} | {change:+.2%} |" for name, change in rows)
+    lines.extend(f"| {name} | {_fmt_change(change)} |" for name, change in rows)
     lines.append("")
     lines.append(f"Regression: {'yes' if comparison.regressed else 'no'}")
     return "\n".join(lines)

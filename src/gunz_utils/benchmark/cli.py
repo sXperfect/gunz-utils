@@ -55,7 +55,7 @@ def main(
             median_threshold=args.median_threshold,
             p95_threshold=args.p95_threshold,
         )
-        print(json.dumps(result.__dict__, indent=2, sort_keys=True))
+        print(json.dumps(result.__dict__, indent=2, sort_keys=True, allow_nan=False))
         return 1 if result.regressed else 0
 
     if not args.program:

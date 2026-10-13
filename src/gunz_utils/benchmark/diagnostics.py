@@ -79,11 +79,16 @@ def analyze_stability(
     mean = statistics.fmean(values)
     cv = 0.0 if mean == 0 else statistics.pstdev(values) / mean
     median = statistics.median(values)
-    relative_range = (
-        0.0
-        if median == 0
-        else (max(values) - min(values)) / median
-    )
+    spread = max(values) - min(values)
+    if median == 0:
+        # A zero median with non-zero spread means division by zero, so the
+        # relative range is effectively infinite. Reporting 0.0 here would
+        # mask a large spread as "no variance", so surface it as infinity
+        # (which then trips the range warning). All-zero samples have no
+        # spread and correctly report 0.0.
+        relative_range = math.inf if spread > 0 else 0.0
+    else:
+        relative_range = spread / median
     quartiles = statistics.quantiles(values, n=4) if len(values) >= 4 else None
     outliers = 0
     if quartiles is not None:
@@ -95,7 +100,10 @@ def analyze_stability(
     if cv > max_cv:
         warnings.append(f"coefficient of variation is high ({cv:.2%})")
     if relative_range > max_relative_range:
-        warnings.append(f"sample range is high ({relative_range:.2%})")
+        if math.isinf(relative_range):
+            warnings.append("sample range is high")
+        else:
+            warnings.append(f"sample range is high ({relative_range:.2%})")
     if outliers:
         warnings.append(f"{outliers} timing outlier(s) detected")
     return StabilityReport(
