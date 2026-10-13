@@ -64,12 +64,15 @@ def env_overrides(
         raise ValueError("separator must be a non-empty string")
     out: dict[str, Any] = {}
     seen_leaves: set[tuple[str, ...]] = set()
-    prefix_value = prefix.upper().rstrip("_") + "_"
+    prefix_upper = prefix.upper().rstrip("_")
     for name, value in environ.items():
         upper = name.upper()
-        if not upper.startswith(prefix_value):
+        if not upper.startswith(prefix_upper + "_"):
             continue
-        suffix = name[len(prefix_value):]
+        #? Consume the prefix plus any leading separator underscores, so both
+        #? the legacy single-underscore and canonical double-underscore prefix
+        #? boundaries nest cleanly without a leading-underscore path segment.
+        suffix = name[len(prefix_upper):].lstrip("_")
         if not suffix:
             continue
         parts = [part.lower() for part in suffix.split(separator)]

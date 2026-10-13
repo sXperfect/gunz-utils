@@ -53,13 +53,24 @@ async def with_timeout(
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
-        or not math.isfinite(float(timeout))
         or timeout < 0
     ):
         raise ValueError(
             "timeout must be a finite non-negative number or None"
         )
-    async with asyncio.timeout(float(timeout)):
+    try:
+        timeout_float = float(timeout)
+    except OverflowError:
+        #? An int too large to convert to float (e.g. 10**400) must surface
+        #? as the documented ValueError, not leak an internal OverflowError.
+        raise ValueError(
+            "timeout must be a finite non-negative number or None"
+        ) from None
+    if not math.isfinite(timeout_float):
+        raise ValueError(
+            "timeout must be a finite non-negative number or None"
+        )
+    async with asyncio.timeout(timeout_float):
         return await awaitable
 
 

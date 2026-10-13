@@ -44,16 +44,20 @@ def env(
         #? default in a safe-defaults reader.
         if default is _MISSING:
             raise KeyError(f"required environment variable {name!r} is not set")
-        return type_cast(T, default)
-    try:
-        if cast is None:
-            result: T | object = value
-        else:
-            result = cast(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"invalid value for environment variable {name!r}") from exc
-    #? A float cast must not propagate a non-finite value (e.g. "1e400" ->
-    #? inf, or "nan"), matching the package's finiteness conventions.
+        result: T | object = default
+    else:
+        try:
+            if cast is None:
+                result = value
+            else:
+                result = cast(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"invalid value for environment variable {name!r}"
+            ) from exc
+    #? A float result must not be non-finite (e.g. "1e400" -> inf, or "nan"),
+    #? matching the package finiteness convention; this also covers a float
+    #? caller-supplied default.
     if isinstance(result, float) and not math.isfinite(result):
         raise ValueError(
             f"invalid value for environment variable {name!r}: non-finite float"
