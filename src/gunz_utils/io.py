@@ -78,6 +78,11 @@ def atomic_write(
         raise ValueError("Binary mode requires bytes content")
     if not is_binary and isinstance(content, bytes):
         raise ValueError("Text mode requires str content")
+    if mode not in ("w", "wb"):
+        raise ValueError(
+            f"atomic_write only supports 'w' or 'wb' mode, got {mode!r}; "
+            "an atomic replace cannot append, exclusively create, or read"
+        )
 
     fd, tmp_path = tempfile.mkstemp(
         dir=str(target.parent),

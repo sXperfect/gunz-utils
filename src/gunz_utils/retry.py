@@ -429,6 +429,8 @@ def retry(
         The result of the operation.
     """
     _validate(attempts, base_delay, max_delay, timeout)
+    if not exceptions:
+        raise ValueError("exceptions must not be empty")
 
     def decorate(
         func: Callable[P, T],
@@ -533,6 +535,8 @@ def async_retry(
         The result of the operation.
     """
     _validate(attempts, base_delay, max_delay, timeout)
+    if not exceptions:
+        raise ValueError("exceptions must not be empty")
 
     def decorate(
         func: Callable[P, Any],

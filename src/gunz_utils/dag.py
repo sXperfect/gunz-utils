@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import math
+import threading
 import time
 from collections.abc import Callable, Coroutine, Mapping, MutableMapping, Sequence
 from contextlib import nullcontext
@@ -19,6 +20,33 @@ from typing import Any
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 from .hashing import structured_hash
+
+
+def _run_coroutine_in_worker_thread(
+    coro: Coroutine[Any, Any, Any],
+) -> Any:
+    """Drive an async coroutine to completion on a fresh loop in a worker thread.
+
+    ``asyncio.run`` cannot be called from a running event loop. Running the
+    coroutine on a separate thread's own loop keeps the synchronous DAG entry
+    point usable when invoked from async code, and always awaits/closes the
+    coroutine so it is never leaked as an un-awaited warning.
+    """
+    holder: list[Any] = []
+    failure: list[BaseException] = []
+
+    def _drive() -> None:
+        try:
+            holder.append(asyncio.run(coro))
+        except BaseException as exc:  # noqa: BLE001
+            failure.append(exc)
+
+    worker = threading.Thread(target=_drive, daemon=True)
+    worker.start()
+    worker.join()
+    if failure:
+        raise failure[0]
+    return holder[0]
 
 
 class WorkflowExecutionError(RuntimeError):
@@ -497,7 +525,20 @@ class WorkflowDAG:
                     #? run may be an async coroutine function; drive it to
                     #? completion so a raw, never-closed coroutine is never
                     #? surfaced as a stage output or cache value.
-                    output = asyncio.run(output)
+                    try:
+                        asyncio.get_running_loop()
+                        in_running_loop = True
+                    except RuntimeError:
+                        in_running_loop = False
+                    if in_running_loop:
+                        #? asyncio.run() cannot be called from a running event
+                        #? loop and would misreport a RuntimeError as a stage
+                        #? failure while leaking the coroutine. Drive the
+                        #? coroutine on a fresh loop in a worker thread so the
+                        #? stage still completes and is always awaited/closed.
+                        output = _run_coroutine_in_worker_thread(output)
+                    else:
+                        output = asyncio.run(output)
             except BaseException as exc:
                 compensation_errors = self._rollback_sync(executed_order, outputs)
                 raise WorkflowExecutionError(
