@@ -96,10 +96,14 @@ def stable_unique(
     Iterator[T]
         Each distinct value in its first-seen position.
     """
-    seen: set[T] = set()
+    seen: set[object] = set()
     for item in items:
-        if item not in seen:
-            seen.add(item)
+        #? Key booleans as ``(bool, item)`` so ``True`` stays distinct from
+        #? ``1`` and ``False`` from ``0``, honoring the package's
+        #? bool-is-subtype-of-int dedup contract.
+        marker: object = (bool, item) if isinstance(item, bool) else item
+        if marker not in seen:
+            seen.add(marker)
             yield item
 
 

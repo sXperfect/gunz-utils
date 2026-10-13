@@ -80,14 +80,19 @@ def _validate_timeout_value(
     """
     if value is None:
         return None
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, int | float)
-        or not math.isfinite(float(value))
-        or value < 0
-    ):
+    if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueError(f"{name} must be a finite non-negative number or None")
-    return float(value)
+    try:
+        value_float = float(value)
+    except OverflowError:
+        #? An int too large to convert to float must surface as the documented
+        #? ValueError, not leak an internal OverflowError.
+        raise ValueError(
+            f"{name} must be a finite non-negative number or None"
+        ) from None
+    if not math.isfinite(value_float) or value_float < 0:
+        raise ValueError(f"{name} must be a finite non-negative number or None")
+    return value_float
 
 
 def _validate_output_limit(
@@ -198,26 +203,47 @@ def _read_bounded_pipe(
         try:
             if selector is not None:
                 selector.register(stream, selectors.EVENT_READ)
-            while not stop.is_set():
-                if selector is not None and not selector.select(timeout=0.05):
-                    continue
-                if stop.is_set():
-                    return
-                chunk = read_chunk(64 * 1024)
-                if not chunk:
-                    return
+
+            def record(
+                chunk: bytes,
+            ) -> bool:
+                """Accumulate one chunk; return True when the bound is exceeded."""
                 with lock:
                     remaining = max_output_bytes - state.total
                     if remaining >= len(chunk):
                         target.extend(chunk)
                         state.total += len(chunk)
-                        continue
+                        return False
                     if remaining > 0:
                         target.extend(chunk[:remaining])
                         state.total += remaining
                     state.exceeded = True
-                _kill_process(process)
-                return
+                return True
+
+            while not stop.is_set():
+                if selector is not None and not selector.select(timeout=0.05):
+                    continue
+                if stop.is_set():
+                    break
+                chunk = read_chunk(64 * 1024)
+                if not chunk:
+                    return
+                if record(chunk):
+                    _kill_process(process)
+                    return
+            if stop.is_set() and selector is not None:
+                #? Stop is requested when the root has exited normally. Drain
+                #? data that is immediately available so a pending overflow is
+                #? still detected, without blocking on a pipe that an escaped
+                #? descendant still holds open (select(timeout=0) never blocks).
+                #? Non-posix paths with no selector rely on stop alone.
+                while selector.select(timeout=0):
+                    chunk = read_chunk(64 * 1024)
+                    if not chunk:
+                        break
+                    if record(chunk):
+                        _kill_process(process)
+                        return
         finally:
             if selector is not None:
                 selector.close()
@@ -441,6 +467,14 @@ def run_command(
             raise TimeoutError(
                 f"Command {list(args)!r} timed out after {timeout or 0.0} seconds"
             ) from exc
+        except OverflowError:
+            #? A finite-but-unrepresentable timeout (e.g. ``1e12``, ``1e308``)
+            #? passes validation but cannot be converted by the underlying
+            #? subprocess machinery; surface it as the documented ValueError
+            #? rather than leaking an untyped OverflowError.
+            raise ValueError(
+                f"{timeout!r} is too large to use as a subprocess timeout"
+            ) from None
         returncode = completed.returncode
         stdout_b = completed.stdout
         stderr_b = completed.stderr

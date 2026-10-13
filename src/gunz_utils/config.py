@@ -72,6 +72,12 @@ def env_overrides(
     underscore_boundary = set(separator) == {"_"}
     for name, value in environ.items():
         upper = name.upper()
+        #? Only keys whose leading characters actually match the prefix are
+        #? owned by this config.  Without this check, an unrelated key whose
+        #? prefix-length head equals the prefix (e.g. "XAP_PORT" for
+        #? prefix="APP") would be misattributed and its value injected here.
+        if not upper.startswith(prefix_upper):
+            continue
         rest = upper[len(prefix_upper):]
         if underscore_boundary:
             #? Legacy single-underscore and canonical separator boundaries both
