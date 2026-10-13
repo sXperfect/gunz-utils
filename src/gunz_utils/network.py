@@ -188,6 +188,11 @@ def _is_non_public_address(
         or ip.is_unspecified
         or ip.is_multicast
         or ip.is_reserved
+        #? Shared CGNAT (100.64.0.0/10, RFC 6598) and other special-use ranges
+        #? report is_private/is_reserved as False, but are not globally routed
+        #? public internet, so they must not be probed under an external-only
+        #? policy.
+        or not ip.is_global
     )
 
 

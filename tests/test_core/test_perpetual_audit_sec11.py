@@ -100,7 +100,9 @@ def test_redact_dict_ordinary_dict_still_masked() -> None:
     """Sanity green: ordinary nested dicts/lists still mask secret leaves."""
     result = redact_dict({"nested": {"password": "hunter2", "name": "alice"}})
     assert "hunter2" not in result["nested"]["password"]
-    assert "****" in result["nested"]["password"]
+    #? Mask length is sized to the hidden middle (length-preserving), so the
+    #? masked value must contain at least one mask character, not a fixed run.
+    assert "*" in result["nested"]["password"]
     assert result["nested"]["name"] == "alice"
 
 

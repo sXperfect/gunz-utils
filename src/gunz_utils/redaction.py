@@ -120,7 +120,11 @@ def redact(
     # ? rather than exposing prefix == suffix.
     if len(value) <= 2 * show_chars:
         return _MASK
-    return f"{value[:show_chars]}{_MASK}{value[-show_chars:]}"
+    #? Size the mask to the hidden middle so the output length equals the
+    #? input length (documented contract), instead of adding a fixed-length
+    #? mask on top of the shown ends (which silently drops a middle char).
+    hidden = len(value) - 2 * show_chars
+    return f"{value[:show_chars]}{_MASK[0] * hidden}{value[-show_chars:]}"
 
 
 def _is_secret_key(

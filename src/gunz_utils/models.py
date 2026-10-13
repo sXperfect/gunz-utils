@@ -42,7 +42,8 @@ def _annotation_is_int(
 
     ``bool`` is an ``int`` subclass, so a bare ``isinstance`` check cannot
     distinguish the two; this helper treats ``bool`` (and ``bool``-only
-    unions) as non-``int`` while accepting ``int`` and ``int | None``.
+    unions) as non-``int`` while accepting ``int``, ``int | None``, and
+    ``Literal[int, ...]`` fields.
     """
     if annotation is int:
         return True
@@ -54,6 +55,12 @@ def _annotation_is_int(
     args = getattr(annotation, "__args__", ())
     if origin in (t.Union, types.UnionType):
         return any(_annotation_is_int(arg) for arg in args)
+    if origin is t.Literal:
+        #? A Literal restricted to int literals is an int-typed field; a bool
+        #? supplied to it must still be rejected.
+        return bool(args) and all(
+            isinstance(arg, int) and not isinstance(arg, bool) for arg in args
+        )
     return False
 
 

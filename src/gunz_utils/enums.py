@@ -166,14 +166,22 @@ class BaseStrEnum(enum.StrEnum):
                     f"member value for {cls.__name__}"
                 ) from exc
 
-        #? 2. Check exact case-sensitive member name, so a name that collides
-        #? with another member's value still resolves to the named member
-        #? (e.g. `FOO = "bar"` / `BAR = "foo"`: "FOO" -> FOO, not BAR).
+        #? 2. Exact case-sensitive member VALUE lookup. A member's value must
+        #? take precedence over another member's name, so a value that also
+        #? happens to be a name (e.g. `A = "a"` / `B = "A"`) resolves to the
+        #? member that owns it.
+        value_owner = cls._value2member_map_.get(value_str)
+        if value_owner is not None:
+            return cast(Self, value_owner)
+
+        #? 3. Exact case-sensitive member name lookup (only reached when the
+        #? input is not a value), so a non-value name resolves to the named
+        #? member (e.g. `FOO = "bar"` / `BAR = "foo"`: "FOO" -> FOO).
         for member in cls:
             if member.name == value_str:
                 return member
 
-        #? 3. Check for matches in the fuzzy map
+        #? 4. Check for matches in the fuzzy map
         #? Optimization: Use cached lookup map instead of iterating
         fuzzy_map = cls._get_fuzzy_map()
 
@@ -182,7 +190,7 @@ class BaseStrEnum(enum.StrEnum):
         if value_lower in fuzzy_map:
             return fuzzy_map[value_lower]
 
-        #? 4. Normalize separators and case for fuzzy matching
+        #? 5. Normalize separators and case for fuzzy matching
         normalized_value_input = value_lower.replace("-", "_").replace(" ", "_")
 
         if normalized_value_input in fuzzy_map:
