@@ -294,6 +294,7 @@ class PolicyUpstream:
         max_concurrency: int = 16,
         max_attempts: int = 1,
         idempotent_tools: frozenset[str] = frozenset(),
+        retry_delay: float = 0.05,
     ) -> None:
         if (
             isinstance(timeout_seconds, bool)
@@ -321,11 +322,21 @@ class PolicyUpstream:
             raise ValueError(
                 "idempotent_tools must be a frozenset of non-empty strings"
             )
+        if (
+            isinstance(retry_delay, bool)
+            or not isinstance(retry_delay, int | float)
+            or not math.isfinite(float(retry_delay))
+            or retry_delay < 0
+        ):
+            raise ValueError(
+                "retry_delay must be a finite non-negative number"
+            )
         self._client = client
         self.name = client.name
         self._timeout_seconds = float(timeout_seconds)
         self._max_attempts = max_attempts
         self._idempotent_tools = idempotent_tools
+        self._retry_delay = float(retry_delay)
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._stats = {"calls": 0, "retries": 0, "timeouts": 0, "failures": 0}
 
@@ -377,6 +388,11 @@ class PolicyUpstream:
                         self._stats["failures"] += 1
                         raise
                     self._stats["retries"] += 1
+                    if self._retry_delay:
+                        #? Back off between attempts so an outage does not
+                        #? trigger a retry storm of immediate, back-to-back
+                        #? requests against the unavailable peer.
+                        await asyncio.sleep(self._retry_delay)
         raise RuntimeError("unreachable retry state")
 
     async def health_check(self) -> bool:

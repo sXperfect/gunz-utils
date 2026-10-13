@@ -37,14 +37,17 @@ def monotonic_deadline(
     float
         The result of the operation.
     """
-    if (
-        isinstance(timeout, bool)
-        or not isinstance(timeout, (int, float))
-        or not math.isfinite(float(timeout))
-        or timeout < 0
-    ):
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
         raise ValueError("timeout must be a finite non-negative number")
-    return time.monotonic() + float(timeout)
+    try:
+        numeric = float(timeout)
+    except OverflowError:
+        raise ValueError(
+            "timeout must be a finite non-negative number"
+        ) from None
+    if not math.isfinite(numeric) or numeric < 0:
+        raise ValueError("timeout must be a finite non-negative number")
+    return time.monotonic() + numeric
 
 
 def remaining(
@@ -62,13 +65,15 @@ def remaining(
     float
         The result of the operation.
     """
-    if (
-        isinstance(deadline, bool)
-        or not isinstance(deadline, (int, float))
-        or not math.isfinite(float(deadline))
-    ):
+    if isinstance(deadline, bool) or not isinstance(deadline, (int, float)):
         raise ValueError("deadline must be a finite number")
-    return max(0.0, float(deadline) - time.monotonic())
+    try:
+        numeric = float(deadline)
+    except OverflowError:
+        raise ValueError("deadline must be a finite number") from None
+    if not math.isfinite(numeric):
+        raise ValueError("deadline must be a finite number")
+    return max(0.0, numeric - time.monotonic())
 
 
 def expired(

@@ -501,6 +501,11 @@ class WorkflowDAG:
             }
             try:
                 output = stage.run(dependency_outputs)
+                if inspect.isawaitable(output):
+                    #? run may be an async coroutine function; drive it to
+                    #? completion so a raw, never-closed coroutine is never
+                    #? surfaced as a stage output or cache value.
+                    output = asyncio.run(output)
             except BaseException as exc:
                 compensation_errors = self._rollback_sync(executed_order, outputs)
                 raise WorkflowExecutionError(

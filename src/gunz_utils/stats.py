@@ -69,6 +69,34 @@ def _finite_values(
     return converted
 
 
+def _robust_mean(values: Iterable[float]) -> float:
+    """Overflow-robust arithmetic mean.
+
+    ``statistics.fmean`` (backed by ``statistics.fsum``) raises
+    ``OverflowError: intermediate overflow in fsum`` when the sum of the
+    observations exceeds the float range even though the mean itself is
+    representable (e.g. two ``1e308`` observations sum to ``2e308``). For the
+    common case we keep ``fmean``'s exact compensated result; when it overflows
+    we fall back to normalizing each observation by the largest magnitude
+    (keeping every term in ``[-1, 1]``), averaging those, and scaling back, so
+    the representable mean is returned instead of an internal fsum error. The
+    caller guarantees at least one finite observation.
+    """
+    observations = list(values)
+    try:
+        return fmean(observations)
+    except OverflowError:
+        scale = max(abs(value) for value in observations)
+        if scale == 0.0:
+            return 0.0
+        count = 0
+        total = 0.0
+        for value in observations:
+            count += 1
+            total += value / scale
+        return (total / count) * scale
+
+
 def bootstrap_mean_ci(
     values: Iterable[float],
     *,
@@ -127,7 +155,7 @@ def bootstrap_mean_ci(
     rng = random.Random(seed)
     count = len(observations)
     estimates = [
-        fmean(
+        _robust_mean(
             rng.choice(observations)
             for _ in range(count)
         )
@@ -151,7 +179,7 @@ def bootstrap_mean_ci(
         ),
     )
     return BootstrapMeanCI(
-        mean=fmean(observations),
+        mean=_robust_mean(observations),
         low=estimates[low_index],
         high=estimates[high_index],
         confidence=confidence,
@@ -215,7 +243,7 @@ def paired_effect(
         raise ValueError(
             "paired differences must be representable as finite floats"
         )
-    center = fmean(differences)
+    center = _robust_mean(differences)
     if len(differences) < 2:
         return PairedEffect(
             mean_difference=center,
@@ -313,7 +341,7 @@ def normal_mean_summary(
         )
     confidence_z = float(confidence_z)
 
-    center = fmean(observations)
+    center = _robust_mean(observations)
     count = len(observations)
     if count == 1:
         return NormalMeanSummary(
