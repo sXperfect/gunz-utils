@@ -90,6 +90,16 @@ def atomic_write(
                 fd,
                 permissions,
             )
+        else:
+            #? Preserve an existing target's mode when the caller did not
+            #? request a permission change, so an atomic update does not
+            #? silently strip group/other access from a published file.
+            try:
+                existing_mode = target.stat().st_mode & 0o7777
+            except FileNotFoundError:
+                existing_mode = None
+            if existing_mode is not None and hasattr(os, "fchmod"):
+                os.fchmod(fd, existing_mode)
         file_handle = os.fdopen(
             fd, mode, encoding=None if is_binary else encoding or "utf-8",
             closefd=False,

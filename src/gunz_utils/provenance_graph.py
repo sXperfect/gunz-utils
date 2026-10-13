@@ -213,26 +213,18 @@ class ProvenanceGraph:
 
         result: list[str] = []
         seen: set[str] = set()
+        stack: list[str] = [identifier]
 
-        def walk(
-            current: str,
-        ) -> None:
-            """walk() function.
-
-            Parameters
-            ----------
-            current : str
-                current parameter.
-            """
+        while stack:
+            current = stack.pop()
             node = self._nodes[current]
             for parent in node.inputs:
                 if parent in seen or parent not in self._nodes:
                     continue
                 seen.add(parent)
                 result.append(parent)
-                walk(parent)
+                stack.append(parent)
 
-        walk(identifier)
         return tuple(result)
 
     def lineage(self,
@@ -266,31 +258,28 @@ class ProvenanceGraph:
         visiting: set[str] = set()
         visited: set[str] = set()
 
-        def visit(
-            identifier: str,
-        ) -> None:
-            """visit() function.
-
-            Parameters
-            ----------
-            identifier : str
-                identifier parameter.
-            """
-            if identifier in visited:
-                return
-            if identifier in visiting:
-                raise ValueError("provenance graph cycle detected")
-
-            visiting.add(identifier)
-            node = self._nodes[identifier]
-            for parent in node.inputs:
-                if parent in self._nodes:
-                    visit(parent)
-            visiting.remove(identifier)
-            visited.add(identifier)
-
-        for identifier in self._nodes:
-            visit(identifier)
+        for start in self._nodes:
+            if start in visited:
+                continue
+            #? Iterative DFS so deep acyclic graphs do not blow the Python
+            #? stack during cycle validation.
+            stack: list[tuple[str, bool]] = [(start, False)]
+            while stack:
+                identifier, expanded = stack.pop()
+                if expanded:
+                    visiting.discard(identifier)
+                    visited.add(identifier)
+                    continue
+                if identifier in visiting:
+                    raise ValueError("provenance graph cycle detected")
+                if identifier in visited:
+                    continue
+                visiting.add(identifier)
+                stack.append((identifier, True))
+                node = self._nodes[identifier]
+                for parent in node.inputs:
+                    if parent in self._nodes and parent not in visited:
+                        stack.append((parent, False))
 
 
 __all__ = ["ProvenanceGraph", "ProvenanceNode"]

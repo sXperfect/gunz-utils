@@ -33,7 +33,14 @@ def parse_bool(
     -------
     bool
         The result of the operation.
+
+    Raises
+    ------
+    TypeError
+        If value is not a string.
     """
+    if not isinstance(value, str):
+        raise TypeError(f"value must be a string, got {type(value).__name__!r}")
     normalized = value.strip().lower()
     if normalized in {"1", "true", "yes", "on"}:
         return True

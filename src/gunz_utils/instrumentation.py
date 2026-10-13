@@ -34,7 +34,14 @@ class Counter:
         -------
         int
             The result of the operation.
+
+        Raises
+        ------
+        ValueError
+            If amount is not an integer (including bool).
         """
+        if isinstance(amount, bool) or not isinstance(amount, int):
+            raise ValueError(f"amount must be an integer, got {amount!r}")
         with self._lock:
             self.value += amount
             return self.value
@@ -171,10 +178,10 @@ class Trace:
         Raises
         ------
         ValueError
-            If n is negative.
+            If n is negative or not an integer.
         """
-        if n < 0:
-            raise ValueError("n must be non-negative")
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError(f"n must be a non-negative integer, got {n!r}")
         with self._lock:
             snapshot = list(self.events)
         return sorted(
