@@ -106,6 +106,8 @@ def env_bool(
             return False
         raise ValueError("expected boolean")
 
+    if default is not _MISSING and not isinstance(default, bool):
+        raise ValueError("default must be a boolean or omitted")
     return env(name, cast=parse, default=default)
 
 

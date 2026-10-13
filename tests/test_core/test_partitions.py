@@ -57,7 +57,9 @@ def test_partition_fingerprint_is_independent_of_partition_mapping_order() -> No
     assert left.fingerprint == right.fingerprint
 
 
-def test_partition_fingerprint_preserves_item_order() -> None:
+def test_partition_fingerprint_is_order_independent() -> None:
+    #? Reordering items within a partition is not a semantic change, so the
+    #? canonical fingerprint must be identical for the same assignment.
     left = PartitionManifest(
         {"items": ("a", "b")}
     )
@@ -65,7 +67,7 @@ def test_partition_fingerprint_preserves_item_order() -> None:
         {"items": ("b", "a")}
     )
 
-    assert left.fingerprint != right.fingerprint
+    assert left.fingerprint == right.fingerprint
 
 
 def test_partition_manifest_rejects_duplicates_and_overlap() -> None:

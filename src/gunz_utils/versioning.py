@@ -176,7 +176,14 @@ class SchemaMigrator:
         """
         if not isinstance(envelope, VersionedEnvelope):
             raise TypeError("envelope must be a VersionedEnvelope")
-        _validate_version(target_version, name="target_version")
+        try:
+            _validate_version(target_version, name="target_version")
+        except ValueError as exc:
+            #? Surface an invalid target_version as the migration-domain error
+            #? type, consistent with the downgrade path and from_dict, so a
+            #? caller handling migration failures via SchemaMigrationError does
+            #? not silently miss it as an untyped ValueError.
+            raise SchemaMigrationError(str(exc)) from None
         if target_version < envelope.version:
             raise SchemaMigrationError("schema downgrades are not supported")
         payload = envelope.payload

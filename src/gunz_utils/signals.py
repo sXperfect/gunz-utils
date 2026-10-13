@@ -395,7 +395,11 @@ class GracefulShutdown:
         return errors
 
     async def __aenter__(self) -> GracefulShutdown:
-        self._get_event()
+        #? Reset per-entry shutdown state so re-entering the same object in a
+        #? fresh `async with` does not leak the previous block's shutdown event
+        #? (which would spuriously run cleanup on a block that never shut down).
+        self._signal_received = None
+        self._get_event().clear()
         loop = self._loop or asyncio.get_running_loop()
         try:
             self._registration = install_async_signal_handlers(

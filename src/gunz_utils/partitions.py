@@ -95,7 +95,10 @@ class PartitionManifest:
         """
         self.validate()
         normalized = {
-            name: list(identifiers)
+            #? Sort identifiers within each partition so the fingerprint is
+            #? canonical over the disjoint assignment, independent of item
+            #? iteration order (reordering items is not a semantic change).
+            name: sorted(identifiers)
             for name, identifiers in sorted(self.partitions.items())
         }
         return structured_hash(normalized)
