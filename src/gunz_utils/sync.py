@@ -49,6 +49,13 @@ _FORBIDDEN_EXTRA_OPTIONS = frozenset(
 _FORBIDDEN_LONG_OPTIONS = frozenset(
     option for option in _FORBIDDEN_EXTRA_OPTIONS if option.startswith("--")
 )
+#? Complete, non-destructive rsync options that happen to be string-prefixes
+#? of a forbidden long option (e.g. "--partial" of "--partial-dir", "--backup"
+#? of "--backup-dir"). rsync treats these as the benign option itself rather
+#? than as an abbreviation of the forbidden compound, so they must stay
+#? allowed. Every other prefix of a forbidden option is an abbreviation and is
+#? rejected.
+_BENIGN_OPTION_PREFIXES = frozenset({"--partial", "--backup"})
 
 
 def _unsafe_rsync_extra_argument(
@@ -86,13 +93,17 @@ def _unsafe_rsync_extra_argument(
         return option in _FORBIDDEN_EXTRA_OPTIONS
     if option in _FORBIDDEN_LONG_OPTIONS:
         return True
-    #? GNU-style long options may accept unique abbreviations. Treat any
-    #? prefix of a forbidden long option as forbidden rather than maintaining
-    #? a brittle exact-name blocklist.
-    return len(option) >= 3 and any(
+    #? GNU-style long options accept unique abbreviations, so a prefix of a
+    #? forbidden option (e.g. "--temp" of "--temp-dir", "--del" of "--delete")
+    #? is rejected. The only exception is a prefix that is itself a complete,
+    #? benign rsync option (e.g. "--partial", "--backup"), which rsync treats
+    #? as that option rather than as an abbreviation.
+    if len(option) >= 3 and any(
         forbidden.startswith(option)
         for forbidden in _FORBIDDEN_LONG_OPTIONS
-    )
+    ):
+        return option not in _BENIGN_OPTION_PREFIXES
+    return False
 
 
 @dataclass(frozen=True)

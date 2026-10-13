@@ -49,6 +49,47 @@ def temporary_env(
                 os.environ[key] = value
 
 
+def _validate_poll_args(
+    timeout: float,
+    interval: float,
+) -> tuple[float, float]:
+    """Validate and convert ``eventually`` poll timing, or raise ValueError.
+
+    Returns
+    -------
+    tuple[float, float]
+        The converted ``(timeout, interval)`` float values.
+    """
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or timeout < 0
+        or isinstance(interval, bool)
+        or not isinstance(interval, (int, float))
+        or interval <= 0
+    ):
+        raise ValueError(
+            "timeout must be finite and non-negative and interval "
+            "must be finite and positive"
+        )
+    try:
+        timeout_float = float(timeout)
+        interval_float = float(interval)
+    except OverflowError:
+        #? An int too large to convert to float must surface as the
+        #? documented ValueError, not leak an internal OverflowError.
+        raise ValueError(
+            "timeout must be finite and non-negative and interval "
+            "must be finite and positive"
+        ) from None
+    if not math.isfinite(timeout_float) or not math.isfinite(interval_float):
+        raise ValueError(
+            "timeout must be finite and non-negative and interval "
+            "must be finite and positive"
+        )
+    return timeout_float, interval_float
+
+
 def eventually(
     predicate: Callable[[], bool],
     *,
@@ -69,27 +110,14 @@ def eventually(
     interval : float
         interval parameter.
     """
-    if (
-        isinstance(timeout, bool)
-        or not isinstance(timeout, (int, float))
-        or not math.isfinite(float(timeout))
-        or timeout < 0
-        or isinstance(interval, bool)
-        or not isinstance(interval, (int, float))
-        or not math.isfinite(float(interval))
-        or interval <= 0
-    ):
-        raise ValueError(
-            "timeout must be finite and non-negative and interval "
-            "must be finite and positive"
-        )
-    deadline = time.monotonic() + timeout
+    timeout_float, interval_float = _validate_poll_args(timeout, interval)
+    deadline = time.monotonic() + timeout_float
     while True:
         if predicate():
             return
         if time.monotonic() >= deadline:
             raise TimeoutError("condition did not become true before timeout")
-        time.sleep(interval)
+        time.sleep(interval_float)
 
 
 async def eventually_async(
@@ -112,27 +140,14 @@ async def eventually_async(
         ValueError: If timeout is negative or interval is not positive.
         TimeoutError: If the condition remains false until the deadline.
     """
-    if (
-        isinstance(timeout, bool)
-        or not isinstance(timeout, (int, float))
-        or not math.isfinite(float(timeout))
-        or timeout < 0
-        or isinstance(interval, bool)
-        or not isinstance(interval, (int, float))
-        or not math.isfinite(float(interval))
-        or interval <= 0
-    ):
-        raise ValueError(
-            "timeout must be finite and non-negative and interval "
-            "must be finite and positive"
-        )
-    deadline = time.monotonic() + timeout
+    timeout_float, interval_float = _validate_poll_args(timeout, interval)
+    deadline = time.monotonic() + timeout_float
     while True:
         if await predicate():
             return
         if time.monotonic() >= deadline:
             raise TimeoutError("condition did not become true before timeout")
-        await asyncio.sleep(interval)
+        await asyncio.sleep(interval_float)
 
 
 __all__ = ["eventually", "eventually_async", "temporary_env"]

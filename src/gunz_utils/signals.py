@@ -282,12 +282,19 @@ class GracefulShutdown:
         if (
             isinstance(timeout, bool)
             or not isinstance(timeout, (int, float))
-            or not math.isfinite(float(timeout))
             or timeout <= 0
         ):
             raise ValueError("timeout must be a finite positive number")
+        try:
+            timeout_float = float(timeout)
+        except OverflowError:
+            #? An int too large to convert to float must surface as the
+            #? documented ValueError, not leak an internal OverflowError.
+            raise ValueError("timeout must be a finite positive number") from None
+        if not math.isfinite(timeout_float):
+            raise ValueError("timeout must be a finite positive number")
         self.signums = signums
-        self.timeout = float(timeout)
+        self.timeout = timeout_float
         self._loop = loop
         self._callbacks: list[Callable[[], Any]] = []
         self._shutdown_event: asyncio.Event | None = None

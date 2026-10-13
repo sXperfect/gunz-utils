@@ -56,6 +56,40 @@ def _get_replacement_pattern(
     return re.compile(f"{re.escape(replacement)}+")
 
 
+def _strip_boundary_units(
+    name: str,
+    replacement: str,
+) -> str:
+    """Strip dangerous boundary characters without treating ``replacement``
+    as a character set.
+
+    ``str.strip`` interprets its argument as a character set, so an
+    alphanumeric (or multi-character) replacement silently removed genuine
+    basename letters (e.g. ``sanitize_filename("apple.txt", "a")`` lost its
+    leading ``a``). Here ``.`` and ``-`` are always stripped at the
+    boundaries (hidden/option-shaped names), while the replacement is
+    stripped only as a whole unit and only when it is not itself a valid
+    alphanumeric basename character.
+    """
+    if not replacement:
+        return name.strip(".-")
+    if replacement.isalnum():
+        return name.strip(".-")
+    result = name
+    while True:
+        if result and result[0] in ".-":
+            result = result[1:]
+        elif result.startswith(replacement):
+            result = result[len(replacement):]
+        elif result and result[-1] in ".-":
+            result = result[:-1]
+        elif result.endswith(replacement):
+            result = result[:-len(replacement)]
+        else:
+            break
+    return result
+
+
 def sanitize_filename(
     filename: str,
     replacement: str = "_",
@@ -139,7 +173,7 @@ def sanitize_filename(
     #? Security (VULN-2026-001): leading dashes can be parsed as options
     #? when a sanitized filename is later passed to a command-line program.
     #? Strip them so the returned basename is not option-shaped.
-    filename = filename.strip(replacement + ".-")
+    filename = _strip_boundary_units(filename, replacement)
 
     #? 6. Check empty
     if not filename:
@@ -155,7 +189,7 @@ def sanitize_filename(
                 break
             except UnicodeDecodeError:
                 encoded = encoded[:-1]
-        filename = filename.rstrip(replacement + ".")
+        filename = _strip_boundary_units(filename, replacement)
         if not filename:
             raise ValueError("Filename is empty after byte-length truncation")
 

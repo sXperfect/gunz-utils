@@ -47,13 +47,24 @@ class ManualClock:
         if (
             isinstance(seconds, bool)
             or not isinstance(seconds, (int, float))
-            or not math.isfinite(float(seconds))
             or seconds < 0
         ):
             raise ValueError(
                 "clock advance must be a finite non-negative number"
             )
-        candidate = self.now + float(seconds)
+        try:
+            seconds_float = float(seconds)
+        except OverflowError:
+            #? An int too large to convert to float must surface as the
+            #? documented ValueError, not leak an internal OverflowError.
+            raise ValueError(
+                "clock advance must be a finite non-negative number"
+            ) from None
+        if not math.isfinite(seconds_float):
+            raise ValueError(
+                "clock advance must be a finite non-negative number"
+            )
+        candidate = self.now + seconds_float
         if not math.isfinite(candidate):
             raise OverflowError("manual clock exceeds finite float range")
         self.now = candidate
@@ -151,11 +162,15 @@ def fuzz_floats(
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     for name, value in (("minimum", minimum), ("maximum", maximum)):
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not math.isfinite(float(value))
-        ):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{name} must be a finite number")
+        try:
+            converted = float(value)
+        except OverflowError:
+            #? An int too large to convert to float must surface as the
+            #? documented ValueError, not leak an internal OverflowError.
+            raise ValueError(f"{name} must be a finite number") from None
+        if not math.isfinite(converted):
             raise ValueError(f"{name} must be a finite number")
     min_f = float(minimum)
     max_f = float(maximum)
@@ -173,7 +188,12 @@ def fuzz_floats(
         if specials and rng.random() < 0.1:
             yield rng.choice(specials)
         else:
-            yield rng.uniform(min_f, max_f)
+            #? `random.uniform(a, b)` computes `a + (b - a) * random()`,
+            #? whose `b - a` overflows to `inf` for a wide span, yielding
+            #? special values even with allow_infinity=False. Interpolate
+            #? instead so a finite range never produces inf/nan.
+            r = rng.random()
+            yield min_f * (1.0 - r) + max_f * r
 
 
 def fuzz_strings(

@@ -33,7 +33,13 @@ class ByteReader:
     def __init__(self,
         data: bytes | bytearray | memoryview,
     ) -> None:
-        self.data = memoryview(data).cast("B")
+        try:
+            self.data = memoryview(data).cast("B")
+        except TypeError:
+            #? A non-contiguous (stepped) memoryview slice cannot be cast to
+            #? a byte view zero-copy; copy the logical bytes so any valid
+            #? buffer input is accepted.
+            self.data = memoryview(bytes(data))
         self.offset = 0
 
     @property
