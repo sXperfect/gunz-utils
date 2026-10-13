@@ -15,6 +15,11 @@ from urllib.parse import quote, urlencode, urlunsplit
 
 _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*$")
 
+#? Sane upper cap for socket timeouts. Values at or above this are beyond what
+#? the platform time_t can represent for settimeout and would otherwise surface
+#? as an unrelated OverflowError instead of a validation error.
+_MAX_SOCKET_TIMEOUT = 86400.0
+
 
 def build_network_uri(
     scheme: str,
@@ -212,8 +217,12 @@ def tcp_reachable(
         or not isinstance(timeout, (int, float))
         or not math.isfinite(float(timeout))
         or timeout <= 0
+        or timeout > _MAX_SOCKET_TIMEOUT
     ):
-        raise ValueError("timeout must be a finite positive number")
+        raise ValueError(
+            f"timeout must be a finite positive number no greater than "
+            f"{_MAX_SOCKET_TIMEOUT}"
+        )
     if not isinstance(allow_private, bool):
         raise TypeError("allow_private must be bool")
 

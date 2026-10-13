@@ -216,11 +216,20 @@ def flatten(
         else:
             yield item
 
-    #? Top-level dispatch: iterate the outer Iterable (the type contract)
-    #? and walk each yielded item at depth 1. This handles generators and
-    #? other non-list/tuple iterables uniformly. Scalar input (which
-    #? violates the type signature) is handled defensively by yielding it
-    #? as a single leaf — preserves the historical single-scalar use case.
+    #? Top-level dispatch. Containers matching `types` are descended into:
+    #? the default (list, tuple) is iterated and each element walked. Leaf
+    #? collections that are NOT in `types` (str, bytes, dict, set,
+    #? frozenset) are yielded as a single leaf rather than iterated — the
+    #? same treatment a nested occurrence gets. Generators and other
+    #? non-leaf iterables are consumed and their items walked. A
+    #? non-iterable scalar falls back to a single leaf.
+    if isinstance(nested, types):
+        for item in nested:
+            yield from _walk(item, 1)
+        return
+    if isinstance(nested, (str, bytes, bytearray, dict, set, frozenset)):
+        yield nested
+        return
     try:
         iterator = iter(nested)
     except TypeError:

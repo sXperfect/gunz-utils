@@ -36,6 +36,46 @@ except (ImportError, AttributeError):  # pragma: no cover
     _accel_is_json_clean = None
 
 
+_MAX_JSON_DEPTH = 100
+
+
+def _excessive_nesting_position(
+    text: str,
+    max_depth: int,
+) -> int:
+    """Return the index where nesting exceeds ``max_depth``, else ``-1``.
+
+    Scans the JSON text tracking bracket depth while skipping string literal
+    contents, so ``[``/``{`` inside strings do not count toward nesting.
+    """
+    depth = 0
+    in_string = False
+    index = 0
+    length = len(text)
+    while index < length:
+        character = text[index]
+        if in_string:
+            if character == "\\":
+                index += 2
+                continue
+            if character == '"':
+                in_string = False
+            index += 1
+            continue
+        if character == '"':
+            in_string = True
+            index += 1
+            continue
+        if character in "[{":
+            depth += 1
+            if depth > max_depth:
+                return index
+        elif character in "]}":
+            depth = depth - 1 if depth else 0
+        index += 1
+    return -1
+
+
 def to_jsonable(
     value: Any,
     *,
@@ -181,6 +221,10 @@ def json_loads(
 ) -> Any:
     """Decode JSON text or bytes using the standard library decoder.
 
+    Nesting depth is bounded to mirror the encode-side recursion limit, so a
+    pathologically nested document raises :class:`json.JSONDecodeError` (a
+    ``ValueError``) rather than an uncontrolled ``RecursionError``.
+
     Parameters
     ----------
     value : str | bytes | bytearray
@@ -191,6 +235,20 @@ def json_loads(
     Any
         The decoded Python object.
     """
+    if isinstance(value, bytes | bytearray):
+        try:
+            text = value.decode("utf-8")
+        except UnicodeDecodeError:
+            text = ""
+    else:
+        text = value
+    position = _excessive_nesting_position(text, _MAX_JSON_DEPTH)
+    if position >= 0:
+        raise json.JSONDecodeError(
+            f"JSON document is nested deeper than {_MAX_JSON_DEPTH} levels",
+            text,
+            position,
+        )
     return json.loads(value)
 
 
