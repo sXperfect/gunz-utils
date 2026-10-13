@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
@@ -54,6 +53,22 @@ _SECRET_KEY_VALUE_TOKEN = re.compile(
     + "|".join(re.escape(pattern) for pattern in SECRET_PATTERNS)
     + r")[A-Za-z0-9_.\-]*)=([^&\s;]*)"
 )
+
+#? Matches a URL userinfo authority ``user:pass@``. urlsplit only places this
+#? in ``netloc`` for the ``scheme://user:pass@host`` form; scheme-relative,
+#? scheme-less, and single-colon-scheme forms keep it in the path, so a
+#? netloc-only guard would leak the password.
+_USERINFO_PASSWORD = re.compile(r"([^@:/]+):([^@/]*)@")
+
+
+def _redact_userinfo_password(
+    value: str,
+) -> str:
+    """Mask the password of a URL userinfo authority wherever it appears."""
+    return _USERINFO_PASSWORD.sub(
+        lambda match: f"{match.group(1)}:****@",
+        value,
+    )
 
 
 def _redact_key_value_tokens(
@@ -93,20 +108,12 @@ def _redact_environment_value(
     if any(pattern in normalized_name for pattern in SECRET_PATTERNS):
         return str(redact(value, show_chars=0))
 
-    try:
-        parsed = urlsplit(value)
-    except ValueError:
-        return _redact_key_value_tokens(value)
-
-    if parsed.scheme and "@" in parsed.netloc:
-        userinfo, hostinfo = parsed.netloc.rsplit("@", 1)
-        if ":" in userinfo:
-            username, _password = userinfo.split(":", 1)
-            parsed = parsed._replace(
-                netloc=f"{username}:****@{hostinfo}",
-            )
-
-    return _redact_key_value_tokens(urlunsplit(parsed))
+    #? Redact any URL userinfo password wherever the authority lives: in the
+    #? netloc (scheme://user:pass@host) or in the path (scheme-relative,
+    #? scheme-less, and single-colon-scheme forms), then mask remaining
+    #? secret-named key=value tokens.
+    value = _redact_userinfo_password(value)
+    return _redact_key_value_tokens(value)
 
 
 def capture_runtime_provenance(

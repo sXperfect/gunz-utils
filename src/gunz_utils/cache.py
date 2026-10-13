@@ -73,12 +73,15 @@ def _validate_cache_bounds(
     maxsize : int
         maxsize parameter.
     """
-    if (
-        isinstance(ttl, bool)
-        or not isinstance(ttl, (int, float))
-        or not math.isfinite(float(ttl))
-        or ttl < 0
-    ):
+    if isinstance(ttl, bool) or not isinstance(ttl, (int, float)):
+        raise ValueError("ttl must be a finite non-negative number")
+    try:
+        ttl_float = float(ttl)
+    except OverflowError:
+        #? An int too large to convert to float (e.g. 10**400) must surface
+        #? as the documented ValueError, not leak an internal OverflowError.
+        raise ValueError("ttl must be a finite non-negative number") from None
+    if not math.isfinite(ttl_float) or ttl < 0:
         raise ValueError("ttl must be a finite non-negative number")
     if isinstance(maxsize, bool) or not isinstance(maxsize, int) or maxsize < 1:
         raise ValueError("maxsize must be a positive integer")

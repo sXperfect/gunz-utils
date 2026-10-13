@@ -14,7 +14,6 @@ __license__ = "Clear BSD"
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
-import functools
 import os
 import re
 import stat
@@ -33,27 +32,6 @@ __all__ = [
     "safe_path_join",
     "sanitize_filename",
 ]
-
-
-@functools.lru_cache(maxsize=16)
-def _get_replacement_pattern(
-    replacement: str,
-) -> re.Pattern:
-    """Cache compiled patterns for collapsing multiple replacements.
-
-    Parameters
-    ----------
-    replacement : str
-        replacement parameter.
-
-    Returns
-    -------
-    re.Pattern
-        The result of the operation.
-    """
-    #? Replacement alphabets are tiny in practice, so a bounded cache avoids
-    #? repeated compilation without allowing user input to grow memory forever.
-    return re.compile(f"{re.escape(replacement)}+")
 
 
 def _strip_boundary_units(
@@ -156,17 +134,6 @@ def sanitize_filename(
     # ? Keep only alphanumeric, ., -, _ using negated character class
     # ? The + in the regex collapses multiple invalid chars into one replacement
     filename = _INVALID_CHARS_PATTERN.sub(replacement, filename)
-
-    #? 4. Collapse multiple replacements
-    if replacement:
-        # ? Optimization: Only run regex if we actually have consecutive
-        # ? replacements
-        # ? This avoids unnecessary regex processing for the common case
-        # ? (e.g. "my_file.txt")
-        if replacement * 2 in filename:
-            # ? Use cached pattern for replacement
-            pattern = _get_replacement_pattern(replacement)
-            filename = pattern.sub(replacement, filename)
 
     #? 5. Strip leading/trailing replacements, dots, or dashes
     # ? Dots at boundaries can be dangerous (e.g., ".hidden" or "file..")
