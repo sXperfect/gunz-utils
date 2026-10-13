@@ -51,12 +51,15 @@ class ResourceGroup:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool | None:
-        result = self._stack.__exit__(exc_type, exc_value, traceback)
-        #? Reset the entered state so a later enter() (after the context has
-        #? exited) raises instead of pushing onto a stack that can never
-        #? release the resource.
-        self._entered = False
-        return result
+        try:
+            return self._stack.__exit__(exc_type, exc_value, traceback)
+        finally:
+            #? Reset the entered state on every exit path so a later enter()
+            #? (after the context has exited) raises instead of pushing onto a
+            #? stack that can never release the resource. Even when a nested
+            #? __exit__ raises, the guard must still reset so the group cannot
+            #? be re-entered.
+            self._entered = False
 
 
 class AsyncResourceGroup:
@@ -99,12 +102,15 @@ class AsyncResourceGroup:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool | None:
-        result = await self._stack.__aexit__(exc_type, exc_value, traceback)
-        #? Reset the entered state so a later enter() (after the context has
-        #? exited) raises instead of pushing onto a stack that can never
-        #? release the resource.
-        self._entered = False
-        return result
+        try:
+            return await self._stack.__aexit__(exc_type, exc_value, traceback)
+        finally:
+            #? Reset the entered state on every exit path so a later enter()
+            #? (after the context has exited) raises instead of pushing onto a
+            #? stack that can never release the resource. Even when a nested
+            #? __aexit__ raises, the guard must still reset so the group cannot
+            #? be re-entered.
+            self._entered = False
 
 
 __all__ = ["AsyncResourceGroup", "ResourceGroup"]

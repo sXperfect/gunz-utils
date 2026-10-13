@@ -119,20 +119,32 @@ async def _run_with_zero_timeout(awaitable: Awaitable[T]) -> T:
     """
     task = asyncio.ensure_future(awaitable)
     loop = asyncio.get_running_loop()
-    for _ in range(_ZERO_TIMEOUT_MAX_DRAIN_TICKS):
-        if task.done():
-            break
-        await asyncio.sleep(0)
-        if task.done() or _loop_needs_real_time(loop):
-            break
-    if not task.done():
+    try:
+        for _ in range(_ZERO_TIMEOUT_MAX_DRAIN_TICKS):
+            if task.done():
+                break
+            await asyncio.sleep(0)
+            if task.done() or _loop_needs_real_time(loop):
+                break
+        if not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            raise TimeoutError
+        return task.result()
+    except asyncio.CancelledError:
+        #? The caller cancelled us mid-drain (e.g. an enclosing timeout). Do
+        #? not orphan the child: cancel it and await its completion so the
+        #? awaited work is not left running in the background, then re-raise
+        #? the cancellation to preserve caller cancellation semantics.
         task.cancel()
         try:
             await task
         except asyncio.CancelledError:
             pass
-        raise TimeoutError
-    return task.result()
+        raise
 
 
 __all__ = ["cancel_and_wait", "with_timeout"]
