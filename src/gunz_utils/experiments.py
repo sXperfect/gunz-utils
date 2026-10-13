@@ -250,12 +250,21 @@ def metric_improvement(
     """
     if direction not in {"lower", "higher"}:
         raise ValueError("direction must be lower or higher")
-    if (
-        isinstance(minimum_relative_improvement, bool)
-        or not isinstance(minimum_relative_improvement, int | float)
-        or not math.isfinite(float(minimum_relative_improvement))
-        or minimum_relative_improvement < 0
+    if isinstance(minimum_relative_improvement, bool) or not isinstance(
+        minimum_relative_improvement, int | float
     ):
+        raise ValueError(
+            "minimum_relative_improvement must be a finite non-negative number"
+        )
+    try:
+        improvement_float = float(minimum_relative_improvement)
+    except OverflowError:
+        #? An int too large to convert to float (e.g. 10**400) must surface as
+        #? the documented ValueError, not leak an internal OverflowError.
+        raise ValueError(
+            "minimum_relative_improvement must be a finite non-negative number"
+        ) from None
+    if not math.isfinite(improvement_float) or improvement_float < 0:
         raise ValueError(
             "minimum_relative_improvement must be a finite non-negative number"
         )

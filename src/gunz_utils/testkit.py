@@ -66,7 +66,10 @@ class ManualClock:
             )
         candidate = self.now + seconds_float
         if not math.isfinite(candidate):
-            raise OverflowError("manual clock exceeds finite float range")
+            #? The running clock sum overflowed finite float range (e.g. two
+            #? near-max finite advances). Surface as the documented ValueError,
+            #? not a raw OverflowError.
+            raise ValueError("clock advance exceeds finite float range")
         self.now = candidate
 
 
