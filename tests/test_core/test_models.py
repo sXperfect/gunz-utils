@@ -172,11 +172,18 @@ class TestGunzBaseModelPublicAPI(unittest.TestCase):
 
         self.assertIs(Imported, GunzBaseModel)
 
-    def test_appears_in_package_all(self):
-        """``GunzBaseModel`` is in ``gunz_utils.__all__``."""
+    def test_not_advertised_in_package_all(self):
+        """``GunzBaseModel`` is NOT in ``gunz_utils.__all__``.
+
+        Optional lazily-imported names are deliberately excluded from
+        ``__all__`` so ``from gunz_utils import *`` does not force-load
+        optional dependencies (and does not abort on a minimal install), while
+        the name remains reachable via direct ``from gunz_utils import ...``.
+        """
         import gunz_utils
 
-        self.assertIn("GunzBaseModel", gunz_utils.__all__)
+        self.assertNotIn("GunzBaseModel", gunz_utils.__all__)
+        self.assertIn("GunzBaseModel", gunz_utils.__dir__())
 
 
 if __name__ == "__main__":

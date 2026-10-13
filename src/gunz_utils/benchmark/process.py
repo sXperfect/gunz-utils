@@ -462,12 +462,16 @@ def profile_command(
     """
     if not args:
         raise ValueError("args must not be empty")
-    if (
-        isinstance(interval, bool)
-        or not isinstance(interval, (int, float))
-        or not math.isfinite(float(interval))
-        or interval <= 0
-    ):
+    if isinstance(interval, bool) or not isinstance(interval, (int, float)):
+        raise ValueError("interval must be a finite positive number")
+    try:
+        interval_float = float(interval)
+    except OverflowError:
+        #? A finite interval that is not float-representable (e.g. 10**400)
+        #? must surface as the documented ValueError, not leak an internal
+        #? OverflowError.
+        raise ValueError("interval must be a finite positive number") from None
+    if not math.isfinite(interval_float) or interval <= 0:
         raise ValueError("interval must be a finite positive number")
     if memory_detail not in {"rss", "pss", "full"}:
         raise ValueError("memory_detail must be rss, pss, or full")
