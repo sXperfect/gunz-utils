@@ -353,6 +353,10 @@ def copy_and_hash(
     )
     while chunk := source.read(chunk_size):
         writer.write(chunk)
+        #? Stop pulling from the source once the byte bound is reached so an
+        #? oversized source is not read to EOF.
+        if max_bytes is not None and writer.bytes_written >= max_bytes:
+            break
     return StreamCopyResult(writer.bytes_written, writer.hexdigest)
 
 

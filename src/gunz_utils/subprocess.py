@@ -392,6 +392,10 @@ def run_command(
     CommandResult
         The result of the operation.
     """
+    if isinstance(args, str) or not isinstance(args, Sequence):
+        raise TypeError(
+            "args must be a sequence of command arguments, not a bare string"
+        )
     if not args:
         raise ValueError("args must not be empty")
     timeout = _validate_timeout_value(timeout, name="timeout")
@@ -702,6 +706,10 @@ async def run_command_async(
     CommandResult
         The result of the operation.
     """
+    if isinstance(args, str) or not isinstance(args, Sequence):
+        raise TypeError(
+            "args must be a sequence of command arguments, not a bare string"
+        )
     if not args:
         raise ValueError("args must not be empty")
     timeout = _validate_timeout_value(timeout, name="timeout")

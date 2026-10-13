@@ -110,7 +110,13 @@ def deep_get(
     >>> deep_get({"a": 1}, "a.b")  # traversal through scalar returns default
     """
     parts = _normalize_path(path, separator)
-    dotted = separator.join(parts)
+
+    def _dotted() -> str:
+        #? Built lazily and only for error messages: segments may be
+        #? non-string (e.g. an int key written by ``deep_set``), which
+        #? ``str.join`` would reject.
+        return separator.join(str(part) for part in parts)
+
     cursor: Any = d
     for key in parts:
         if not isinstance(cursor, Mapping):
@@ -119,13 +125,13 @@ def deep_get(
             #? as "not found" rather than raising TypeError so callers can
             #? probe config trees safely.
             if default is _MISSING:
-                raise KeyError(dotted)
+                raise KeyError(_dotted())
             return default
         try:
             cursor = cursor[key]
         except (KeyError, IndexError, TypeError):
             if default is _MISSING:
-                raise KeyError(dotted) from None
+                raise KeyError(_dotted()) from None
             return default
     return cursor
 

@@ -1816,6 +1816,8 @@ class SecureStore:
         list[dict[str, object]]
             The result of the operation.
         """
+        if self._fernet is None:
+            raise RuntimeError("Store is locked. Call unlock() first.")
         if (
             isinstance(limit, bool)
             or not isinstance(limit, int)

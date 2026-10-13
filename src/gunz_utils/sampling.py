@@ -95,6 +95,13 @@ def sample_named_items(
     if limit is not None and limit < 0:
         raise ValueError("limit must be non-negative or None")
 
+    #? A bare string passed as a pattern is treated as a single glob pattern,
+    #? not iterated into characters. Empty string still means "no filter".
+    if isinstance(include_patterns, str):
+        include_patterns = (include_patterns,) if include_patterns else None
+    if isinstance(exclude_patterns, str):
+        exclude_patterns = (exclude_patterns,) if exclude_patterns else None
+
     eligible: list[tuple[str, T]] = []
     seen_names: set[str] = set()
     for name, value in items:
