@@ -109,8 +109,13 @@ async def gather_limited(
                 index = pending.pop(task)
                 try:
                     ordered[index] = task.result()
-                except asyncio.CancelledError:
-                    raise
+                except asyncio.CancelledError as exc:
+                    #? A cancelled subtask must not abort the whole gather. With
+                    #? return_exceptions it is collected as a result (matching
+                    #? asyncio.gather); otherwise it propagates.
+                    if not return_exceptions:
+                        raise
+                    ordered[index] = exc
                 except Exception as exc:
                     if not return_exceptions:
                         raise

@@ -30,11 +30,21 @@ class TestDeepAuditRound2(unittest.IsolatedAsyncioTestCase):
         async def cancelled() -> None:
             raise asyncio.CancelledError
 
+        #? With return_exceptions=True a cancelled subtask is collected as a
+        #? result (matching asyncio.gather) rather than aborting the gather.
+        result = await gather_limited(
+            [cancelled()],
+            limit=1,
+            return_exceptions=True,
+        )
+        self.assertIsInstance(result[0], asyncio.CancelledError)
+
+        #? With return_exceptions=False cancellation still propagates.
         with self.assertRaises(asyncio.CancelledError):
             await gather_limited(
                 [cancelled()],
                 limit=1,
-                return_exceptions=True,
+                return_exceptions=False,
             )
 
     async def test_half_open_cancellation_releases_probe(self) -> None:

@@ -54,12 +54,17 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
         async def cancel() -> int:
             raise asyncio.CancelledError
 
+        #? With return_exceptions=True a cancelled subtask is collected as a
+        #? result (matching asyncio.gather) rather than aborting the gather.
+        result = await gather_limited(
+            [cancel()],
+            limit=1,
+            return_exceptions=True,
+        )
+        self.assertIsInstance(result[0], asyncio.CancelledError)
+        #? Without return_exceptions the cancellation still propagates.
         with self.assertRaises(asyncio.CancelledError):
-            await gather_limited(
-                [cancel()],
-                limit=1,
-                return_exceptions=True,
-            )
+            await gather_limited([cancel()], limit=1)
 
     async def test_invalid_limit(self) -> None:
         with self.assertRaises(ValueError):

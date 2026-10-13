@@ -216,49 +216,42 @@ class WorkflowDAG:
 
         memo: dict[str, str | None] = {}
 
-        def resolve(
-            stage_name: str,
-        ) -> str | None:
-            """resolve() function.
-
-            Parameters
-            ----------
-            stage_name : str
-                stage_name parameter.
-
-            Returns
-            -------
-            str | None
-                The result of the operation.
-            """
+        #? Iterative post-order traversal (mirrors _topological_order) so deep
+        #? acyclic DAGs do not blow the Python stack. The shared memo makes
+        #? repeated calls deterministic and cacheable.
+        stack: list[tuple[str, bool]] = [(name, False)]
+        while stack:
+            stage_name, processed = stack.pop()
             if stage_name in memo:
-                return memo[stage_name]
-
+                continue
+            if not processed:
+                stack.append((stage_name, True))
+                for dependency in self.stages[stage_name].dependencies:
+                    if dependency not in memo:
+                        stack.append((dependency, False))
+                continue
             stage = self.stages[stage_name]
             if stage.fingerprint is None:
                 memo[stage_name] = None
-                return None
-
+                continue
             dependencies: dict[str, str] = {}
             for dependency in stage.dependencies:
-                token = resolve(dependency)
+                token = memo.get(dependency)
                 if token is None:
                     memo[stage_name] = None
-                    return None
+                    break
                 dependencies[dependency] = token
+            else:
+                memo[stage_name] = structured_hash(
+                    {
+                        "name": stage.name,
+                        "fingerprint": stage.fingerprint,
+                        "dependency_order": list(stage.dependencies),
+                        "dependency_fingerprints": dependencies,
+                    }
+                )
 
-            token = structured_hash(
-                {
-                    "name": stage.name,
-                    "fingerprint": stage.fingerprint,
-                    "dependency_order": list(stage.dependencies),
-                    "dependency_fingerprints": dependencies,
-                }
-            )
-            memo[stage_name] = token
-            return token
-
-        return resolve(name)
+        return memo[name]
 
     def _rollback_sync(self,
         completed_order: list[str],
