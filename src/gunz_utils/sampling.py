@@ -95,6 +95,12 @@ def sample_named_items(
     if limit is not None and limit < 0:
         raise ValueError("limit must be non-negative or None")
 
+    #? Validate seed upfront (like limit) so the documented TypeError for a
+    #? non-int seed is raised consistently, even when no items are eligible and
+    #? the sort key (which routes seed through stable_priority) never runs.
+    if not isinstance(seed, int):
+        raise TypeError(f"seed must be int, got {type(seed).__name__}")
+
     #? A bare string passed as a pattern is treated as a single glob pattern,
     #? not iterated into characters. Empty string still means "no filter".
     if isinstance(include_patterns, str):

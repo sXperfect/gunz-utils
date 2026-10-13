@@ -27,12 +27,18 @@ def as_readonly_view(
     memoryview
         The result of the operation.
     """
+    if not isinstance(data, bytes | bytearray | memoryview):
+        raise TypeError(
+            "as_readonly_view requires bytes, bytearray, or memoryview input, "
+            f"got {type(data).__name__}"
+        )
     try:
         view = memoryview(data).cast("B")
     except TypeError:
         #? A non-contiguous (stepped) memoryview slice cannot be cast to a
         #? byte view zero-copy. Fall back to a copy of the logical bytes so a
-        #? readonly byte view is still returned for any accepted input.
+        #? readonly byte view is still returned for any accepted bytes-like
+        #? input.
         view = memoryview(bytes(data))
     return view.toreadonly()
 
