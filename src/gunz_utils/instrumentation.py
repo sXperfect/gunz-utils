@@ -82,6 +82,15 @@ class Timer:
         exc: object,
         tb: object,
     ) -> None:
+        if not self._active:
+            #? Symmetric guard to __enter__: an __exit__ without a matching
+            #? __enter__ (or a second __exit__ after a normal one) would
+            #? silently record a bogus elapsed based on started=0.0 or the
+            #? previous entry's start. Fail loudly instead.
+            raise RuntimeError(
+                f"Timer {self.name!r} is not active; __exit__ requires a "
+                "matching __enter__"
+            )
         self.result = Timing(
             self.name,
             time.perf_counter() - self.started,
@@ -155,7 +164,15 @@ class Trace:
         Exceptions are never suppressed. Failed spans are still recorded with
         success set to False.
         """
-        metadata_snapshot = copy.deepcopy(metadata)
+        if not isinstance(name, str):
+            raise TypeError(f"name must be a str, got {type(name).__name__}")
+        try:
+            metadata_snapshot = copy.deepcopy(metadata)
+        except Exception:
+            #? Instrumentation must not break the instrumented operation when a
+            #? metadata value cannot be deep-copied. Fall back to the original
+            #? dict so the body still runs and a span is still recorded.
+            metadata_snapshot = metadata
         start = time.perf_counter()
         success = False
         try:

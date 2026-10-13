@@ -91,10 +91,17 @@ def discover_plugins(
         raise ValueError("group must be a non-empty string")
     if not isinstance(instantiate, bool):
         raise ValueError("instantiate must be bool")
-    candidates = sorted(
-        entry_points(group=group),
-        key=lambda item: (item.name, item.value),
-    )
+    try:
+        candidates = sorted(
+            entry_points(group=group),
+            key=lambda item: (item.name, item.value),
+        )
+    except Exception:
+        #? A single corrupt/malformed installed distribution can make
+        #? entry_points(group=...) itself raise. Contain the enumeration
+        #? failure as an empty result so it cannot abort discovery of the
+        #? whole group (BaseException subclasses still propagate).
+        return ()
     results: list[PluginLoadResult] = []
     for entry_point in candidates:
         info = _entry_point_info(entry_point, group)
