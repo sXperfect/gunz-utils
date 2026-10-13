@@ -310,7 +310,21 @@ def _run_command_bounded(
         for thread in threads:
             thread.start()
             started_threads.append(thread)
-        returncode = process.wait(timeout=remaining_timeout())
+        try:
+            returncode = process.wait(timeout=remaining_timeout())
+        except subprocess.TimeoutExpired as exc:
+            #? Popen.wait raises subprocess.TimeoutExpired (not a TimeoutError
+            #? subclass). Surface a consistent TimeoutError for the timeout
+            #? condition across the sync and async entry points.
+            raise TimeoutError(
+                f"Command {process.args!r} timed out after {timeout or 0.0} seconds"
+            ) from exc
+        if deadline is None:
+            #? The root command has exited and there is no caller deadline. Stop
+            #? the readers so a descendant holding a pipe open without writing
+            #? cannot keep capture spinning for the descendant's full lifetime:
+            #? such a pipe is not reliable capture input once the root is done.
+            stop.set()
         for thread in threads:
             while thread.is_alive():
                 if state.exceeded:
@@ -320,7 +334,10 @@ def _run_command_bounded(
                     raise error from reader_errors[0]
                 remaining = remaining_timeout()
                 if remaining is not None and remaining <= 0:
-                    raise subprocess.TimeoutExpired(process.args, timeout or 0.0)
+                    raise TimeoutError(
+                        f"Command {process.args!r} timed out after "
+                        f"{timeout or 0.0} seconds"
+                    )
                 thread.join(timeout=0.05 if remaining is None else min(0.05, remaining))
     except BaseException as exc:
         _kill_process(process)
@@ -344,7 +361,7 @@ def _run_command_bounded(
                     cleanup_pipe.close()
                 except OSError:
                     pass
-        if isinstance(exc, subprocess.TimeoutExpired) and state.exceeded:
+        if isinstance(exc, TimeoutError) and state.exceeded:
             raise _output_limit_error(max_output_bytes) from None
         raise
     if reader_errors:
@@ -406,16 +423,24 @@ def run_command(
     _validate_output_limit(max_output_bytes)
     started = time.perf_counter()
     if max_output_bytes is None:
-        completed = subprocess.run(
-            list(args),
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=False,
-            timeout=timeout,
-            check=False,
-            cwd=cwd,
-            env=env,
-        )
+        try:
+            completed = subprocess.run(
+                list(args),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=False,
+                timeout=timeout,
+                check=False,
+                cwd=cwd,
+                env=env,
+            )
+        except subprocess.TimeoutExpired as exc:
+            #? Surface a consistent TimeoutError for the timeout condition
+            #? across the sync and async entry points (subprocess.TimeoutExpired
+            #? is not a subclass of TimeoutError).
+            raise TimeoutError(
+                f"Command {list(args)!r} timed out after {timeout or 0.0} seconds"
+            ) from exc
         returncode = completed.returncode
         stdout_b = completed.stdout
         stderr_b = completed.stderr

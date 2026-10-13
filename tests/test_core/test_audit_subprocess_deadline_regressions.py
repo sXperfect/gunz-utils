@@ -65,7 +65,7 @@ def test_deadline_and_overflow_cleanup_with_inherited_pipe_holder(
     started = time.monotonic()
     try:
         expected = (
-            CommandOutputLimitError if output_overflow else subprocess.TimeoutExpired
+            CommandOutputLimitError if output_overflow else TimeoutError
         )
         with pytest.raises(expected):
             run_command(

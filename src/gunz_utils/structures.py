@@ -377,22 +377,16 @@ def deep_diff(
             pending.append((pair, sequence_children()))
             return
 
-        if type(left_value) is not type(right_value):
-            differences.append(
-                DeepDifference(
-                    current,
-                    "type",
-                    type(left_value).__name__,
-                    type(right_value).__name__,
-                )
-            )
-            return
-
-        #? A failed equality (e.g. a buggy __eq__) is surfaced as a typed
-        #? error carrying the path rather than silently swallowed.
+        #? Leaf values implement scalar boolean equality: numerically-equal
+        #? values of different numeric types (1 vs 1.0, int vs Decimal) are
+        #? equal and must not be reported. Only report a difference when
+        #? equality is False. Container type distinctions (list vs tuple) are
+        #? handled earlier in the sequence branch and remain strict.
         try:
             equal = bool(left_value == right_value)
         except Exception as exc:
+            #? A failed equality (e.g. a buggy __eq__) is surfaced as a typed
+            #? error carrying the path rather than silently swallowed.
             raise TypeError(f"leaf equality failed at {current or '<root>'}") from exc
         if not equal:
             differences.append(
@@ -410,7 +404,8 @@ def deep_diff(
             item = next(iterator)
         except StopIteration:
             pending.pop()
-            active.discard(pair)
+            if pair is not None:
+                active.discard(pair)
             continue
         if isinstance(item, DeepDifference):
             differences.append(item)
