@@ -38,9 +38,13 @@ def unique(
     for item in items:
         marker: object = item if key is None else key(item)
         try:
-            if marker in seen:
+            #? Booleans key as ``(bool, marker)`` so ``True`` stays distinct
+            #? from ``1`` and ``False`` from ``0``, honoring the package's
+            #? bool-is-subtype-of-int numeric contract.
+            dedup_key: object = (bool, marker) if isinstance(marker, bool) else marker
+            if dedup_key in seen:
                 continue
-            seen.add(marker)
+            seen.add(dedup_key)
         except TypeError:
             if any(marker == previous for previous in seen_unhashable):
                 continue

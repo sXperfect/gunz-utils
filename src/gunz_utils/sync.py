@@ -155,6 +155,11 @@ def _normalize_rsync_source(
         )
     )
     if remote:
+        #? rsync feeds a remote-shell source to a remote shell (ssh/rsh), so
+        #? shell metacharacters there enable remote command injection. Reject
+        #? them, consistent with the local-source validation above.
+        if re.search(r"[;|&`$<>(){}\[\]*?\"'\\]", text):
+            raise ValueError("remote source contains shell metacharacters")
         normalized = text.rstrip("/")
     elif windows_drive:
         normalized = text.replace("\\", "/").rstrip("/")
@@ -309,6 +314,8 @@ def rsync_mirror(
         raise ValueError(
             "completion_marker must be a simple filename or None"
         )
+    if isinstance(extra_args, str):
+        raise TypeError("extra_args must be a sequence of strings, not a bare str")
     if any(
         not isinstance(argument, str) or not argument
         for argument in extra_args

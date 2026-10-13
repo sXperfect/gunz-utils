@@ -419,28 +419,26 @@ class GracefulShutdown:
         if self._registration is not None:
             self._registration.restore()
             self._registration = None
-        is_cancelled = (
-            exc_type is not None and issubclass(exc_type, asyncio.CancelledError)
-        )
-        if self.is_shutting_down or is_cancelled:
-            if not self.is_shutting_down:
-                self.trigger_shutdown()
-            cleanup_task = asyncio.create_task(self.run_cleanup())
-            while not cleanup_task.done():
-                try:
-                    await asyncio.shield(cleanup_task)
-                except asyncio.CancelledError:
-                    #? A CancelledError here is either the OUTER task being
-                    #? re-cancelled while cleanup drains (absorb it so cleanup
-                    #? can finish) or the cleanup task itself finishing with a
-                    #? CancelledError/BaseException from a callback (which must
-                    #? propagate per run_cleanup's contract, not be discarded).
-                    if cleanup_task.done():
-                        if cleanup_task.cancelled():
-                            raise
-                        exc = cleanup_task.exception()
-                        if exc is not None:
-                            raise exc from None
+        #? Run registered cleanup callbacks on EVERY exit -- shutdown, body
+        #? cancellation, a body exception, and normal completion -- so the
+        #? resources they release are never leaked. Returning False lets the
+        #? original body exception (if any) propagate.
+        cleanup_task = asyncio.create_task(self.run_cleanup())
+        while not cleanup_task.done():
+            try:
+                await asyncio.shield(cleanup_task)
+            except asyncio.CancelledError:
+                #? A CancelledError here is either the OUTER task being
+                #? re-cancelled while cleanup drains (absorb it so cleanup can
+                #? finish) or the cleanup task itself finishing with a
+                #? CancelledError/BaseException from a callback (which must
+                #? propagate per run_cleanup's contract, not be discarded).
+                if cleanup_task.done():
+                    if cleanup_task.cancelled():
+                        raise
+                    exc = cleanup_task.exception()
+                    if exc is not None:
+                        raise exc from None
         return False
 
 

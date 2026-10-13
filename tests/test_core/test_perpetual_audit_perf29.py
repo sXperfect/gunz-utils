@@ -55,8 +55,9 @@ def test_env_bool_rejects_non_bool_default() -> None:
 
 
 # ---------------------------------------------------------------------------
-# RED: GracefulShutdown must not run cleanup on a fresh re-entered context that
-# never shut down (stale shutdown event leaks across blocks).
+# RED: GracefulShutdown must reset stale shutdown state on re-entry; cleanup
+# runs once per exit (phase-33 contract: cleanup always runs on exit, so the
+# re-entered block's normal exit legitimately runs cleanup again).
 # ---------------------------------------------------------------------------
 def test_graceful_shutdown_reuse_does_not_leak_shutdown_state() -> None:
     async def main() -> None:
@@ -67,18 +68,20 @@ def test_graceful_shutdown_reuse_does_not_leak_shutdown_state() -> None:
             cleanup_runs.append(1)
 
         gs.add_callback(cleanup)
-        # First block triggers shutdown -> cleanup runs.
+        # First block triggers shutdown -> cleanup runs once.
         async with gs:
             gs.trigger_shutdown()
         assert len(cleanup_runs) == 1
-        # Re-enter the same object; this block never shuts down and is not
-        # cancelled, so cleanup must NOT run again.
+        # Re-enter the same object. The __aenter__ reset clears stale shutdown
+        # state, so this fresh block does NOT start in a shutting-down state.
         async with gs:
-            pass
-        assert len(cleanup_runs) == 1, (
-            "reusing a GracefulShutdown must reset stale shutdown state; "
-            "cleanup ran on a block that never shut down"
-        )
+            assert gs.is_shutting_down is False
+            assert gs.signal_received is None
+        # Cleanup runs on EVERY exit (phase-33 contract), including this
+        # block's normal exit, so it runs once per block.
+        assert len(cleanup_runs) == 2
+        assert gs.is_shutting_down is False
+        assert gs.signal_received is None
 
     asyncio.run(main())
 
