@@ -14,6 +14,10 @@ T = TypeVar("T")
 E = TypeVar("E")
 U = TypeVar("U")
 
+#? Sentinel distinguishing "caller did not set _ok" from an explicit True, so
+#? the constructor can infer the active variant from which field is populated.
+_UNSET = object()
+
 
 @dataclass(frozen=True)
 class Result(Generic[T, E]):
@@ -24,9 +28,14 @@ class Result(Generic[T, E]):
 
     value: T | None = None
     error: E | None = None
-    _ok: bool = True
+    _ok: bool | object = _UNSET
 
     def __post_init__(self) -> None:
+        if self._ok is _UNSET:
+            #? Infer the active variant from which field the caller populated,
+            #? so ``Result(error=exc)`` builds an error result and
+            #? ``Result(value=v)`` a success result.
+            object.__setattr__(self, "_ok", self.error is None)
         if not isinstance(self._ok, bool):
             raise TypeError("_ok must be a boolean")
         if self._ok and self.error is not None:
@@ -79,7 +88,7 @@ class Result(Generic[T, E]):
         bool
             The result of the operation.
         """
-        return self._ok
+        return cast(bool, self._ok)
 
     @property
     def is_err(self) -> bool:

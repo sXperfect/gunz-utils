@@ -127,7 +127,7 @@ def safe_float(
         return default
     try:
         result = float(stripped)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
         return default
     #? Infinity remains opt-in controllable, while NaN stays rejected by default.
     if not allow_inf and math.isinf(result):

@@ -67,18 +67,30 @@ def resolve_project_root(
         and _PROJECT_ANCHOR is not None
         and (start == _PROJECT_ROOT or _PROJECT_ROOT in start.parents)
     ):
-        if inject_to_sys_path:
-            root_str = str(_PROJECT_ROOT)
-            if root_str not in sys.path:
-                #? Intentional, documented, opt-in side effect of
-                #? ``inject_to_sys_path`` (tested); not a hidden mutation.
-                # gunz-style: ignore[GS007]
-                sys.path.insert(0, root_str)
-                logger.debug(
-                    "Added cached project root to sys.path: %s",
-                    root_str,
-                )
-        return _PROJECT_ROOT
+        #? Only reuse the cached root when it is still the nearest git boundary
+        #? for this anchor. A nested repository (e.g. a submodule) between the
+        #? cached root and the anchor must re-search so the nested repo's own
+        #? root wins instead of silently returning the outer root.
+        current = start
+        has_nested_boundary = False
+        while current != _PROJECT_ROOT and current != current.parent:
+            if (current / ".git").exists():
+                has_nested_boundary = True
+                break
+            current = current.parent
+        if not has_nested_boundary:
+            if inject_to_sys_path:
+                root_str = str(_PROJECT_ROOT)
+                if root_str not in sys.path:
+                    #? Intentional, documented, opt-in side effect of
+                    #? ``inject_to_sys_path`` (tested); not a hidden mutation.
+                    # gunz-style: ignore[GS007]
+                    sys.path.insert(0, root_str)
+                    logger.debug(
+                        "Added cached project root to sys.path: %s",
+                        root_str,
+                    )
+            return _PROJECT_ROOT
 
     try:
         # ? Search upwards for the .git directory

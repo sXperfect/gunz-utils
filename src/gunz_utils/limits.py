@@ -36,13 +36,26 @@ class Limits:
                 or value < 0
             ):
                 raise ValueError(f"{name} must be a non-negative integer or None")
-        if self.timeout is not None and (
-            isinstance(self.timeout, bool)
-            or not isinstance(self.timeout, (int, float))
-            or not math.isfinite(float(self.timeout))
-            or self.timeout < 0
-        ):
-            raise ValueError("timeout must be a finite non-negative number or None")
+        if self.timeout is not None:
+            if isinstance(self.timeout, bool) or not isinstance(
+                self.timeout, (int, float)
+            ):
+                raise ValueError(
+                    "timeout must be a finite non-negative number or None"
+                )
+            try:
+                timeout_float = float(self.timeout)
+            except OverflowError:
+                #? An int too large to convert to float (e.g. 10**400) must
+                #? surface as the documented ValueError, not leak an internal
+                #? OverflowError.
+                raise ValueError(
+                    "timeout must be a finite non-negative number or None"
+                ) from None
+            if not math.isfinite(timeout_float) or self.timeout < 0:
+                raise ValueError(
+                    "timeout must be a finite non-negative number or None"
+                )
 
     def check_bytes(self,
         size: int,
