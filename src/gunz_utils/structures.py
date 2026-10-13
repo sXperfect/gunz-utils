@@ -241,12 +241,18 @@ def deep_diff(
     equality belongs in the owning numerical package.
     """
     differences: list[DeepDifference] = []
-    #? Track id pairs of already-visited containers to stop traversal on
-    #? shared or cyclic substructure without an unbounded recursion.
-    visited: set[tuple[int, int]] = set()
-    pending: list[Iterator[tuple[t.Any, t.Any, str] | DeepDifference]] = [
-        iter(((left, right, path),))
-    ]
+    #? Track (id(left), id(right)) pairs currently on the ancestor path so
+    #? traversal stops only on actual cycles, not on shared non-cyclic
+    #? substructure that legitimately appears at multiple paths and must be
+    #? compared each time. Pairs are added when their children are pushed and
+    #? removed when that subtree finishes.
+    active: set[tuple[int, int]] = set()
+    pending: list[
+        tuple[
+            tuple[int, int] | None,
+            Iterator[tuple[t.Any, t.Any, str] | DeepDifference],
+        ]
+    ] = [(None, iter(((left, right, path),)))]
 
     def child_path(
         parent: str,
@@ -291,13 +297,13 @@ def deep_diff(
         None
         """
         pair = (id(left_value), id(right_value))
-        if pair in visited:
+        if pair in active:
             return
 
         #? Mappings are compared by their sorted key union so the report order
         #? is deterministic regardless of insertion order.
         if isinstance(left_value, Mapping) and isinstance(right_value, Mapping):
-            visited.add(pair)
+            active.add(pair)
             keys = sorted(
                 set(left_value) | set(right_value),
                 key=repr,
@@ -317,7 +323,7 @@ def deep_diff(
                     else:
                         yield left_value[key], right_value[key], nested
 
-            pending.append(mapping_children())
+            pending.append((pair, mapping_children()))
             return
 
         #? Strings, bytes, and bytearrays are scalar leaves, not sequences.
@@ -339,7 +345,7 @@ def deep_diff(
                     )
                 )
                 return
-            visited.add(pair)
+            active.add(pair)
             left_length = len(left_value)
             right_length = len(right_value)
             if left_length != right_length:
@@ -368,7 +374,7 @@ def deep_diff(
                     else:
                         yield left_value[index], right_value[index], nested
 
-            pending.append(sequence_children())
+            pending.append((pair, sequence_children()))
             return
 
         if type(left_value) is not type(right_value):
@@ -399,10 +405,12 @@ def deep_diff(
             )
 
     while pending:
+        pair, iterator = pending[-1]
         try:
-            item = next(pending[-1])
+            item = next(iterator)
         except StopIteration:
             pending.pop()
+            active.discard(pair)
             continue
         if isinstance(item, DeepDifference):
             differences.append(item)

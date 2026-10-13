@@ -65,14 +65,24 @@ def env_overrides(
     out: dict[str, Any] = {}
     seen_leaves: set[tuple[str, ...]] = set()
     prefix_upper = prefix.upper().rstrip("_")
+    underscore_boundary = separator.startswith("_")
     for name, value in environ.items():
         upper = name.upper()
-        if not upper.startswith(prefix_upper + "_"):
-            continue
-        #? Consume the prefix plus any leading separator underscores, so both
-        #? the legacy single-underscore and canonical double-underscore prefix
-        #? boundaries nest cleanly without a leading-underscore path segment.
-        suffix = name[len(prefix_upper):].lstrip("_")
+        rest = upper[len(prefix_upper):]
+        if underscore_boundary:
+            #? Legacy single-underscore and canonical separator boundaries both
+            #? begin with "_"; require at least one and strip all leading
+            #? underscores after the prefix so no leading-underscore segment
+            #? survives.
+            if not rest.startswith("_"):
+                continue
+            suffix = name[len(prefix_upper):].lstrip("_")
+        else:
+            #? Non-underscore separator (e.g. "::", ":", "."): the key must
+            #? carry the exact separator immediately after the prefix.
+            if not rest.startswith(separator):
+                continue
+            suffix = name[len(prefix_upper):][len(separator):]
         if not suffix:
             continue
         parts = [part.lower() for part in suffix.split(separator)]

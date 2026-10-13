@@ -398,6 +398,10 @@ def run_command(
         )
     if not args:
         raise ValueError("args must not be empty")
+    if not all(isinstance(arg, str | bytes | os.PathLike) for arg in args):
+        raise ValueError(
+            "args must contain only str, bytes, or os.PathLike values"
+        )
     timeout = _validate_timeout_value(timeout, name="timeout")
     _validate_output_limit(max_output_bytes)
     started = time.perf_counter()
@@ -712,6 +716,10 @@ async def run_command_async(
         )
     if not args:
         raise ValueError("args must not be empty")
+    if not all(isinstance(arg, str | bytes | os.PathLike) for arg in args):
+        raise ValueError(
+            "args must contain only str, bytes, or os.PathLike values"
+        )
     timeout = _validate_timeout_value(timeout, name="timeout")
     validated_grace = _validate_timeout_value(
         terminate_grace,
