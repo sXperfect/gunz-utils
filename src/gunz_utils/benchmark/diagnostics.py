@@ -81,11 +81,11 @@ def analyze_stability(
     median = statistics.median(values)
     spread = max(values) - min(values)
     if median == 0:
-        # A zero median with non-zero spread means division by zero, so the
-        # relative range is effectively infinite. Reporting 0.0 here would
-        # mask a large spread as "no variance", so surface it as infinity
-        # (which then trips the range warning). All-zero samples have no
-        # spread and correctly report 0.0.
+        #? A zero median with non-zero spread means division by zero, so the
+        #? relative range is effectively infinite. Reporting 0.0 here would
+        #? mask a large spread as "no variance", so surface it as infinity
+        #? (which then trips the range warning). All-zero samples have no
+        #? spread and correctly report 0.0.
         relative_range = math.inf if spread > 0 else 0.0
     else:
         relative_range = spread / median

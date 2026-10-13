@@ -37,6 +37,7 @@ from __future__ import annotations
 import io
 
 import pytest
+
 from gunz_utils import cache, context, provenance, streaming
 from gunz_utils.content_store import ContentAddressedStore
 from gunz_utils.serialization import _MAX_JSON_DEPTH

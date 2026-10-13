@@ -105,8 +105,7 @@ def resolve_project_root(
                 if root_str not in sys.path:
                     #? Intentional, documented, opt-in side effect of
                     #? ``inject_to_sys_path`` (tested); not a hidden mutation.
-                    # gunz-style: ignore[GS007]
-                    sys.path.insert(0, root_str)
+                    sys.path.insert(0, root_str)  # gunz-style: ignore[GS007]
             return _PROJECT_ROOT
     root = _walk_up_for_marker(start) or _git_rev_parse_toplevel(str(start))
     if root is None:
@@ -126,7 +125,6 @@ def resolve_project_root(
         if root_str not in sys.path:
             #? Intentional, documented, opt-in side effect of
             #? ``inject_to_sys_path`` (tested); not a hidden mutation.
-            # gunz-style: ignore[GS007]
-            sys.path.insert(0, root_str)
+            sys.path.insert(0, root_str)  # gunz-style: ignore[GS007]
 
     return _PROJECT_ROOT

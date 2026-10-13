@@ -37,7 +37,9 @@ def _reject_json_constant(
     raise ValueError(f"non-standard JSON constant: {value}")
 
 
-def _reject_nonfinite(value: Any) -> None:
+def _reject_nonfinite(
+    value: Any,
+) -> None:
     """Raise ``ValueError`` if ``value`` decodes to a non-finite float.
 
     ``parse_constant`` only intercepts the non-standard ``NaN``/``Infinity``
@@ -59,7 +61,9 @@ def _reject_nonfinite(value: Any) -> None:
             stack.extend(node)
 
 
-def _reject_excessive_nesting(value: Any) -> None:
+def _reject_excessive_nesting(
+    value: Any,
+) -> None:
     """Raise ``ValueError`` if ``value`` nests deeper than the JSON depth bound.
 
     The encode path must enforce the same ``_MAX_JSON_DEPTH`` bound the decode

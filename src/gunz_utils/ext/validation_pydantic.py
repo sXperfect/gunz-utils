@@ -133,7 +133,7 @@ def type_checked(
             return wrapper
 
         @functools.wraps(f)
-        def wrapper(
+        def wrapper_sync(
             *args: t.Any,
             **kw: t.Any,
         ) -> t.Any:
@@ -158,7 +158,7 @@ def type_checked(
                     _validation_error_message(exc, f.__name__)
                 ) from None
 
-        return wrapper
+        return wrapper_sync
 
     if func is not None:
         return decorator(func)

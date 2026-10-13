@@ -30,7 +30,6 @@ import pytest
 from gunz_utils.network import build_network_uri, tcp_reachable
 from gunz_utils.serialization import json_loads
 
-
 # -----------------------------------------------------------------------------
 # serialization.py - json_loads does not bound nesting depth
 # -----------------------------------------------------------------------------

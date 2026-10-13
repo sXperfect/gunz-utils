@@ -84,8 +84,7 @@ def resolve_project_root(
                 if root_str not in sys.path:
                     #? Intentional, documented, opt-in side effect of
                     #? ``inject_to_sys_path`` (tested); not a hidden mutation.
-                    # gunz-style: ignore[GS007]
-                    sys.path.insert(0, root_str)
+                    sys.path.insert(0, root_str)  # gunz-style: ignore[GS007]
                     logger.debug(
                         "Added cached project root to sys.path: %s",
                         root_str,
@@ -132,8 +131,7 @@ def resolve_project_root(
             #? ``inject_to_sys_path`` (tested); not a hidden mutation.
             #? Insert at position 0 to prioritize local source over
             #? installed packages
-            # gunz-style: ignore[GS007]
-            sys.path.insert(0, root_str)
+            sys.path.insert(0, root_str)  # gunz-style: ignore[GS007]
             logger.debug(f"Added project root to sys.path: {root_str}")
 
     return _PROJECT_ROOT

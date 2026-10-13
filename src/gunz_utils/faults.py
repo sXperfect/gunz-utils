@@ -12,7 +12,7 @@ from collections.abc import Callable
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from types import TracebackType
-from typing import BinaryIO, TypeVar
+from typing import Any, BinaryIO, TypeVar, cast
 
 T = TypeVar("T")
 
@@ -343,19 +343,25 @@ class FaultyStream:
             and self.read_calls > self.fail_read_after
         ):
             raise self.read_error()
+        wrapped = cast(Any, self.wrapped)
+        writable = cast(bytearray, buffer)
         if (
             self.max_read_bytes is not None
-            and len(buffer) > self.max_read_bytes
+            and len(writable) > self.max_read_bytes
         ):
-            return self.wrapped.readinto(memoryview(buffer)[:self.max_read_bytes])
-        return self.wrapped.readinto(buffer)
+            return cast(
+                int,
+                wrapped.readinto(
+                    memoryview(writable)[: self.max_read_bytes]
+                ),
+            )
+        return cast(int, wrapped.readinto(writable))
 
     def __enter__(self) -> FaultyStream:
         """Return self for use as a binary-stream context manager."""
         return self
 
-    def __exit__(
-        self,
+    def __exit__(self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,

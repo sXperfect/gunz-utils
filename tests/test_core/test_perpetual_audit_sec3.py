@@ -16,7 +16,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 # isort: split
@@ -35,7 +34,6 @@ from gunz_utils.provenance import (
     _redact_environment_value,
     capture_runtime_provenance,
 )
-
 
 # -----------------------------------------------------------------------------
 # provenance.py - allowlisted environment values with embedded credentials leak

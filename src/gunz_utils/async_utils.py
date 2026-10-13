@@ -83,7 +83,9 @@ async def with_timeout(
         return await awaitable
 
 
-def _loop_needs_real_time(loop: asyncio.AbstractEventLoop) -> bool:
+def _loop_needs_real_time(
+    loop: asyncio.AbstractEventLoop,
+) -> bool:
     """Whether the loop's soonest pending timer is strictly in the future.
 
     A zero-delay timer (e.g. ``asyncio.sleep(0)``) is scheduled for the
@@ -106,7 +108,9 @@ def _loop_needs_real_time(loop: asyncio.AbstractEventLoop) -> bool:
     return when > loop.time()
 
 
-async def _run_with_zero_timeout(awaitable: Awaitable[T]) -> T:
+async def _run_with_zero_timeout(
+    awaitable: Awaitable[T],
+) -> T:
     """Run ``awaitable`` with a zero timeout ("do not wait").
 
     A zero timeout means succeed if the work is already ready. Both

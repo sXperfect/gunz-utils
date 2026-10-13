@@ -14,7 +14,7 @@ import time
 from collections.abc import Callable, Coroutine, Mapping, MutableMapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
@@ -571,9 +571,13 @@ class WorkflowDAG:
                         #? failure while leaking the coroutine. Drive the
                         #? coroutine on a fresh loop in a worker thread so the
                         #? stage still completes and is always awaited/closed.
-                        output = _run_coroutine_in_worker_thread(output)
+                        output = _run_coroutine_in_worker_thread(
+                            cast(Coroutine[Any, Any, Any], output)
+                        )
                     else:
-                        output = asyncio.run(output)
+                        output = asyncio.run(
+                            cast(Coroutine[Any, Any, Any], output)
+                        )
             except BaseException as exc:
                 compensation_errors = self._rollback_sync(executed_order, outputs)
                 raise WorkflowExecutionError(

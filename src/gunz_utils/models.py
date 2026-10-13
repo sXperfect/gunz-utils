@@ -112,7 +112,9 @@ class GunzBaseModel(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _reject_bool_for_int_fields(cls, data: object) -> object:
+    def _reject_bool_for_int_fields(cls,
+        data: object,
+    ) -> object:
         """Reject a Python ``bool`` supplied for an ``int``-typed field.
 
         Pydantic's lax mode silently coerces ``bool`` into ``int`` (and vice

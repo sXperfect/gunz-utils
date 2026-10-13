@@ -29,8 +29,8 @@ import pytest
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 
-from gunz_utils.env import env, env_bool
 from gunz_utils.enums import BaseIntEnum
+from gunz_utils.env import env, env_bool
 
 
 @contextlib.contextmanager

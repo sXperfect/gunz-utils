@@ -38,7 +38,7 @@ class AsyncRateLimiter:
         elapsed = time.monotonic() - self._updated
         return min(self.capacity, self._tokens + elapsed * self.rate)
 
-    async def try_acquire(self,
+    async def try_acquire(self,  # gunz-style: ignore[GS046]
         tokens: float = 1.0,
     ) -> bool:
         """Consume tokens immediately when available without waiting.
@@ -61,7 +61,7 @@ class AsyncRateLimiter:
             self._tokens -= tokens
             return True
 
-    async def acquire(self,
+    async def acquire(self,  # gunz-style: ignore[GS046]
         tokens: float = 1.0,
         *,
         timeout: float | None = None,

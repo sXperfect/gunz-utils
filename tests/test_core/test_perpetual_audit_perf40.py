@@ -36,6 +36,7 @@ for the companion behaviors.
 from __future__ import annotations
 
 import pytest
+
 from gunz_utils.diagnostics import exception_dict
 from gunz_utils.dict_utils import deep_get, deep_merge, deep_set
 from gunz_utils.enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
@@ -197,8 +198,9 @@ def test_int_enum_bool_rejected():
 
 
 def test_gunz_base_model_bool_int_rejection():
-    from gunz_utils.models import GunzBaseModel
     from pydantic import ValidationError
+
+    from gunz_utils.models import GunzBaseModel
 
     class M(GunzBaseModel):
         count: int

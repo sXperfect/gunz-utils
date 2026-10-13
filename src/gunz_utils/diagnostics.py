@@ -15,7 +15,9 @@ from typing import Any
 from .redaction import redact_dict
 
 
-def _json_safe(value: Any) -> Any:
+def _json_safe(
+    value: Any,
+) -> Any:
     """Recursively coerce a value to a JSON-serializable form.
 
     Sets become sorted lists, bytes become a repr string, and any other

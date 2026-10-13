@@ -35,7 +35,6 @@ from gunz_utils.stats import (
 )
 from gunz_utils.time_utils import expired, monotonic_deadline, remaining
 
-
 # ---------------------------------------------------------------------------
 # time_utils: a huge integer timeout/deadline leaks an uncaught OverflowError
 # from ``float(int)`` instead of the documented ValueError.

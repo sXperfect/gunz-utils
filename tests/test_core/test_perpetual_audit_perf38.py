@@ -45,6 +45,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+
 from gunz_utils.faults import (
     AwaitBoundaryChaos,
     FailAfter,

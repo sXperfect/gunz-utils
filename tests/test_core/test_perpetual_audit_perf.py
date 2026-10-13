@@ -21,7 +21,6 @@ from __future__ import annotations
 from gunz_utils.dict_utils import deep_merge
 from gunz_utils.formatting import format_bytes, format_duration
 
-
 # ---------------------------------------------------------------------------
 # format_bytes / format_duration: negative fractional values produce a
 # meaningless "-0 B" / "-0ms" string.

@@ -35,7 +35,6 @@ from gunz_utils.upstream_protocol import (
     UpstreamUnavailableError,
 )
 
-
 # -----------------------------------------------------------------------------
 # dag.py - synchronous execute() leaks an unawaited coroutine for async run
 # -----------------------------------------------------------------------------
@@ -110,7 +109,7 @@ def test_retry_applies_backoff_between_attempts() -> None:
         return client.times
 
     times = _run(scenario())
-    gaps = [b - a for a, b in zip(times, times[1:])]
+    gaps = [b - a for a, b in zip(times, times[1:], strict=False)]
     assert len(times) == 5, f"expected 5 attempts, got {len(times)}"
     assert min(gaps) >= 0.005, (
         f"retries issued with zero backoff between attempts (gaps={gaps!r})"

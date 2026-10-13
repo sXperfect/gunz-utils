@@ -32,10 +32,6 @@ T = TypeVar("T", bound="BaseStrEnum")
 # ? lookup keys) via `__init_subclass__` or direct attribute override.
 DEFAULT_MAX_INPUT_LENGTH = 1024  #? Security: Prevent DoS via long strings
 
-# ? Backward-compat alias for the module-level constant. New code should
-# ? reference `cls.DEFAULT_MAX_INPUT_LENGTH` (the class attribute).
-_MAX_INPUT_LENGTH = DEFAULT_MAX_INPUT_LENGTH
-
 # ? mypy cannot see StrEnum ``ClassVar`` attributes as their declared type
 # ? (it resolves ``cls.<attr>`` to the enum member type instead), and ruff's
 # ? B009 rejects ``getattr`` with a constant name. These private, per-class

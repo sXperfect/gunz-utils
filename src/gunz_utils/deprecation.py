@@ -11,7 +11,7 @@ import functools
 import inspect
 import warnings
 from collections.abc import AsyncIterator, Callable
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar, cast
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -69,7 +69,7 @@ def deprecated(
             #? must stay True) so async consumers that dispatch on
             #? coroutine-function-ness are not mis-handled.
             @functools.wraps(func)
-            async def wrapped(
+            async def wrapped_async(
                 *args: P.args,
                 **kwargs: P.kwargs,
             ) -> T:
@@ -92,11 +92,11 @@ def deprecated(
                     GunzDeprecationWarning,
                     stacklevel=2,
                 )
-                return await func(*args, **kwargs)
+                return cast(T, await func(*args, **kwargs))
 
             if descriptor is not None:
-                return descriptor(wrapped)
-            return wrapped
+                return cast(Callable[P, T], descriptor(cast(Any, wrapped_async)))
+            return cast(Callable[P, T], wrapped_async)
 
         if inspect.isasyncgenfunction(func):
             #? An async generator function is not a coroutine function, so the
@@ -105,7 +105,7 @@ def deprecated(
             #? (inspect.isasyncgenfunction must stay True) so consumers that
             #? dispatch on async-generator-function-ness are not mis-handled.
             @functools.wraps(func)
-            async def wrapped(
+            async def wrapped_asyncgen(
                 *args: P.args,
                 **kwargs: P.kwargs,
             ) -> AsyncIterator[T]:
@@ -132,11 +132,11 @@ def deprecated(
                     yield item
 
             if descriptor is not None:
-                return descriptor(wrapped)
-            return wrapped
+                return cast(Callable[P, T], descriptor(cast(Any, wrapped_asyncgen)))
+            return cast(Callable[P, T], wrapped_asyncgen)
 
         @functools.wraps(func)
-        def wrapped(
+        def wrapped_sync(
             *args: P.args,
             **kwargs: P.kwargs,
         ) -> T:
@@ -162,8 +162,8 @@ def deprecated(
             return func(*args, **kwargs)
 
         if descriptor is not None:
-            return descriptor(wrapped)
-        return wrapped
+            return cast(Callable[P, T], descriptor(cast(Any, wrapped_sync)))
+        return wrapped_sync
 
     return decorate
 

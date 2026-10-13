@@ -77,7 +77,9 @@ def _finite_values(
     return converted
 
 
-def _robust_mean(values: Iterable[float]) -> float:
+def _robust_mean(
+    values: Iterable[float],
+) -> float:
     """Overflow-robust arithmetic mean.
 
     ``statistics.fmean`` (backed by ``statistics.fsum``) raises

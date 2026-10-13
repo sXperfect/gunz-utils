@@ -34,7 +34,9 @@ def format_comparison(
         ("Mean", comparison.mean_change),
     ]
 
-    def _fmt_change(change: float | None) -> str:
+    def _fmt_change(
+        change: float | None,
+    ) -> str:
         if change is None:
             return "+inf%"
         return f"{change:+.2%}"

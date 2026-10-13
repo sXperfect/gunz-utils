@@ -35,7 +35,6 @@ from gunz_utils.partitions import (
 )
 from gunz_utils.streaming import copy_and_hash, iter_jsonl
 
-
 # ---------------------------------------------------------------------------
 # iter_jsonl: overflowing JSON numeric literals silently decode to +/-inf.
 #

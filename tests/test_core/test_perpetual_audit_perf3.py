@@ -30,7 +30,6 @@ from gunz_utils.hashing import short_hash
 from gunz_utils.parsing import safe_float
 from gunz_utils.sampling import sample_named_items
 
-
 # ---------------------------------------------------------------------------
 # short_hash: ``chars`` larger than the algorithm's digest length silently
 # returns a shorter-than-requested prefix.

@@ -299,20 +299,33 @@ def deep_merge(
                 memo[val_id] = val
             return memo[val_id]
 
-        def _key_sink(shell: dict[Any, Any], key: Any) -> Any:
-            def sink(value: Any) -> None:
+        def _key_sink(
+            shell: dict[Any, Any],
+            key: Any,
+        ) -> Any:
+            def sink(
+                value: Any,
+            ) -> None:
                 shell[key] = value
 
             return sink
 
-        def _append_sink(container: list[Any]) -> Any:
-            def sink(value: Any) -> None:
+        def _append_sink(
+            container: list[Any],
+        ) -> Any:
+            def sink(
+                value: Any,
+            ) -> None:
                 container.append(value)
 
             return sink
 
-        def _add_sink(container: set[Any]) -> Any:
-            def sink(value: Any) -> None:
+        def _add_sink(
+            container: set[Any],
+        ) -> Any:
+            def sink(
+                value: Any,
+            ) -> None:
                 container.add(value)
 
             return sink
@@ -380,7 +393,7 @@ def deep_merge(
                     #? Push in reverse so LIFO pop order preserves tuple order.
                     for child in reversed(node):
                         stack.append(("expand", child, _append_sink(children), None))
-            else:  # tuple_finalize
+            else:  #? tuple_finalize
                 if node_id in memo:
                     result = memo[node_id]
                 else:

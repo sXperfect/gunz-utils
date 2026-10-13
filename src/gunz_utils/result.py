@@ -26,8 +26,8 @@ class Result(Generic[T, E]):
     None is valid in either active variant; _ok identifies which is active.
     """
 
-    value: T | None = _UNSET
-    error: E | None = _UNSET
+    value: T | None = cast(T | None, _UNSET)
+    error: E | None = cast(E | None, _UNSET)
     _ok: bool | object = _UNSET
 
     def __post_init__(self) -> None:

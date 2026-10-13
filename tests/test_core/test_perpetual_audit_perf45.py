@@ -34,6 +34,7 @@ for the companion behaviors.
 from __future__ import annotations
 
 import pytest
+
 from gunz_utils import config, network, serialization
 from gunz_utils.redaction import redact, redact_dict
 from gunz_utils.upstream_protocol import PolicyUpstream

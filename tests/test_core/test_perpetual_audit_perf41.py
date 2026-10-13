@@ -42,6 +42,7 @@ import pathlib
 import tempfile
 
 import pytest
+
 from gunz_utils import async_utils
 from gunz_utils.binary import ByteReader, encode_uvarint
 from gunz_utils.fs import (

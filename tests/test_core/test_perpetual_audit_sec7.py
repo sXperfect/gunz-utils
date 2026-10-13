@@ -32,7 +32,6 @@ import pytest
 from gunz_utils.io import atomic_write
 from gunz_utils.provenance_graph import ProvenanceGraph, ProvenanceNode
 
-
 # -----------------------------------------------------------------------------
 # provenance_graph.py - unbounded recursion in ancestors()
 # -----------------------------------------------------------------------------
