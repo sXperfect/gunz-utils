@@ -26,16 +26,28 @@ class Result(Generic[T, E]):
     None is valid in either active variant; _ok identifies which is active.
     """
 
-    value: T | None = None
-    error: E | None = None
+    value: T | None = _UNSET
+    error: E | None = _UNSET
     _ok: bool | object = _UNSET
 
     def __post_init__(self) -> None:
         if self._ok is _UNSET:
-            #? Infer the active variant from which field the caller populated,
-            #? so ``Result(error=exc)`` builds an error result and
-            #? ``Result(value=v)`` a success result.
-            object.__setattr__(self, "_ok", self.error is None)
+            #? Infer the active variant from which field the caller explicitly
+            #? populated, so ``Result(error=exc)`` builds an error result and
+            #? ``Result(value=v)`` a success result. The sentinel defaults let
+            #? us distinguish "error explicitly provided as None" from "error
+            #? never provided", so ``Result(error=None)`` stays an error result
+            #? instead of silently collapsing into a success.
+            if self.error is not _UNSET:
+                object.__setattr__(self, "_ok", False)
+            else:
+                object.__setattr__(self, "_ok", True)
+        #? Normalize the internal sentinels to None so the public view of an
+        #? unpopulated field is None (as before), never a sentinel object.
+        if self.value is _UNSET:
+            object.__setattr__(self, "value", None)
+        if self.error is _UNSET:
+            object.__setattr__(self, "error", None)
         if not isinstance(self._ok, bool):
             raise TypeError("_ok must be a boolean")
         if self._ok and self.error is not None:

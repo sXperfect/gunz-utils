@@ -9,7 +9,7 @@ __license__ = "Clear BSD"
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import copy
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Hashable, Mapping, MutableMapping, Sequence
 from typing import Any, Literal, cast
 
 # =============================================================================
@@ -423,15 +423,24 @@ def deep_merge(
         seen_unhashable: list[Any] = []
         result: list[Any] = []
         for item in (*a, *b):
-            try:
-                dedup_key: Any = (bool, item) if isinstance(item, bool) else item
-                if dedup_key in seen_hashable:
+            #? Duplicate detection must be symmetric: two equal values that
+            #? differ only in hashability (e.g. ``{1, 2}`` vs
+            #? ``frozenset({1, 2})``) must collapse to one kept item regardless
+            #? of base/override order. Checking equality against BOTH the
+            #? hashable set and the unhashable list, in either branch, removes
+            #? the order-dependence of the old set-membership test (CPython's
+            #? ``in`` on an equal-but-unhashable needle is order-dependent).
+            marker: Any = (bool, item) if isinstance(item, bool) else item
+            if any(marker == previous for previous in seen_unhashable):
+                continue
+            if isinstance(marker, Hashable):
+                if marker in seen_hashable:
                     continue
-                seen_hashable.add(dedup_key)
-            except TypeError:
-                if any(item == previous for previous in seen_unhashable):
+                seen_hashable.add(marker)
+            else:
+                if any(marker == previous for previous in seen_hashable):
                     continue
-                seen_unhashable.append(item)
+                seen_unhashable.append(marker)
             result.append(_isolate(item))
         return result
 
