@@ -51,14 +51,18 @@ class RuntimeProvenance:
 _SECRET_KEY_VALUE_TOKEN = re.compile(
     r"(?i)([A-Za-z0-9_.\-]*(?:"
     + "|".join(re.escape(pattern) for pattern in SECRET_PATTERNS)
-    + r")[A-Za-z0-9_.\-]*)=([^&\s;]*)"
+    + r")[A-Za-z0-9_.\-]*)=([^\s]*)"
 )
 
 #? Matches a URL userinfo authority ``user:pass@``. urlsplit only places this
 #? in ``netloc`` for the ``scheme://user:pass@host`` form; scheme-relative,
 #? scheme-less, and single-colon-scheme forms keep it in the path, so a
-#? netloc-only guard would leak the password.
-_USERINFO_PASSWORD = re.compile(r"([^@:/]+):([^@/]*)@")
+#? netloc-only guard would leak the password. The ``(?!/)`` lookahead skips the
+#? scheme's ``scheme://`` colon, and the greedy password consumes every
+#? credential character up to the last ``@`` before the host — including a
+#? literal ``@`` or ``/`` inside the password — so no credential fragment (with
+#? or without ``@``/``/``) survives redaction.
+_USERINFO_PASSWORD = re.compile(r"([^@:/]+):(?!/)(.*)@")
 
 
 def _redact_userinfo_password(

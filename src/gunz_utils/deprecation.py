@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import inspect
 import warnings
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from typing import ParamSpec, TypeVar
 
 P = ParamSpec("P")
@@ -80,6 +81,41 @@ def deprecated(
                     stacklevel=2,
                 )
                 return await func(*args, **kwargs)
+
+            return wrapped
+
+        if inspect.isasyncgenfunction(func):
+            #? An async generator function is not a coroutine function, so the
+            #? coroutine branch above does not catch it. Keep deprecated async
+            #? generator functions recognizable as such
+            #? (inspect.isasyncgenfunction must stay True) so consumers that
+            #? dispatch on async-generator-function-ness are not mis-handled.
+            @functools.wraps(func)
+            async def wrapped(
+                *args: P.args,
+                **kwargs: P.kwargs,
+            ) -> AsyncIterator[T]:
+                """wrapped() function.
+
+                Parameters
+                ----------
+                args : P.args
+                    args parameter.
+                kwargs : P.kwargs
+                    kwargs parameter.
+
+                Yields
+                ------
+                T
+                    items from the deprecated async generator.
+                """
+                warnings.warn(
+                    message,
+                    GunzDeprecationWarning,
+                    stacklevel=2,
+                )
+                async for item in func(*args, **kwargs):
+                    yield item
 
             return wrapped
 

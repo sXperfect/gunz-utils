@@ -33,6 +33,18 @@ class CacheInfo:
     maxsize: int
 
 
+def _normalize_cache_value(
+    value: Any,
+) -> Any:
+    """Normalize one cache-key component so a bool stays distinct from an int.
+
+    ``bool`` is a subtype of ``int``, so ``True == 1`` and ``False == 0`` with
+    equal hashes; keying booleans as ``(bool, value)`` keeps them out of the
+    integer keys, honoring the package's bool-is-subtype-of-int contract.
+    """
+    return (bool, value) if isinstance(value, bool) else value
+
+
 def _cache_key(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
@@ -51,7 +63,11 @@ def _cache_key(
     Hashable | None
         The result of the operation.
     """
-    key: Hashable = (args, tuple(sorted(kwargs.items())))
+    normalized_args = tuple(_normalize_cache_value(a) for a in args)
+    normalized_kwargs = tuple(
+        (key, _normalize_cache_value(value)) for key, value in sorted(kwargs.items())
+    )
+    key: Hashable = (normalized_args, normalized_kwargs)
     try:
         hash(key)
     except TypeError:
