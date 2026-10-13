@@ -378,11 +378,19 @@ class PolicyUpstream:
                         return await self._client.call(tool_name, arguments)
                 except TimeoutError as exc:
                     self._stats["timeouts"] += 1
-                    raise UpstreamTimeoutError(
-                        f"upstream call timed out after {self._timeout_seconds}s",
-                        upstream=self.name,
-                        tool_name=tool_name,
-                    ) from exc
+                    if attempt + 1 >= attempts:
+                        raise UpstreamTimeoutError(
+                            f"upstream call timed out after {self._timeout_seconds}s",
+                            upstream=self.name,
+                            tool_name=tool_name,
+                        ) from exc
+                    #? A timeout is a canonical transient upstream failure, so
+                    #? idempotent tools (attempts > 1) retry it with the same
+                    #? backoff as an unavailable upstream; only the final
+                    #? attempt surfaces UpstreamTimeoutError.
+                    self._stats["retries"] += 1
+                    if self._retry_delay:
+                        await asyncio.sleep(self._retry_delay)
                 except UpstreamUnavailableError:
                     if attempt + 1 >= attempts:
                         self._stats["failures"] += 1

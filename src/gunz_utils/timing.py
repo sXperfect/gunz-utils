@@ -81,9 +81,14 @@ class Timer:
         return end_time - self._start_time
 
     def __enter__(self) -> Timer:
-        """Enter the context, starting the timer if it was not started."""
-        if self._start_time is None:
-            self.start()
+        """Enter the context, restarting the timer.
+
+        Re-entering the same timer as a context manager restarts the clock
+        (matching ``start()``'s "start or restart" semantics), so a reused
+        timer times each ``with`` block independently rather than leaking the
+        stale elapsed value from a previous block.
+        """
+        self.start()
         return self
 
     def __exit__(self,

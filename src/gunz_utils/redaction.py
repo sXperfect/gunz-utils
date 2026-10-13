@@ -52,6 +52,12 @@ SECRET_PATTERNS: frozenset[str] = frozenset(
 # ? and keeps the redaction footprint short in tight log lines.
 _MASK = "****"
 
+# ? Bound on recursive descent into nested structures. Config before logging
+# ? is potentially untrusted, so a pathologically deep structure must not blow
+# ? the Python stack; beyond this depth the subtree is fully masked instead of
+# ? recursing. Kept well below the interpreter recursion limit.
+_MAX_REDACT_DEPTH = 128
+
 
 def _validate_show_chars(
     show_chars: int,
@@ -195,6 +201,7 @@ def redact_dict(
     def _walk(
         value: object,
         secret_context: bool = False,
+        depth: int = 0,
     ) -> object:
         """_walk() function.
 
@@ -204,21 +211,30 @@ def redact_dict(
             value parameter.
         secret_context : bool
             secret_context parameter.
+        depth : int
+            depth parameter.
 
         Returns
         -------
         object
             The result of the operation.
         """
+        if depth > _MAX_REDACT_DEPTH:
+            #? Bound recursion so untrusted deep input cannot blow the stack;
+            #? the subtree is fully masked rather than recursed.
+            return _MASK
         if secret_context:
             if isinstance(value, dict):
-                return {key: _walk(item, True) for key, item in value.items()}
+                return {
+                    key: _walk(item, True, depth + 1)
+                    for key, item in value.items()
+                }
             if isinstance(value, list):
-                return [_walk(item, True) for item in value]
+                return [_walk(item, True, depth + 1) for item in value]
             if isinstance(value, tuple):
-                return tuple(_walk(item, True) for item in value)
+                return tuple(_walk(item, True, depth + 1) for item in value)
             if isinstance(value, set | frozenset):
-                return type(value)(_walk(item, True) for item in value)
+                return type(value)(_walk(item, True, depth + 1) for item in value)
             if isinstance(value, (str, bytes, bytearray, memoryview)):
                 return _MASK
             return value
@@ -230,18 +246,18 @@ def redact_dict(
                     if isinstance(item, str):
                         out[key] = redact(item, show_chars=show_chars)
                     elif isinstance(item, (dict, list, tuple)):
-                        out[key] = _walk(item, True)
+                        out[key] = _walk(item, True, depth + 1)
                     elif item is None:
                         out[key] = None
                     else:
                         out[key] = _MASK
                 else:
-                    out[key] = _walk(item)
+                    out[key] = _walk(item, False, depth + 1)
             return out
         if isinstance(value, list):
-            return [_walk(item) for item in value]
+            return [_walk(item, False, depth + 1) for item in value]
         if isinstance(value, tuple):
-            return tuple(_walk(item) for item in value)
+            return tuple(_walk(item, False, depth + 1) for item in value)
         return value
 
     return _walk(d)
