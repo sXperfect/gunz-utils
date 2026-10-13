@@ -201,7 +201,12 @@ def flatten(
         if max_depth is not None and depth > max_depth:
             yield item
             return
-        if isinstance(item, types):
+        #? Descend into containers matching `types` AND into iterators
+        #? (generators are consumed like the top-level dispatch does, rather
+        #? than being yielded as an opaque leaf). Leaf collections (str,
+        #? bytes, dict, set, frozenset) and scalars are not iterators and
+        #? fall through to the leaf branch.
+        if isinstance(item, types) or isinstance(item, Iterator):
             if depth > max_nesting:
                 raise ValueError(f"maximum nesting depth exceeded ({max_nesting})")
             identity = id(item)

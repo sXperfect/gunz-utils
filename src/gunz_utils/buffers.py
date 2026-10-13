@@ -27,7 +27,13 @@ def as_readonly_view(
     memoryview
         The result of the operation.
     """
-    view = memoryview(data).cast("B")
+    try:
+        view = memoryview(data).cast("B")
+    except TypeError:
+        #? A non-contiguous (stepped) memoryview slice cannot be cast to a
+        #? byte view zero-copy. Fall back to a copy of the logical bytes so a
+        #? readonly byte view is still returned for any accepted input.
+        view = memoryview(bytes(data))
     return view.toreadonly()
 
 

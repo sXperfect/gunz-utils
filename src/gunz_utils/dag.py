@@ -163,35 +163,34 @@ class WorkflowDAG:
         temporary: set[str] = set()
         permanent: set[str] = set()
 
-        def visit(
-            name: str,
-        ) -> None:
-            """visit() function.
+        for start in self.stages:
+            if start in permanent:
+                continue
+            #? Iterative DFS so deep acyclic DAGs do not blow the Python stack
+            #? during dependency validation and topological ordering.
+            stack: list[tuple[str, bool]] = [(start, False)]
+            while stack:
+                name, expanded = stack.pop()
+                if expanded:
+                    temporary.discard(name)
+                    permanent.add(name)
+                    result.append(name)
+                    continue
+                if name in permanent:
+                    continue
+                if name in temporary:
+                    raise ValueError("workflow DAG cycle detected")
+                temporary.add(name)
+                stack.append((name, True))
+                stage = self.stages[name]
+                for dependency in stage.dependencies:
+                    if dependency not in self.stages:
+                        raise KeyError(
+                            f"missing stage dependency {dependency!r}"
+                        )
+                    if dependency not in permanent:
+                        stack.append((dependency, False))
 
-            Parameters
-            ----------
-            name : str
-                name parameter.
-            """
-            if name in permanent:
-                return
-            if name in temporary:
-                raise ValueError("workflow DAG cycle detected")
-
-            stage = self.stages[name]
-            temporary.add(name)
-            for dependency in stage.dependencies:
-                if dependency not in self.stages:
-                    raise KeyError(
-                        f"missing stage dependency {dependency!r}"
-                    )
-                visit(dependency)
-            temporary.remove(name)
-            permanent.add(name)
-            result.append(name)
-
-        for name in self.stages:
-            visit(name)
         return tuple(result)
 
     def order(self) -> tuple[str, ...]:

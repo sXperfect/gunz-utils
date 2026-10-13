@@ -213,6 +213,8 @@ def redact_dict(
                 return [_walk(item, True) for item in value]
             if isinstance(value, tuple):
                 return tuple(_walk(item, True) for item in value)
+            if isinstance(value, set | frozenset):
+                return type(value)(_walk(item, True) for item in value)
             if isinstance(value, (str, bytes, bytearray, memoryview)):
                 return _MASK
             return value
