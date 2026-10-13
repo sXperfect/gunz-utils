@@ -16,7 +16,7 @@ from typing import Any, BinaryIO, TextIO
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
-from .serialization import canonical_json
+from .serialization import _MAX_JSON_DEPTH, _excessive_nesting_position, canonical_json
 
 
 def _reject_json_constant(
@@ -82,6 +82,17 @@ def iter_jsonl(
     """
     for line in handle:
         if line.strip():
+            #? Apply the package's shared JSON nesting-depth bound before
+            #? parsing (matching serialization.json_loads) so a record nested
+            #? deeper than the encode-side bound is rejected with ValueError
+            #? instead of silently accepted or surfacing a raw RecursionError.
+            position = _excessive_nesting_position(line, _MAX_JSON_DEPTH)
+            if position >= 0:
+                raise json.JSONDecodeError(
+                    f"JSON record is nested deeper than {_MAX_JSON_DEPTH} levels",
+                    line,
+                    position,
+                )
             record = json.loads(line, parse_constant=_reject_json_constant)
             _reject_nonfinite(record)
             yield record

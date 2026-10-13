@@ -44,7 +44,7 @@ def stable_priority(
     """
     if not isinstance(name, str):
         raise TypeError(f"name must be str, got {type(name).__name__}")
-    if not isinstance(seed, int):
+    if isinstance(seed, bool) or not isinstance(seed, int):
         raise TypeError(f"seed must be int, got {type(seed).__name__}")
 
     payload = f"{seed}:{name}".encode()
@@ -98,7 +98,7 @@ def sample_named_items(
     #? Validate seed upfront (like limit) so the documented TypeError for a
     #? non-int seed is raised consistently, even when no items are eligible and
     #? the sort key (which routes seed through stable_priority) never runs.
-    if not isinstance(seed, int):
+    if isinstance(seed, bool) or not isinstance(seed, int):
         raise TypeError(f"seed must be int, got {type(seed).__name__}")
 
     #? A bare string passed as a pattern is treated as a single glob pattern,
