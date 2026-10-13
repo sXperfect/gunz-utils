@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import typing as t
 
@@ -17,6 +18,40 @@ from pydantic import ValidationError, validate_call
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
+
+
+def _validation_error_message(
+    exc: ValidationError,
+    func_name: str,
+) -> str:
+    """Build a redacted validation error message.
+
+    Pydantic messages can include arbitrary custom-validator text; expose only
+    the stable error code and input type so secret-bearing validator messages
+    and original input values cannot leak into the public TypeError.
+    """
+    errors: list[str] = []
+    for error in exc.errors():
+        loc = error.get("loc", ())
+        input_val = error.get("input", "unknown")
+        error_type = str(error.get("type", "validation_error"))
+
+        clean_loc = [
+            str(item)
+            for item in loc
+            if item not in ("args", "kwargs")
+        ]
+        loc_str = " -> ".join(clean_loc) if clean_loc else "input"
+        input_type = type(input_val).__name__
+        errors.append(
+            f"Argument '{loc_str}': validation failed "
+            f"[{error_type}] (got type '{input_type}')"
+        )
+
+    return (
+        f"Validation error in '{func_name}':\n"
+        + "\n".join(errors)
+    )
 
 
 def type_checked(
@@ -63,6 +98,40 @@ def type_checked(
         options["config"] = config
         validated_func = validate_call(f, **options)
 
+        if asyncio.iscoroutinefunction(f):
+            #? pydantic.validate_call on an async function defers validation to
+            #? await time: calling it returns a coroutine without raising, so a
+            #? synchronous try/except would let the raw ValidationError (with
+            #? the original input value) escape. Await inside the guarded try so
+            #? async calls surface the same redacted TypeError as sync calls.
+            @functools.wraps(f)
+            async def wrapper(
+                *args: t.Any,
+                **kw: t.Any,
+            ) -> t.Any:
+                """wrapper() function.
+
+                Parameters
+                ----------
+                args : t.Any
+                    args parameter.
+                kw : t.Any
+                    kw parameter.
+
+                Returns
+                -------
+                t.Any
+                    The result of the operation.
+                """
+                try:
+                    return await validated_func(*args, **kw)
+                except ValidationError as exc:
+                    raise TypeError(
+                        _validation_error_message(exc, f.__name__)
+                    ) from None
+
+            return wrapper
+
         @functools.wraps(f)
         def wrapper(
             *args: t.Any,
@@ -85,34 +154,9 @@ def type_checked(
             try:
                 return validated_func(*args, **kw)
             except ValidationError as exc:
-                errors: list[str] = []
-                for error in exc.errors():
-                    loc = error.get("loc", ())
-                    input_val = error.get("input", "unknown")
-                    error_type = str(error.get("type", "validation_error"))
-
-                    clean_loc = [
-                        str(item)
-                        for item in loc
-                        if item not in ("args", "kwargs")
-                    ]
-                    loc_str = " -> ".join(clean_loc) if clean_loc else "input"
-
-                    #? Human-readable Pydantic messages can include arbitrary
-                    #? custom-validator text. Expose only the stable error code
-                    #? and input type so secret-bearing validator messages cannot
-                    #? leak into the public TypeError.
-                    input_type = type(input_val).__name__
-                    errors.append(
-                        f"Argument '{loc_str}': validation failed "
-                        f"[{error_type}] (got type '{input_type}')"
-                    )
-
-                error_msg = (
-                    f"Validation error in '{f.__name__}':\n"
-                    + "\n".join(errors)
-                )
-                raise TypeError(error_msg) from None
+                raise TypeError(
+                    _validation_error_message(exc, f.__name__)
+                ) from None
 
         return wrapper
 

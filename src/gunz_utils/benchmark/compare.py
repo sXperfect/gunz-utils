@@ -48,16 +48,24 @@ def _finite_non_negative(
     float
         The result of the operation.
     """
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, (int, float))
-        or not math.isfinite(float(value))
-        or value < 0
-    ):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(
             f"{name} must be a finite non-negative number"
         )
-    return float(value)
+    try:
+        value_float = float(value)
+    except OverflowError:
+        #? A finite value that is not float-representable (e.g. 10**400) must
+        #? surface as the documented ValueError, not leak an internal
+        #? OverflowError.
+        raise ValueError(
+            f"{name} must be a finite non-negative number"
+        ) from None
+    if not math.isfinite(value_float) or value < 0:
+        raise ValueError(
+            f"{name} must be a finite non-negative number"
+        )
+    return value_float
 
 
 def _change(

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import warnings
 from collections.abc import Callable
@@ -49,6 +50,39 @@ def deprecated(
         Callable[P, T]
             The result of the operation.
         """
+        if asyncio.iscoroutinefunction(func):
+            #? Keep deprecated async functions recognizable as coroutine
+            #? functions (asyncio.iscoroutinefunction/inspect.iscoroutinefunction
+            #? must stay True) so async consumers that dispatch on
+            #? coroutine-function-ness are not mis-handled.
+            @functools.wraps(func)
+            async def wrapped(
+                *args: P.args,
+                **kwargs: P.kwargs,
+            ) -> T:
+                """wrapped() function.
+
+                Parameters
+                ----------
+                args : P.args
+                    args parameter.
+                kwargs : P.kwargs
+                    kwargs parameter.
+
+                Returns
+                -------
+                T
+                    The result of the operation.
+                """
+                warnings.warn(
+                    message,
+                    GunzDeprecationWarning,
+                    stacklevel=2,
+                )
+                return await func(*args, **kwargs)
+
+            return wrapped
+
         @functools.wraps(func)
         def wrapped(
             *args: P.args,

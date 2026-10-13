@@ -124,9 +124,20 @@ def scaling_efficiency(
         or base_workers <= 0
         or isinstance(base_duration, bool)
         or not isinstance(base_duration, (int, float))
-        or not math.isfinite(float(base_duration))
-        or base_duration <= 0
     ):
+        raise ValueError(
+            "baseline worker count and duration must be finite and positive"
+        )
+    try:
+        base_duration_f = float(base_duration)
+    except OverflowError:
+        #? A finite duration that is not float-representable (e.g. 10**400)
+        #? must surface as the documented ValueError, not leak an internal
+        #? OverflowError.
+        raise ValueError(
+            "baseline worker count and duration must be finite and positive"
+        ) from None
+    if not math.isfinite(base_duration_f) or base_duration <= 0:
         raise ValueError(
             "baseline worker count and duration must be finite and positive"
         )
@@ -139,9 +150,18 @@ def scaling_efficiency(
             or count <= 0
             or isinstance(duration, bool)
             or not isinstance(duration, (int, float))
-            or not math.isfinite(float(duration))
-            or duration <= 0
         ):
+            result.append(None)
+            continue
+        try:
+            duration_f = float(duration)
+        except OverflowError:
+            #? An unrepresentable finite duration is a data validation error,
+            #? not a skipped measurement: surface the documented ValueError.
+            raise ValueError(
+                "workers and durations must be finite and positive"
+            ) from None
+        if not math.isfinite(duration_f) or duration <= 0:
             result.append(None)
             continue
         speedup = float(base_duration) / float(duration)
