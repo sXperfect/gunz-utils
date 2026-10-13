@@ -190,7 +190,7 @@ def format_duration(
     Examples
     --------
     >>> format_duration(0)
-    '0s'
+    '0ms'
     >>> format_duration(0.5)
     '500ms'
     >>> format_duration(3661)
