@@ -119,7 +119,9 @@ class TestRedactDict(unittest.TestCase):
         out = redact_dict(cfg)
         #? 'abc123xyz' length 9 > 4 -> 'ab****yz'.
         self.assertEqual(out["auth"]["token"], "****")
-        self.assertEqual(out["auth"]["expires"], 1234567890)
+        #? The whole 'auth' dict is a secret context, so the numeric 'expires'
+        #? leaf is masked too (not leaked verbatim).
+        self.assertEqual(out["auth"]["expires"], "****")
 
     def test_list_of_dicts_secrets_are_masked(self):
         """Lists containing dicts are walked element by element."""

@@ -44,9 +44,17 @@ class AsyncCircuitBreaker:
         if (
             isinstance(recovery_timeout, bool)
             or not isinstance(recovery_timeout, (int, float))
-            or not math.isfinite(float(recovery_timeout))
-            or recovery_timeout < 0
         ):
+            raise ValueError("recovery_timeout must be finite and non-negative")
+        try:
+            recovery_timeout_float = float(recovery_timeout)
+        except OverflowError:
+            #? A finite timeout not representable as float (e.g. 10**400) must
+            #? surface as the documented ValueError, not leak OverflowError.
+            raise ValueError(
+                "recovery_timeout must be finite and non-negative"
+            ) from None
+        if not math.isfinite(recovery_timeout_float) or recovery_timeout < 0:
             raise ValueError("recovery_timeout must be finite and non-negative")
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
@@ -192,13 +200,24 @@ class AsyncBulkhead:
         T
             The result of the operation.
         """
-        if timeout is not None and (
-            isinstance(timeout, bool)
-            or not isinstance(timeout, (int, float))
-            or not math.isfinite(float(timeout))
-            or timeout < 0
-        ):
-            raise ValueError("timeout must be a finite non-negative number or None")
+        if timeout is not None:
+            if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+                raise ValueError(
+                    "timeout must be a finite non-negative number or None"
+                )
+            try:
+                timeout_float = float(timeout)
+            except OverflowError:
+                #? A finite timeout not representable as float (e.g. 10**400)
+                #? must surface as the documented ValueError, not leak
+                #? OverflowError.
+                raise ValueError(
+                    "timeout must be a finite non-negative number or None"
+                ) from None
+            if not math.isfinite(timeout_float) or timeout < 0:
+                raise ValueError(
+                    "timeout must be a finite non-negative number or None"
+                )
         try:
             if timeout is None:
                 await self._semaphore.acquire()

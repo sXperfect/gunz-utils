@@ -299,9 +299,17 @@ class PolicyUpstream:
         if (
             isinstance(timeout_seconds, bool)
             or not isinstance(timeout_seconds, (int, float))
-            or not math.isfinite(float(timeout_seconds))
-            or timeout_seconds <= 0
         ):
+            raise ValueError("timeout_seconds must be a finite positive number")
+        try:
+            timeout_seconds_float = float(timeout_seconds)
+        except OverflowError:
+            #? A finite timeout not representable as float (e.g. 10**400) must
+            #? surface as the documented ValueError, not leak OverflowError.
+            raise ValueError(
+                "timeout_seconds must be a finite positive number"
+            ) from None
+        if not math.isfinite(timeout_seconds_float) or timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be a finite positive number")
         if (
             isinstance(max_concurrency, bool)
@@ -322,12 +330,19 @@ class PolicyUpstream:
             raise ValueError(
                 "idempotent_tools must be a frozenset of non-empty strings"
             )
-        if (
-            isinstance(retry_delay, bool)
-            or not isinstance(retry_delay, int | float)
-            or not math.isfinite(float(retry_delay))
-            or retry_delay < 0
-        ):
+        if isinstance(retry_delay, bool) or not isinstance(retry_delay, (int, float)):
+            raise ValueError(
+                "retry_delay must be a finite non-negative number"
+            )
+        try:
+            retry_delay_float = float(retry_delay)
+        except OverflowError:
+            #? A finite delay not representable as float (e.g. 10**400) must
+            #? surface as the documented ValueError, not leak OverflowError.
+            raise ValueError(
+                "retry_delay must be a finite non-negative number"
+            ) from None
+        if not math.isfinite(retry_delay_float) or retry_delay < 0:
             raise ValueError(
                 "retry_delay must be a finite non-negative number"
             )

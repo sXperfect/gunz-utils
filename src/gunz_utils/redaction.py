@@ -195,8 +195,7 @@ def redact_dict(
     """
     if patterns is None:
         patterns = SECRET_PATTERNS
-    if show_chars < 0:
-        raise ValueError("show_chars must be non-negative")
+    _validate_show_chars(show_chars)
 
     def _walk(
         value: object,
@@ -237,7 +236,11 @@ def redact_dict(
                 return type(value)(_walk(item, True, depth + 1) for item in value)
             if isinstance(value, (str, bytes, bytearray, memoryview)):
                 return _MASK
-            return value
+            #? Non-collection scalar leaves under a secret key (e.g. an
+            #? int/float/bool token inside a secret-keyed list) must be masked
+            #? too, consistent with the dict-key-secret path, so a numeric
+            #? secret is not leaked verbatim.
+            return _MASK
         if isinstance(value, dict):
             out: dict[object, object] = {}
             for key, item in value.items():

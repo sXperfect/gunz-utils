@@ -217,10 +217,23 @@ def tcp_reachable(
         or not 1 <= port <= 65535
     ):
         raise ValueError("port must be an integer in the range 1..65535")
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+        raise ValueError(
+            f"timeout must be a finite positive number no greater than "
+            f"{_MAX_SOCKET_TIMEOUT}"
+        )
+    try:
+        timeout_float = float(timeout)
+    except OverflowError:
+        #? A finite timeout that is not float-representable (e.g. 10**400)
+        #? must surface as the documented ValueError, not leak an internal
+        #? OverflowError.
+        raise ValueError(
+            f"timeout must be a finite positive number no greater than "
+            f"{_MAX_SOCKET_TIMEOUT}"
+        ) from None
     if (
-        isinstance(timeout, bool)
-        or not isinstance(timeout, (int, float))
-        or not math.isfinite(float(timeout))
+        not math.isfinite(timeout_float)
         or timeout <= 0
         or timeout > _MAX_SOCKET_TIMEOUT
     ):

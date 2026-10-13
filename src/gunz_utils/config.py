@@ -65,7 +65,11 @@ def env_overrides(
     out: dict[str, Any] = {}
     seen_leaves: set[tuple[str, ...]] = set()
     prefix_upper = prefix.upper().rstrip("_")
-    underscore_boundary = separator.startswith("_")
+    #? Only a canonical underscore run (e.g. "_" or "__") is a legacy
+    #? underscore boundary. A separator that merely starts with "_" (e.g.
+    #? "_X_") must require the actual separator string in the key, not just a
+    #? single leading underscore.
+    underscore_boundary = set(separator) == {"_"}
     for name, value in environ.items():
         upper = name.upper()
         rest = upper[len(prefix_upper):]
