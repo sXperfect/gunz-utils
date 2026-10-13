@@ -63,7 +63,15 @@ def _finite_values(
         for value in raw
     ):
         raise ValueError(f"{name} must contain only real numeric values")
-    converted = [float(value) for value in raw]
+    converted: list[float] = []
+    for value in raw:
+        try:
+            converted.append(float(value))
+        except OverflowError:
+            #? A finite Real that is not float-representable (e.g. 10**400)
+            #? must surface as the documented ValueError, not leak an internal
+            #? OverflowError.
+            raise ValueError(f"{name} must contain only finite values") from None
     if not all(math.isfinite(value) for value in converted):
         raise ValueError(f"{name} must contain only finite values")
     return converted
@@ -133,11 +141,22 @@ def bootstrap_mean_ci(
         values,
         name="values",
     )
+    if isinstance(confidence, bool) or not isinstance(confidence, Real):
+        raise ValueError(
+            "confidence must be a finite number strictly between 0 and 1"
+        )
+    try:
+        confidence_float = float(confidence)
+    except OverflowError:
+        #? A finite Real that is not float-representable (e.g. 10**400) must
+        #? surface as the documented ValueError, not leak an internal
+        #? OverflowError.
+        raise ValueError(
+            "confidence must be a finite number strictly between 0 and 1"
+        ) from None
     if (
-        isinstance(confidence, bool)
-        or not isinstance(confidence, Real)
-        or not math.isfinite(float(confidence))
-        or not 0.0 < float(confidence) < 1.0
+        not math.isfinite(confidence_float)
+        or not 0.0 < confidence_float < 1.0
     ):
         raise ValueError(
             "confidence must be a finite number strictly between 0 and 1"
@@ -330,16 +349,23 @@ def normal_mean_summary(
         values,
         name="values",
     )
-    if (
-        isinstance(confidence_z, bool)
-        or not isinstance(confidence_z, Real)
-        or not math.isfinite(float(confidence_z))
-        or confidence_z < 0
-    ):
+    if isinstance(confidence_z, bool) or not isinstance(confidence_z, Real):
         raise ValueError(
             "confidence_z must be a non-negative finite number"
         )
-    confidence_z = float(confidence_z)
+    try:
+        confidence_z = float(confidence_z)
+    except OverflowError:
+        #? A finite Real that is not float-representable (e.g. 10**400) must
+        #? surface as the documented ValueError, not leak an internal
+        #? OverflowError.
+        raise ValueError(
+            "confidence_z must be a non-negative finite number"
+        ) from None
+    if not math.isfinite(confidence_z) or confidence_z < 0:
+        raise ValueError(
+            "confidence_z must be a non-negative finite number"
+        )
 
     center = _robust_mean(observations)
     count = len(observations)

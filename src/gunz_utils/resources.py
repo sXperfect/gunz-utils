@@ -51,7 +51,12 @@ class ResourceGroup:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool | None:
-        return self._stack.__exit__(exc_type, exc_value, traceback)
+        result = self._stack.__exit__(exc_type, exc_value, traceback)
+        #? Reset the entered state so a later enter() (after the context has
+        #? exited) raises instead of pushing onto a stack that can never
+        #? release the resource.
+        self._entered = False
+        return result
 
 
 class AsyncResourceGroup:
@@ -94,7 +99,12 @@ class AsyncResourceGroup:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool | None:
-        return await self._stack.__aexit__(exc_type, exc_value, traceback)
+        result = await self._stack.__aexit__(exc_type, exc_value, traceback)
+        #? Reset the entered state so a later enter() (after the context has
+        #? exited) raises instead of pushing onto a stack that can never
+        #? release the resource.
+        self._entered = False
+        return result
 
 
 __all__ = ["AsyncResourceGroup", "ResourceGroup"]

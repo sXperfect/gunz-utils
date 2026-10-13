@@ -54,7 +54,12 @@ def _annotation_is_int(
     origin = t.get_origin(annotation)
     args = getattr(annotation, "__args__", ())
     if origin in (t.Union, types.UnionType):
-        return any(_annotation_is_int(arg) for arg in args)
+        #? A union is int-only only when it has no bool member; a bool must be
+        #? accepted when the field explicitly allows it (e.g. ``int | bool``).
+        has_bool_member = any(arg is bool for arg in args)
+        return bool(any(_annotation_is_int(arg) for arg in args)) and (
+            not has_bool_member
+        )
     if origin is t.Literal:
         #? A Literal restricted to int literals is an int-typed field; a bool
         #? supplied to it must still be rejected.
