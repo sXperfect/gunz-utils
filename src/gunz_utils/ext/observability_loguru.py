@@ -127,12 +127,23 @@ def setup_logging(
         log_dir.mkdir(parents=True, exist_ok=True)
         if log_dir.is_symlink() or not log_dir.is_dir():
             raise ValueError("log directory must be a directory")
-        logger.add(
-            log_dir / f"{log_name}.log",
-            level="DEBUG",
-            format=log_format,
-            rotation="10 MB",
-            retention="30 days",
-            enqueue=True,
-            diagnose=False,
-        )
+        log_path = log_dir / f"{log_name}.log"
+        if log_path.is_symlink():
+            #? Refuse to follow a symlink planted at the log file path. Writing
+            #? through it would append log output into the symlink target (e.g.
+            #? a sensitive file outside logs/), defeating the directory guard,
+            #? so skip the file sink rather than opening it.
+            logger.warning(
+                "Refusing to open symlinked log file, skipping file sink: %s",
+                log_path,
+            )
+        else:
+            logger.add(
+                log_path,
+                level="DEBUG",
+                format=log_format,
+                rotation="10 MB",
+                retention="30 days",
+                enqueue=True,
+                diagnose=False,
+            )

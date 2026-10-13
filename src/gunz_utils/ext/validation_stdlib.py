@@ -28,6 +28,7 @@ from __future__ import annotations
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
+import asyncio
 import functools
 import inspect
 import types
@@ -159,6 +160,66 @@ def _safe_args_repr(
     return f"{type(exc).__name__}: argument binding failed"
 
 
+def _validate_type_checked_args(
+    f: t.Callable,
+    sig: inspect.Signature,
+    hints: dict[str, t.Any],
+    args: tuple[t.Any, ...],
+    kw: dict[str, t.Any],
+) -> None:
+    """Validate ``args``/``kw`` against ``f``'s annotations, raising on error.
+
+    Shared by the synchronous and asynchronous wrappers produced by
+    ``type_checked`` so both validate arguments eagerly.
+    """
+    try:
+        bound = sig.bind(*args, **kw)
+    except TypeError as e:
+        raise TypeError(
+            f"Validation error in '{f.__name__}':\n{_safe_args_repr(e)}"
+        ) from None
+
+    errors: list[str] = []
+    for name, param in sig.parameters.items():
+        ann = hints.get(name, param.annotation)
+        if ann is inspect.Parameter.empty:
+            continue
+        if name not in bound.arguments:
+            continue
+        value = bound.arguments[name]
+
+        if param.kind is inspect.Parameter.VAR_POSITIONAL:
+            for idx, elem in enumerate(value):
+                if not _check_one(elem, ann):
+                    input_type = type(elem).__name__
+                    errors.append(
+                        f"Argument '{name}[{idx}]': expected {ann!r} "
+                        f"(got type '{input_type}')"
+                    )
+            continue
+
+        if param.kind is inspect.Parameter.VAR_KEYWORD:
+            for k, v in value.items():
+                if not _check_one(v, ann):
+                    input_type = type(v).__name__
+                    errors.append(
+                        f"Argument '{name}[{k!r}]': expected {ann!r} "
+                        f"(got type '{input_type}')"
+                    )
+            continue
+
+        if not _check_one(value, ann):
+            input_type = type(value).__name__
+            errors.append(
+                f"Argument '{name}': expected {ann!r} (got type '{input_type}')"
+            )
+
+    if errors:
+        raise TypeError(
+            f"Validation error in '{f.__name__}':\n" + "\n".join(errors)
+        ) from None
+
+
 def type_checked(
     func: t.Callable | None = None,
     **kwargs: t.Any,
@@ -205,6 +266,37 @@ def type_checked(
             hints = getattr(f, "__annotations__", {}) or {}
         sig = inspect.signature(f)
 
+        if asyncio.iscoroutinefunction(f):
+            #? Preserve coroutine-function identity on an async target so
+            #? async-aware dispatchers (FastAPI, pytest-asyncio, etc.) that
+            #? branch on iscoroutinefunction still treat the wrapped callable
+            #? as async. Validate arguments eagerly (before await), then await
+            #? the wrapped function so its result is returned, not an unawaited
+            #? coroutine object.
+            @functools.wraps(f)
+            async def async_wrapper(
+                *args: t.Any,
+                **kw: t.Any,
+            ) -> t.Any:
+                """wrapper() function.
+
+                Parameters
+                ----------
+                args : t.Any
+                    args parameter.
+                kw : t.Any
+                    kw parameter.
+
+                Returns
+                -------
+                t.Any
+                    The result of the operation.
+                """
+                _validate_type_checked_args(f, sig, hints, args, kw)
+                return await f(*args, **kw)
+
+            return async_wrapper
+
         @functools.wraps(f)
         def wrapper(
             *args: t.Any,
@@ -224,53 +316,7 @@ def type_checked(
             t.Any
                 The result of the operation.
             """
-            try:
-                bound = sig.bind(*args, **kw)
-            except TypeError as e:
-                raise TypeError(
-                    f"Validation error in '{f.__name__}':\n{_safe_args_repr(e)}"
-                ) from None
-
-            errors: list[str] = []
-            for name, param in sig.parameters.items():
-                ann = hints.get(name, param.annotation)
-                if ann is inspect.Parameter.empty:
-                    continue
-                if name not in bound.arguments:
-                    continue
-                value = bound.arguments[name]
-
-                if param.kind is inspect.Parameter.VAR_POSITIONAL:
-                    for idx, elem in enumerate(value):
-                        if not _check_one(elem, ann):
-                            input_type = type(elem).__name__
-                            errors.append(
-                                f"Argument '{name}[{idx}]': expected {ann!r} "
-                                f"(got type '{input_type}')"
-                            )
-                    continue
-
-                if param.kind is inspect.Parameter.VAR_KEYWORD:
-                    for k, v in value.items():
-                        if not _check_one(v, ann):
-                            input_type = type(v).__name__
-                            errors.append(
-                                f"Argument '{name}[{k!r}]': expected {ann!r} "
-                                f"(got type '{input_type}')"
-                            )
-                    continue
-
-                if not _check_one(value, ann):
-                    input_type = type(value).__name__
-                    errors.append(
-                        f"Argument '{name}': expected {ann!r} (got type '{input_type}')"
-                    )
-
-            if errors:
-                raise TypeError(
-                    f"Validation error in '{f.__name__}':\n" + "\n".join(errors)
-                ) from None
-
+            _validate_type_checked_args(f, sig, hints, args, kw)
             return f(*args, **kw)
 
         return wrapper
