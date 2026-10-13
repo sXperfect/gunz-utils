@@ -126,6 +126,15 @@ async def gather_limited(
         raise
     finally:
         cancelled = await _cancel_and_drain(pending)
+        #? On every exit path, close any coroutines still held by the input
+        #? iterator that were never scheduled. A materialized iterable (e.g. a
+        #? plain list) has all its coroutines created up front, so the ones
+        #? beyond the in-flight window would otherwise be left forever
+        #? un-awaited and un-closed, emitting "coroutine was never awaited"
+        #? warnings on GC. asyncio.gather awaits every supplied coroutine, so
+        #? we must at least close the surplus on early exit.
+        for item in iterator:
+            item.close()
         if failure is None and cancelled is not None:
             raise cancelled
     return [ordered[index] for index in range(next_index)]

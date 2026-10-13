@@ -41,12 +41,19 @@ class LeaseTiming:
             ("lease_seconds", self.lease_seconds),
             ("heartbeat_interval", self.heartbeat_interval),
         ):
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or not math.isfinite(float(value))
-                or value <= 0
-            ):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(
+                    f"{name} must be a finite positive number"
+                )
+            try:
+                value_float = float(value)
+            except OverflowError:
+                #? An int too large to convert to float (e.g. 10**400) must
+                #? surface as the documented ValueError, not leak OverflowError.
+                raise ValueError(
+                    f"{name} must be a finite positive number"
+                ) from None
+            if not math.isfinite(value_float) or value <= 0:
                 raise ValueError(
                     f"{name} must be a finite positive number"
                 )
@@ -154,12 +161,21 @@ async def run_with_lease_heartbeat(
         raise TypeError("renew must be callable")
     if not isinstance(renew_immediately, bool):
         raise ValueError("renew_immediately must be bool")
-    if (
-        isinstance(heartbeat_interval, bool)
-        or not isinstance(heartbeat_interval, (int, float))
-        or not math.isfinite(float(heartbeat_interval))
-        or heartbeat_interval <= 0
+    if isinstance(heartbeat_interval, bool) or not isinstance(
+        heartbeat_interval, (int, float)
     ):
+        raise ValueError(
+            "heartbeat_interval must be a finite positive number"
+        )
+    try:
+        heartbeat_float = float(heartbeat_interval)
+    except OverflowError:
+        #? An int too large to convert to float (e.g. 10**400) must surface as
+        #? the documented ValueError, not leak an internal OverflowError.
+        raise ValueError(
+            "heartbeat_interval must be a finite positive number"
+        ) from None
+    if not math.isfinite(heartbeat_float) or heartbeat_interval <= 0:
         raise ValueError(
             "heartbeat_interval must be a finite positive number"
         )

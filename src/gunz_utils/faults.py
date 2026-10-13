@@ -188,14 +188,19 @@ class VirtualClock:
     def __init__(self,
         start_time: float = 1000.0,
     ) -> None:
-        if (
-            isinstance(start_time, bool)
-            or not isinstance(start_time, (int, float))
-            or not math.isfinite(start_time)
-            or start_time < 0
-        ):
+        if isinstance(start_time, bool) or not isinstance(start_time, (int, float)):
             raise ValueError("start_time must be a finite non-negative number")
-        self._current: float = float(start_time)
+        try:
+            start_float = float(start_time)
+        except OverflowError:
+            #? An int too large to convert to float (e.g. 10**400) must surface
+            #? as the documented ValueError, not leak an internal OverflowError.
+            raise ValueError(
+                "start_time must be a finite non-negative number"
+            ) from None
+        if not math.isfinite(start_float) or start_float < 0:
+            raise ValueError("start_time must be a finite non-negative number")
+        self._current: float = start_float
 
     def now(self) -> float:
         """Return current virtual time in seconds.
@@ -234,14 +239,19 @@ class VirtualClock:
         float
             The result of the operation.
         """
-        if (
-            isinstance(seconds, bool)
-            or not isinstance(seconds, (int, float))
-            or not math.isfinite(seconds)
-            or seconds < 0
-        ):
+        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)):
             raise ValueError("seconds must be a finite non-negative number")
-        new_time = self._current + float(seconds)
+        try:
+            seconds_float = float(seconds)
+        except OverflowError:
+            #? An int too large to convert to float (e.g. 10**400) must surface
+            #? as the documented ValueError, not leak an internal OverflowError.
+            raise ValueError(
+                "seconds must be a finite non-negative number"
+            ) from None
+        if not math.isfinite(seconds_float) or seconds_float < 0:
+            raise ValueError("seconds must be a finite non-negative number")
+        new_time = self._current + seconds_float
         if not math.isfinite(new_time):
             raise ValueError("advancing clock results in non-finite time")
         self._current = new_time
