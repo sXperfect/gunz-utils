@@ -71,6 +71,7 @@ __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 import abc
 import asyncio
+import copy
 import math
 from typing import Any, Protocol, runtime_checkable
 
@@ -394,8 +395,12 @@ class PolicyUpstream:
                         #? consumes or mutates its arguments cannot change what a
                         #? later retry sees, and the caller's own dict is never
                         #? mutated as a side effect. Retries stay semantically
-                        #? identical.
-                        return await self._client.call(tool_name, dict(arguments))
+                        #? identical. A deep copy isolates nested mutable values
+                        #? too: a shallow dict copy would still share lists and
+                        #? nested dicts across attempts and with the caller.
+                        return await self._client.call(
+                            tool_name, copy.deepcopy(arguments)
+                        )
                 except TimeoutError as exc:
                     self._stats["timeouts"] += 1
                     if attempt + 1 >= attempts:

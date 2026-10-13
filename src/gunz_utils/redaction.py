@@ -256,7 +256,7 @@ def redact_dict(
                 if secret:
                     if isinstance(item, str):
                         out[key] = redact(item, show_chars=show_chars)
-                    elif isinstance(item, (dict, list, tuple)):
+                    elif isinstance(item, (dict, list, tuple, set, frozenset)):
                         out[key] = _walk(item, True, depth + 1)
                     elif item is None:
                         out[key] = None

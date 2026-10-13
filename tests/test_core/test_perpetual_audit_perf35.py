@@ -161,10 +161,15 @@ def test_redact_dict_masks_numeric_secret_and_none() -> None:
 
 
 def test_redact_dict_secret_set_and_tuple() -> None:
+    # A set/frozenset directly under a secret key is masked element-wise,
+    # preserving its container shape (consistent with lists/dicts/tuples and
+    # with the deeper secret_context path). This is the corrected behavior
+    # established by the perf45 finding; the previous scalar "****" behavior
+    # was the bug being fixed.
     out = R.redact_dict({"api_key": {"a", "b"}})
-    assert out["api_key"] == "****"
+    assert out["api_key"] == {"****"}
     out2 = R.redact_dict({"api_key": frozenset({"a", "b"})})
-    assert out2["api_key"] == "****"
+    assert out2["api_key"] == frozenset({"****"})
     out3 = R.redact_dict({"api_key": ("a", "b")})
     assert out3["api_key"] == ("****", "****")
 
