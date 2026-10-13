@@ -134,7 +134,7 @@ def setup_logging(
             #? a sensitive file outside logs/), defeating the directory guard,
             #? so skip the file sink rather than opening it.
             logger.warning(
-                "Refusing to open symlinked log file, skipping file sink: %s",
+                "Refusing to open symlinked log file, skipping file sink: {}",
                 log_path,
             )
         else:
