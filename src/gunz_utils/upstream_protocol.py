@@ -390,7 +390,12 @@ class PolicyUpstream:
             for attempt in range(attempts):
                 try:
                     async with asyncio.timeout(self._timeout_seconds):
-                        return await self._client.call(tool_name, arguments)
+                        #? Pass a shallow copy on every attempt so a client that
+                        #? consumes or mutates its arguments cannot change what a
+                        #? later retry sees, and the caller's own dict is never
+                        #? mutated as a side effect. Retries stay semantically
+                        #? identical.
+                        return await self._client.call(tool_name, dict(arguments))
                 except TimeoutError as exc:
                     self._stats["timeouts"] += 1
                     if attempt + 1 >= attempts:

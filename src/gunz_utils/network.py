@@ -14,6 +14,13 @@ from collections.abc import Mapping, Sequence
 from urllib.parse import quote, urlencode, urlunsplit
 
 _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*$")
+#? RFC 7343 ORCHIDv2 (overlay-encrypted identifier) special-use range
+#? 2001:20::/28 (second hextet 0x20..0x2f). These addresses are overlay-only
+#? and not globally routed, but ipaddress reports is_global=True and none of
+#? the other special-use flags catch them, so they must be rejected explicitly.
+#? Note /28 per RFC 7343 -- not /27, which would wrongly also cover the
+#? adjacent 2001:30::/28 block (second hextet 0x30..0x3f).
+_ORCHIDV2 = ipaddress.ip_network("2001:20::/28")
 
 #? Sane upper cap for socket timeouts. Values at or above this are beyond what
 #? the platform time_t can represent for settimeout and would otherwise surface
@@ -182,7 +189,8 @@ def _is_non_public_address(
     normalized = address.split("%", 1)[0]
     ip = ipaddress.ip_address(normalized)
     return (
-        ip.is_private
+        (ip.version == 6 and ip in _ORCHIDV2)
+        or ip.is_private
         or ip.is_loopback
         or ip.is_link_local
         or ip.is_unspecified

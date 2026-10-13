@@ -117,6 +117,10 @@ def redact(
     12345
     """
     _validate_show_chars(show_chars)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        #? Bytes-like secrets must be masked, not returned raw, consistent
+        #? with redact_dict's handling of bytes-like values under a secret key.
+        return _MASK
     if not isinstance(value, str):
         return value
     if show_chars == 0:
@@ -219,9 +223,13 @@ def redact_dict(
             The result of the operation.
         """
         if depth > _MAX_REDACT_DEPTH:
-            #? Bound recursion so untrusted deep input cannot blow the stack;
-            #? the subtree is fully masked rather than recursed.
-            return _MASK
+            #? Bound recursion so untrusted deep input cannot blow the stack.
+            #? Non-secret content is preserved unchanged (shape and leaves
+            #? intact); only a secret subtree degrades to the mask, so a deep
+            #? structure of non-secret data is not corrupted.
+            if secret_context:
+                return _MASK
+            return value
         if secret_context:
             if isinstance(value, dict):
                 return {
