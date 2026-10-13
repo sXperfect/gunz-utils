@@ -333,8 +333,29 @@ class OptionalBaseStrEnum(BaseStrEnum):
         return cast(Self, super()._missing_(value))
 
 
+class _BaseIntEnumMeta(enum.EnumMeta):
+    """EnumMeta that rejects raw boolean values on member lookup.
+
+    ``True``/``False`` are a strict subtype of ``int`` and would otherwise be
+    silently coerced into the value-1/value-0 member. The runtime constructor
+    and ``cls(value)`` lookups go through ``EnumMeta.__call__``, so intercept
+    them here (member creation during class construction is unaffected).
+    """
+
+    def __call__(cls,
+        value: object,
+        *values: Any,
+        **kwargs: Any,
+    ) -> Any:
+        if isinstance(value, bool):
+            raise ValueError(
+                f"boolean {value!r} is not a valid {cls.__name__} value"
+            )
+        return super().__call__(value, *values, **kwargs)
+
+
 @enum.verify(enum.UNIQUE)
-class BaseIntEnum(enum.IntEnum):
+class BaseIntEnum(enum.IntEnum, metaclass=_BaseIntEnumMeta):
     """
     A base class for IntEnum that provides string-based lookup and alias support.
 

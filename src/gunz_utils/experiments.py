@@ -104,6 +104,27 @@ def run_variant_matrix(
     }
 
 
+def _as_float(
+    value: int | float,
+) -> float:
+    """Convert a numeric value to float, mapping int overflow to infinity.
+
+    Parameters
+    ----------
+    value : int | float
+        value parameter.
+
+    Returns
+    -------
+    float
+        The result of the operation.
+    """
+    try:
+        return float(value)
+    except OverflowError:
+        return math.inf if value > 0 else -math.inf
+
+
 def compare_numeric_metrics(
     baseline: dict[str, Any],
     candidate: dict[str, Any],
@@ -156,8 +177,8 @@ def compare_numeric_metrics(
             }
             continue
 
-        left_value = float(left)
-        right_value = float(right)
+        left_value = _as_float(left)
+        right_value = _as_float(right)
         delta_f = right_value - left_value
         result[key] = {
             "numeric": True,
@@ -219,8 +240,15 @@ def metric_improvement(
     """
     if direction not in {"lower", "higher"}:
         raise ValueError("direction must be lower or higher")
-    if minimum_relative_improvement < 0:
-        raise ValueError("minimum_relative_improvement must be non-negative")
+    if (
+        isinstance(minimum_relative_improvement, bool)
+        or not isinstance(minimum_relative_improvement, int | float)
+        or not math.isfinite(float(minimum_relative_improvement))
+        or minimum_relative_improvement < 0
+    ):
+        raise ValueError(
+            "minimum_relative_improvement must be a finite non-negative number"
+        )
 
     comparison = matrix.get("comparisons", {}).get(variant, {}).get(metric)
     if not comparison or not comparison.get("numeric"):

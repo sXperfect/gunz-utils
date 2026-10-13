@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Callable
 from typing import TypeVar
@@ -38,16 +39,26 @@ def env(
         The result of the operation.
     """
     value = os.environ.get(name)
-    if value is None:
+    if value is None or not value.strip():
+        #? An unset, empty, or whitespace-only variable resolves to the
+        #? default in a safe-defaults reader.
         if default is _MISSING:
             raise KeyError(f"required environment variable {name!r} is not set")
         return type_cast(T, default)
     try:
         if cast is None:
-            return type_cast(T, value)
-        return cast(value)
+            result: T | object = value
+        else:
+            result = cast(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"invalid value for environment variable {name!r}") from exc
+    #? A float cast must not propagate a non-finite value (e.g. "1e400" ->
+    #? inf, or "nan"), matching the package's finiteness conventions.
+    if isinstance(result, float) and not math.isfinite(result):
+        raise ValueError(
+            f"invalid value for environment variable {name!r}: non-finite float"
+        )
+    return type_cast(T, result)
 
 
 def env_bool(
