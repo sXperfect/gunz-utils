@@ -147,16 +147,34 @@ def _validate_rollback_timeout(
     """
     if timeout is None:
         return None
-    if (
-        isinstance(timeout, bool)
-        or not isinstance(timeout, (int, float))
-        or not math.isfinite(timeout)
-        or timeout <= 0
-    ):
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
         raise ValueError(
             "rollback_timeout must be a finite positive number or None"
         )
-    return float(timeout)
+    try:
+        timeout_float = float(timeout)
+    except OverflowError:
+        #? An int too large to convert to float (e.g. 10**400) must surface as
+        #? the documented ValueError, not leak an internal OverflowError.
+        raise ValueError(
+            "rollback_timeout must be a finite positive number or None"
+        ) from None
+    if not math.isfinite(timeout_float) or timeout_float <= 0:
+        raise ValueError(
+            "rollback_timeout must be a finite positive number or None"
+        )
+    return timeout_float
+
+
+async def _drive_awaitable(
+    awaitable: Any,
+) -> Any:
+    """Await any awaitable from a non-coroutine wrapper.
+
+    ``asyncio.run`` refuses non-coroutine awaitables directly, so route them
+    through this coroutine to drive a custom ``__await__`` to completion.
+    """
+    return await awaitable
 
 
 class WorkflowDAG:
@@ -178,6 +196,11 @@ class WorkflowDAG:
         if any(not name for name in self.stages):
             raise ValueError("stage names must be non-empty")
         self._order = self._topological_order()
+        #? Instance-level memo shared across effective_fingerprint calls so a
+        #? workflow's transitive dependency closures are computed once per stage
+        #? and reused (execution stays linear instead of O(V^2)). Stages are
+        #? fixed at construction, so the memo never goes stale.
+        self._fingerprint_memo: dict[str, str | None] = {}
 
     def _topological_order(self) -> tuple[str, ...]:
         """Validate dependencies/cycles and return deterministic execution order.
@@ -242,11 +265,14 @@ class WorkflowDAG:
         if name not in self.stages:
             raise KeyError(name)
 
-        memo: dict[str, str | None] = {}
+        memo: dict[str, str | None] = self._fingerprint_memo
+        if name in memo:
+            return memo[name]
 
         #? Iterative post-order traversal (mirrors _topological_order) so deep
-        #? acyclic DAGs do not blow the Python stack. The shared memo makes
-        #? repeated calls deterministic and cacheable.
+        #? acyclic DAGs do not blow the Python stack. The shared instance memo
+        #? makes repeated calls across stages cacheable and keeps workflow
+        #? execution linear.
         stack: list[tuple[str, bool]] = [(name, False)]
         while stack:
             stage_name, processed = stack.pop()
@@ -308,15 +334,24 @@ class WorkflowDAG:
                     if inspect.isawaitable(res):
                         if inspect.iscoroutine(res):
                             res.close()
-                        errors.append(
-                            (
-                                name,
-                                TypeError(
-                                    f"asynchronous compensation for stage {name!r} "
-                                    "cannot be executed during synchronous rollback"
-                                ),
+                            errors.append(
+                                (
+                                    name,
+                                    TypeError(
+                                        f"asynchronous compensation for stage {name!r} "
+                                        "cannot be executed during synchronous rollback"
+                                    ),
+                                )
                             )
-                        )
+                        else:
+                            #? A non-coroutine awaitable (custom ``__await__``)
+                            #? cannot be left pending: await it to completion on
+                            #? a fresh loop so it is neither leaked nor
+                            #? misreported as a TypeError.
+                            try:
+                                asyncio.run(_drive_awaitable(res))
+                            except BaseException as exc:
+                                errors.append((name, exc))
                 except BaseException as exc:
                     errors.append((name, exc))
         return errors
