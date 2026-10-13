@@ -107,7 +107,18 @@ def _check_one(
         if not isinstance(value, tuple):
             return False
         if not args:
-            return True
+            # A bare Tuple/tuple accepts any tuple. The empty-tuple type
+            # ``Tuple[()]``/``tuple[()]`` also resolves to empty ``args`` but
+            # is a distinct object; it must accept only ``()``.
+            # `t.Tuple` (the typing alias) and the builtin `tuple` are
+            # distinct objects; both must be accepted as a bare tuple.
+            # UP006 is suppressed because the typing alias is semantically
+            # required here, not a mere style preference.
+            if annotation is t.Tuple or annotation is tuple:  # noqa: UP006
+                return True
+            return len(value) == 0
+        if args == ((),):
+            return len(value) == 0
         if len(args) == 2 and args[1] is Ellipsis:
             return all(_check_one(item, args[0]) for item in value)
         return len(value) == len(args) and all(

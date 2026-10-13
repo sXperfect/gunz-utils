@@ -11,7 +11,6 @@ this test file followed.
 # =============================================================================
 
 import os
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -181,7 +180,9 @@ class TestSecureStore(unittest.TestCase):
             with SecureStore(base_dir=tmp) as store:
                 store.unlock()
                 store.set("k", "v")
-            with self.assertRaises(sqlite3.ProgrammingError):
+            # A closed store is effectively locked and must refuse to enumerate
+            # secret names rather than reaching a closed database connection.
+            with self.assertRaises(RuntimeError):
                 store.list_keys()
         finally:
             import shutil

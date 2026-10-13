@@ -92,7 +92,7 @@ class TestTypeChecked(unittest.TestCase):
 
         msg = str(cm.exception)
         self.assertIn("Validation error in 'typed_func'", msg)
-        self.assertIn("validation failed [int_parsing]", msg)
+        self.assertIn("validation failed [int_type]", msg)
         self.assertIn("got type 'str'", msg)
 
     def test_varargs(self):

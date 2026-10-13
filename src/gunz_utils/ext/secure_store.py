@@ -659,9 +659,11 @@ class SecureStore:
             or len(value) > 256
             or "," in value
             or "\x00" in value
+            or any(ord(character) < 0x20 for character in value)
         ):
             raise ValueError(
-                f"{field} must be a non-empty identifier without commas or NULs"
+                f"{field} must be a non-empty identifier without commas "
+                "or control characters"
             )
         return value
 
@@ -1508,6 +1510,8 @@ class SecureStore:
         list[SecretMetadata]
             The result of the operation.
         """
+        if self._fernet is None:
+            raise RuntimeError("Store is locked. Call unlock() first.")
         caller = self._validate_identity(caller, field="caller")
         if not isinstance(acl_filter, bool):
             raise ValueError("acl_filter must be bool")

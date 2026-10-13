@@ -53,7 +53,15 @@ def type_checked(
         t.Callable
             The result of the operation.
         """
-        validated_func = validate_call(f, **kwargs)
+        #? Default to strict validation so this backend matches the stdlib
+        #? analog's bool-vs-int / numeric separation (e.g. a bool or string is
+        #? not silently coerced into an int). Callers may override by passing
+        #? an explicit ``config``.
+        options = dict(kwargs)
+        config = dict(options.get("config") or {})
+        config.setdefault("strict", True)
+        options["config"] = config
+        validated_func = validate_call(f, **options)
 
         @functools.wraps(f)
         def wrapper(
