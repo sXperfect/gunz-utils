@@ -109,19 +109,20 @@ class BaseStrEnum(enum.StrEnum):
         if existing is not None:
             return existing
         lookup_map: dict[str, Self] = {}
+        #? Register member VALUES first (normalized then raw lowercase) so a
+        #? value always takes precedence over another member's name that
+        #? happens to collide with it.
         for member in cls:
-            #? Add normalized value
             val_lower = member.value.lower()
             val_norm = val_lower.replace("-", "_").replace(" ", "_")
             if val_norm not in lookup_map:
                 lookup_map[val_norm] = member
-
-            #? Add raw lowercase value
-            #? (optimization for inputs matching value but with separators)
             if val_lower not in lookup_map:
                 lookup_map[val_lower] = member
 
-            #? Add lowercase name
+        #? Register lowercase names only when they do not collide with a value,
+        #? so passing a value returns the member that owns it.
+        for member in cls:
             name_lower = member.name.lower()
             if name_lower not in lookup_map:
                 lookup_map[name_lower] = member
@@ -165,7 +166,14 @@ class BaseStrEnum(enum.StrEnum):
                     f"member value for {cls.__name__}"
                 ) from exc
 
-        #? 2. Check for matches in the fuzzy map
+        #? 2. Check exact case-sensitive member name, so a name that collides
+        #? with another member's value still resolves to the named member
+        #? (e.g. `FOO = "bar"` / `BAR = "foo"`: "FOO" -> FOO, not BAR).
+        for member in cls:
+            if member.name == value_str:
+                return member
+
+        #? 3. Check for matches in the fuzzy map
         #? Optimization: Use cached lookup map instead of iterating
         fuzzy_map = cls._get_fuzzy_map()
 
@@ -174,7 +182,7 @@ class BaseStrEnum(enum.StrEnum):
         if value_lower in fuzzy_map:
             return fuzzy_map[value_lower]
 
-        #? 3. Normalize separators and case for fuzzy matching
+        #? 4. Normalize separators and case for fuzzy matching
         normalized_value_input = value_lower.replace("-", "_").replace(" ", "_")
 
         if normalized_value_input in fuzzy_map:

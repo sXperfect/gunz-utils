@@ -14,9 +14,11 @@ from typing import Any
 class ResourceGroup:
     def __init__(self) -> None:
         self._stack = ExitStack()
+        self._entered = False
 
     def __enter__(self) -> ResourceGroup:
         self._stack.__enter__()
+        self._entered = True
         return self
 
     def enter(self,
@@ -33,7 +35,15 @@ class ResourceGroup:
         -------
         Any
             The result of the operation.
+
+        Raises
+        ------
+        RuntimeError
+            If the group's context manager was not entered, so a resource is
+            not silently pushed onto a stack that can never release it.
         """
+        if not self._entered:
+            raise RuntimeError("resource group must be entered before use")
         return self._stack.enter_context(resource)
 
     def __exit__(self,
@@ -47,9 +57,11 @@ class ResourceGroup:
 class AsyncResourceGroup:
     def __init__(self) -> None:
         self._stack = AsyncExitStack()
+        self._entered = False
 
     async def __aenter__(self) -> AsyncResourceGroup:
         await self._stack.__aenter__()
+        self._entered = True
         return self
 
     async def enter(self,
@@ -66,7 +78,15 @@ class AsyncResourceGroup:
         -------
         Any
             The result of the operation.
+
+        Raises
+        ------
+        RuntimeError
+            If the group's context manager was not entered, so a resource is
+            not silently pushed onto a stack that can never release it.
         """
+        if not self._entered:
+            raise RuntimeError("resource group must be entered before use")
         return await self._stack.enter_async_context(resource)
 
     async def __aexit__(self,

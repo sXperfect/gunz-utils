@@ -163,17 +163,26 @@ def compare_numeric_metrics(
 
         if isinstance(left, int) and isinstance(right, int):
             delta = right - left
+            #? Compute relative_delta in an overflow-safe way. A plain
+            #? int/int division raises OverflowError when the quotient is too
+            #? large for a float (e.g. delta=10**400, abs(left)=1), which would
+            #? crash the whole variant matrix. Convert the delta through
+            #? _as_float (mapping overflow to +/-inf) first, matching the
+            #? float path, and report a non-finite relative delta as None.
+            relative_delta: float | None
+            if left == 0:
+                relative_delta = None
+            else:
+                relative_delta = _as_float(delta) / abs(left)
+                if not math.isfinite(relative_delta):
+                    relative_delta = None
             result[key] = {
                 "numeric": True,
                 "baseline": left,
                 "candidate": right,
                 "finite": True,
                 "delta": delta,
-                "relative_delta": (
-                    delta / abs(left)
-                    if left != 0
-                    else None
-                ),
+                "relative_delta": relative_delta,
             }
             continue
 

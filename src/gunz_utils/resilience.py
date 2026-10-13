@@ -202,6 +202,20 @@ class AsyncBulkhead:
         try:
             if timeout is None:
                 await self._semaphore.acquire()
+            elif timeout == 0:
+                #? A zero timeout means "do not wait": acquire only if a
+                #? permit is available right now. asyncio.wait_for(coro, 0)
+                #? never lets a ready coroutine complete, so give the acquire
+                #? a single event-loop tick and fail if it did not finish.
+                acquire_task = asyncio.ensure_future(self._semaphore.acquire())
+                await asyncio.sleep(0)
+                if not acquire_task.done():
+                    acquire_task.cancel()
+                    try:
+                        await acquire_task
+                    except asyncio.CancelledError:
+                        pass
+                    raise TimeoutError("bulkhead acquisition timed out")
             else:
                 await asyncio.wait_for(self._semaphore.acquire(), timeout)
         except TimeoutError:
