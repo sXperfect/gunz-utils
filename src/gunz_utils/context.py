@@ -60,7 +60,14 @@ def operation_context(
     Iterator[str]
         The result of the operation.
     """
-    correlation = value or str(uuid.uuid4())
+    if value is not None and not isinstance(value, str):
+        raise TypeError(
+            f"value must be a string or None, got {type(value).__name__}"
+        )
+    if value is None or not value.strip():
+        correlation = str(uuid.uuid4())
+    else:
+        correlation = value
     token: Token[str | None] = _correlation_id.set(correlation)
     try:
         yield correlation

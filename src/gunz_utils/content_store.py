@@ -778,6 +778,28 @@ class ContentAddressedStore:
         normalized = self._validate_digest(digest)
         source = self.path_for(normalized)
         target = Path(destination)
+        try:
+            resolved_dest = target.resolve()
+            resolved_root = self.root.resolve()
+        except OSError:
+            resolved_dest = None
+            resolved_root = None
+        if (
+            resolved_root is not None
+            and resolved_dest is not None
+            and (
+                resolved_dest == resolved_root
+                or resolved_root in resolved_dest.parents
+            )
+        ):
+            #? Never materialize onto a path inside the store's own content
+            #? tree: doing so would os.replace onto another stored artifact's
+            #? canonical path and silently corrupt (clobber) its bytes. The
+            #? unaffected artifact must be preserved.
+            raise ValueError(
+                "materialize destination must not resolve inside the "
+                "store's content tree"
+            )
         destination_fd = None
         try:
             with self._parent_handle(source, create=False) as source_parent_fd:

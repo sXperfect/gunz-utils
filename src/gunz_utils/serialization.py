@@ -178,7 +178,7 @@ def to_jsonable(
                 separators=(",", ":"), default=repr,
             ),
         )
-    if isinstance(value, bytes):
+    if isinstance(value, (bytes, bytearray, memoryview)):
         raise TypeError("bytes are not implicitly JSON serializable")
     if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
         raise ValueError("Out of range float values are not JSON compliant")
