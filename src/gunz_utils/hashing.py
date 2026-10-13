@@ -230,7 +230,13 @@ def short_hash(
             f"chars must be an integer in "
             f"[{_MIN_SHORT_CHARS}, {_MAX_SHORT_CHARS}], got {chars!r}"
         )
-    return content_hash(data, algo=algo)[:chars]
+    digest = content_hash(data, algo=algo)
+    if chars > len(digest):
+        raise ValueError(
+            f"chars {chars} exceeds the {algo!r} digest length "
+            f"{len(digest)}"
+        )
+    return digest[:chars]
 
 
 

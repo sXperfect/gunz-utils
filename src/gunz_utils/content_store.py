@@ -693,9 +693,11 @@ class ContentAddressedStore:
             The result of the operation.
         """
         item = Path(source)
-        flags = os.O_RDONLY
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
         try:
             descriptor = os.open(item, flags)
         except OSError as exc:

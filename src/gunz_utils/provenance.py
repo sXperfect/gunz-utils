@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.metadata
 import os
 import platform
+import re
 import sys
 import uuid
 from collections.abc import Iterable, Mapping
@@ -48,11 +49,33 @@ class RuntimeProvenance:
         )
 
 
+_SECRET_KEY_VALUE_TOKEN = re.compile(
+    r"(?i)([A-Za-z0-9_.\-]*(?:"
+    + "|".join(re.escape(pattern) for pattern in SECRET_PATTERNS)
+    + r")[A-Za-z0-9_.\-]*)=([^&\s;]*)"
+)
+
+
+def _redact_key_value_tokens(
+    value: str,
+) -> str:
+    """Mask values of ``key=value`` tokens whose key names a secret.
+
+    Covers credentials that sit outside the URI user-info component, such as
+    secret-named query parameters (``?token=...``, ``?password=...``) and
+    non-URI ``key=value`` DSNs (``host=db password=...``).
+    """
+    return _SECRET_KEY_VALUE_TOKEN.sub(
+        lambda match: f"{match.group(1)}=****",
+        value,
+    )
+
+
 def _redact_environment_value(
     name: str,
     value: str,
 ) -> str:
-    """Redact secret-named values and passwords embedded in URI user-info.
+    """Redact secret-named values and embedded credentials from the value.
 
     Parameters
     ----------
@@ -73,18 +96,17 @@ def _redact_environment_value(
     try:
         parsed = urlsplit(value)
     except ValueError:
-        return value
-    if not parsed.scheme or "@" not in parsed.netloc:
-        return value
+        return _redact_key_value_tokens(value)
 
-    userinfo, hostinfo = parsed.netloc.rsplit("@", 1)
-    if ":" not in userinfo:
-        return value
-    username, _password = userinfo.split(":", 1)
-    sanitized = parsed._replace(
-        netloc=f"{username}:****@{hostinfo}",
-    )
-    return urlunsplit(sanitized)
+    if parsed.scheme and "@" in parsed.netloc:
+        userinfo, hostinfo = parsed.netloc.rsplit("@", 1)
+        if ":" in userinfo:
+            username, _password = userinfo.split(":", 1)
+            parsed = parsed._replace(
+                netloc=f"{username}:****@{hostinfo}",
+            )
+
+    return _redact_key_value_tokens(urlunsplit(parsed))
 
 
 def capture_runtime_provenance(

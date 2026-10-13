@@ -120,8 +120,13 @@ def safe_float(
     float or None
         Parsed float, or ``default`` on failure.
     """
+    stripped = _stripped(value)
+    #? Booleans are a strict subtype of int and are not numeric config values;
+    #? they are handled by safe_bool/parse_bool, so reject them like safe_int.
+    if isinstance(stripped, bool):
+        return default
     try:
-        result = float(_stripped(value))
+        result = float(stripped)
     except (ValueError, TypeError):
         return default
     #? Infinity remains opt-in controllable, while NaN stays rejected by default.
