@@ -197,6 +197,7 @@ def deep_merge(
     override: Mapping[str, Any],
     *,
     list_strategy: Literal["replace", "concat", "dedup"] = "replace",
+    max_depth: int | None = 100,
 ) -> dict[str, Any]:
     """Recursively merge two mappings, returning a new dict (no mutation).
 
@@ -226,6 +227,10 @@ def deep_merge(
           (order: base then override).
         - ``"dedup"``: like ``"concat"`` but with duplicates removed
           (first occurrence wins).
+    max_depth : int | None, optional
+        Maximum recursion depth allowed when traversing nested structures.
+        Defaults to 100 to protect against call-stack exhaustion. Pass ``None``
+        to disable depth checking.
 
     Returns
     -------
@@ -235,8 +240,11 @@ def deep_merge(
 
     Raises
     ------
+    TypeError
+        If ``base`` or ``override`` is not a mapping.
     ValueError
-        If ``list_strategy`` is not one of the allowed values.
+        If ``list_strategy`` is not one of the allowed values, if ``max_depth``
+        is invalid, or if nesting exceeds ``max_depth``.
 
     Examples
     --------
@@ -249,10 +257,20 @@ def deep_merge(
     >>> deep_merge({"xs": [1, 2, 3]}, {"xs": [2, 4]}, list_strategy="dedup")
     {'xs': [1, 2, 3, 4]}
     """
+    if not isinstance(base, Mapping) or not isinstance(override, Mapping):
+        raise TypeError("base and override must be mappings")
     if list_strategy not in ("replace", "concat", "dedup"):
         raise ValueError(
             f"list_strategy must be one of 'replace', 'concat', 'dedup'; "
             f"got {list_strategy!r}"
+        )
+    if max_depth is not None and (
+        isinstance(max_depth, bool)
+        or not isinstance(max_depth, int)
+        or max_depth < 0
+    ):
+        raise ValueError(
+            f"max_depth must be a non-negative integer or None, got {max_depth!r}"
         )
 
     memo: dict[int, Any] = {}
@@ -260,6 +278,7 @@ def deep_merge(
 
     def _isolate(
         val: Any,
+        depth: int,
     ) -> Any:
         """Return a deep, cycle-safe copy of ``val`` preserving shared references.
 
@@ -267,6 +286,8 @@ def deep_merge(
         ----------
         val : Any
             Value to isolate from the source mapping.
+        depth : int
+            Current recursion depth.
 
         Returns
         -------
@@ -274,6 +295,10 @@ def deep_merge(
             A cycle-safe copy of containers. Leaf identity follows its copy
             protocol; failed copies retain the original object and mutable state.
         """
+        if max_depth is not None and depth > max_depth:
+            raise ValueError(
+                f"maximum mapping merge depth exceeded ({max_depth})"
+            )
         val_id = id(val)
         if val_id in memo:
             return memo[val_id]
@@ -282,22 +307,22 @@ def deep_merge(
             res_dict: dict[Any, Any] = {}
             memo[val_id] = res_dict
             for k, v in val.items():
-                res_dict[k] = _isolate(v)
+                res_dict[k] = _isolate(v, depth + 1)
             return res_dict
         if isinstance(val, list):
             res_list: list[Any] = []
             memo[val_id] = res_list
             for v in val:
-                res_list.append(_isolate(v))
+                res_list.append(_isolate(v, depth + 1))
             return res_list
         if isinstance(val, set):
             res_set: set[Any] = set()
             memo[val_id] = res_set
             for v in val:
-                res_set.add(_isolate(v))
+                res_set.add(_isolate(v, depth + 1))
             return res_set
         if isinstance(val, tuple):
-            y = [_isolate(v) for v in val]
+            y = [_isolate(v, depth + 1) for v in val]
             if val_id in memo:
                 return memo[val_id]
             for k, j in zip(val, y, strict=True):
@@ -319,6 +344,7 @@ def deep_merge(
     def _merge(
         a: Any,
         b: Any,
+        depth: int,
     ) -> Any:
         """Merge two values recursively without mutating either input.
 
@@ -328,12 +354,18 @@ def deep_merge(
             Base value; takes precedence for non-list/non-mapping pairs.
         b : Any
             Override value; wins over ``a`` for scalars and mixed pairs.
+        depth : int
+            Current recursion depth.
 
         Returns
         -------
         Any
             The merged value as a fresh, isolated structure.
         """
+        if max_depth is not None and depth > max_depth:
+            raise ValueError(
+                f"maximum mapping merge depth exceeded ({max_depth})"
+            )
         if isinstance(a, Mapping) and isinstance(b, Mapping):
             pair_key = (id(a), id(b))
             if pair_key in merge_memo:
@@ -342,16 +374,20 @@ def deep_merge(
             out: dict[str, Any] = {}
             merge_memo[pair_key] = out
             for key in a:
-                out[key] = _merge(a[key], b[key]) if key in b else _isolate(a[key])
+                out[key] = (
+                    _merge(a[key], b[key], depth + 1)
+                    if key in b
+                    else _isolate(a[key], depth + 1)
+                )
             for key in b:
                 if key not in a:
-                    out[key] = _isolate(b[key])
+                    out[key] = _isolate(b[key], depth + 1)
             return out
         if isinstance(a, list) and isinstance(b, list):
             if list_strategy == "replace":
-                return _isolate(b)
+                return _isolate(b, depth + 1)
             if list_strategy == "concat":
-                return _isolate(a) + _isolate(b)
+                return _isolate(a, depth + 1) + _isolate(b, depth + 1)
             #? dedup: first occurrence wins, order = base then override.
             #? Unhashable items (e.g. dicts) fall through without being
             #? tracked; that mirrors common stdlib semantics and avoids
@@ -368,10 +404,10 @@ def deep_merge(
                     if any(item == previous for previous in seen_unhashable):
                         continue
                     seen_unhashable.append(item)
-                result.append(_isolate(item))
+                result.append(_isolate(item, depth + 1))
             return result
         #? Non-dict / non-list: override wins. Plain scalars and mixed
         #? type pairs all fall through here.
-        return _isolate(b)
+        return _isolate(b, depth + 1)
 
-    return cast(dict[str, Any], _merge(base, override))
+    return cast(dict[str, Any], _merge(base, override, 0))

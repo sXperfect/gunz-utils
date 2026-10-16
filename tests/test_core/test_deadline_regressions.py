@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import math
 import sys
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -476,5 +478,40 @@ def test_largest_finite_float_parameters_remain_valid() -> None:
             limiter = AsyncRateLimiter(maximum, capacity=maximum)
             await limiter.acquire(maximum, timeout=0)
             assert limiter.available_tokens == 0.0
+
+    asyncio.run(scenario())
+
+
+def test_rate_limiter_subnormal_rate_timeout_and_overflow() -> None:
+    tiny_rate = 5e-324
+
+    async def scenario() -> None:
+        with _stationary_limiter_clock():
+            limiter = AsyncRateLimiter(tiny_rate, capacity=1.0)
+            #? First token exhausts capacity
+            assert await limiter.try_acquire(1.0)
+            assert limiter.available_tokens == 0.0
+
+            #? Acquire with timeout on empty bucket raises TimeoutError cleanly
+            with pytest.raises(TimeoutError):
+                await limiter.acquire(1.0, timeout=0.01)
+
+            #? Acquire without timeout raises OverflowError due to non-finite wait
+            with pytest.raises(OverflowError, match="non-finite"):
+                await limiter.acquire(1.0)
+
+    asyncio.run(scenario())
+
+
+def test_rate_limiter_refill_overflow_saturation() -> None:
+    huge_rate = sys.float_info.max
+
+    async def scenario() -> None:
+        limiter = AsyncRateLimiter(huge_rate, capacity=10.0)
+        #? 100 seconds elapsed * 1e308 overflows to infinity
+        limiter._updated = time.monotonic() - 100.0
+        assert math.isclose(limiter.available_tokens, 10.0)
+        limiter._refill()
+        assert math.isclose(limiter._tokens, 10.0)
 
     asyncio.run(scenario())

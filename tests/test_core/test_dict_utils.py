@@ -345,7 +345,56 @@ class TestIntegration(unittest.TestCase):
         self.assertIsNot(merged_t, tup)
         self.assertIs(merged_t[0][0], merged_t)
 
+    def test_deep_merge_enforces_max_depth_limit(self) -> None:
+        #? Build a deeply nested structure exceeding default max_depth (100)
+        deep: dict[str, Any] = {"leaf": 1}
+        for _ in range(105):
+            deep = {"nested": deep}
+
+        with self.assertRaises(ValueError) as ctx:
+            deep_merge(deep, {})
+        self.assertIn("maximum mapping merge depth exceeded", str(ctx.exception))
+
+    def test_deep_merge_custom_max_depth(self) -> None:
+        #? Build structure of depth 6
+        nested: dict[str, Any] = {"leaf": 1}
+        for _ in range(5):
+            nested = {"k": nested}
+
+        #? max_depth=3 should reject it
+        with self.assertRaises(ValueError) as ctx:
+            deep_merge(nested, {}, max_depth=3)
+        self.assertIn("maximum mapping merge depth exceeded", str(ctx.exception))
+
+        #? max_depth=10 should allow it
+        merged = deep_merge(nested, {}, max_depth=10)
+        self.assertEqual(merged, nested)
+
+        #? max_depth=None disables depth checking
+        deep: dict[str, Any] = {"leaf": 1}
+        for _ in range(120):
+            deep = {"k": deep}
+        merged_none = deep_merge(deep, {}, max_depth=None)
+        self.assertEqual(merged_none, deep)
+
+    def test_deep_merge_validates_max_depth_argument(self) -> None:
+        with self.assertRaises(ValueError):
+            deep_merge({}, {}, max_depth=-1)
+
+        with self.assertRaises(ValueError):
+            deep_merge({}, {}, max_depth=True)  # type: ignore[arg-type]
+
+        with self.assertRaises(ValueError):
+            deep_merge({}, {}, max_depth="100")  # type: ignore[arg-type]
+
+    def test_deep_merge_validates_mapping_arguments(self) -> None:
+        with self.assertRaises(TypeError):
+            deep_merge(123, {})  # type: ignore[arg-type]
+
+        with self.assertRaises(TypeError):
+            deep_merge({}, "not-a-map")  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":
     unittest.main()
+

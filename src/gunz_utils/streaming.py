@@ -38,20 +38,44 @@ def _reject_json_constant(
 
 def iter_jsonl(
     handle: TextIO,
+    *,
+    max_line_length: int | None = None,
 ) -> Iterator[Any]:
     """Decode non-empty JSON Lines records lazily.
 
     Parameters
     ----------
     handle : TextIO
-        handle parameter.
+        Text stream open for reading JSON Lines records.
+    max_line_length : int | None, optional
+        Maximum allowed character length for any single line in the stream.
+        If a line exceeds this length, ValueError is raised. Defaults to None
+        (unlimited).
 
-    Returns
-    -------
-    Iterator[Any]
-        The result of the operation.
+    Yields
+    ------
+    Any
+        The decoded JSON object for each non-empty line.
+
+    Raises
+    ------
+    ValueError
+        If ``max_line_length`` is not a positive integer or None, if any line
+        exceeds ``max_line_length``, or if a line contains non-standard JSON
+        constants.
     """
+    if max_line_length is not None and (
+        isinstance(max_line_length, bool)
+        or not isinstance(max_line_length, int)
+        or max_line_length <= 0
+    ):
+        raise ValueError("max_line_length must be a positive integer or None")
+
     for line in handle:
+        if max_line_length is not None and len(line) > max_line_length:
+            raise ValueError(
+                f"JSON Lines record exceeds maximum line length ({max_line_length})"
+            )
         if line.strip():
             yield json.loads(line, parse_constant=_reject_json_constant)
 

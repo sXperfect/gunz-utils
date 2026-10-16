@@ -327,14 +327,23 @@ def test_resource_groups_drop_completed_exit_callbacks_and_payloads() -> None:
     asyncio.run(scenario())
 
 
+_DESCRIPTOR_DIR: Path | None = (
+    Path("/proc/self/fd")
+    if Path("/proc/self/fd").is_dir()
+    else (Path("/dev/fd") if Path("/dev/fd").is_dir() else None)
+)
+
+
 @pytest.mark.skipif(
-    not Path("/proc/self/fd").is_dir(), reason="actual Linux descriptor inventory"
+    _DESCRIPTOR_DIR is None,
+    reason="actual process descriptor inventory (/proc/self/fd or /dev/fd) required",
 )
 def test_repeated_sync_async_child_runs_release_file_descriptors() -> None:
     import sys
 
     def descriptor_count() -> int:
-        return len(os.listdir("/proc/self/fd"))
+        assert _DESCRIPTOR_DIR is not None
+        return len([entry for entry in os.listdir(_DESCRIPTOR_DIR) if entry.isdigit()])
 
     baseline = descriptor_count()
     for _ in range(4):

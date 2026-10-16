@@ -151,3 +151,21 @@ def test_provenance_node_rejects_cyclic_metadata() -> None:
             "artifact",
             metadata=metadata,
         )
+
+
+def test_provenance_graph_deep_chain_does_not_hit_recursion_limit() -> None:
+    depth = 1500
+    nodes = [ProvenanceNode("node_0", "artifact")]
+    for i in range(1, depth):
+        nodes.append(
+            ProvenanceNode(
+                f"node_{i}",
+                "artifact",
+                inputs=(f"node_{i - 1}",),
+            )
+        )
+
+    graph = ProvenanceGraph(nodes)
+    ancestors = graph.ancestors(f"node_{depth - 1}")
+    assert len(ancestors) == depth - 1
+    assert ancestors[-1] == "node_0"

@@ -14,6 +14,17 @@ in [`docs/tasks/README.md`](tasks/README.md); completed work is indexed in
 | NP-03 | 2026-10-08 | [Portable platform verifier](tasks/active/2026-10-08-platform-verifier.md) | Linux preparation verified; native hosts pending |
 | NP-04 | 2026-10-08 | [Async pipe deadline follow-up](tasks/active/2026-10-08-platform-async-drain.md) | Repaired and integrated on Linux; native proofs pending |
 
+The [2026-10-17 audit network, dict, streaming fixes](tasks/done/2026-10-17-audit-network-dict-streaming-fixes.md)
+are complete; tcp_reachable cumulative deadline bounding across multiple resolved IPs,
+dict_utils.deep_merge max_depth recursion guards, streaming.iter_jsonl max_line_length
+memory protections, and ext/project_* same-line GS007 suppressions are verified across
+all 1782 unit tests, native extension compilation, and local gates.
+
+The [2026-10-16 audit correctness repairs](tasks/done/2026-10-16-audit-correctness-repairs.md)
+are complete; safe_float overflow/bool rejection, iterative DAG and provenance
+graph traversals, rate-limiter numerical bounds, and redaction parameter validation
+are verified across all 1774 unit tests and native extension builds.
+
 The [2026-10-08 follow-up audit and repairs](tasks/done/2026-10-08-audit-follow-up.md)
 are complete for the stated scope; all six canonical gates passed. Detailed
 review/repair records are listed in the task archive.

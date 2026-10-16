@@ -208,6 +208,34 @@ def test_rsync_mirror_validates_tools_and_marker(
             completion_marker="../bad",
         )
 
+    with pytest.raises(ValueError, match="completion_marker"):
+        rsync_mirror(
+            "source",
+            tmp_path / "target",
+            completion_marker="bad\nmarker",
+        )
+
+    with pytest.raises(ValueError, match="extra_args"):
+        rsync_mirror(
+            "source",
+            tmp_path / "target",
+            extra_args="--verbose",
+        )
+
+    with pytest.raises(ValueError, match="lock must be bool"):
+        rsync_mirror(
+            "source",
+            tmp_path / "target",
+            lock=1,  # type: ignore[arg-type]
+        )
+
+    with pytest.raises(ValueError, match="delete must be bool"):
+        rsync_mirror(
+            "source",
+            tmp_path / "target",
+            delete=1,  # type: ignore[arg-type]
+        )
+
 
 def test_rsync_mirror_rejects_hidden_destructive_extra_args(
     tmp_path: Path,

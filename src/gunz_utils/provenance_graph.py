@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -213,26 +213,21 @@ class ProvenanceGraph:
 
         result: list[str] = []
         seen: set[str] = set()
+        stack: list[Iterator[str]] = [iter(self._nodes[identifier].inputs)]
 
-        def walk(
-            current: str,
-        ) -> None:
-            """walk() function.
+        while stack:
+            try:
+                parent = next(stack[-1])
+            except StopIteration:
+                stack.pop()
+                continue
 
-            Parameters
-            ----------
-            current : str
-                current parameter.
-            """
-            node = self._nodes[current]
-            for parent in node.inputs:
-                if parent in seen or parent not in self._nodes:
-                    continue
-                seen.add(parent)
-                result.append(parent)
-                walk(parent)
+            if parent in seen or parent not in self._nodes:
+                continue
+            seen.add(parent)
+            result.append(parent)
+            stack.append(iter(self._nodes[parent].inputs))
 
-        walk(identifier)
         return tuple(result)
 
     def lineage(self,
@@ -266,31 +261,36 @@ class ProvenanceGraph:
         visiting: set[str] = set()
         visited: set[str] = set()
 
-        def visit(
-            identifier: str,
-        ) -> None:
-            """visit() function.
+        for start_identifier in self._nodes:
+            if start_identifier in visited:
+                continue
 
-            Parameters
-            ----------
-            identifier : str
-                identifier parameter.
-            """
-            if identifier in visited:
-                return
-            if identifier in visiting:
-                raise ValueError("provenance graph cycle detected")
+            visiting.add(start_identifier)
+            stack: list[tuple[str, Iterator[str]]] = [
+                (start_identifier, iter(self._nodes[start_identifier].inputs))
+            ]
 
-            visiting.add(identifier)
-            node = self._nodes[identifier]
-            for parent in node.inputs:
-                if parent in self._nodes:
-                    visit(parent)
-            visiting.remove(identifier)
-            visited.add(identifier)
+            while stack:
+                identifier, it = stack[-1]
+                try:
+                    parent = next(it)
+                except StopIteration:
+                    stack.pop()
+                    visiting.remove(identifier)
+                    visited.add(identifier)
+                    continue
 
-        for identifier in self._nodes:
-            visit(identifier)
+                if parent not in self._nodes:
+                    continue
+                if parent in visited:
+                    continue
+                if parent in visiting:
+                    raise ValueError("provenance graph cycle detected")
+
+                visiting.add(parent)
+                stack.append(
+                    (parent, iter(self._nodes[parent].inputs))
+                )
 
 
 __all__ = ["ProvenanceGraph", "ProvenanceNode"]

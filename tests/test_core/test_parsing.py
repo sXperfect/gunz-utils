@@ -76,6 +76,17 @@ class TestSafeFloat(unittest.TestCase):
         self.assertIsNone(safe_float("nan"))
         self.assertTrue(math.isnan(safe_float("nan", allow_nan=True)))
 
+    def test_bool_rejected(self) -> None:
+        self.assertIsNone(safe_float(True))
+        self.assertIsNone(safe_float(False))
+        self.assertEqual(safe_float(True, default=-1.0), -1.0)
+
+    def test_overflow_returns_default(self) -> None:
+        huge_int = 10**10000
+        self.assertIsNone(safe_float(huge_int))
+        self.assertEqual(safe_float(huge_int, default=0.0), 0.0)
+        self.assertIsNone(safe_float("1e10000", allow_inf=False))
+
 
 class TestSafeBool(unittest.TestCase):
     def test_bool_values(self) -> None:

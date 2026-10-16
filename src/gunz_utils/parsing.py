@@ -120,9 +120,12 @@ def safe_float(
     float or None
         Parsed float, or ``default`` on failure.
     """
+    stripped = _stripped(value)
+    if isinstance(stripped, bool):
+        return default
     try:
-        result = float(_stripped(value))
-    except (ValueError, TypeError):
+        result = float(stripped)
+    except (ValueError, TypeError, OverflowError):
         return default
     #? Infinity remains opt-in controllable, while NaN stays rejected by default.
     if not allow_inf and math.isinf(result):

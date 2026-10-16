@@ -85,6 +85,24 @@ class TestBaseStrEnum(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.EnumClass.from_fuzzy_string("purple")
 
+    def test_from_fuzzy_string_rejects_non_string(self):
+        with self.assertRaises(TypeError):
+            self.EnumClass.from_fuzzy_string(["red"])  # type: ignore[arg-type]
+
+    def test_from_fuzzy_string_uppercase_and_separator_aliases(self):
+        class UpperAliasColor(BaseStrEnum):
+            __ALIASES__ = {"DARK-SHADE": "dark_blue"}
+            DARK_BLUE = "dark_blue"
+
+        self.assertEqual(
+            UpperAliasColor.from_fuzzy_string("dark-shade"),
+            UpperAliasColor.DARK_BLUE,
+        )
+        self.assertEqual(
+            UpperAliasColor.from_fuzzy_string("dark_shade"),
+            UpperAliasColor.DARK_BLUE,
+        )
+
 
 class TestOptionalBaseStrEnum(unittest.TestCase):
     def test_none_handling_get_or_none(self):
@@ -115,9 +133,10 @@ class TestBaseIntEnum(unittest.TestCase):
     def setUp(self):
         class ErrorCode(BaseIntEnum):
             #? _ignore_ = ["ALIASES"]
-            __ALIASES__ = {"missing": 404, "ok": 200}
+            __ALIASES__ = {"missing": 404, "ok": 200, "NOT-HERE": 404}
             OK = 200
             NOT_FOUND = 404
+            ONE = 1
 
         self.EnumClass = ErrorCode
 
@@ -130,6 +149,9 @@ class TestBaseIntEnum(unittest.TestCase):
             self.EnumClass.from_fuzzy_int_string("missing"), self.EnumClass.NOT_FOUND
         )
         self.assertEqual(self.EnumClass.from_fuzzy_int_string("ok"), self.EnumClass.OK)
+        self.assertEqual(
+            self.EnumClass.from_fuzzy_int_string("not_here"), self.EnumClass.NOT_FOUND
+        )
 
     def test_from_fuzzy_int_string_name_match(self):
         self.assertEqual(
@@ -137,6 +159,12 @@ class TestBaseIntEnum(unittest.TestCase):
         )
         self.assertEqual(
             self.EnumClass.from_fuzzy_int_string("not_found"), self.EnumClass.NOT_FOUND
+        )
+        self.assertEqual(
+            self.EnumClass.from_fuzzy_int_string("not-found"), self.EnumClass.NOT_FOUND
+        )
+        self.assertEqual(
+            self.EnumClass.from_fuzzy_int_string("not found"), self.EnumClass.NOT_FOUND
         )
 
     def test_from_fuzzy_int_string_int_string_conversion(self):
@@ -150,6 +178,8 @@ class TestBaseIntEnum(unittest.TestCase):
             self.EnumClass.from_fuzzy_int_string("500")
         with self.assertRaises(ValueError):
             self.EnumClass.from_fuzzy_int_string("bad_request")
+        with self.assertRaises(TypeError):
+            self.EnumClass.from_fuzzy_int_string(["200"])  # type: ignore[arg-type]
 
     def test_get_or_none_exact_match(self):
         self.assertEqual(self.EnumClass.get_or_none(200), self.EnumClass.OK)
@@ -165,6 +195,8 @@ class TestBaseIntEnum(unittest.TestCase):
         self.assertIsNone(self.EnumClass.get_or_none(500))
         self.assertIsNone(self.EnumClass.get_or_none("unknown_error"))
         self.assertIsNone(self.EnumClass.get_or_none(None))
+        self.assertIsNone(self.EnumClass.get_or_none(True))
+        self.assertIsNone(self.EnumClass.get_or_none(False))
 
 
 if __name__ == "__main__":

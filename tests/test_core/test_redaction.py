@@ -60,12 +60,18 @@ class TestRedact(unittest.TestCase):
             redact("secret", show_chars=-1)
         with self.assertRaises(ValueError):
             redact_dict({"password": "secret"}, show_chars=-1)
+        with self.assertRaises(ValueError):
+            redact_dict({"non_secret": 123}, show_chars=-1)
 
     def test_show_chars_requires_integer_not_bool(self):
         with self.assertRaises(ValueError):
             redact("secret", show_chars=True)
         with self.assertRaises(ValueError):
             redact_dict({"password": "secret"}, show_chars=True)
+        with self.assertRaises(ValueError):
+            redact_dict({"non_secret": 123}, show_chars=True)
+        with self.assertRaises(ValueError):
+            redact_dict({"non_secret": 123}, show_chars=1.5)
 
     def test_show_chars_one(self):
         """``show_chars=1`` exposes a single character at each end."""
