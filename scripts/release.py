@@ -6,6 +6,10 @@ for release metadata checks and release preparation; GitHub Actions only calls
 into it and does not contain independent versioning logic.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import argparse
@@ -89,7 +93,9 @@ class SemVer:
     patch: int
 
     @classmethod
-    def parse(cls, value: str) -> SemVer:
+    def parse(cls,
+        value: str,
+    ) -> SemVer:
         match = SEMVER_RE.fullmatch(value.strip())
         if match is None:
             raise ReleaseError(
@@ -126,7 +132,9 @@ class CheckResult:
 class ReleaseRepo:
     """Release operations rooted at one repository checkout."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self,
+        root: Path,
+    ) -> None:
         self.root = root.resolve()
         self.pyproject = self.root / "pyproject.toml"
         self.changelog = self.root / "CHANGELOG.md"
@@ -180,7 +188,9 @@ class ReleaseRepo:
         return fragments
 
     @staticmethod
-    def required_bump(fragments: Iterable[Fragment]) -> str:
+    def required_bump(
+        fragments: Iterable[Fragment],
+    ) -> str:
         required = "none"
         for fragment in fragments:
             candidate = CATEGORY_BUMP[fragment.category]
@@ -189,7 +199,11 @@ class ReleaseRepo:
         return required
 
     @staticmethod
-    def target_satisfies(current: SemVer, target: SemVer, bump: str) -> bool:
+    def target_satisfies(
+        current: SemVer,
+        target: SemVer,
+        bump: str,
+    ) -> bool:
         if target <= current:
             return False
         if bump == "major":
@@ -203,7 +217,10 @@ class ReleaseRepo:
         return target > current
 
     @staticmethod
-    def minimum_target(current: SemVer, bump: str) -> SemVer:
+    def minimum_target(
+        current: SemVer,
+        bump: str,
+    ) -> SemVer:
         if bump == "major":
             return SemVer(current.major + 1, 0, 0)
         if bump == "minor":
@@ -402,14 +419,18 @@ class ReleaseRepo:
         return 1
 
     @staticmethod
-    def _render_fragment_text(text: str) -> str:
+    def _render_fragment_text(
+        text: str,
+    ) -> str:
         stripped = text.strip()
         if stripped.startswith("- "):
             return stripped
         lines = stripped.splitlines()
         return "- " + lines[0] + "".join(f"\n  {line}" for line in lines[1:])
 
-    def _render_release_sections(self, fragments: list[Fragment]) -> str:
+    def _render_release_sections(self,
+        fragments: list[Fragment],
+    ) -> str:
         grouped: dict[str, list[Fragment]] = defaultdict(list)
         for fragment in fragments:
             grouped[fragment.category].append(fragment)
@@ -433,7 +454,9 @@ class ReleaseRepo:
             )
         return "\n\n".join(parts)
 
-    def _updated_pyproject(self, target: SemVer) -> str:
+    def _updated_pyproject(self,
+        target: SemVer,
+    ) -> str:
         text = self.pyproject.read_text(encoding="utf-8")
         project_match = re.search(r"^\[project\]\s*$", text, re.MULTILINE)
         if project_match is None:
@@ -459,8 +482,7 @@ class ReleaseRepo:
             raise ReleaseError("could not replace [project].version")
         return text[: project_match.end()] + replaced + text[end:]
 
-    def _updated_changelog(
-        self,
+    def _updated_changelog(self,
         target: SemVer,
         fragments: list[Fragment],
         release_date: dt.date,
@@ -485,12 +507,19 @@ class ReleaseRepo:
         return text[: match.start()] + replacement + text[match.end() :]
 
     @staticmethod
-    def _atomic_write(path: Path, text: str) -> None:
+    def _atomic_write(
+        path: Path,
+        text: str,
+    ) -> None:
         tmp = path.with_name(path.name + ".release-tmp")
         tmp.write_text(text, encoding="utf-8")
         tmp.replace(path)
 
-    def prepare(self, target_text: str = "auto", *, dry_run: bool = False) -> int:
+    def prepare(self,
+        target_text: str = "auto",
+        *,
+        dry_run: bool = False,
+    ) -> int:
         result = self.check()
         if not result.ok:
             for error in result.errors:
@@ -589,7 +618,9 @@ class ReleaseRepo:
         print(sections)
         return 0
 
-    def notes(self, version_text: str | None = None) -> int:
+    def notes(self,
+        version_text: str | None = None,
+    ) -> int:
         if version_text is None:
             target = self.current_version()
         else:
@@ -619,8 +650,7 @@ class ReleaseRepo:
         print(notes_text)
         return 0
 
-    def new_fragment(
-        self,
+    def new_fragment(self,
         category: str,
         message: str,
         identifier: str | None = None,
@@ -661,7 +691,9 @@ class ReleaseRepo:
         print(f"Created fragment: {path.relative_to(self.root)}")
         return 0
 
-    def tag_release(self, create: bool = False) -> int:
+    def tag_release(self,
+        create: bool = False,
+    ) -> int:
         current = self.current_version()
         tag_name = f"v{current}"
 
@@ -806,7 +838,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+) -> int:
     args = build_parser().parse_args(argv)
     repo = ReleaseRepo(Path(__file__).resolve().parent.parent)
     try:

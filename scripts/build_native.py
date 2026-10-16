@@ -5,6 +5,10 @@ Compiles native/src/_accel.c into src/gunz_utils/_accel<ext_suffix>.
 Uses clang/gcc on POSIX and cl.exe on Windows with zero third-party dependencies.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import argparse
@@ -51,7 +55,12 @@ def _windows_command(
     ]
 
 
-def _run_build(cmd: list[str], output: Path, *, cwd: Path | None = None) -> int:
+def _run_build(
+    cmd: list[str],
+    output: Path,
+    *,
+    cwd: Path | None = None,
+) -> int:
     print(f"Compiling native extension: {' '.join(cmd)}")
     try:
         res = subprocess.run(cmd, check=False, cwd=cwd)
@@ -71,7 +80,9 @@ def _run_build(cmd: list[str], output: Path, *, cwd: Path | None = None) -> int:
     return res.returncode
 
 
-def build(output_dir: Path | None = None) -> int:
+def build(
+    output_dir: Path | None = None,
+) -> int:
     """Compile optional acceleration, optionally into an isolated package copy."""
     root = Path(__file__).resolve().parent.parent
     c_src = root / "native" / "src" / "_accel.c"
@@ -87,8 +98,8 @@ def build(output_dir: Path | None = None) -> int:
     py_inc = sysconfig.get_paths()["include"]
 
     if sys.platform == "win32":
-        # A venv uses the base interpreter's import library. Keep every MSVC
-        # intermediate in scratch, including defaults created in its cwd.
+        #? A venv uses the base interpreter's import library. Keep every MSVC
+        #? intermediate in scratch, including defaults created in its cwd.
         debug = bool(sysconfig.get_config_var("Py_DEBUG")) or hasattr(
             sys, "gettotalrefcount"
         )

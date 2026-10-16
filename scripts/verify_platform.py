@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Capture real local platform evidence; Linux is preparation only."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import argparse
@@ -68,7 +72,9 @@ def host_name() -> str:
     )
 
 
-def fingerprint(root: Path) -> dict[str, Any]:
+def fingerprint(
+    root: Path,
+) -> dict[str, Any]:
     """Hash runtime/build/proof inputs, including dirty source and local binaries."""
     files: set[Path] = {root / "pyproject.toml"}
     for folder in ("src", "native", "scripts", "tests"):
@@ -97,7 +103,9 @@ def fingerprint(root: Path) -> dict[str, Any]:
     return {"algorithm": "sha256", "value": digest.hexdigest(), "files": len(files)}
 
 
-def _terminate(process: subprocess.Popen[bytes]) -> dict[str, Any]:
+def _terminate(
+    process: subprocess.Popen[bytes],
+) -> dict[str, Any]:
     """Bound cleanup and retain native process-tree strategy evidence."""
     result: dict[str, Any] = {
         "strategy": "process-group" if os.name == "posix" else "tree"
@@ -191,7 +199,9 @@ def run_command(
     return result
 
 
-def junit_evidence(path: Path) -> dict[str, Any]:
+def junit_evidence(
+    path: Path,
+) -> dict[str, Any]:
     """Record each actual skip/failure; malformed or absent reports cannot pass."""
     if not path.is_file():
         return {"valid": False, "error": "missing_junit"}
@@ -270,7 +280,12 @@ def junit_evidence(path: Path) -> dict[str, Any]:
     }
 
 
-def attach_test_evidence(result: dict[str, Any], path: Path, *, mode: str) -> None:
+def attach_test_evidence(
+    result: dict[str, Any],
+    path: Path,
+    *,
+    mode: str,
+) -> None:
     """Only exact native-only forced-fallback skips are expected coverage exclusions."""
     evidence = junit_evidence(path)
     result["pytest"] = evidence
@@ -331,7 +346,10 @@ print(json.dumps({'system': platform.system(), 'release': platform.release(),
 
 
 def validate_identity(
-    identity: dict[str, Any], *, root: Path, system: str
+    identity: dict[str, Any],
+    *,
+    root: Path,
+    system: str,
 ) -> list[str]:
     """Refuse wrong kernel, old Python, or installed-package source shadowing."""
     errors: list[str] = []
@@ -357,7 +375,9 @@ def validate_identity(
     return errors
 
 
-def verification_environment(root: Path) -> dict[str, str]:
+def verification_environment(
+    root: Path,
+) -> dict[str, str]:
     """Use checkout/configured checks without inherited pytest selection plugins."""
     env = dict(os.environ)
     env["PYTHONPATH"] = str(root / "src")
@@ -367,7 +387,9 @@ def verification_environment(root: Path) -> dict[str, str]:
     return env
 
 
-def missing_versions(entries: list[dict[str, Any]]) -> list[str]:
+def missing_versions(
+    entries: list[dict[str, Any]],
+) -> list[str]:
     """Native acceptance requires actual verified Python 3.11 and 3.12."""
     observed = {
         tuple(entry["identity"]["version"][:2])
@@ -416,7 +438,7 @@ def verify(
         report.update(
             status="refused", reason="requested platform differs from actual host"
         )
-    # Standalone executable must diagnose unsupported launchers explicitly.
+    #? Standalone executable must diagnose unsupported launchers explicitly.
     elif sys.version_info < (3, 11):  # noqa: UP036
         report.update(status="refused", reason="launcher requires Python >= 3.11")
     else:

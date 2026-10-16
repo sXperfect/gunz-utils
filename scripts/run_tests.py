@@ -6,6 +6,10 @@ ambient Python 3.11+ environment without requiring pytest or third-party tools.
 Supports both unittest.TestCase subclasses and standalone test_* functions.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import argparse
@@ -82,11 +86,11 @@ def load_test_suite(
             sys.modules[module_name] = module
             spec.loader.exec_module(module)
         except (ImportError, ModuleNotFoundError):
-            # Optional third-party dependency missing in current environment
+            #? Optional third-party dependency missing in current environment
             skipped_modules += 1
             continue
         except Exception as exc:
-            # Fatal error during module import
+            #? Fatal error during module import
             print(f"Warning: could not import {py_file}: {exc}", file=sys.stderr)
             skipped_modules += 1
             continue
@@ -110,8 +114,8 @@ def load_test_suite(
                 try:
                     sig = inspect.signature(obj)
                     if len(sig.parameters) > 0:
-                        # Skip functions requiring pytest fixtures
-                        # (monkeypatch, capsys, etc.)
+                        #? Skip functions requiring pytest fixtures
+                        #? (monkeypatch, capsys, etc.)
                         continue
                 except Exception:
                     continue
@@ -127,15 +131,17 @@ def load_test_suite(
     return suite, skipped_modules
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+) -> int:
     """Discover and execute tests with pure Python unittest."""
     args = build_parser().parse_args(argv)
 
-    # Ensure worktree src/ and tests/ are on sys.path
+    #? Ensure worktree src/ and tests/ are on sys.path
     if str(SRC_DIR) not in sys.path:
-        sys.path.insert(0, str(SRC_DIR))
+        sys.path.insert(0, str(SRC_DIR))  # gunz-style: ignore[GS007]
     if str(TESTS_DIR) not in sys.path:
-        sys.path.insert(1, str(TESTS_DIR))
+        sys.path.insert(1, str(TESTS_DIR))  # gunz-style: ignore[GS007]
 
     suite, skipped = load_test_suite(
         args.start_dir,
