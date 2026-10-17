@@ -18,11 +18,12 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, BinaryIO, Literal, cast
+from typing import BinaryIO, Literal, cast
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
+from .fs import advisory_file_lock
 from .hashing import DEFAULT_ALGO, SUPPORTED_ALGOS
 from .streaming import copy_and_hash
 
@@ -42,61 +43,11 @@ _CONTENT_ID_ALGOS = frozenset({"sha256", "sha512", "sha3_256", "blake2b", "blake
 def _publication_lock(
     path: Path,
 ) -> Iterator[None]:
-    """Serialize cooperating publishers through a symlink-safe file lock.
-
-    Parameters
-    ----------
-    path : Path
-        path parameter.
-
-    Returns
-    -------
-    Iterator[None]
-        The result of the operation.
-    """
+    """Serialize cooperating publishers through a symlink-safe file lock."""
     if path.is_symlink():
         raise ValueError("content-addressed publication lock must not be a symlink")
-    flags = os.O_CREAT | os.O_RDWR
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = os.open(path, flags, 0o600)
-    try:
-        descriptor_info = os.fstat(descriptor)
-        path_info = os.stat(path, follow_symlinks=False)
-        if (
-            not stat.S_ISREG(descriptor_info.st_mode)
-            or not stat.S_ISREG(path_info.st_mode)
-            or not os.path.samestat(descriptor_info, path_info)
-        ):
-            raise ValueError(
-                "content-addressed publication lock must be a regular file"
-            )
-
-        if os.name == "nt":
-            import msvcrt
-
-            windows_runtime = cast(Any, msvcrt)
-            if descriptor_info.st_size == 0:
-                os.write(descriptor, b"\0")
-            os.lseek(descriptor, 0, os.SEEK_SET)
-            windows_runtime.locking(descriptor, windows_runtime.LK_LOCK, 1)
-            try:
-                yield
-            finally:
-                os.lseek(descriptor, 0, os.SEEK_SET)
-                windows_runtime.locking(descriptor, windows_runtime.LK_UNLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(descriptor, fcntl.LOCK_UN)
-    finally:
-        os.close(descriptor)
+    with advisory_file_lock(path):
+        yield
 
 
 @dataclass(frozen=True)

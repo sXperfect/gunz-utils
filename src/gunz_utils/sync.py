@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import math
-import os
 import re
 import shutil
 from collections.abc import Iterator, Sequence
@@ -18,6 +17,7 @@ from pathlib import Path
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
+from .fs import advisory_file_lock
 from .io import atomic_write
 from .subprocess import CommandResult, run_command
 
@@ -157,44 +157,9 @@ def _normalize_rsync_source(
 def _advisory_lock(
     path: Path,
 ) -> Iterator[None]:
-    """Hold a POSIX advisory lock for the complete guarded operation.
-
-    Parameters
-    ----------
-    path : Path
-        path parameter.
-
-    Returns
-    -------
-    Iterator[None]
-        The result of the operation.
-    """
-    try:
-        import fcntl
-    except ImportError as exc:
-        raise RuntimeError(
-            "lock=True requires POSIX fcntl support; use lock=False "
-            "on unsupported platforms"
-        ) from exc
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.is_symlink():
-        raise ValueError("lock path must not be a symlink")
-
-    flags = os.O_CREAT | os.O_RDWR
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = os.open(
-        path,
-        flags,
-        0o600,
-    )
-    with os.fdopen(descriptor, "a+b") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    """Hold a POSIX advisory lock for the complete guarded operation."""
+    with advisory_file_lock(path):
+        yield
 
 
 def rsync_mirror(
