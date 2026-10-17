@@ -1,0 +1,1 @@
+Add native C statistical acceleration (`stats.summarize`, `stats.RunningStats.extend`), $O(N \log N)$ 2D Pareto frontier sweep (`stats.pareto_frontier`), stat-based directory tree fingerprinting (`fs.tree_fingerprint`), and harden directory walking against symlink loops (`fs.walk_files`) and file readers against unbounded payloads (`io.read_file_snapshot`).

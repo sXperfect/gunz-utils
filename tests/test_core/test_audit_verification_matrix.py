@@ -122,6 +122,9 @@ def test_native_activation_cannot_report_fallback_as_native(
     (package / "__init__.py").write_text("")
     (package / "binary.py").write_text("_accel_encode = None\n_accel_decode = None\n")
     (package / "serialization.py").write_text("_accel_is_json_clean = None\n")
+    (package / "stats.py").write_text(
+        "_accel_fast_summary = None\n_accel_update_running_stats = None\n"
+    )
     env = dict(os.environ, PYTHONPATH=str(tmp_path))
     result = subprocess.run(
         [sys.executable, "-c", native.activation_code(tmp_path, native=True)],

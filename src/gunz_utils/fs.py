@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import errno
 import fnmatch
+import hashlib
 import math
 import os
 import shutil
@@ -463,6 +464,7 @@ def walk_files(
     exclude: Iterable[str] = (),
     extensions: Iterable[str] = (),
     follow_symlinks: bool = False,
+    max_depth: int | None = None,
 ) -> Iterator[Path]:
     """Deterministically walk directory tree, pruning excluded subtrees early.
 
@@ -481,12 +483,17 @@ def walk_files(
         with matching extensions are yielded.
     follow_symlinks : bool, default=False
         Whether to follow directory symlinks. Default False prevents symlink loops.
+    max_depth : int | None, default=None
+        Maximum directory descent depth relative to root. None imposes no bound.
 
     Yields
     ------
     Path
         Matching regular file paths in deterministic sorted order.
     """
+    if max_depth is not None and (type(max_depth) is not int or max_depth < 0):
+        raise ValueError("max_depth must be a non-negative integer or None")
+
     base = Path(root).resolve()
     if not base.is_dir():
         raise NotADirectoryError(f"root is not a directory: {base}")
@@ -498,23 +505,45 @@ def walk_files(
         for ext in extensions
     )
 
+    visited_dirs: set[tuple[int, int]] = set()
+
     for current_dir, dir_names, file_names in os.walk(
         base, topdown=True, followlinks=follow_symlinks
     ):
+        #? Guard against symlink recursion cycles
+        if follow_symlinks:
+            try:
+                cstat = os.stat(current_dir)
+                ckey = (cstat.st_dev, cstat.st_ino)
+                if ckey in visited_dirs:
+                    dir_names.clear()
+                    continue
+                visited_dirs.add(ckey)
+            except OSError:
+                dir_names.clear()
+                continue
+
+        #? Enforce max_depth bound
+        curr_path = Path(current_dir)
+        rel_current = curr_path.relative_to(base)
+        current_depth = len(rel_current.parts)
+        if max_depth is not None and current_depth >= max_depth:
+            dir_names.clear()
+
         dir_names.sort()
         for d in list(dir_names):
-            rel_dir = (Path(current_dir) / d).relative_to(base)
+            rel_dir = rel_current / d if current_depth > 0 else Path(d)
             if exc_patterns and matches_any_glob(rel_dir, exc_patterns):
                 dir_names.remove(d)
 
         file_names.sort()
         for f in file_names:
-            file_path = Path(current_dir) / f
+            file_path = curr_path / f
             if not follow_symlinks and file_path.is_symlink():
                 continue
             if not file_path.is_file():
                 continue
-            rel_file = file_path.relative_to(base)
+            rel_file = rel_current / f if current_depth > 0 else Path(f)
             if ext_set and not any(f.lower().endswith(ext) for ext in ext_set):
                 continue
             if exc_patterns and matches_any_glob(rel_file, exc_patterns):
@@ -522,6 +551,55 @@ def walk_files(
             if inc_patterns and not matches_any_glob(rel_file, inc_patterns):
                 continue
             yield file_path
+
+
+def tree_fingerprint(
+    root: str | Path,
+    *,
+    exclude: Iterable[str] = (),
+    extensions: Iterable[str] = (),
+    algorithm: str = "sha256",
+) -> str:
+    """Compute a deterministic hash fingerprint of a directory tree.
+
+    Fingerprints relative POSIX paths, file sizes, and nanosecond modification
+    timestamps without reading entire file bodies. Suitable for instantaneous
+    cache invalidation across builds, lints, or benchmarks.
+
+    Parameters
+    ----------
+    root : str | Path
+        Root directory to fingerprint.
+    exclude : Iterable[str], default=()
+        Glob patterns for files or subdirectories to omit.
+    extensions : Iterable[str], default=()
+        Filter for specific file extensions (e.g. ('.py',)).
+    algorithm : str, default='sha256'
+        Hash algorithm name accepted by hashlib.new.
+
+    Returns
+    -------
+    str
+        Hexadecimal digest string representing directory contents.
+    """
+    base = Path(root).resolve()
+    hasher = hashlib.new(algorithm)
+    for file_path in walk_files(
+        base,
+        exclude=exclude,
+        extensions=extensions,
+        follow_symlinks=False,
+    ):
+        rel_posix = file_path.relative_to(base).as_posix()
+        try:
+            st = file_path.stat()
+        except OSError:
+            continue
+        hasher.update(rel_posix.encode("utf-8"))
+        hasher.update(b"\x00")
+        hasher.update(st.st_size.to_bytes(8, "big", signed=False))
+        hasher.update(st.st_mtime_ns.to_bytes(8, "big", signed=False))
+    return hasher.hexdigest()
 
 
 __all__ = [
@@ -532,5 +610,6 @@ __all__ = [
     "match_path_glob",
     "matches_any_glob",
     "transactional_directory",
+    "tree_fingerprint",
     "walk_files",
 ]

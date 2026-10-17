@@ -21,6 +21,8 @@ TESTS = (
     "tests/test_core/test_serialization.py",
     "tests/test_core/test_audit_native_safety_regressions.py",
     "tests/test_core/test_parser_native_resource_audit.py",
+    "tests/test_core/test_stats.py",
+    "tests/test_core/test_v1_17_capabilities.py",
 )
 
 
@@ -32,12 +34,13 @@ def activation_code(
     """Return an independent import/dispatch check run before the proof suite."""
     return (
         "from pathlib import Path\n"
-        "from gunz_utils import binary, serialization\n"
+        "from gunz_utils import binary, serialization, stats\n"
         f"source = Path({str(source)!r}).resolve()\n"
         "if not Path(binary.__file__).resolve().is_relative_to(source):\n"
         "    raise SystemExit('native verification imported outside isolated source')\n"
         "hooks = (binary._accel_encode, binary._accel_decode, "
-        "serialization._accel_is_json_clean)\n"
+        "serialization._accel_is_json_clean, stats._accel_fast_summary, "
+        "stats._accel_update_running_stats)\n"
         f"native = {native!r}\n"
         "if native and not all(hook is not None for hook in hooks):\n"
         "    raise SystemExit('native activation required; fallback is not proof')\n"

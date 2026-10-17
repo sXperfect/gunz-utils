@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.abc
 import importlib.machinery
 import importlib.util
+import stat
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -201,11 +202,14 @@ def load_module_from_path(
     ImportError
         If module spec creation fails.
     """
-    target = Path(path).resolve()
+    raw_path = Path(path)
+    if raw_path.is_symlink():
+        raise ValueError("module file must not be a symbolic link")
+    target = raw_path.resolve()
     if not target.is_file():
         raise FileNotFoundError(f"Python source file not found: {target}")
-    if target.is_symlink():
-        raise ValueError("module file must not be a symbolic link")
+    if not stat.S_ISREG(target.stat().st_mode):
+        raise ValueError(f"module file must be a regular file: {target}")
 
     install_file_module_finder()
     module_name = make_file_module_name(target, prefix=prefix)

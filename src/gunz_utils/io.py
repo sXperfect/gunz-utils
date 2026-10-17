@@ -413,6 +413,9 @@ def read_file_snapshot(
         Immutable snapshot carrying raw bytes, decoded text, and stat signature.
     """
     target = pathlib.Path(path)
+    if max_bytes is not None and (type(max_bytes) is not int or max_bytes <= 0):
+        raise ValueError("max_bytes must be a positive integer or None")
+
     if max_bytes is not None:
         raw = read_regular_bytes(target, max_bytes=max_bytes)
         st = target.lstat()

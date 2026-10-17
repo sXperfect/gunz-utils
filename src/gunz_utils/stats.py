@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import importlib
 import math
 import random
 from collections import Counter
@@ -15,6 +16,18 @@ from fractions import Fraction
 from numbers import Real
 from statistics import fmean, median, pstdev, pvariance, stdev
 from typing import Any, TypeVar
+
+try:
+    _accel = importlib.import_module("._accel", package=__package__)
+    _accel_update_running_stats: Callable[
+        ..., tuple[int, float, float, float, float, float]
+    ] | None = getattr(_accel, "update_running_stats", None)
+    _accel_fast_summary: Callable[..., dict[str, Any]] | None = getattr(
+        _accel, "fast_summary", None
+    )
+except (ImportError, AttributeError):  # pragma: no cover
+    _accel_update_running_stats = None
+    _accel_fast_summary = None
 
 T = TypeVar("T")
 
@@ -523,6 +536,29 @@ def summarize(
         if not math.isfinite(q) or not 0.0 <= q <= 1.0:
             raise ValueError("percentile q must be finite and between 0 and 1")
 
+    if _accel_fast_summary is not None and isinstance(values, (list, tuple)):
+        try:
+            raw_summary = _accel_fast_summary(
+                values, requested, outlier_threshold
+            )
+            return SummaryStats(
+                count=raw_summary["count"],
+                minimum=raw_summary["minimum"],
+                maximum=raw_summary["maximum"],
+                mean=raw_summary["mean"],
+                median=raw_summary["median"],
+                variance=raw_summary["variance"],
+                stdev=raw_summary["stdev"],
+                coefficient_of_variation=raw_summary[
+                    "coefficient_of_variation"
+                ],
+                mad=raw_summary["mad"],
+                percentiles=raw_summary["percentiles"],
+                outlier_indices=raw_summary["outlier_indices"],
+            )
+        except (TypeError, ValueError):
+            raise
+
     data = _finite_values(values, name="samples")
     ordered = sorted(data)
     med = median(ordered)
@@ -623,6 +659,29 @@ class RunningStats:
         values: Iterable[float],
     ) -> None:
         """Add multiple sample values."""
+        if _accel_update_running_stats is not None and isinstance(
+            values, (list, tuple)
+        ):
+            try:
+                (
+                    self._count,
+                    self._mean,
+                    self._m2,
+                    self._min,
+                    self._max,
+                    self._total,
+                ) = _accel_update_running_stats(
+                    self._count,
+                    self._mean,
+                    self._m2,
+                    self._min,
+                    self._max,
+                    self._total,
+                    values,
+                )
+                return
+            except (TypeError, ValueError):
+                raise
         for value in values:
             self.update(value)
 
@@ -774,7 +833,11 @@ def pareto_frontier(
     key: Callable[[T], Sequence[float]],
     objectives: Sequence[ParetoObjective],
 ) -> list[T]:
-    """Compute the Pareto-optimal (non-dominated) subset of items."""
+    """Compute the Pareto-optimal (non-dominated) subset of items.
+
+    Uses an O(N log N) lexicographical sweep for 2D objectives, and
+    sorted-frontier early pruning for higher dimensions.
+    """
     item_list = list(items)
     if not item_list:
         return []
@@ -789,19 +852,79 @@ def pareto_frontier(
         if not all(math.isfinite(v) for v in pt):
             raise ValueError("all objective values must be finite")
 
-    frontier: list[T] = []
-    for idx_a, item_a in enumerate(item_list):
-        pt_a = points[idx_a]
+    num_dims = len(obj_tuple)
+    #? Orient coordinates so lower is always better
+    norm_points = [
+        tuple(
+            val if obj.lower_is_better else -val
+            for val, obj in zip(pt, obj_tuple, strict=True)
+        )
+        for pt in points
+    ]
+
+    #? Special case 1D: all points matching global minimum are non-dominated
+    if num_dims == 1:
+        min_val = min(p[0] for p in norm_points)
+        return [
+            item
+            for item, p in zip(item_list, norm_points, strict=True)
+            if math.isclose(p[0], min_val, abs_tol=1e-15)
+        ]
+
+    #? Special case 2D: O(N log N) sorting + monotone sweep
+    if num_dims == 2:
+        sorted_indices = sorted(
+            range(len(item_list)),
+            key=lambda i: (norm_points[i][0], norm_points[i][1]),
+        )
+        frontier_indices: list[int] = []
+        min_y = float("inf")
+        idx = 0
+        n_items = len(sorted_indices)
+        while idx < n_items:
+            curr_x = norm_points[sorted_indices[idx]][0]
+            group: list[int] = []
+            while idx < n_items and math.isclose(
+                norm_points[sorted_indices[idx]][0], curr_x, abs_tol=1e-15
+            ):
+                group.append(sorted_indices[idx])
+                idx += 1
+
+            group_min_y = min(norm_points[i][1] for i in group)
+            if group_min_y < min_y:
+                for i in group:
+                    if math.isclose(
+                        norm_points[i][1], group_min_y, abs_tol=1e-15
+                    ):
+                        frontier_indices.append(i)
+                min_y = group_min_y
+        frontier_set = set(frontier_indices)
+        return [item for i, item in enumerate(item_list) if i in frontier_set]
+
+    #? General D >= 3: Sort by coordinates and prune against non-dominated set
+    sorted_indices = sorted(range(len(item_list)), key=lambda i: norm_points[i])
+    frontier_indices = []
+    for cand_idx in sorted_indices:
+        cand_pt = norm_points[cand_idx]
         is_dominated = False
-        for idx_b in range(len(item_list)):
-            if idx_a == idx_b:
-                continue
-            if pareto_dominates(points[idx_b], pt_a, obj_tuple):
+        for f_idx in frontier_indices:
+            f_pt = norm_points[f_idx]
+            all_le = True
+            strictly_less = False
+            for d in range(num_dims):
+                if f_pt[d] > cand_pt[d]:
+                    all_le = False
+                    break
+                if f_pt[d] < cand_pt[d]:
+                    strictly_less = True
+            if all_le and strictly_less:
                 is_dominated = True
                 break
         if not is_dominated:
-            frontier.append(item_a)
-    return frontier
+            frontier_indices.append(cand_idx)
+
+    frontier_set = set(frontier_indices)
+    return [item for i, item in enumerate(item_list) if i in frontier_set]
 
 
 @dataclass(frozen=True)
