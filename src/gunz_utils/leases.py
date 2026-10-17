@@ -97,8 +97,7 @@ async def _heartbeat_loop(
     #? Heartbeat loop runs until the task is cancelled or ``_renew_once``
     #? raises ``LeaseLostError`` when ownership is lost, so it is not a
     #? non-terminating loop.
-    # gunz-style: ignore[GS033]
-    while True:
+    while True:  # gunz-style: ignore[GS033]
         await asyncio.sleep(interval)
         await _renew_once(renew)
 

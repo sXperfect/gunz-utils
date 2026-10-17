@@ -34,7 +34,7 @@ DEFAULT_MAX_INPUT_LENGTH = 1024  #? Security: Prevent DoS via long strings
 
 # ? Backward-compat alias for the module-level constant. New code should
 # ? reference `cls.DEFAULT_MAX_INPUT_LENGTH` (the class attribute).
-_MAX_INPUT_LENGTH = DEFAULT_MAX_INPUT_LENGTH
+_MAX_INPUT_LENGTH = DEFAULT_MAX_INPUT_LENGTH  # gunz-style: ignore[GS057]
 
 # ? mypy cannot see StrEnum ``ClassVar`` attributes as their declared type
 # ? (it resolves ``cls.<attr>`` to the enum member type instead), and ruff's

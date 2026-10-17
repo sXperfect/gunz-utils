@@ -568,13 +568,17 @@ class SecureStore:
     @classmethod
     def _read_private(cls,
         path: Path,
+        *,
+        max_bytes: int = 4096,
     ) -> bytes:
-        """Read key material through the descriptor that was type-checked.
+        """Read key material through descriptor with size bounds.
 
         Parameters
         ----------
         path : Path
             path parameter.
+        max_bytes : int
+            Maximum number of bytes to read before rejecting.
 
         Returns
         -------
@@ -593,13 +597,24 @@ class SecureStore:
             info = os.fstat(descriptor)
             if not stat.S_ISREG(info.st_mode):
                 raise ValueError(f"private path must be a regular file: {path.name}")
+            if info.st_size > max_bytes:
+                raise ValueError(
+                    f"private file exceeds maximum size limit of {max_bytes} bytes: "
+                    f"{path.name}"
+                )
             if os.name == "posix":
                 if info.st_uid != os.getuid():
                     raise PermissionError(f"private file has wrong owner: {path.name}")
                 os.fchmod(descriptor, _KEY_FILE_MODE)
             with os.fdopen(descriptor, "rb") as handle:
                 descriptor = -1
-                return handle.read()
+                content = handle.read(max_bytes + 1)
+                if len(content) > max_bytes:
+                    raise ValueError(
+                        f"private file exceeds maximum size limit of {max_bytes} "
+                        f"bytes: {path.name}"
+                    )
+                return content
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
@@ -1030,7 +1045,7 @@ class SecureStore:
                     existing = [self._master_key_path]
 
                 for path in existing:
-                    key = self._read_private(path).strip()
+                    key = self._read_private(path, max_bytes=4096).strip()
                     try:
                         candidate = Fernet(key)
                     except ValueError:
@@ -1058,7 +1073,11 @@ class SecureStore:
                     existing = [self._salt_path]
 
                 for path in existing:
-                    salt = self._read_private(path)
+                    salt = self._read_private(path, max_bytes=64)
+                    if len(salt) != 16:
+                        #? A damaged regular-file salt must not hide an independently
+                        #? authenticatable pending candidate. Unsafe reads still fail.
+                        continue
                     candidates.append(
                         (
                             Fernet(self._derive_key(passphrase, salt)),
@@ -1112,10 +1131,12 @@ class SecureStore:
         """
         if not isinstance(passphrase, str) or not passphrase:
             raise ValueError("passphrase must be a non-empty string")
+        if not isinstance(salt, (bytes, bytearray)) or len(salt) != 16:
+            raise ValueError("salt must be exactly 16 bytes")
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=salt,
+            salt=bytes(salt),
             iterations=_PBKDF2_ITERATIONS,
         )
         return base64.urlsafe_b64encode(kdf.derive(passphrase.encode()))

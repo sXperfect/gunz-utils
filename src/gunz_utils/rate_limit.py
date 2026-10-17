@@ -43,7 +43,9 @@ class AsyncRateLimiter:
             tokens = self.capacity
         return min(self.capacity, tokens)
 
-    async def try_acquire(self,
+    #? GS046 false positive: 'tokens' parameter is token-bucket capacity,
+    #? not an authentication credential or secret token.
+    async def try_acquire(self,  # gunz-style: ignore[GS046]
         tokens: float = 1.0,
     ) -> bool:
         """Consume tokens immediately when available without waiting.
@@ -66,7 +68,9 @@ class AsyncRateLimiter:
             self._tokens -= tokens
             return True
 
-    async def acquire(self,
+    #? GS046 false positive: 'tokens' parameter is token-bucket capacity,
+    #? not an authentication credential or secret token.
+    async def acquire(self,  # gunz-style: ignore[GS046]
         tokens: float = 1.0,
         *,
         timeout: float | None = None,

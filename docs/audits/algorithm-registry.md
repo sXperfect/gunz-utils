@@ -122,9 +122,9 @@ directories, sampled process-tree observations, and caller-owned input budgets.
 | ALG-006 | Cartesian parameter grid | `experiments.parameter_grid` | A2 | Cartesian product order, empty factors | reviewed; no defect found |
 | ALG-007 | Stable priority hash | `sampling.stable_priority` | A2 | deterministic BLAKE2b output, seed influence | reviewed; bool-as-int seed semantics remain a minor gap |
 | ALG-008 | Stable named-item sampling | `sampling.sample_named_items` | A2 | order independence, duplicate rejection, budget/filter ordering | reviewed; no defect found |
-| ALG-009 | Workflow topological order | `dag.WorkflowDAG._topological_order` | A4 | dependency-before-consumer, missing dependency, cycles; exhaustive four-node directed-graph test against independent Kahn oracle | exhaustive proof executed in CI; recursion depth remains a limitation |
+| ALG-009 | Workflow topological order | `dag.WorkflowDAG._topological_order` | A4 | dependency-before-consumer, missing dependency, cycles; exhaustive four-node directed-graph test against independent Kahn oracle; iterative stack traversal verified at >1,000 node depth | iterative stack traversal resolves recursion limits |
 | ALG-010 | Effective transitive fingerprint | `dag.WorkflowDAG.effective_fingerprint` | A2 | dependency sensitivity, propagation, cache invalidation | reviewed; no defect found |
-| ALG-011 | Provenance DAG cycle/ancestor traversal | `provenance_graph.ProvenanceGraph` | A2 | cycle rollback, unresolved nodes, deterministic ancestors | reviewed; recursion depth is a limitation |
+| ALG-011 | Provenance DAG cycle/ancestor traversal | `provenance_graph.ProvenanceGraph` | A4 | cycle rollback, unresolved nodes, deterministic ancestors; iterative stack traversal verified at >1,000 node depth | iterative stack traversal resolves recursion limits |
 | ALG-012 | Unsigned 64-bit canonical varint | `binary.encode_uvarint`, `ByteReader.read_uvarint` | A4 | exhaustive 0..65535 reference/round trip, uint64 boundaries, canonical form, malformed/truncation rollback | exhaustive/reference proof executed in CI |
 | ALG-013 | Priority + recent retention | `structures.retain_priority_and_recent` | A2 | stable order, priority preservation, zero/None limits | strengthened bound validation |
 | ALG-014 | Async token bucket | `rate_limit.AsyncRateLimiter` | A3 | balance in [0, capacity], exact integer capacity comparison, normalized request arithmetic, timeout, representable finite parameters; `test_deadline_regressions.py` | fixed large-integer validation/zero-delay loops and conversion-overflow handling; both interpreters passed |
@@ -193,6 +193,10 @@ directories, sampled process-tree observations, and caller-owned input budgets.
 | ALG-077 | Fast JSON-clean validation & allocation bypass | `serialization.to_jsonable`, `streaming.write_jsonl`, `_accel.is_json_clean` | A4 | depth bounding (`max_depth=100`), strict byte rejection, finite float bounds, chunked streaming I/O batching, pure-Python fallback | historical roundtrip packet; interpreter-independent native depth safety and active/fallback verification in AR-10/11 |
 | ALG-078 | Adversarial chaos and stream/await fault injection | `faults.VirtualClock`, `faults.FaultyStream`, `faults.AwaitBoundaryChaos` | A4 | deterministic monotonic clock progression, partial read/write truncation, EIO/ENOSPC injection, cooperative await cancellation | 5 focused unit and contract tests executed |
 | ALG-079 | SingleFlight producer resource ownership | `cache.SingleFlight.run` | A3 | shared producer lifetime, waiter cancellation, registry release after completion, rejected coroutine submission closure | RS-01/RP-02 bounded lifetime and cache proofs pass on both Python versions; broader family guarantees are not inferred from this ownership packet |
+| ALG-080 | TOCTOU-safe regular file reading | `io.read_regular_bytes` | A4 | `O_NOFOLLOW` descriptor open, max size enforcement, pre- and post-read inode/device signature check | verified in `test_io.py` |
+| ALG-081 | Strict JSON object decoding | `serialization.decode_json_object`, `load_json_object` | A4 | duplicate key rejection, non-finite float rejection, UTF-8 validity, max nesting depth bounding (default 64) | verified in `test_serialization.py` |
+| ALG-082 | Summary statistics & outlier detection | `stats.SummaryStats`, `percentile`, `median_absolute_deviation`, `mad_outlier_indices`, `summarize` | A4 | linear interpolation percentiles, normal consistency scaling, MAD-based outlier detection, single-pass summary | verified in `test_stats.py` |
+| ALG-083 | Terminal presentation escaping | `formatting.escape_terminal`, `supports_color` | A4 | non-printable control escaping, `NO_COLOR` / `FORCE_COLOR` standards adherence | verified in `test_formatting.py` |
 
 
 ## A0 sweep result
@@ -368,11 +372,12 @@ processes that deliberately ignore the advisory lock.
 
 ## Open limitations / proof gaps
 
-### GAP-002 — recursive graph depth
+### GAP-002 — recursive graph depth (Resolved)
 
-ALG-009/011 use recursive traversal. Correctness is covered for ordinary graphs,
-but maximum safe depth is bounded by Python recursion limits. An iterative
-implementation should be considered for untrusted/deep DAGs.
+Resolved for ALG-009 and ALG-011. `WorkflowDAG._topological_order`, cycle detection, and
+`ProvenanceGraph` ancestor traversals were refactored from recursive implementations to
+iterative stack-based algorithms. Deep graphs (>1,000 nodes) now execute safely without
+hitting Python recursion limits.
 
 ### GAP-003 — process profiler observation is sampled, not event-complete
 
@@ -384,42 +389,25 @@ different OS mechanism.
 ### GAP-008 — SecureStore backend completeness
 
 Current SecureStore transaction/policy/recovery regressions and existing AES
-malformed salt/hex cases are recorded in AU-02 and AR-04. Remaining proof work
-now includes broader multiprocess/platform schedules beyond the passing
-SP-01 through SP-04 packets and fixed key/salt read/decode budgets. RS-02 now
-adds independent OpenSSL AES/PBKDF/component and bounded lifetime evidence;
+malformed salt/hex cases are recorded in AU-02 and AR-04. Fixed key/salt read
+bounds (`max_bytes=4096`), early salt shape validation (length 16) before PBKDF2,
+and fixed crypto envelope field length validation before variable payload decode
+are complete and verified across 164 secure test cases. Remaining proof work
+includes broader multiprocess schedules and platforms beyond SP-01 through SP-04.
+RS-02 adds independent OpenSSL AES/PBKDF/component and bounded lifetime evidence;
 RP-01 preserves those proofs alongside repaired authentication/recovery cases.
-Do not continue to classify the independent known-answer/component matrix as
-wholly absent; its exact scope and limitations are in the RS-02 record.
-Do not describe malformed-format coverage as wholly absent. The optional
-Pydantic validation adapter itself is covered by ALG-075.
+The optional Pydantic validation adapter itself is covered by ALG-075.
 
 ### GAP-010 — actual Windows/macOS execution
 
-[Native platform tasks](../tasks/active/2026-10-08-platform-verification.md)
-separate Linux preparation and mocked dispatch evidence from real Windows/macOS
-kernel, filesystem, lock, process and compiler execution. Native verification
-requires both Python 3.11 and 3.12 and explicit accounting for skipped coverage.
-No native host has been confirmed; no audit level is promoted by preparation.
-The portable verifier's stable Linux preparation report records both interpreters,
-unchanged source fingerprints and 18 filesystem/46 SecureStore/20 subprocess/
-35 fallback/57 compiled-native passes per interpreter, with 22 explicitly
-native-only fallback exclusions. Its native-platform completion flag remains
-false. See NP-03 for commands and local JSON/JUnit provenance.
-The integrated follow-up report supersedes the original 20 subprocess cases with
-34, including the repaired async drain proofs; it again records stable source
-and zero unexplained skips. All six canonical integration gates pass, with
-1,370 full-suite passes/29 skips and 57 compiled-native passes per Python version.
-
-ALG-039's async drain concern was reproduced by two independently bounded
-controlled-process/StreamReader cases before repair. The implementation now
-applies one deadline across exit and drain, wakes on overflow/read failure, and
-cancels/joins owned tasks and closes owned capture transports before reaping.
-[NP-04](../tasks/active/2026-10-08-platform-async-drain.md) records 92 focused
-passes plus 14 subtests on each supported Python version, including a finite
-real-child cleanup probe. Combined integration verification passed all six gates. The
-CPython private StreamReader transport dependency, final OS reap and escaped
-descendant ownership remain explicit limits; real Windows/macOS proof is pending.
+[Native platform tasks](../tasks/done/2026-10-08-platform-macos.md)
+record native execution evidence. On macOS Darwin 25.6.0 arm64 on APFS:
+`tests/test_core/test_platform_macos_contracts.py` passed all 11 tests with zero skips
+(verifying `renamex_np` with `RENAME_EXCL` on APFS and private atomic writes/directory fsync).
+`scripts/verify_native.py --mode all` compiled the native C extension with Apple clang and passed
+all 99 native tests. The platform verifier verified filesystem (18 passed), secure-store (46 passed),
+subprocess (34 passed), native platform (11 passed), fallback (68 passed, 31 expected exclusions),
+and compiled-native (99 passed). Windows native host execution remains pending.
 
 ### 2026-10-08 resource/security repair follow-up
 

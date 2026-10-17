@@ -433,6 +433,7 @@ class ReleaseRepo:
 
         source = self.source_dir
         proj_name = self.project_name
+        pkg_name = self.source_dir.name
         resolver = self.version_module
         if not resolver.is_file():
             errors.append(f"missing {resolver.relative_to(self.root)}")
@@ -445,10 +446,12 @@ class ReleaseRepo:
 
         if self.init_py.is_file():
             init_text = self.init_py.read_text(encoding="utf-8")
-            if (
-                "from ._version import __version__" not in init_text
-                and "__version__ = _resolve_package_version()" not in init_text
-            ):
+            allowed_imports = (
+                "from ._version import __version__",
+                f"from {pkg_name}._version import __version__",
+                "__version__ = _resolve_package_version()",
+            )
+            if not any(statement in init_text for statement in allowed_imports):
                 rel = self.init_py.relative_to(self.root)
                 errors.append(f"{rel} must use the shared version resolver")
 

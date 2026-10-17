@@ -150,6 +150,14 @@ def decrypt(
     parts = payload.split(":")
     if len(parts) != 4:
         raise ValueError("Invalid encrypted format")
+    #? Validate fixed component hex lengths before decoding or allocating
+    #? variable payload bytes.
+    if (
+        len(parts[0]) != SALT_LENGTH * 2
+        or len(parts[1]) != IV_LENGTH * 2
+        or len(parts[2]) != 32
+    ):
+        raise ValueError("Invalid encrypted format")
     try:
         salt = binascii.unhexlify(parts[0])
         iv = binascii.unhexlify(parts[1])

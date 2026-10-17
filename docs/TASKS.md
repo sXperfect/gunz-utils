@@ -7,12 +7,27 @@ in [`docs/tasks/README.md`](tasks/README.md); completed work is indexed in
 | Task ID | Date | Description | Status |
 |:---|:---:|:---|:---:|
 | ALGORITHM-2026-09-28 | 2026-09-28 | [Repository-wide algorithm proof program](tasks/active/2026-09-28-algorithm-correctness-audit.md) | Active — remaining proofs/limitations |
-| INPUT-ADMISSION-2026-10-08 | 2026-10-08 | [Fixed key/salt input admission](tasks/pending/2026-10-08-fixed-key-input-admission.md) | Pending; compatibility contract first |
-| PLATFORM-2026-10-08 | 2026-10-08 | [Native Windows/macOS verification](tasks/active/2026-10-08-platform-verification.md) | Active; native hosts pending |
+| Task ID | Date | Description | Status |
+|:---|:---:|:---|:---:|
+| ALGORITHM-2026-09-28 | 2026-09-28 | [Repository-wide algorithm proof program](tasks/active/2026-09-28-algorithm-correctness-audit.md) | Active — remaining proofs/limitations |
+| PLATFORM-2026-10-08 | 2026-10-08 | [Native Windows/macOS verification](tasks/active/2026-10-08-platform-verification.md) | Active; macOS verified, Windows pending |
 | NP-01 | 2026-10-08 | [Windows readiness and contracts](tasks/active/2026-10-08-platform-windows.md) | Preparation complete; native host pending |
-| NP-02 | 2026-10-08 | [macOS readiness and contracts](tasks/active/2026-10-08-platform-macos.md) | Preparation complete; native host pending |
-| NP-03 | 2026-10-08 | [Portable platform verifier](tasks/active/2026-10-08-platform-verifier.md) | Linux preparation verified; native hosts pending |
+| NP-03 | 2026-10-08 | [Portable platform verifier](tasks/active/2026-10-08-platform-verifier.md) | Linux & macOS preparation verified; Windows pending |
 | NP-04 | 2026-10-08 | [Async pipe deadline follow-up](tasks/active/2026-10-08-platform-async-drain.md) | Repaired and integrated on Linux; native proofs pending |
+
+The [2026-10-17 general-purpose utilities consolidation](tasks/done/2026-10-17-consolidate-general-purpose-utils.md)
+is complete; read_regular_bytes, strict JSON decoding (decode_json_object/load_json_object),
+summary statistics (SummaryStats/percentile/median_absolute_deviation/mad_outlier_indices/summarize),
+and terminal utilities (escape_terminal/supports_color) are consolidated into gunz_utils.
+scripts/release.py is hardened with dynamic multi-repo root discovery, heading injection protection,
+and fragment branch gating.
+
+The [2026-10-08 fixed key/salt input admission](tasks/done/2026-10-08-fixed-key-input-admission.md)
+and [macOS native contracts](tasks/done/2026-10-08-platform-macos.md) (NP-02) are complete;
+bounded key/salt file reading (max_bytes=4096), early salt shape validation (length 16) before PBKDF2,
+and fixed crypto envelope hex length validation are verified across 164 secure test cases. Real macOS
+Darwin arm64 tests (renamex_np with RENAME_EXCL on APFS, atomic writes, directory fsync, and Apple clang
+C-extension compilation) pass with zero skips.
 
 The [2026-10-17 audit network, dict, streaming fixes](tasks/done/2026-10-17-audit-network-dict-streaming-fixes.md)
 are complete; tcp_reachable cumulative deadline bounding across multiple resolved IPs,

@@ -300,7 +300,8 @@ def _linux_snapshot(
     ticks = os.sysconf("SC_CLK_TCK")
     page_size = os.sysconf("SC_PAGE_SIZE")
     details: list[ProcessDetail] = []
-    user = system = 0.0
+    user_times: list[float] = []
+    system_times: list[float] = []
     rss = read_bytes = write_bytes = 0
     pss_total = private_total = 0
     pss_complete = private_complete = True
@@ -326,8 +327,8 @@ def _linux_snapshot(
             if memory_detail == "pss":
                 private = None
         command = stat[1][1:-1]
-        user += pid_user
-        system += pid_system
+        user_times.append(pid_user)
+        system_times.append(pid_system)
         rss += pid_rss
         threads += pid_threads
         minor_faults += pid_minor_faults
@@ -404,6 +405,8 @@ def _linux_snapshot(
             )
         )
 
+    user = math.fsum(user_times)
+    system = math.fsum(system_times)
     return ProcessSample(
         elapsed=time.perf_counter() - started,
         process_count=len(details),
@@ -577,7 +580,7 @@ def profile_command(
             The result of the operation.
         """
         if lifetime_counters:
-            return sum(
+            return math.fsum(
                 float(getattr(item, name)) for item in lifetime_counters.values()
             )
         return max(
