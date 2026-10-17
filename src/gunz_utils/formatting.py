@@ -14,6 +14,8 @@ __license__ = "Clear BSD"
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import math
+import os
+import sys
 from decimal import Decimal
 
 # =============================================================================
@@ -23,7 +25,13 @@ from decimal import Decimal
 #? backwards-compatible module-level access.
 from ._version import __version__ as __version__
 
-__all__ = ["format_bytes", "format_duration", "format_count"]
+__all__ = [
+    "escape_terminal",
+    "format_bytes",
+    "format_count",
+    "format_duration",
+    "supports_color",
+]
 
 
 def _validated_precision(
@@ -260,3 +268,66 @@ def format_count(
         if value < 1000:
             return f"{sign}{value:.{precision}f}{suffix}"
     return f"{sign}{value:.{precision}f}T"
+
+
+def escape_terminal(
+    text: str,
+    *,
+    multiline: bool = False,
+) -> str:
+    """Make untrusted text visible without emitting terminal controls.
+
+    Parameters
+    ----------
+    text : str
+        Source, filename, message, or diff text to display.
+    multiline : bool, default=False
+        Whether to preserve structural newlines.
+
+    Returns
+    -------
+    str
+        Printable text with controls and invisible Unicode characters escaped.
+    """
+    escaped: list[str] = []
+    for character in text:
+        if character.isprintable() or (multiline and character == "\n"):
+            escaped.append(character)
+        elif character in ("\t", "\n", "\r"):
+            escaped.append({"\t": r"\t", "\n": r"\n", "\r": r"\r"}[character])
+        else:
+            codepoint = ord(character)
+            if codepoint <= 0xFF:
+                escaped.append(f"\\x{codepoint:02x}")
+            elif codepoint <= 0xFFFF:
+                escaped.append(f"\\u{codepoint:04x}")
+            else:
+                escaped.append(f"\\U{codepoint:08x}")
+    return "".join(escaped)
+
+
+def supports_color(
+    no_color_flag: bool = False,
+) -> bool:
+    """Determine whether ANSI color output should be enabled.
+
+    Follows the NO_COLOR and FORCE_COLOR terminal conventions.
+
+    Parameters
+    ----------
+    no_color_flag : bool, default=False
+        Explicit caller override disabling color.
+
+    Returns
+    -------
+    bool
+        True if colored escape sequences should be emitted.
+    """
+    if no_color_flag:
+        return False
+    if "NO_COLOR" in os.environ:
+        return False
+    if os.environ.get("FORCE_COLOR") in ("1", "true"):
+        return True
+    return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+

@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import math
 import random
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Real
-from statistics import fmean, stdev
+from statistics import fmean, median, pstdev, pvariance, stdev
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,24 @@ class PairedEffect:
     standard_deviation: float
     standardized_effect: float | None
     observations: int
+
+
+@dataclass(frozen=True)
+class SummaryStats:
+    """Summary statistics for a sample distribution."""
+
+    count: int
+    minimum: float
+    maximum: float
+    mean: float
+    median: float
+    variance: float
+    stdev: float
+    coefficient_of_variation: float | None
+    mad: float
+    percentiles: Mapping[float, float]
+    outlier_indices: tuple[int, ...]
+
 
 
 def _finite_values(
@@ -245,14 +263,7 @@ def paired_effect(
     )
 
 
-__all__ = [
-    "BootstrapMeanCI",
-    "NormalMeanSummary",
-    "PairedEffect",
-    "bootstrap_mean_ci",
-    "normal_mean_summary",
-    "paired_effect",
-]
+
 
 
 @dataclass(frozen=True)
@@ -353,3 +364,218 @@ def normal_mean_summary(
         high=high,
         confidence_z=confidence_z,
     )
+
+
+def _percentile_presorted(
+    ordered: Sequence[float],
+    q: float,
+) -> float:
+    """Compute percentile for presorted sequence using linear interpolation."""
+    n = len(ordered)
+    if n == 1:
+        return ordered[0]
+
+    position = (n - 1) * q
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
+def percentile(
+    values: Sequence[float],
+    q: float,
+) -> float:
+    """Compute quantile/percentile for sample sequence using linear interpolation.
+
+    Parameters
+    ----------
+    values : Sequence[float]
+        Sequence of finite numeric values.
+    q : float
+        Quantile between 0.0 and 1.0 inclusive.
+
+    Returns
+    -------
+    float
+        Interpolated quantile value.
+    """
+    if (
+        isinstance(q, bool)
+        or not isinstance(q, (int, float))
+        or not math.isfinite(q)
+        or not 0.0 <= q <= 1.0
+    ):
+        raise ValueError("percentile q must be finite and between 0 and 1")
+
+    data = _finite_values(values, name="percentile")
+    ordered = sorted(data)
+    return _percentile_presorted(ordered, q)
+
+
+def median_absolute_deviation(
+    values: Sequence[float],
+) -> float:
+    """Compute the Median Absolute Deviation (MAD) of finite values.
+
+    Parameters
+    ----------
+    values : Sequence[float]
+        Sample sequence.
+
+    Returns
+    -------
+    float
+        Median absolute deviation.
+    """
+    data = _finite_values(values, name="MAD")
+    center = median(data)
+    return float(median(abs(value - center) for value in data))
+
+
+def mad_outlier_indices(
+    values: Sequence[float],
+    *,
+    threshold: float = 3.5,
+) -> tuple[int, ...]:
+    """Identify sample indices exceeding the MAD outlier threshold.
+
+    Parameters
+    ----------
+    values : Sequence[float]
+        Sample values to inspect.
+    threshold : float, default=3.5
+        Modified Z-score threshold for outlier classification.
+
+    Returns
+    -------
+    tuple[int, ...]
+        Indices of detected outliers.
+    """
+    if (
+        isinstance(threshold, bool)
+        or not isinstance(threshold, (int, float))
+        or not math.isfinite(threshold)
+        or threshold <= 0
+    ):
+        raise ValueError("threshold must be finite and > 0")
+    if not values:
+        return ()
+
+    data = _finite_values(values, name="MAD outlier detection")
+    ordered = sorted(data)
+    center = median(ordered)
+    devs = sorted(abs(value - center) for value in data)
+    mad = _percentile_presorted(devs, 0.5)
+    if math.isclose(mad, 0.0, abs_tol=1e-15):
+        return ()
+
+    scale = 0.6744897501960817
+    inv_denom = scale / mad
+    return tuple(
+        index
+        for index, value in enumerate(data)
+        if abs(value - center) * inv_denom > threshold
+    )
+
+
+def summarize(
+    values: Iterable[float],
+    *,
+    percentiles: Sequence[float] = (0.25, 0.5, 0.75, 0.95),
+    outlier_threshold: float = 3.5,
+) -> SummaryStats:
+    """Compute comprehensive descriptive summary statistics for sample values.
+
+    Parameters
+    ----------
+    values : Iterable[float]
+        Sample observations.
+    percentiles : Sequence[float], default=(0.25, 0.5, 0.75, 0.95)
+        Quantiles to compute.
+    outlier_threshold : float, default=3.5
+        MAD outlier threshold.
+
+    Returns
+    -------
+    SummaryStats
+        Calculated distribution metrics.
+    """
+    if (
+        isinstance(outlier_threshold, bool)
+        or not isinstance(outlier_threshold, (int, float))
+        or not math.isfinite(outlier_threshold)
+        or outlier_threshold <= 0
+    ):
+        raise ValueError("outlier_threshold must be finite and > 0")
+    requested = tuple(float(q) for q in percentiles)
+    if len(set(requested)) != len(requested):
+        raise ValueError("percentiles must not contain duplicates")
+    for q in requested:
+        if not math.isfinite(q) or not 0.0 <= q <= 1.0:
+            raise ValueError("percentile q must be finite and between 0 and 1")
+
+    data = _finite_values(values, name="samples")
+    ordered = sorted(data)
+    med = median(ordered)
+    percentile_values = {q: _percentile_presorted(ordered, q) for q in requested}
+
+    mean_value = fmean(data)
+    variance_value = pvariance(data)
+    stdev_value = pstdev(data)
+    cv = (
+        None
+        if math.isclose(mean_value, 0.0, abs_tol=1e-15)
+        else stdev_value / abs(mean_value)
+    )
+
+    devs = sorted(abs(x - med) for x in data)
+    mad = _percentile_presorted(devs, 0.5)
+
+    if (
+        math.isclose(mad, 0.0, abs_tol=1e-15)
+        or not math.isfinite(outlier_threshold)
+        or outlier_threshold <= 0
+    ):
+        outliers: tuple[int, ...] = ()
+    else:
+        scale = 0.6744897501960817
+        inv_denom = scale / mad
+        outliers = tuple(
+            index
+            for index, value in enumerate(data)
+            if abs(value - med) * inv_denom > outlier_threshold
+        )
+
+    return SummaryStats(
+        count=len(data),
+        minimum=min(data),
+        maximum=max(data),
+        mean=mean_value,
+        median=med,
+        variance=variance_value,
+        stdev=stdev_value,
+        coefficient_of_variation=cv,
+        mad=mad,
+        percentiles=percentile_values,
+        outlier_indices=outliers,
+    )
+
+
+__all__ = [
+    "BootstrapMeanCI",
+    "NormalMeanSummary",
+    "PairedEffect",
+    "SummaryStats",
+    "bootstrap_mean_ci",
+    "mad_outlier_indices",
+    "median_absolute_deviation",
+    "normal_mean_summary",
+    "paired_effect",
+    "percentile",
+    "summarize",
+]
+

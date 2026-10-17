@@ -1,7 +1,8 @@
+# gunz-style: ignore-file[GS010,GS011]
 #!/usr/bin/env python3
-"""Deterministic local release and changelog tooling for gunz-utils.
+"""Deterministic local release and changelog tooling.
 
-This module is intentionally standard-library only.  It is the canonical place
+This module is intentionally standard-library only. It is the canonical place
 for release metadata checks and release preparation; GitHub Actions only calls
 into it and does not contain independent versioning logic.
 """
@@ -13,29 +14,18 @@ into it and does not contain independent versioning logic.
 from __future__ import annotations
 
 import argparse
+import ast
 import datetime as dt
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import tomllib
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-
-SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
-VERSION_LITERAL_RE = re.compile(
-    r'^\s*__version__\s*=\s*["\']\d+\.\d+\.\d+["\']\s*$',
-    re.MULTILINE,
-)
-CHANGELOG_HEADING_RE = re.compile(
-    r"^## \[(?P<version>[^]]+)\](?:\s+—\s+.+)?$",
-    re.MULTILINE,
-)
-UNRELEASED_SECTION_RE = re.compile(
-    r"^## \[Unreleased\]\s*\n(?P<body>.*?)(?=^## \[|\Z)",
-    re.MULTILINE | re.DOTALL,
-)
 
 CATEGORY_ORDER = (
     "breaking",
@@ -61,27 +51,33 @@ CATEGORY_TITLES = {
     "docs": "Documentation",
     "internal": "Internal",
 }
-BUMP_RANK = {"none": 0, "patch": 1, "minor": 2, "major": 3}
 CATEGORY_BUMP = {
     "breaking": "major",
-    "removed": "major",
+    "security": "patch",
     "added": "minor",
     "changed": "minor",
     "deprecated": "minor",
-    "security": "patch",
     "fixed": "patch",
+    "removed": "major",
     "performance": "patch",
     "docs": "patch",
     "internal": "patch",
 }
+BUMP_RANK = {"none": 0, "patch": 1, "minor": 2, "major": 3}
+SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+HEADING = re.compile(r"^## \[([^]\n]+)\](?:[^\n]*)$", re.MULTILINE)
+FRAGMENT_HEADING = re.compile(r"^ {0,3}#{1,2}(?:[ \t]|$)", re.MULTILINE)
+SETEXT_HEADING = re.compile(r"^ {0,3}(?:=+|-+)[ \t]*$")
+CONFLICT = re.compile(r"^(?:<{7}|={7}|>{7})(?:\s|$)", re.MULTILINE)
 UNRELEASED_NOTE = (
-    "Unreleased changes are collected as conflict-free fragments in "
-    "`changes/`. Run `python scripts/release.py status` to inspect them."
+    "Unreleased changes are collected as conflict-free fragments in `changes/`.\n"
+    "Run `python scripts/release.py status` to inspect their release impact."
 )
 
 
-class ReleaseError(RuntimeError):
-    """Raised for invalid release metadata or an unsafe release operation."""
+class ReleaseError(ValueError):
+    """Invalid metadata or a release operation that cannot safely proceed."""
 
 
 @dataclass(frozen=True, order=True)
@@ -96,12 +92,13 @@ class SemVer:
     def parse(cls,
         value: str,
     ) -> SemVer:
-        match = SEMVER_RE.fullmatch(value.strip())
+        """Parse a version without prerelease or leading-zero components."""
+        match = SEMVER.fullmatch(value.strip())
         if match is None:
             raise ReleaseError(
                 f"invalid version {value!r}; expected strict MAJOR.MINOR.PATCH"
             )
-        return cls(*(int(group) for group in match.groups()))
+        return cls(*(int(part) for part in match.groups()))
 
     def __str__(self) -> str:
         return f"{self.major}.{self.minor}.{self.patch}"
@@ -109,7 +106,7 @@ class SemVer:
 
 @dataclass(frozen=True)
 class Fragment:
-    """One changelog fragment."""
+    """One validated pending changelog entry."""
 
     identifier: str
     category: str
@@ -128,9 +125,157 @@ class CheckResult:
     def ok(self) -> bool:
         return not self.errors
 
+    def __iter__(self):
+        """Allow tuple unpacking: errors, warnings = repo.check()."""
+        return iter((list(self.errors), list(self.warnings)))
+
+
+def minimum_target(
+    current: SemVer,
+    bump: str,
+) -> SemVer:
+    """Return the minimum version satisfying the requested release impact."""
+    if bump == "major":
+        return SemVer(current.major + 1, 0, 0)
+    if bump == "minor":
+        return SemVer(current.major, current.minor + 1, 0)
+    return SemVer(current.major, current.minor, current.patch + 1)
+
+
+def required_bump(
+    fragments: Iterable[Fragment],
+) -> str:
+    """Choose the strongest pending category."""
+    return max(
+        (CATEGORY_BUMP[fragment.category] for fragment in fragments),
+        key=BUMP_RANK.__getitem__,
+        default="none",
+    )
+
+
+def target_satisfies(
+    current: SemVer,
+    target: SemVer,
+    bump: str,
+) -> bool:
+    """Return True if target satisfies the minimum required bump."""
+    if target <= current:
+        return False
+    if bump == "major":
+        return target.major > current.major
+    if bump == "minor":
+        return target.major > current.major or (
+            target.major == current.major and target.minor > current.minor
+        )
+    return target > current
+
+
+def validate_fragment_text(
+    text: str,
+    name: str,
+) -> None:
+    """Reject empty entries, conflicts, and headings reserved for releases."""
+    if not text:
+        raise ReleaseError(f"empty changelog fragment: {name}")
+    if CONFLICT.search(text):
+        raise ReleaseError(
+            f"changelog fragment {name} contains unresolved git conflict markers"
+        )
+    lines = text.splitlines()
+    setext_heading = any(
+        previous.strip() and SETEXT_HEADING.fullmatch(line)
+        for previous, line in zip(lines, lines[1:], strict=False)
+    )
+    if FRAGMENT_HEADING.search(text) or setext_heading:
+        raise ReleaseError(
+            f"unsupported release-level heading in fragment: {name}; "
+            "use prose, bullets, or headings at level 3 or deeper"
+        )
+
+
+def project_version(
+    text: str,
+) -> SemVer:
+    """Read and validate the project version from complete TOML contents."""
+    data = tomllib.loads(text)
+    project = data.get("project")
+    value = project.get("version") if isinstance(project, dict) else None
+    if not isinstance(value, str):
+        raise ReleaseError("missing pyproject.toml [project].version")
+    return SemVer.parse(value)
+
+
+def project_metadata(
+    text: str,
+) -> tuple[str, SemVer]:
+    """Read and validate the project name and version from TOML contents."""
+    data = tomllib.loads(text)
+    project = data.get("project")
+    if not isinstance(project, dict):
+        raise ReleaseError("missing pyproject.toml [project] table")
+    name = project.get("name")
+    if not isinstance(name, str) or not name.strip():
+        name = "gunz-utils"
+    value = project.get("version")
+    if not isinstance(value, str):
+        raise ReleaseError("missing pyproject.toml [project].version")
+    return name, SemVer.parse(value)
+
+
+def changelog_errors(
+    text: str,
+    current: SemVer,
+) -> list[str]:
+    """Validate complete changelog contents against their project version."""
+    errors: list[str] = []
+    headings = [match[1] for match in HEADING.finditer(text)]
+    if not headings or headings[0] != "Unreleased":
+        errors.append("CHANGELOG.md must start with a [Unreleased] section")
+    if len(headings) != len(set(headings)):
+        errors.append("duplicate CHANGELOG.md version heading")
+    for value in headings:
+        if value != "Unreleased":
+            try:
+                version = SemVer.parse(value)
+            except ReleaseError as exc:
+                errors.append(str(exc))
+            else:
+                if version > current:
+                    errors.append(f"changelog version {value} is newer than {current}")
+    if CONFLICT.search(text):
+        errors.append("CHANGELOG.md contains unresolved conflict markers")
+    return errors
+
+
+def atomic_write(
+    path: Path,
+    text: str,
+) -> None:
+    """Replace one file after its complete UTF-8 contents have been flushed."""
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            delete=False,
+            prefix=f".{path.name}.",
+            suffix=".release-tmp",
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if path.exists():
+            temporary.chmod(path.stat().st_mode & 0o777)
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
 
 class ReleaseRepo:
-    """Release operations rooted at one repository checkout."""
+    """Release operations on one explicit local repository root."""
 
     def __init__(self,
         root: Path,
@@ -139,64 +284,87 @@ class ReleaseRepo:
         self.pyproject = self.root / "pyproject.toml"
         self.changelog = self.root / "CHANGELOG.md"
         self.fragments_dir = self.root / "changes"
-        self.source_dir = self.root / "src" / "gunz_utils"
-        self.init_py = self.source_dir / "__init__.py"
-        self.version_module = self.source_dir / "_version.py"
-        self.sphinx_conf = self.root / "docs" / "source" / "conf.py"
+        self._project_name: str | None = None
+
+    @property
+    def project_name(self) -> str:
+        """Resolve the project name from pyproject.toml."""
+        if self._project_name is None:
+            if self.pyproject.is_file():
+                try:
+                    self._project_name = project_metadata(
+                        self.pyproject.read_text(encoding="utf-8")
+                    )[0]
+                except (OSError, ValueError):
+                    self._project_name = "gunz-utils"
+            else:
+                self._project_name = "gunz-utils"
+        return self._project_name
+
+    @property
+    def source_dir(self) -> Path:
+        """Path to main package source directory under src/."""
+        package_dir = self.project_name.replace("-", "_")
+        return self.root / "src" / package_dir
+
+    @property
+    def version_module(self) -> Path:
+        """Path to _version.py module."""
+        return self.source_dir / "_version.py"
+
+    @property
+    def init_py(self) -> Path:
+        """Path to package __init__.py."""
+        return self.source_dir / "__init__.py"
+
+    @property
+    def sphinx_conf(self) -> Path:
+        """Path to Sphinx documentation configuration."""
+        return self.root / "docs" / "source" / "conf.py"
 
     def current_version(self) -> SemVer:
-        with self.pyproject.open("rb") as handle:
-            data = tomllib.load(handle)
-        value = data.get("project", {}).get("version")
-        if not isinstance(value, str):
-            raise ReleaseError("pyproject.toml [project].version is missing")
-        return SemVer.parse(value)
+        """Read the only static package-version source."""
+        return project_version(self.pyproject.read_text(encoding="utf-8"))
 
     def fragments(self) -> list[Fragment]:
+        """Validate fragment names, unique IDs, contents, and conflict markers."""
         if not self.fragments_dir.is_dir():
-            raise ReleaseError("missing changes/ fragment directory")
-        fragments: list[Fragment] = []
-        seen_ids: set[str] = set()
-        for path in sorted(self.fragments_dir.glob("*.md")):
-            if path.name == "README.md":
+            raise ReleaseError("missing changes/ directory")
+        result: list[Fragment] = []
+        seen: set[str] = set()
+        for path in sorted(self.fragments_dir.iterdir()):
+            if path.name == "README.md" or path.name.startswith("."):
                 continue
-            stem = path.name[:-3]
-            if "." not in stem:
-                raise ReleaseError(
-                    f"invalid fragment filename {path.name!r}; "
-                    "expected <id>.<category>.md"
-                )
-            identifier, category = stem.rsplit(".", 1)
-            valid_identifier = re.fullmatch(
-                r"[A-Za-z0-9][A-Za-z0-9._-]*", identifier
-            )
-            if not identifier or valid_identifier is None:
-                raise ReleaseError(f"invalid fragment id in {path.name!r}")
-            if category not in CATEGORY_TITLES:
-                allowed = ", ".join(CATEGORY_ORDER)
-                raise ReleaseError(
-                    f"invalid fragment category {category!r} in {path.name}; "
-                    f"allowed: {allowed}"
-                )
-            if identifier in seen_ids:
-                raise ReleaseError(f"duplicate fragment id {identifier!r}")
-            seen_ids.add(identifier)
+            if not path.is_file() or not path.name.endswith(".md"):
+                raise ReleaseError(f"unexpected fragment entry: {path.name}")
+            parts = path.name[:-3].rsplit(".", 1)
+            if len(parts) != 2 or IDENTIFIER.fullmatch(parts[0]) is None:
+                raise ReleaseError(f"invalid fragment filename: {path.name}")
+            identifier, category = parts
+            if category not in CATEGORY_BUMP:
+                raise ReleaseError(f"invalid fragment category: {path.name}")
+            if identifier in seen:
+                raise ReleaseError(f"duplicate fragment id (ID): {identifier}")
             text = path.read_text(encoding="utf-8").strip()
-            if not text:
-                raise ReleaseError(f"empty changelog fragment: {path.name}")
-            fragments.append(Fragment(identifier, category, text, path))
-        return fragments
+            validate_fragment_text(text, path.name)
+            seen.add(identifier)
+            result.append(Fragment(identifier, category, text, path))
+        return result
 
     @staticmethod
     def required_bump(
         fragments: Iterable[Fragment],
     ) -> str:
-        required = "none"
-        for fragment in fragments:
-            candidate = CATEGORY_BUMP[fragment.category]
-            if BUMP_RANK[candidate] > BUMP_RANK[required]:
-                required = candidate
-        return required
+        """Choose the strongest pending category."""
+        return required_bump(fragments)
+
+    @staticmethod
+    def minimum_target(
+        current: SemVer,
+        bump: str,
+    ) -> SemVer:
+        """Return the minimum version satisfying the requested release impact."""
+        return minimum_target(current, bump)
 
     @staticmethod
     def target_satisfies(
@@ -204,138 +372,116 @@ class ReleaseRepo:
         target: SemVer,
         bump: str,
     ) -> bool:
-        if target <= current:
-            return False
-        if bump == "major":
-            return target.major > current.major
-        if bump == "minor":
-            return target.major > current.major or (
-                target.major == current.major and target.minor > current.minor
-            )
-        if bump == "patch":
-            return True
-        return target > current
+        """Return True if target satisfies the minimum required bump."""
+        return target_satisfies(current, target, bump)
 
-    @staticmethod
-    def minimum_target(
-        current: SemVer,
-        bump: str,
-    ) -> SemVer:
-        if bump == "major":
-            return SemVer(current.major + 1, 0, 0)
-        if bump == "minor":
-            return SemVer(current.major, current.minor + 1, 0)
-        return SemVer(current.major, current.minor, current.patch + 1)
+    def _git(self,
+        *args: str,
+    ) -> str:
+        """Run a bounded, shell-free local Git command."""
+        result = subprocess.run(
+            ["git", "-C", str(self.root), *args],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        if result.returncode:
+            raise ReleaseError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+        return result.stdout.strip()
 
-    def _git_tags(self) -> list[SemVer]:
+    def tags(self) -> list[SemVer]:
+        """Read available local tags; metadata checks also work without Git."""
         try:
-            result = subprocess.run(
-                ["git", "-C", str(self.root), "tag", "--list", "v*"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return []
-        if result.returncode != 0:
+            text = self._git("tag", "--list", "v*")
+        except (OSError, subprocess.TimeoutExpired, ReleaseError):
             return []
         tags: list[SemVer] = []
-        for line in result.stdout.splitlines():
-            value = line.strip()
-            if not value.startswith("v"):
-                continue
-            try:
-                tags.append(SemVer.parse(value[1:]))
-            except ReleaseError:
-                continue
+        for line in text.splitlines():
+            val = line.strip()
+            if val.startswith("v") and SEMVER.fullmatch(val[1:]):
+                try:
+                    tags.append(SemVer.parse(val[1:]))
+                except ReleaseError:
+                    continue
         return sorted(set(tags))
 
+    def _git_tags(self) -> list[SemVer]:
+        """Backward-compatibility alias for tags()."""
+        return self.tags()
+
     def check(self) -> CheckResult:
+        """Return metadata errors and advisory release-history warnings."""
         errors: list[str] = []
         warnings: list[str] = []
-
         try:
             current = self.current_version()
-        except (OSError, tomllib.TOMLDecodeError, ReleaseError) as exc:
+        except (OSError, ValueError) as exc:
             return CheckResult((str(exc),), ())
 
         try:
             fragments = self.fragments()
-        except (OSError, ReleaseError) as exc:
+        except (OSError, ValueError) as exc:
             errors.append(str(exc))
             fragments = []
 
-        for frag in fragments:
-            for marker in ("<<<<<<<", "=======", ">>>>>>>"):
-                if marker in frag.text:
-                    errors.append(
-                        f"changelog fragment {frag.path.name} contains unresolved "
-                        f"git conflict marker {marker!r}"
-                    )
-            if frag.text.startswith("* "):
-                warnings.append(
-                    f"changelog fragment {frag.path.name} uses '*' bullet; "
-                    "standard format prefers '- '"
-                )
+        try:
+            changelog = self.changelog.read_text(encoding="utf-8")
+            errors.extend(changelog_errors(changelog, current))
+        except OSError as exc:
+            errors.append(f"missing CHANGELOG.md: {exc}")
 
-        if not self.changelog.is_file():
-            errors.append("missing CHANGELOG.md")
-            changelog_text = ""
+        source = self.source_dir
+        proj_name = self.project_name
+        resolver = self.version_module
+        if not resolver.is_file():
+            errors.append(f"missing {resolver.relative_to(self.root)}")
         else:
-            changelog_text = self.changelog.read_text(encoding="utf-8")
-            if UNRELEASED_SECTION_RE.search(changelog_text) is None:
+            resolver_text = resolver.read_text(encoding="utf-8")
+            if f'metadata.version("{proj_name}")' not in resolver_text:
                 errors.append(
-                    "CHANGELOG.md must contain a top-level [Unreleased] section"
-                )
-
-            seen: set[str] = set()
-            for match in CHANGELOG_HEADING_RE.finditer(changelog_text):
-                value = match.group("version")
-                if value == "Unreleased":
-                    continue
-                try:
-                    SemVer.parse(value)
-                except ReleaseError:
-                    errors.append(f"invalid changelog version heading: {value!r}")
-                    continue
-                if value in seen:
-                    errors.append(f"duplicate changelog version heading: {value}")
-                seen.add(value)
-
-        if self.source_dir.is_dir():
-            for path in sorted(self.source_dir.rglob("*.py")):
-                if path == self.init_py:
-                    continue
-                text = path.read_text(encoding="utf-8")
-                if VERSION_LITERAL_RE.search(text):
-                    errors.append(
-                        f"{path.relative_to(self.root)} contains a package "
-                        "__version__ literal"
-                    )
-
-        if not self.version_module.is_file():
-            errors.append("missing src/gunz_utils/_version.py")
-        else:
-            version_text = self.version_module.read_text(encoding="utf-8")
-            if 'metadata.version("gunz-utils")' not in version_text:
-                errors.append(
-                    "gunz_utils._version must derive from importlib.metadata"
+                    f"runtime version must use installed {proj_name} metadata"
                 )
 
         if self.init_py.is_file():
             init_text = self.init_py.read_text(encoding="utf-8")
             if (
                 "from ._version import __version__" not in init_text
-                or "__version__ = _resolve_package_version()" not in init_text
+                and "__version__ = _resolve_package_version()" not in init_text
             ):
-                errors.append(
-                    "gunz_utils.__version__ must use the shared version resolver"
-                )
-            if VERSION_LITERAL_RE.search(init_text):
-                errors.append(
-                    "src/gunz_utils/__init__.py contains a static version literal"
-                )
+                rel = self.init_py.relative_to(self.root)
+                errors.append(f"{rel} must use the shared version resolver")
+
+        if source.is_dir():
+            for path in sorted(source.rglob("*.py")):
+                if "_vendor" in path.parts:
+                    continue
+                try:
+                    tree = ast.parse(
+                        path.read_text(encoding="utf-8"), filename=str(path)
+                    )
+                except (OSError, SyntaxError) as exc:
+                    errors.append(f"cannot parse {path.relative_to(self.root)}: {exc}")
+                    continue
+                for node in ast.walk(tree):
+                    if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                        continue
+                    targets = (
+                        node.targets if isinstance(node, ast.Assign) else [node.target]
+                    )
+                    if not any(
+                        isinstance(target, ast.Name) and target.id == "__version__"
+                        for target in targets
+                    ):
+                        continue
+                    if isinstance(node.value, ast.Constant) and not (
+                        path == resolver and node.value.value == "0+unknown"
+                    ):
+                        rel_path = path.relative_to(self.root)
+                        errors.append(
+                            f"independent __version__ literal: {rel_path} "
+                            "contains a package __version__ literal"
+                        )
 
         if self.sphinx_conf.is_file():
             conf_text = self.sphinx_conf.read_text(encoding="utf-8")
@@ -346,226 +492,276 @@ class ReleaseRepo:
             )
             if static_release is not None:
                 errors.append("docs/source/conf.py contains a static release version")
-            if 'package_version("gunz-utils")' not in conf_text:
+            if f'package_version("{proj_name}")' not in conf_text:
                 errors.append(
                     "Sphinx release must derive from installed package metadata"
                 )
 
-        tags = self._git_tags()
+        tags = self.tags()
         if tags:
             latest = tags[-1]
             if latest > current:
-                errors.append(
-                    f"latest tag v{latest} is newer than pyproject version {current}"
-                )
+                errors.append(f"latest tag v{latest} is newer than {current}")
             elif current not in tags:
                 warnings.append(
                     f"pyproject version {current} has no matching tag; latest tag is "
                     f"v{latest}"
                 )
         else:
-            warnings.append("Git tags are unavailable in this checkout")
-
-        required = self.required_bump(fragments)
-        if required != "none":
-            minimum = self.minimum_target(current, required)
             warnings.append(
-                f"current fragments require at least a {required} release "
-                f"(minimum {minimum})"
+                "No local release tags available; history was not inferred"
+            )
+
+        bump = required_bump(fragments)
+        if bump != "none":
+            warnings.append(
+                f"current fragments require at least a {bump} release "
+                f"(minimum {minimum_target(current, bump)})"
             )
 
         return CheckResult(tuple(errors), tuple(warnings))
 
-    def status(self) -> int:
-        current = self.current_version()
-        fragments = self.fragments()
-        tags = self._git_tags()
-        counts = Counter(fragment.category for fragment in fragments)
-        required = self.required_bump(fragments)
+    def changed_files(self,
+        base: str,
+    ) -> list[str]:
+        """Return paths changed on this branch relative to base revision."""
+        if not base:
+            raise ReleaseError("check-fragment requires a --base revision")
+        text = self._git(
+            "diff", "--name-only", "--diff-filter=ACMR", f"{base}...HEAD"
+        )
+        return [line for line in text.splitlines() if line]
 
-        print(f"Current version:       {current}")
-        if tags:
-            print(f"Latest Git tag:        v{tags[-1]}")
-        else:
-            print("Latest Git tag:        unavailable")
-        print(f"Unreleased fragments:  {len(fragments)}")
-        for category in CATEGORY_ORDER:
-            if counts[category]:
-                print(f"  {category:<12} {counts[category]}")
-        if required == "none":
-            print("Minimum SemVer bump:   none")
-        else:
-            print(
-                f"Minimum SemVer bump:   {required} "
-                f"(>= {self.minimum_target(current, required)})"
+    def check_fragment(self,
+        base: str,
+    ) -> tuple[list[str], list[str]]:
+        """Return errors and warnings for changelog coverage of source changes."""
+        errors: list[str] = []
+        warnings: list[str] = []
+        changed = self.changed_files(base)
+        src_changed = [
+            path
+            for path in changed
+            if path.startswith("src/") and "_vendor" not in path
+        ]
+        if not src_changed:
+            return errors, warnings
+        added = self._git(
+            "diff", "--name-only", "--diff-filter=A", f"{base}...HEAD"
+        ).splitlines()
+        added_fragments = [
+            path
+            for path in added
+            if path.startswith("changes/")
+            and path.endswith(".md")
+            and Path(path).name != "README.md"
+        ]
+        if not added_fragments:
+            errors.append(
+                "source changes under src/ without a changelog fragment; add "
+                "one under changes/ (internal-only changes may use the "
+                "'internal' category)"
             )
+        return errors, warnings
 
+    def report(self,
+        *,
+        status: bool = False,
+    ) -> int:
+        """Print metadata diagnostics and optionally pending release counts."""
         result = self.check()
         for warning in result.warnings:
             print(f"WARNING: {warning}")
         for error in result.errors:
             print(f"ERROR: {error}", file=sys.stderr)
-        return 0 if result.ok else 1
+        if not result.ok:
+            return 1
+        if status:
+            current = self.current_version()
+            fragments = self.fragments()
+            tags = self.tags()
+            counts = Counter(fragment.category for fragment in fragments)
+            req = required_bump(fragments)
+            print(f"Current version:       {current}")
+            if tags:
+                print(f"Latest Git tag:        v{tags[-1]}")
+            else:
+                print("Latest Git tag:        unavailable")
+            print(f"Unreleased fragments:  {len(fragments)}")
+            for category in CATEGORY_ORDER:
+                if counts[category]:
+                    print(f"  {category:<12} {counts[category]}")
+            if req == "none":
+                print("Minimum SemVer bump:   none")
+            else:
+                print(
+                    f"Minimum SemVer bump:   {req} "
+                    f"(>= {minimum_target(current, req)})"
+                )
+        else:
+            print("release metadata check: OK")
+        return 0
 
     def check_command(self) -> int:
-        result = self.check()
-        for warning in result.warnings:
-            print(f"WARNING: {warning}")
-        for error in result.errors:
-            print(f"ERROR: {error}", file=sys.stderr)
-        if result.ok:
-            print("release metadata check: OK")
-            return 0
-        return 1
+        """Backward-compatibility alias for report(status=False)."""
+        return self.report(status=False)
+
+    def status(self) -> int:
+        """Backward-compatibility alias for report(status=True)."""
+        return self.report(status=True)
 
     @staticmethod
-    def _render_fragment_text(
-        text: str,
-    ) -> str:
-        stripped = text.strip()
-        if stripped.startswith("- "):
-            return stripped
-        lines = stripped.splitlines()
-        return "- " + lines[0] + "".join(f"\n  {line}" for line in lines[1:])
-
-    def _render_release_sections(self,
+    def render(
         fragments: list[Fragment],
     ) -> str:
-        grouped: dict[str, list[Fragment]] = defaultdict(list)
+        """Render deterministic public notes; consume internal entries silently."""
+        grouped: dict[str, list[str]] = defaultdict(list)
         for fragment in fragments:
-            grouped[fragment.category].append(fragment)
-
-        parts: list[str] = []
-        for category in CATEGORY_ORDER:
-            if category == "internal" or not grouped[category]:
-                continue
-            parts.append(f"### {CATEGORY_TITLES[category]}")
-            entries = [
-                self._render_fragment_text(fragment.text)
-                for fragment in grouped[category]
-            ]
-            parts.append("\n\n".join(entries))
-        if not parts:
-            parts.extend(
-                [
-                    "### Internal",
-                    "- Internal-only maintenance; no user-facing changelog entries.",
-                ]
+            lines = fragment.text.splitlines()
+            entry = (
+                fragment.text
+                if fragment.text.startswith("- ")
+                else ("- " + lines[0] + "".join(f"\n  {line}" for line in lines[1:]))
             )
-        return "\n\n".join(parts)
+            grouped[fragment.category].append(entry)
+        sections = []
+        for category in CATEGORY_ORDER:
+            if category != "internal" and grouped[category]:
+                sections.append(
+                    f"### {CATEGORY_TITLES[category]}\n\n"
+                    + "\n\n".join(grouped[category])
+                )
+        fallback = (
+            "### Internal\n\n"
+            "- Internal-only maintenance; no user-facing changelog entries."
+        )
+        return "\n\n".join(sections) or fallback
 
     def _updated_pyproject(self,
         target: SemVer,
     ) -> str:
+        """Replace only the top-level project version, retaining other TOML."""
         text = self.pyproject.read_text(encoding="utf-8")
-        project_match = re.search(r"^\[project\]\s*$", text, re.MULTILINE)
-        if project_match is None:
-            raise ReleaseError("pyproject.toml is missing [project]")
-        next_section = re.search(
-            r"^\[[^]]+\]\s*$",
-            text[project_match.end() :],
-            re.MULTILINE,
-        )
-        end = (
-            project_match.end() + next_section.start()
-            if next_section is not None
-            else len(text)
-        )
-        section = text[project_match.end() : end]
-        replaced, count = re.subn(
-            r'(?m)^version[ \t]*=[ \t]*"[^"]+"[ \t]*$',
-            f'version = "{target}"',
-            section,
+        section = re.search(r"(?ms)^\[project\][ \t]*\n(.*?)(?=^\[|\Z)", text)
+        if section is None:
+            raise ReleaseError("cannot locate [project] section")
+        body, count = re.subn(
+            r"(?m)^(version[ \t]*=[ \t]*)([\"'])[^\"']+\2([ \t]*(?:#.*)?)$",
+            lambda match: f'{match[1]}"{target}"{match[3]}',
+            section[1],
             count=1,
         )
         if count != 1:
-            raise ReleaseError("could not replace [project].version")
-        return text[: project_match.end()] + replaced + text[end:]
-
-    def _updated_changelog(self,
-        target: SemVer,
-        fragments: list[Fragment],
-        release_date: dt.date,
-    ) -> str:
-        text = self.changelog.read_text(encoding="utf-8")
-        if re.search(
-            rf"^## \[{re.escape(str(target))}\](?:\s|$)",
-            text,
-            re.MULTILINE,
-        ):
-            raise ReleaseError(f"CHANGELOG.md already contains [{target}]")
-        match = UNRELEASED_SECTION_RE.search(text)
-        if match is None:
-            raise ReleaseError("CHANGELOG.md is missing [Unreleased]")
-        release_body = self._render_release_sections(fragments)
-        replacement = (
-            "## [Unreleased]\n\n"
-            f"{UNRELEASED_NOTE}\n\n"
-            f"## [{target}] — {release_date.isoformat()}\n\n"
-            f"{release_body}\n\n"
-        )
-        return text[: match.start()] + replacement + text[match.end() :]
+            raise ReleaseError("cannot update [project].version")
+        updated = text[: section.start(1)] + body + text[section.end(1) :]
+        if tomllib.loads(updated)["project"]["version"] != str(target):
+            raise ReleaseError("updated project version did not round-trip")
+        return updated
 
     @staticmethod
-    def _atomic_write(
-        path: Path,
-        text: str,
+    def _validate_prepared(
+        pyproject: str,
+        changelog: str,
+        target: SemVer,
+        previous_headings: list[str],
     ) -> None:
-        tmp = path.with_name(path.name + ".release-tmp")
-        tmp.write_text(text, encoding="utf-8")
-        tmp.replace(path)
+        """Validate the complete candidate before writes or fragment removal."""
+        current = project_version(pyproject)
+        errors = changelog_errors(changelog, current)
+        if current != target:
+            errors.append(f"prepared project version {current} does not match {target}")
+        headings = [match[1] for match in HEADING.finditer(changelog)]
+        if headings != ["Unreleased", str(target), *previous_headings[1:]]:
+            errors.append(
+                "prepared CHANGELOG.md must add exactly one release heading "
+                f"for {target}"
+            )
+        if errors:
+            raise ReleaseError("invalid prepared release: " + "; ".join(errors))
 
     def prepare(self,
         target_text: str = "auto",
         *,
         dry_run: bool = False,
     ) -> int:
-        result = self.check()
-        if not result.ok:
-            for error in result.errors:
-                print(f"ERROR: {error}", file=sys.stderr)
+        """Validate and prepare local release files; never commit, tag, or push."""
+        if self.report():
             return 1
-
         current = self.current_version()
         fragments = self.fragments()
         if not fragments:
             raise ReleaseError("no changelog fragments to release")
-
-        required = self.required_bump(fragments)
-        effective_bump = "patch" if required == "none" else required
-
-        if target_text.strip().lower() == "auto":
-            target = self.minimum_target(current, effective_bump)
-        else:
-            target = SemVer.parse(target_text)
-            if not self.target_satisfies(current, target, required):
-                minimum = self.minimum_target(current, required)
-                raise ReleaseError(
-                    f"{target} is too small for {required} changes; "
-                    f"minimum allowed target is {minimum}"
-                )
-
-        pyproject_text = self._updated_pyproject(target)
-        changelog_text = self._updated_changelog(target, fragments, dt.date.today())
-
+        minimum = minimum_target(current, required_bump(fragments))
+        target = minimum if target_text == "auto" else SemVer.parse(target_text)
+        if not target_satisfies(current, target, required_bump(fragments)):
+            raise ReleaseError(
+                f"{target} is too small for {required_bump(fragments)} changes; "
+                f"minimum allowed target is {minimum}"
+            )
+        old_changelog = self.changelog.read_text(encoding="utf-8")
+        headings = list(HEADING.finditer(old_changelog))
+        if any(match[1] == str(target) for match in headings):
+            raise ReleaseError(f"release {target} already appears in CHANGELOG.md")
+        end = headings[1].start() if len(headings) > 1 else len(old_changelog)
+        manual_notes = old_changelog[headings[0].end() : end].strip("\n")
+        if manual_notes == UNRELEASED_NOTE:
+            manual_notes = ""
+        elif manual_notes.startswith(UNRELEASED_NOTE + "\n"):
+            manual_notes = manual_notes[len(UNRELEASED_NOTE) :].lstrip("\n")
+        rendered_body = self.render(fragments)
+        notes = (
+            "\n\n".join(part for part in (manual_notes, rendered_body) if part)
+        )
+        release_text = (
+            f"## [{target}] — {dt.date.today().isoformat()}\n\n"
+            f"{notes}\n\n"
+        )
+        updated = {
+            self.pyproject: self._updated_pyproject(target),
+            self.changelog: (
+                old_changelog[: headings[0].start()]
+                + f"## [Unreleased]\n\n{UNRELEASED_NOTE}\n\n"
+                + release_text
+                + old_changelog[end:]
+            ),
+        }
+        self._validate_prepared(
+            updated[self.pyproject],
+            updated[self.changelog],
+            target,
+            [match[1] for match in headings],
+        )
         if dry_run:
-            print(f"[DRY-RUN] Target version: {target} (bump: {required})")
+            req_bump = required_bump(fragments)
+            print(f"[DRY-RUN] Target version: {target} (bump: {req_bump})")
             print(f"[DRY-RUN] Fragments consumed ({len(fragments)}):")
             for frag in fragments:
                 print(f"  - {frag.path.name}")
             print("\n[DRY-RUN] Proposed CHANGELOG.md addition:")
             print("-" * 60)
-            release_body = self._render_release_sections(fragments)
-            print(f"## [{target}] — {dt.date.today().isoformat()}\n\n{release_body}")
+            print(f"## [{target}] — {dt.date.today().isoformat()}\n\n{notes}")
             print("-" * 60)
             print("[DRY-RUN] No files modified and no fragments deleted.")
             return 0
-
-        self._atomic_write(self.pyproject, pyproject_text)
-        self._atomic_write(self.changelog, changelog_text)
-        for fragment in fragments:
-            fragment.path.unlink()
-
+        originals = {path: path.read_text(encoding="utf-8") for path in updated}
+        originals.update(
+            {
+                fragment.path: fragment.path.read_text(encoding="utf-8")
+                for fragment in fragments
+            }
+        )
+        changed: list[Path] = []
+        try:
+            for path, text in updated.items():
+                atomic_write(path, text)
+                changed.append(path)
+            for fragment in fragments:
+                fragment.path.unlink()
+                changed.append(fragment.path)
+        except OSError:
+            for path in reversed(changed):
+                atomic_write(path, originals[path])
+            raise
         print(f"Prepared release {target}.")
         print(f"Recommended commit: chore(release): v{target}")
         print(
@@ -575,79 +771,56 @@ class ReleaseRepo:
         return 0
 
     def verify(self) -> int:
-        result = self.check()
-        for warning in result.warnings:
-            print(f"WARNING: {warning}")
-        for error in result.errors:
-            print(f"ERROR: {error}", file=sys.stderr)
-        if not result.ok:
+        """Require a prepared version with no remaining fragments."""
+        if self.report():
             return 1
-
-        current = self.current_version()
-        fragments = self.fragments()
-        if fragments:
+        if self.fragments():
             print(
-                f"ERROR: {len(fragments)} changelog fragment(s) remain; "
-                "run prepare before release verification",
+                "ERROR: pending fragments remain; run prepare before verify",
                 file=sys.stderr,
             )
             return 1
-        text = self.changelog.read_text(encoding="utf-8")
-        release_heading = re.search(
-            rf"^## \[{re.escape(str(current))}\](?:\s|$)",
-            text,
-            re.MULTILINE,
-        )
-        if release_heading is None:
+        version = str(self.current_version())
+        headings = [
+            match[1]
+            for match in HEADING.finditer(self.changelog.read_text(encoding="utf-8"))
+        ]
+        if len(headings) < 2 or headings[1] != version:
             print(
-                f"ERROR: CHANGELOG.md has no [{current}] release entry",
+                f"ERROR: latest changelog release must match {version}",
                 file=sys.stderr,
             )
             return 1
-        print(f"release {current} is ready for commit/tag verification")
-        print(f"expected commit message: chore(release): v{current}")
-        print(f"expected tag: v{current}")
+        print(f"release {version} is ready for commit/tag verification")
+        print(f"expected commit message: chore(release): v{version}")
+        print(f"expected tag: v{version}")
         return 0
 
-    def unreleased(self) -> int:
-        fragments = self.fragments()
-        if not fragments:
-            print("No unreleased fragments in changes/.")
-            return 0
-        sections = self._render_release_sections(fragments)
-        print(sections)
-        return 0
-
-    def notes(self,
-        version_text: str | None = None,
+    def new(self,
+        identifier: str | None,
+        category: str,
+        message: str,
     ) -> int:
-        if version_text is None:
-            target = self.current_version()
-        else:
-            target = SemVer.parse(version_text)
-
-        if not self.changelog.is_file():
-            print("ERROR: missing CHANGELOG.md", file=sys.stderr)
-            return 1
-
-        text = self.changelog.read_text(encoding="utf-8")
-        heading_pattern = rf"^## \[{re.escape(str(target))}\](?:\s+—\s+.+)?$"
-        match = re.search(heading_pattern, text, re.MULTILINE)
-        if match is None:
-            print(
-                f"ERROR: release section [{target}] not found in CHANGELOG.md",
-                file=sys.stderr,
+        """Create an exclusive, validated fragment without overwriting an ID."""
+        text = message.strip()
+        validate_fragment_text(text, identifier or "new message")
+        if identifier is None:
+            slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40]
+            identifier = f"{dt.date.today():%Y%m%d}-{slug or 'change'}"
+        if IDENTIFIER.fullmatch(identifier) is None or category not in CATEGORY_BUMP:
+            raise ReleaseError("invalid fragment ID or category")
+        if any(fragment.identifier == identifier for fragment in self.fragments()):
+            raise ReleaseError(f"fragment ID already exists: {identifier}")
+        path = self.fragments_dir / f"{identifier}.{category}.md"
+        with path.open("x", encoding="utf-8") as stream:
+            lines = text.splitlines()
+            formatted = (
+                text
+                if text.startswith("- ")
+                else ("- " + lines[0] + "".join(f"\n  {line}" for line in lines[1:]))
             )
-            return 1
-
-        body_start = match.end()
-        next_match = re.search(r"^## \[", text[body_start:], re.MULTILINE)
-        if next_match is not None:
-            notes_text = text[body_start : body_start + next_match.start()].strip()
-        else:
-            notes_text = text[body_start:].strip()
-
-        print(notes_text)
+            stream.write(formatted + "\n")
+        print(f"Created {path.relative_to(self.root)}")
         return 0
 
     def new_fragment(self,
@@ -655,216 +828,137 @@ class ReleaseRepo:
         message: str,
         identifier: str | None = None,
     ) -> int:
-        category = category.lower().strip()
-        if category not in CATEGORY_TITLES:
-            allowed = ", ".join(CATEGORY_ORDER)
-            print(
-                f"ERROR: invalid category {category!r}; allowed: {allowed}",
-                file=sys.stderr,
+        """Backward-compatibility alias for new()."""
+        return self.new(identifier, category, message)
+
+    def notes(self,
+        version_text: str | None = None,
+    ) -> int:
+        """Print one prepared release's public notes."""
+        version = str(
+            self.current_version()
+            if version_text is None
+            else SemVer.parse(version_text)
+        )
+        text = self.changelog.read_text(encoding="utf-8")
+        headings = list(HEADING.finditer(text))
+        for index, match in enumerate(headings):
+            if match[1] == version:
+                end = (
+                    headings[index + 1].start()
+                    if index + 1 < len(headings)
+                    else len(text)
+                )
+                print(text[match.end() : end].strip())
+                return 0
+        raise ReleaseError(f"no changelog release for {version}")
+
+    def unreleased(self) -> int:
+        """Render pending fragments in changelog format."""
+        fragments = self.fragments()
+        if not fragments:
+            print("No unreleased fragments in changes/.")
+            return 0
+        print(self.render(fragments))
+        return 0
+
+    def tag(self,
+        *,
+        create: bool = False,
+    ) -> int:
+        """Validate main's release commit and optionally create its annotated tag."""
+        if self.verify():
+            return 1
+        version = self.current_version()
+        name = f"v{version}"
+        if self._git("status", "--porcelain"):
+            raise ReleaseError("tagging requires a clean working tree")
+        if self._git("branch", "--show-current") != "main":
+            raise ReleaseError("tagging requires the main branch")
+        try:
+            origin_main = self._git("rev-parse", "refs/remotes/origin/main")
+        except ReleaseError:
+            origin_main = None
+        if origin_main and self._git("rev-parse", "HEAD") != origin_main:
+            raise ReleaseError("HEAD must equal the locally fetched origin/main")
+        head_commit = self._git("log", "-1", "--format=%s")
+        expected_commit = f"chore(release): {name}"
+        if head_commit != expected_commit:
+            raise ReleaseError(
+                f"expected release commit message: {expected_commit}"
             )
-            return 1
-
-        msg = message.strip()
-        if not msg:
-            print("ERROR: fragment message cannot be empty", file=sys.stderr)
-            return 1
-
-        if not identifier:
-            slug = re.sub(r"[^a-z0-9]+", "-", msg.lower()).strip("-")[:35]
-            date_str = dt.date.today().strftime("%Y%m%d")
-            identifier = f"{date_str}-{slug}" if slug else f"{date_str}-change"
-
-        valid_identifier = re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", identifier)
-        if valid_identifier is None:
-            print(f"ERROR: invalid fragment id {identifier!r}", file=sys.stderr)
-            return 1
-
-        filename = f"{identifier}.{category}.md"
-        path = self.fragments_dir / filename
-        if path.exists():
-            print(f"ERROR: fragment {filename} already exists", file=sys.stderr)
-            return 1
-
-        formatted_message = self._render_fragment_text(msg) + "\n"
-        self.fragments_dir.mkdir(parents=True, exist_ok=True)
-        path.write_text(formatted_message, encoding="utf-8")
-        print(f"Created fragment: {path.relative_to(self.root)}")
+        if version in self.tags():
+            raise ReleaseError(f"tag {name} already exists")
+        if create:
+            self._git("tag", "-a", name, "-m", name)
+            print(f"Created annotated tag {name}; no push or publication was performed")
+        else:
+            print(f"Tag {name} is ready; use tag --create to create it locally")
         return 0
 
     def tag_release(self,
         create: bool = False,
     ) -> int:
-        current = self.current_version()
-        tag_name = f"v{current}"
-
-        verify_status = self.verify()
-        if verify_status != 0:
-            return verify_status
-
-        status_proc = subprocess.run(
-            ["git", "-C", str(self.root), "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if status_proc.returncode != 0:
-            print("ERROR: git status failed", file=sys.stderr)
-            return 1
-        if status_proc.stdout.strip():
-            print("ERROR: working tree contains uncommitted changes:", file=sys.stderr)
-            for line in status_proc.stdout.splitlines():
-                print(f"  {line}", file=sys.stderr)
-            return 1
-
-        branch_proc = subprocess.run(
-            ["git", "-C", str(self.root), "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        branch = branch_proc.stdout.strip()
-        if branch != "main":
-            print(
-                f"WARNING: current branch is {branch!r}; releases should normally "
-                "be tagged on 'main'",
-                file=sys.stderr,
-            )
-
-        log_proc = subprocess.run(
-            ["git", "-C", str(self.root), "log", "-1", "--format=%s"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        head_commit = log_proc.stdout.strip()
-        expected_commit = f"chore(release): {tag_name}"
-        if head_commit != expected_commit:
-            print(
-                f"ERROR: HEAD commit message is {head_commit!r}; "
-                f"expected {expected_commit!r}",
-                file=sys.stderr,
-            )
-            return 1
-
-        tags = self._git_tags()
-        if current in tags:
-            print(
-                f"ERROR: tag {tag_name} already exists in repository",
-                file=sys.stderr,
-            )
-            return 1
-
-        if create:
-            tag_proc = subprocess.run(
-                ["git", "-C", str(self.root), "tag", "-a", tag_name, "-m", tag_name],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            if tag_proc.returncode != 0:
-                print(
-                    f"ERROR: failed to create tag: {tag_proc.stderr}",
-                    file=sys.stderr,
-                )
-                return tag_proc.returncode
-            print(f"Created annotated tag: {tag_name}")
-            print(f"Push with: git push origin {tag_name}")
-            return 0
-        else:
-            print(f"Tag {tag_name} is valid and ready to be created.")
-            print(f"Run: git tag -a {tag_name} -m \"{tag_name}\"")
-            print("Or rerun with --create: python scripts/release.py tag --create")
-            return 0
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("status", help="show version, tags, fragments and minimum bump")
-    sub.add_parser("check", help="validate release metadata without modifying files")
-    sub.add_parser("unreleased", help="render pending fragments in changelog format")
-
-    notes = sub.add_parser(
-        "notes",
-        help="extract release notes for a version from CHANGELOG.md",
-    )
-    notes.add_argument(
-        "version",
-        nargs="?",
-        default=None,
-        help="target version (default: current version in pyproject.toml)",
-    )
-
-    new = sub.add_parser("new", help="create a new changelog fragment file")
-    new.add_argument(
-        "-c",
-        "--category",
-        required=True,
-        choices=CATEGORY_ORDER,
-        help="change category",
-    )
-    new.add_argument("-m", "--message", required=True, help="description of the change")
-    new.add_argument(
-        "--id",
-        default=None,
-        help="optional unique fragment ID (default: date + slug)",
-    )
-
-    prepare = sub.add_parser("prepare", help="prepare a release in the working tree")
-    prepare.add_argument(
-        "version",
-        nargs="?",
-        default="auto",
-        help="target MAJOR.MINOR.PATCH version or 'auto' (default: auto)",
-    )
-    prepare.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="preview changes without modifying files or deleting fragments",
-    )
-
-    sub.add_parser("verify", help="verify a prepared release before tagging")
-
-    tag = sub.add_parser(
-        "tag",
-        help="validate release commit and optionally create git tag",
-    )
-    tag.add_argument(
-        "--create",
-        action="store_true",
-        help="create the annotated git tag",
-    )
-
-    return parser
+        """Backward-compatibility alias for tag()."""
+        return self.tag(create=create)
 
 
 def main(
     argv: list[str] | None = None,
 ) -> int:
-    args = build_parser().parse_args(argv)
-    repo = ReleaseRepo(Path(__file__).resolve().parent.parent)
+    """Dispatch the local release commands shared by developers and CI."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--root", type=Path, default=Path(__file__).resolve().parent.parent
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+    for command in ("check", "status", "verify", "unreleased"):
+        sub.add_parser(command)
+    check_fragment = sub.add_parser("check-fragment")
+    check_fragment.add_argument(
+        "--base", default="origin/main", help="git revision to diff against"
+    )
+    prepare = sub.add_parser("prepare")
+    prepare.add_argument("version", nargs="?", default="auto")
+    prepare.add_argument("--dry-run", action="store_true")
+    new = sub.add_parser("new")
+    new.add_argument("--id")
+    new.add_argument("-c", "--category", required=True, choices=CATEGORY_ORDER)
+    new.add_argument("-m", "--message", required=True)
+    notes = sub.add_parser("notes")
+    notes.add_argument("version", nargs="?")
+    tag = sub.add_parser("tag")
+    tag.add_argument("--create", action="store_true")
+    args = parser.parse_args(argv)
+    repo = ReleaseRepo(args.root)
     try:
-        if args.command == "status":
-            return repo.status()
-        if args.command == "check":
-            return repo.check_command()
-        if args.command == "unreleased":
-            return repo.unreleased()
-        if args.command == "notes":
-            return repo.notes(args.version)
-        if args.command == "new":
-            return repo.new_fragment(args.category, args.message, args.id)
+        if args.command in ("check", "status"):
+            return repo.report(status=args.command == "status")
         if args.command == "prepare":
             return repo.prepare(args.version, dry_run=args.dry_run)
+        if args.command == "new":
+            return repo.new(args.id, args.category, args.message)
+        if args.command == "check-fragment":
+            errors, warnings = repo.check_fragment(args.base)
+            for warning in warnings:
+                print(f"WARNING: {warning}")
+            for error in errors:
+                print(f"ERROR: {error}", file=sys.stderr)
+            if not errors:
+                print("changelog fragment coverage: OK")
+            return 1 if errors else 0
         if args.command == "verify":
             return repo.verify()
         if args.command == "tag":
-            return repo.tag_release(create=args.create)
-    except (OSError, tomllib.TOMLDecodeError, ReleaseError) as exc:
+            return repo.tag(create=args.create)
+        if args.command == "notes":
+            return repo.notes(args.version)
+        if args.command == "unreleased":
+            return repo.unreleased()
+        return 0
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
-    raise AssertionError(f"unhandled command: {args.command}")
-
 
 
 if __name__ == "__main__":

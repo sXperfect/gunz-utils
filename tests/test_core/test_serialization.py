@@ -15,7 +15,13 @@ from types import MappingProxyType
 # =============================================================================
 
 import gunz_utils.serialization as ser_mod
-from gunz_utils.serialization import canonical_json, json_loads, to_jsonable
+from gunz_utils.serialization import (
+    canonical_json,
+    decode_json_object,
+    json_loads,
+    load_json_object,
+    to_jsonable,
+)
 
 
 @dataclasses.dataclass
@@ -207,3 +213,50 @@ class TestSerializationDifferential(unittest.TestCase):
             self.assertEqual(py_dict, clean_dict)
         finally:
             ser_mod._accel_is_json_clean = saved_clean
+
+
+class TestDecodeJsonObject(unittest.TestCase):
+    def test_basic_decode(self) -> None:
+        data = b'{"name": "test", "count": 42, "ratio": 3.14}'
+        result = decode_json_object(data)
+        self.assertEqual(result, {"name": "test", "count": 42, "ratio": 3.14})
+
+    def test_string_payload_supported(self) -> None:
+        result = decode_json_object('{"key": "value"}')
+        self.assertEqual(result, {"key": "value"})
+
+    def test_rejects_duplicate_keys(self) -> None:
+        with self.assertRaisesRegex(ValueError, "duplicate JSON key"):
+            decode_json_object(b'{"a": 1, "a": 2}')
+
+    def test_rejects_non_finite_numbers(self) -> None:
+        for val in (b'{"a": NaN}', b'{"a": Infinity}', b'{"a": -Infinity}'):
+            with self.assertRaisesRegex(ValueError, "non-finite JSON number"):
+                decode_json_object(val)
+
+    def test_rejects_non_object_root(self) -> None:
+        for val in (b"[1, 2, 3]", b'"string"', b"123", b"true", b"null"):
+            with self.assertRaisesRegex(ValueError, "Expected JSON object"):
+                decode_json_object(val)
+
+    def test_rejects_invalid_utf8(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Invalid UTF-8"):
+            decode_json_object(b'{"name": "\xff\xfe"}')
+
+    def test_rejects_deep_nesting(self) -> None:
+        #? Build payload with depth 70
+        nested = "1"
+        for _ in range(70):
+            nested = f'{{"nested": {nested}}}'
+        with self.assertRaisesRegex(ValueError, "JSON nesting exceeds 64 containers"):
+            decode_json_object(nested.encode())
+
+    def test_load_json_object(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            file_path = Path(tmp_dir) / "config.json"
+            file_path.write_bytes(b'{"service": "auth", "port": 8080}')
+            result = load_json_object(file_path, max_bytes=1024)
+            self.assertEqual(result, {"service": "auth", "port": 8080})
+

@@ -12,9 +12,9 @@ import dataclasses
 import importlib
 import json
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -212,4 +212,133 @@ def canonical_json(
     return json_dumps(value)
 
 
-__all__ = ["canonical_json", "json_dumps", "json_loads", "to_jsonable"]
+def _object_hook(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, val in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key!r}")
+        result[key] = val
+    return result
+
+
+def _constant_hook(
+    value: str,
+) -> NoReturn:
+    raise ValueError(f"non-finite JSON number: {value}")
+
+
+def _float_hook(
+    value: str,
+) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("JSON number overflows a finite float")
+    return number
+
+
+def decode_json_object(
+    payload: bytes | str,
+    *,
+    label: str = "JSON",
+    max_depth: int = 64,
+) -> dict[str, Any]:
+    """Decode strict JSON object, rejecting duplicates, nonfinites, and recursion.
+
+    Parameters
+    ----------
+    payload : bytes | str
+        UTF-8 bytes or text representing a JSON object.
+    label : str, default="JSON"
+        Descriptor used in error messages.
+    max_depth : int, default=64
+        Maximum permitted container nesting depth.
+
+    Returns
+    -------
+    dict[str, Any]
+        Parsed JSON object mapping.
+    """
+    if isinstance(payload, bytes):
+        try:
+            text = payload.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Invalid UTF-8 in {label}: {exc}") from exc
+    elif isinstance(payload, str):
+        text = payload
+    else:
+        actual = type(payload).__name__
+        raise TypeError(f"{label} payload must be bytes or str, not {actual}")
+
+    try:
+        result = json.loads(
+            text,
+            object_pairs_hook=_object_hook,
+            parse_constant=_constant_hook,
+            parse_float=_float_hook,
+        )
+    except (ValueError, RecursionError) as exc:
+        raise ValueError(f"Invalid JSON in {label}: {exc}") from exc
+
+    if not isinstance(result, dict):
+        raise ValueError(f"Expected JSON object in {label}")
+
+    stack: list[tuple[Iterator[Any], int]] = [(iter(result.values()), 1)]
+    while stack:
+        iterator, depth = stack[-1]
+        try:
+            val = next(iterator)
+        except StopIteration:
+            stack.pop()
+            continue
+        if isinstance(val, (dict, list)):
+            if depth >= max_depth:
+                raise ValueError(
+                    f"{label}: JSON nesting exceeds {max_depth} containers"
+                )
+            sub_iter = iter(val.values() if isinstance(val, dict) else val)
+            stack.append((sub_iter, depth + 1))
+    return result
+
+
+def load_json_object(
+    path: str | Path,
+    *,
+    max_bytes: int,
+    label: str = "JSON file",
+    max_depth: int = 64,
+) -> dict[str, Any]:
+    """Read a bounded regular file snapshot and decode it as a strict JSON object.
+
+    Parameters
+    ----------
+    path : str | Path
+        Path to regular JSON file.
+    max_bytes : int
+        Maximum permitted file size in bytes.
+    label : str, default="JSON file"
+        Descriptor used in error messages.
+    max_depth : int, default=64
+        Maximum container nesting depth.
+
+    Returns
+    -------
+    dict[str, Any]
+        Parsed JSON object mapping.
+    """
+    from .io import read_regular_bytes
+
+    raw = read_regular_bytes(path, max_bytes=max_bytes, label=label)
+    return decode_json_object(raw, label=label, max_depth=max_depth)
+
+
+__all__ = [
+    "canonical_json",
+    "decode_json_object",
+    "json_dumps",
+    "json_loads",
+    "load_json_object",
+    "to_jsonable",
+]
+

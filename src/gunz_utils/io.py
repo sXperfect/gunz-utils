@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import stat
 import tempfile
 from typing import Any
 
@@ -20,7 +21,7 @@ from .serialization import json_dumps
 __author__ = "Yeremia Gunz"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
-__all__ = ["atomic_json_write", "atomic_write"]
+__all__ = ["atomic_json_write", "atomic_write", "read_regular_bytes"]
 
 
 def atomic_write(
@@ -160,3 +161,78 @@ def atomic_json_write(
         durable=durable,
         permissions=permissions,
     )
+
+
+def read_regular_bytes(
+    path: str | pathlib.Path,
+    *,
+    max_bytes: int,
+    label: str = "file",
+) -> bytes:
+    """Capture one bounded regular-file snapshot; never reopen it for decoding.
+
+    The final path component must not be a symlink. Parent directories are
+    trusted local paths, not a sandbox boundary. Check identity/size/timestamps
+    before and after reading. A digest must be computed from these returned
+    bytes, not from a separate open. This does not lock out writers or promise
+    filesystem snapshots.
+
+    Parameters
+    ----------
+    path : str | pathlib.Path
+        Target regular file path to read.
+    max_bytes : int
+        Maximum permitted file size and payload bytes.
+    label : str, default="file"
+        Human-readable descriptor used in exception messages.
+
+    Returns
+    -------
+    bytes
+        Captured byte contents of the regular file.
+    """
+    if type(max_bytes) is not int or max_bytes <= 0:
+        raise ValueError("max_bytes must be a positive integer")
+    target = pathlib.Path(path)
+    before_path = target.lstat()
+    if not stat.S_ISREG(before_path.st_mode):
+        raise ValueError(f"{label} must be a non-symlink regular file")
+    flags = os.O_RDONLY
+    for name in ("O_CLOEXEC", "O_NOFOLLOW", "O_NONBLOCK", "O_BINARY"):
+        flags |= getattr(os, name, 0)
+    descriptor = os.open(target, flags)
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or not os.path.samestat(before_path, before)
+        ):
+            raise ValueError(f"{label} path changed during open")
+        if before.st_size > max_bytes:
+            raise ValueError(f"{label} exceeds size limit ({max_bytes} bytes)")
+        chunks: list[bytes] = []
+        remaining = max_bytes + 1
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 1 << 20))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        payload = b"".join(chunks)
+        if len(payload) > max_bytes:
+            raise ValueError(f"{label} exceeds size limit ({max_bytes} bytes)")
+        after = os.fstat(descriptor)
+        after_path = target.lstat()
+        signature_before = (before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        signature_after = (after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        if (
+            not stat.S_ISREG(after_path.st_mode)
+            or not os.path.samestat(before, after_path)
+            or signature_before != signature_after
+            or len(payload) != after.st_size
+        ):
+            raise ValueError(f"{label} changed during read")
+        return payload
+    finally:
+        os.close(descriptor)
+
