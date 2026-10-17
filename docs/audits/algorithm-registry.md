@@ -126,7 +126,7 @@ directories, sampled process-tree observations, and caller-owned input budgets.
 | ALG-010 | Effective transitive fingerprint | `dag.WorkflowDAG.effective_fingerprint` | A2 | dependency sensitivity, propagation, cache invalidation | reviewed; no defect found |
 | ALG-011 | Provenance DAG cycle/ancestor traversal | `provenance_graph.ProvenanceGraph` | A4 | cycle rollback, unresolved nodes, deterministic ancestors; iterative stack traversal verified at >1,000 node depth | iterative stack traversal resolves recursion limits |
 | ALG-012 | Unsigned 64-bit canonical varint | `binary.encode_uvarint`, `ByteReader.read_uvarint` | A4 | exhaustive 0..65535 reference/round trip, uint64 boundaries, canonical form, malformed/truncation rollback | exhaustive/reference proof executed in CI |
-| ALG-013 | Priority + recent retention | `structures.retain_priority_and_recent` | A2 | stable order, priority preservation, zero/None limits | strengthened bound validation |
+| ALG-013 | Priority + recent retention | `structures.retain_priority_and_recent` | A4 | stable order, priority preservation, zero/None limits, one-pass predicate evaluation, boolean/negative rejection | verified in `test_structures_retention.py` |
 | ALG-014 | Async token bucket | `rate_limit.AsyncRateLimiter` | A4 | balance in [0, capacity], exact integer capacity comparison, normalized request arithmetic, timeout, representable finite parameters | verified in `test_deadline_regressions.py`, `test_rate_limit.py`, full CI |
 | ALG-015 | Benchmark loop calibration | `benchmark.runner.calibrate_loops` | A2 | monotonic loop growth, target/max bounds | fixed non-finite target and invalid max-loop domains |
 | ALG-016 | Benchmark sampling/stat summary | `benchmark.runner.benchmark` | A2 | iteration bounds, min-time semantics, finite config, percentile summary | configuration hardened; focused execution pending |
@@ -141,17 +141,17 @@ directories, sampled process-tree observations, and caller-owned input budgets.
 | ALG-025 | TTL/LRU caches | `cache.ttl_cache`, `async_ttl_cache` | A4 | TTL expiry, capacity eviction, coalesced async misses, finite TTL/maxsize domains | verified in `test_cache.py` |
 | ALG-026 | Circuit breaker | `resilience.AsyncCircuitBreaker` | A4 | state transitions, failure threshold, recovery timer, concurrent half-open probe isolation | verified in `test_resilience.py` |
 | ALG-027 | Async bulkhead | `resilience.AsyncBulkhead` | A4 | concurrency bound, timeout acquisition, cancellation permit release | verified in `test_resilience.py` |
-| ALG-028 | Monotonic deadline arithmetic | `time_utils.monotonic_deadline`, `remaining` | A2 | finite monotonic deadlines, non-negative remaining time | fixed NaN/inf deadline semantics |
-| ALG-029 | Sync/async eventually polling | `testing.eventually`, `eventually_async` | A2 | termination, interval positivity, timeout | fixed `timeout=NaN` non-termination class |
-| ALG-030 | Manual clock / deterministic integer fuzz | `testkit.ManualClock`, `fuzz_integers` | A2 | monotonic clock, finite advance, integer generator bounds | hardened domains and overflow behavior |
-| ALG-031 | Resource budgets | `limits.Limits`, `ResourceBudget` | A2 | byte/item/depth monotonic consumption, finite deadlines and injected clocks | fixed non-finite/bool domains and NaN-clock deadline poisoning |
-| ALG-032 | Canonical JSON conversion | `serialization.to_jsonable`, `canonical_json` | A2 | deterministic mappings/sets, JSON compatibility, collision freedom | fixed normalized-key collision data loss |
-| ALG-033 | Structured/content hashing parameters | `hashing.*` | A2 | deterministic digest, bounded reads, size domains | strict chunk/short-hash integer bounds added |
-| ALG-034 | Chunk/batch/flatten iteration | `iteration.chunked`, `batched`, `flatten` | A2 | laziness, grouping, cycle rejection, depth bounds | strict integer/depth domains added |
-| ALG-035 | Ring buffer / top-k bounds | `structures.RingBuffer`, `top_k` | A2 | capacity invariant, ordering, k bounds | strict integer bound validation added |
-| ALG-036 | Recursive redaction | `redaction.redact`, `redact_dict` | A2 | secret-context propagation, non-mutation, reveal-count bound | strict reveal-count domain added |
-| ALG-037 | Safe integer parsing | `parsing.safe_int` | A2 | strings/bytes/ordinary ints, base handling, bounds/fallback | fixed documented integer inputs returning fallback |
-| ALG-038 | Generic async timeout wrapper | `async_utils.with_timeout` | A2 | None semantics, finite timeout, cancellation | finite timeout validation added |
+| ALG-028 | Monotonic deadline arithmetic | `time_utils.monotonic_deadline`, `remaining` | A4 | finite monotonic deadlines, non-negative remaining time, expired predicate, non-finite/boolean rejection | verified in `test_foundation_more.py` |
+| ALG-029 | Sync/async eventually polling | `testing.eventually`, `eventually_async` | A4 | termination, interval positivity, finite timeout, exception trapping, async polling parity | verified in `test_foundation_more.py`, `test_acquisition_context.py` |
+| ALG-030 | Manual clock / deterministic integer fuzz | `testkit.ManualClock`, `fuzz_integers` | A4 | monotonic clock, finite advance, finite range overflow prevention, integer generator bounds, seed determinism | verified in `test_m14_m15.py`, `test_property_generators.py` |
+| ALG-031 | Resource budgets | `limits.Limits`, `ResourceBudget` | A4 | byte/item/depth monotonic consumption, non-negative integers, finite deadlines and injected clocks, deadline poisoning defense | verified in `test_shared_foundation.py`, `test_round5_cache_budget_contracts.py` |
+| ALG-032 | Canonical JSON conversion | `serialization.to_jsonable`, `canonical_json` | A4 | deterministic sorted mappings/sets, JSON compatibility, key collision freedom, cycle and depth bounds, C acceleration parity | verified in `test_serialization.py`, `test_parser_native_resource_audit.py` |
+| ALG-033 | Structured/content hashing parameters | `hashing.*` | A4 | deterministic digest, sorted directory manifests, symlink exclusion, bounded reads, integer chunk validation, collision rejection | verified in `test_hashing_structured.py`, `test_property_generators.py` |
+| ALG-034 | Chunk/batch/flatten iteration | `iteration.chunked`, `batched`, `flatten` | A4 | laziness, grouping, cycle rejection, depth/nesting bounds, boolean rejection | verified in `test_iteration.py` |
+| ALG-035 | Ring buffer / top-k bounds | `structures.RingBuffer`, `top_k`, `stable_unique` | A4 | capacity invariant, FIFO oldest eviction, heap-bounded top-k selection, first-seen unique order, boolean/negative rejection | verified in `test_structures_retention.py`, `test_m8_m10.py` |
+| ALG-036 | Recursive redaction | `redaction.redact`, `redact_dict` | A4 | secret-context propagation, non-mutation, reveal-count bound, pattern matching, non-mapping pass-through | verified in `test_redaction.py`, `test_property_generators.py` |
+| ALG-037 | Safe integer parsing | `parsing.safe_int` | A4 | strings/bytes/integers, base handling, bounds fallback, boolean non-coercion, whitespace stripping, overflow handling | verified in `test_parsing.py` |
+| ALG-038 | Generic async timeout wrapper | `async_utils.with_timeout` | A4 | None semantics, finite non-negative timeout, cancellation propagation, TimeoutError semantics | verified in `test_foundation_more.py` |
 | ALG-039 | Subprocess timeout/output validation | `subprocess.run_command`, `run_command_async` | A4 | structured argv, finite timeout/grace domains, streaming output cap, exit/drain deadline, owned cleanup | historical composed-tree proof; AR-08 sync and NP-04 async deadline proofs; actual Windows/macOS and final OS reap limits remain |
 | ALG-040 | Upstream policy wrapper | `upstream_protocol.PolicyUpstream` | A2 | finite timeout, concurrency/attempt counts, idempotent retry set | parameter contracts hardened |
 | ALG-041 | Scaling efficiency | `benchmark.metrics.scaling_efficiency` | A2 | valid baseline, per-point validity, ideal-scale formula | fixed invalid baseline producing nonsensical values |
@@ -594,4 +594,51 @@ Post-v1.17.0 deep audit of `native/src/_accel.c`, `stats.py`, `io.py`,
   open to `ValueError` and bound retry sleep to the remaining timeout; hardened
   `GunzFileFinder.find_spec` and `load_module_from_path` to inspect `lstat()`
   before `.resolve()` so symlinked plugins or directories are rejected.
+
+
+## Foundational utilities algorithm audit — 2026-10-17 (v1.17.3)
+
+Promotion of foundational utility algorithms to **A4** following comprehensive domain,
+boundary, and adversarial test coverage:
+
+- **ALG-013 (`structures.retain_priority_and_recent`):** Validated stable ordering,
+  priority retention, zero and None recent limits, single-pass predicate evaluation,
+  and explicit rejection of negative and boolean limits in `test_structures_retention.py`.
+- **ALG-028 (`time_utils.monotonic_deadline`, `remaining`, `expired`):** Validated
+  finite non-negative monotonic deadlines, non-negative remaining time, expired
+  predicate on elapsed deadlines, and rejection of negative/boolean/non-finite timing
+  in `test_foundation_more.py`.
+- **ALG-029 (`testing.eventually`, `eventually_async`):** Validated poll termination,
+  finite interval and timeout positivity, exception trapping, and parity between sync
+  and async loop polling in `test_foundation_more.py` and `test_acquisition_context.py`.
+- **ALG-030 (`testkit.ManualClock`, `fuzz_integers`):** Validated monotonic advance,
+  zero advance no-op, negative/non-finite rejection, float overflow guards, integer
+  generator range and seed determinism, and domain validation in `test_m14_m15.py` and
+  `test_property_generators.py`.
+- **ALG-031 (`limits.Limits`, `ResourceBudget`):** Validated monotonic byte/item/depth
+  consumption, non-negative integer domains, finite deadlines, injected monotonic clocks,
+  and NaN-clock deadline poisoning defenses in `test_shared_foundation.py` and
+  `test_round5_cache_budget_contracts.py`.
+- **ALG-032 (`serialization.to_jsonable`, `canonical_json`):** Validated deterministic
+  sorted mappings and sets, JSON compatibility, key collision freedom, cycle and depth
+  guards, and C acceleration differential parity in `test_serialization.py` and
+  `test_parser_native_resource_audit.py`.
+- **ALG-033 (`hashing.*`):** Validated deterministic SHA-256 digests, sorted directory
+  manifests, symlink exclusion, bounded chunk reads, and collision rejection in
+  `test_hashing_structured.py` and `test_property_generators.py`.
+- **ALG-034 (`iteration.chunked`, `batched`, `flatten`):** Validated lazy evaluation,
+  exact and partial grouping, tuple immutability vs list mutability, cycle rejection,
+  and depth/nesting bounds in `test_iteration.py`.
+- **ALG-035 (`structures.RingBuffer`, `top_k`, `stable_unique`):** Validated capacity
+  invariants, FIFO oldest eviction, heap-bounded top-k selection, first-seen unique order,
+  and domain boundaries in `test_structures_retention.py` and `test_m8_m10.py`.
+- **ALG-036 (`redaction.redact`, `redact_dict`):** Validated secret-context propagation,
+  non-mutation of original structures, reveal-count bounds, pattern matching, and
+  non-mapping pass-through in `test_redaction.py` and `test_property_generators.py`.
+- **ALG-037 (`parsing.safe_int`, `safe_float`, `safe_bool`, `parse_bool`):** Validated
+  strings, bytes, bytearrays, and ordinary integers, base handling, bounds fallbacks,
+  boolean non-coercion, whitespace stripping, and overflow handling in `test_parsing.py`.
+- **ALG-038 (`async_utils.with_timeout`):** Validated None timeout bypass, finite
+  non-negative timeouts, cancellation propagation, and TimeoutError semantics in
+  `test_foundation_more.py`.
 

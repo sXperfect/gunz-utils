@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Unreleased changes are collected as conflict-free fragments in `changes/`.
 Run `python scripts/release.py status` to inspect their release impact.
 
+## [1.17.3] — 2026-10-17
+
+### Documentation
+
+- Promote ALG-013 (`structures.retain_priority_and_recent`) and foundational utility algorithms ALG-028 through ALG-038 (`time_utils`, `testing.eventually`, `testkit.ManualClock`, `limits.Limits`, `serialization.to_jsonable`, `hashing`, `iteration`, `structures.RingBuffer`, `redaction`, `parsing.safe_int`, and `async_utils.with_timeout`) to A4 in the algorithm audit registry with comprehensive boundary and regression coverage.
+
 ## [1.17.2] — 2026-10-17
 
 ### Performance

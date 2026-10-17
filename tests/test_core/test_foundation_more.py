@@ -70,12 +70,16 @@ class TestIdsTimeResult(unittest.TestCase):
         deadline = monotonic_deadline(0.05)
         self.assertGreater(remaining(deadline), 0)
         self.assertFalse(expired(deadline))
+        past_deadline = monotonic_deadline(0.0)
+        self.assertEqual(remaining(past_deadline - 1.0), 0.0)
+        self.assertTrue(expired(past_deadline - 1.0))
 
     def test_time_rejects_non_finite_deadlines(self) -> None:
-        for value in (math.nan, math.inf, -math.inf, True):
+        for value in (math.nan, math.inf, -math.inf, True, -1.0, -0.01):
             with self.subTest(timeout=value):
                 with self.assertRaises(ValueError):
                     monotonic_deadline(value)
+        for value in (math.nan, math.inf, -math.inf, True):
             with self.subTest(deadline=value):
                 with self.assertRaises(ValueError):
                     remaining(value)
@@ -126,10 +130,13 @@ class TestAsyncFoundation(unittest.IsolatedAsyncioTestCase):
 
     async def test_timeout(self) -> None:
         self.assertEqual(await with_timeout(asyncio.sleep(0, result=3), 1), 3)
+        self.assertEqual(await with_timeout(asyncio.sleep(0, result=7), None), 7)
+        with self.assertRaises(TimeoutError):
+            await with_timeout(asyncio.sleep(0.1), 0.001)
 
     async def test_timeout_rejects_non_finite_values(self) -> None:
         loop = asyncio.get_running_loop()
-        for value in (math.nan, math.inf, -math.inf, True):
+        for value in (math.nan, math.inf, -math.inf, True, -1.0, -0.01):
             future: asyncio.Future[None] = loop.create_future()
             future.set_result(None)
             with self.subTest(timeout=value):

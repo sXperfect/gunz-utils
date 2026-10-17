@@ -18,7 +18,12 @@ import pytest
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 
-from gunz_utils.structures import retain_priority_and_recent
+from gunz_utils.structures import (
+    RingBuffer,
+    retain_priority_and_recent,
+    stable_unique,
+    top_k,
+)
 
 
 def test_retain_priority_and_recent_preserves_order() -> None:
@@ -106,11 +111,11 @@ def test_retain_priority_and_recent_rejects_boolean_limit() -> None:
 
 
 def test_top_k_returns_largest_values_and_validates_k() -> None:
-    from gunz_utils.structures import top_k
-
     assert top_k([5, 1, 9, 3, 7], 3) == [9, 7, 5]
     assert top_k([], 5) == []
     assert top_k([1, 2, 3], 0) == []
+    assert top_k([1, 2], 5) == [2, 1]
+    assert top_k((x for x in range(10)), 2) == [9, 8]
 
     with pytest.raises(ValueError, match="non-negative integer"):
         top_k([1, 2, 3], -1)
@@ -118,10 +123,40 @@ def test_top_k_returns_largest_values_and_validates_k() -> None:
     with pytest.raises(ValueError, match="non-negative integer"):
         top_k([1, 2, 3], True)  # type: ignore[arg-type]
 
+    with pytest.raises(ValueError, match="non-negative integer"):
+        top_k([1, 2, 3], 1.5)  # type: ignore[arg-type]
+
 
 def test_stable_unique_preserves_first_seen_order() -> None:
-    from gunz_utils.structures import stable_unique
-
     assert list(stable_unique([3, 1, 3, 2, 1, 4])) == [3, 1, 2, 4]
     assert list(stable_unique([])) == []
+
+
+def test_ring_buffer_fifo_eviction_and_boundaries() -> None:
+    ring = RingBuffer[int](3)
+    assert len(ring) == 0
+    assert list(ring) == []
+
+    ring.append(1)
+    ring.append(2)
+    assert len(ring) == 2
+    assert list(ring) == [1, 2]
+
+    ring.append(3)
+    assert len(ring) == 3
+    assert list(ring) == [1, 2, 3]
+
+    #? FIFO eviction of oldest items
+    ring.append(4)
+    assert len(ring) == 3
+    assert list(ring) == [2, 3, 4]
+
+    ring.append(5)
+    assert len(ring) == 3
+    assert list(ring) == [3, 4, 5]
+
+    #? Boundary and domain checks
+    for invalid in (0, -1, True, 1.5, "3"):
+        with pytest.raises(ValueError, match="capacity must be a positive integer"):
+            RingBuffer[int](invalid)  # type: ignore[arg-type]
 

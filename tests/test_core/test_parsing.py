@@ -48,6 +48,18 @@ class TestSafeInt(unittest.TestCase):
 
     def test_alternate_base(self) -> None:
         self.assertEqual(safe_int("ff", base=16), 255)
+        self.assertEqual(safe_int("42", base=37, default=-1), -1)
+
+    def test_bytes_and_bytearray(self) -> None:
+        self.assertEqual(safe_int(b"42"), 42)
+        self.assertEqual(safe_int(bytearray(b"42")), 42)
+        self.assertEqual(safe_int(b"ff", base=16), 255)
+
+    def test_none_and_bounds_fallback(self) -> None:
+        self.assertIsNone(safe_int(None))
+        self.assertEqual(safe_int(None, default=0), 0)
+        self.assertEqual(safe_int("10", min=20, default=99), 99)
+        self.assertEqual(safe_int("50", max=20, default=99), 99)
 
 
 class TestSafeFloat(unittest.TestCase):
