@@ -8,10 +8,15 @@ from __future__ import annotations
 
 import math
 import random
-from collections.abc import Iterable, Mapping, Sequence
+from collections import Counter
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from fractions import Fraction
 from numbers import Real
 from statistics import fmean, median, pstdev, pvariance, stdev
+from typing import Any, TypeVar
+
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
@@ -565,16 +570,293 @@ def summarize(
     )
 
 
+class RunningStats:
+    """Constant-memory online summary statistics using Welford's algorithm.
+
+    Maintains count, mean, min, max, total, and M2 (sum of squared deviations).
+    Provides sample and population variance/stdev.
+    Can be updated observation-by-observation in O(1) space, or merged in O(1) time
+    using Chan's parallel variance formula.
+    """
+
+    __slots__ = ("_count", "_mean", "_m2", "_min", "_max", "_total")
+
+    def __init__(self) -> None:
+        self._count: int = 0
+        self._mean: float = 0.0
+        self._m2: float = 0.0
+        self._min: float = float("inf")
+        self._max: float = float("-inf")
+        self._total: float = 0.0
+
+    @classmethod
+    def from_iterable(cls,
+        values: Iterable[float],
+    ) -> RunningStats:
+        """Create an accumulator initialized from an iterable of samples."""
+        stats = cls()
+        stats.extend(values)
+        return stats
+
+    def update(self,
+        value: float,
+    ) -> None:
+        """Add one sample value."""
+        if isinstance(value, bool) or not isinstance(value, Real):
+            raise TypeError("value must be real numeric")
+        val = float(value)
+        if not math.isfinite(val):
+            raise ValueError("value must be finite")
+
+        self._count += 1
+        delta = val - self._mean
+        self._mean += delta / self._count
+        delta2 = val - self._mean
+        self._m2 += delta * delta2
+        self._total += val
+        if val < self._min:
+            self._min = val
+        if val > self._max:
+            self._max = val
+
+    def extend(self,
+        values: Iterable[float],
+    ) -> None:
+        """Add multiple sample values."""
+        for value in values:
+            self.update(value)
+
+    def merge(self,
+        other: RunningStats,
+    ) -> RunningStats:
+        """Merge this accumulator with another using parallel variance formula."""
+        if not isinstance(other, RunningStats):
+            raise TypeError("other must be RunningStats")
+        if self._count == 0:
+            return other.copy()
+        if other._count == 0:
+            return self.copy()
+
+        combined = RunningStats()
+        combined._count = self._count + other._count
+        delta = other._mean - self._mean
+        combined._mean = self._mean + delta * (other._count / combined._count)
+        combined._m2 = (
+            self._m2
+            + other._m2
+            + (delta * delta) * (self._count * other._count / combined._count)
+        )
+        combined._total = self._total + other._total
+        combined._min = min(self._min, other._min)
+        combined._max = max(self._max, other._max)
+        return combined
+
+    def copy(self) -> RunningStats:
+        """Return a shallow copy of this accumulator."""
+        clone = RunningStats()
+        clone._count = self._count
+        clone._mean = self._mean
+        clone._m2 = self._m2
+        clone._min = self._min
+        clone._max = self._max
+        clone._total = self._total
+        return clone
+
+    @property
+    def count(self) -> int:
+        return self._count
+
+    @property
+    def mean(self) -> float:
+        return self._mean if self._count > 0 else 0.0
+
+    @property
+    def variance(self) -> float:
+        """Sample variance s^2 (degrees of freedom = n - 1)."""
+        return self._m2 / (self._count - 1) if self._count >= 2 else 0.0
+
+    @property
+    def pvariance(self) -> float:
+        """Population variance sigma^2 (degrees of freedom = n)."""
+        return self._m2 / self._count if self._count >= 1 else 0.0
+
+    @property
+    def stdev(self) -> float:
+        """Sample standard deviation s."""
+        return math.sqrt(self.variance)
+
+    @property
+    def pstdev(self) -> float:
+        """Population standard deviation sigma."""
+        return math.sqrt(self.pvariance)
+
+    @property
+    def minimum(self) -> float:
+        return self._min if self._count > 0 else float("nan")
+
+    @property
+    def maximum(self) -> float:
+        return self._max if self._count > 0 else float("nan")
+
+    @property
+    def total(self) -> float:
+        return self._total
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "count": self.count,
+            "mean": self.mean,
+            "variance": self.variance,
+            "stdev": self.stdev,
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+            "total": self.total,
+        }
+
+    def __repr__(self) -> str:
+        return (
+            f"RunningStats(count={self.count}, mean={self.mean:.6g}, "
+            f"stdev={self.stdev:.6g}, min={self.minimum:.6g}, max={self.maximum:.6g})"
+        )
+
+
+@dataclass(frozen=True)
+class ParetoObjective:
+    """One objective direction for multi-objective Pareto analysis."""
+
+    name: str
+    lower_is_better: bool = True
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("objective name must be nonempty string")
+        if not isinstance(self.lower_is_better, bool):
+            raise TypeError("lower_is_better must be bool")
+
+
+def pareto_dominates(
+    a: Sequence[float],
+    b: Sequence[float],
+    objectives: Sequence[ParetoObjective],
+) -> bool:
+    """Return whether point a Pareto-dominates point b.
+
+    Point a dominates point b iff a is no worse than b across all objectives,
+    and strictly better than b on at least one objective.
+    """
+    if len(a) != len(objectives) or len(b) != len(objectives):
+        raise ValueError("point dimensions must match number of objectives")
+    if not objectives:
+        raise ValueError("at least one objective is required")
+
+    no_worse = True
+    strictly_better = False
+    for val_a, val_b, obj in zip(a, b, objectives, strict=True):
+        if not math.isfinite(val_a) or not math.isfinite(val_b):
+            raise ValueError("objective values must be finite")
+        if obj.lower_is_better:
+            if val_a > val_b:
+                no_worse = False
+                break
+            if val_a < val_b:
+                strictly_better = True
+        else:
+            if val_a < val_b:
+                no_worse = False
+                break
+            if val_a > val_b:
+                strictly_better = True
+    return no_worse and strictly_better
+
+
+def pareto_frontier(
+    items: Iterable[T],
+    key: Callable[[T], Sequence[float]],
+    objectives: Sequence[ParetoObjective],
+) -> list[T]:
+    """Compute the Pareto-optimal (non-dominated) subset of items."""
+    item_list = list(items)
+    if not item_list:
+        return []
+    obj_tuple = tuple(objectives)
+    if not obj_tuple:
+        raise ValueError("at least one objective is required")
+
+    points = [tuple(float(v) for v in key(item)) for item in item_list]
+    for pt in points:
+        if len(pt) != len(obj_tuple):
+            raise ValueError("key dimensions must match number of objectives")
+        if not all(math.isfinite(v) for v in pt):
+            raise ValueError("all objective values must be finite")
+
+    frontier: list[T] = []
+    for idx_a, item_a in enumerate(item_list):
+        pt_a = points[idx_a]
+        is_dominated = False
+        for idx_b in range(len(item_list)):
+            if idx_a == idx_b:
+                continue
+            if pareto_dominates(points[idx_b], pt_a, obj_tuple):
+                is_dominated = True
+                break
+        if not is_dominated:
+            frontier.append(item_a)
+    return frontier
+
+
+@dataclass(frozen=True)
+class ECDFPoint:
+    """One discrete step of an empirical cumulative distribution function."""
+
+    value: float
+    probability: float
+    count: int
+
+
+def ecdf(
+    values: Iterable[float],
+) -> list[ECDFPoint]:
+    """Compute the exact empirical cumulative distribution function (ECDF).
+
+    Accumulates exact rational masses to eliminate floating-point drift
+    for tied values and guarantees the final probability equals 1.0.
+    """
+    data = _finite_values(values, name="values")
+    n = len(data)
+    counts = Counter(data)
+    sorted_unique = sorted(counts.keys())
+
+    cumulative_mass = Fraction(0, 1)
+    points: list[ECDFPoint] = []
+    for val in sorted_unique:
+        cnt = counts[val]
+        cumulative_mass += Fraction(cnt, n)
+        points.append(
+            ECDFPoint(
+                value=val,
+                probability=float(cumulative_mass),
+                count=cnt,
+            )
+        )
+    return points
+
+
 __all__ = [
     "BootstrapMeanCI",
+    "ECDFPoint",
     "NormalMeanSummary",
     "PairedEffect",
+    "ParetoObjective",
+    "RunningStats",
     "SummaryStats",
     "bootstrap_mean_ci",
+    "ecdf",
     "mad_outlier_indices",
     "median_absolute_deviation",
     "normal_mean_summary",
     "paired_effect",
+    "pareto_dominates",
+    "pareto_frontier",
     "percentile",
     "summarize",
 ]

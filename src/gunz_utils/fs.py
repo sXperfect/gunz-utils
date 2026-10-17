@@ -7,13 +7,18 @@
 from __future__ import annotations
 
 import errno
+import fnmatch
+import math
 import os
 import shutil
+import stat
 import sys
 import tempfile
-from collections.abc import Iterator
+import time
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any, cast
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
@@ -181,9 +186,351 @@ def transactional_directory(
         raise
 
 
+@contextmanager
+def advisory_file_lock(
+    path: str | Path,
+    *,
+    timeout: float | None = None,
+    shared: bool = False,
+    mode: int = 0o600,
+) -> Iterator[Path]:
+    """Hold an inter-process advisory file lock for the duration of the context.
+
+    Parameters
+    ----------
+    path : str | Path
+        Path of the lock file.
+    timeout : float | None, default=None
+        Maximum seconds to wait for the lock. If None, blocks indefinitely.
+        If timeout <= 0, makes a non-blocking attempt immediately.
+        Raises TimeoutError if the lock cannot be acquired within the timeout.
+    shared : bool, default=False
+        If True, acquires a shared (reader) lock. If False, acquires an exclusive
+        (writer) lock.
+    mode : int, default=0o600
+        File permissions used if the lock file is created.
+
+    Yields
+    ------
+    Path
+        The locked path.
+
+    Raises
+    ------
+    ValueError
+        If the path is empty, a symlink, or timeout is invalid.
+    TimeoutError
+        If timeout expires before lock acquisition.
+    RuntimeError
+        If advisory locking is unsupported on the platform.
+    """
+    if not str(path):
+        raise ValueError("lock path must not be empty")
+    target = Path(path)
+    if target.is_symlink():
+        raise ValueError("lock path must not be a symlink")
+    if timeout is not None and (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(timeout)
+        or timeout < 0
+    ):
+        raise ValueError("timeout must be a non-negative finite number or None")
+    if not isinstance(shared, bool):
+        raise ValueError("shared must be a boolean")
+    if (
+        isinstance(mode, bool)
+        or not isinstance(mode, int)
+        or not 0 <= mode <= 0o7777
+    ):
+        raise ValueError("mode must be an integer between 0 and 0o7777")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    descriptor = os.open(target, flags, mode)
+    try:
+        desc_stat = os.fstat(descriptor)
+        path_stat = target.lstat()
+        if (
+            not stat.S_ISREG(desc_stat.st_mode)
+            or not stat.S_ISREG(path_stat.st_mode)
+            or not os.path.samestat(desc_stat, path_stat)
+        ):
+            raise ValueError("lock path must be a non-symlink regular file")
+
+        if os.name == "nt":
+            import msvcrt
+
+            windows_runtime = cast(Any, msvcrt)
+            if desc_stat.st_size == 0:
+                os.write(descriptor, b"\0")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            if timeout is None:
+                windows_runtime.locking(descriptor, windows_runtime.LK_LOCK, 1)
+            else:
+                deadline = time.monotonic() + timeout
+                delay = 0.005
+                while True:
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    try:
+                        windows_runtime.locking(
+                            descriptor, windows_runtime.LK_NBLCK, 1
+                        )
+                        break
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise TimeoutError(
+                                f"timed out waiting for lock on {target}"
+                            ) from None
+                        time.sleep(delay)
+                        delay = min(delay * 1.5, 0.1)
+            try:
+                yield target
+            finally:
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                try:
+                    windows_runtime.locking(
+                        descriptor, windows_runtime.LK_UNLCK, 1
+                    )
+                except OSError:
+                    pass
+        else:
+            try:
+                import fcntl
+            except ImportError as exc:
+                raise RuntimeError("POSIX fcntl support is unavailable") from exc
+
+            lock_op = fcntl.LOCK_SH if shared else fcntl.LOCK_EX
+            if timeout is None:
+                fcntl.flock(descriptor, lock_op)
+            elif timeout == 0:
+                try:
+                    fcntl.flock(descriptor, lock_op | fcntl.LOCK_NB)
+                except OSError as exc:
+                    raise TimeoutError(
+                        f"timed out waiting for lock on {target}"
+                    ) from exc
+            else:
+                deadline = time.monotonic() + timeout
+                delay = 0.005
+                while True:
+                    try:
+                        fcntl.flock(descriptor, lock_op | fcntl.LOCK_NB)
+                        break
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise TimeoutError(
+                                f"timed out waiting for lock on {target}"
+                            ) from None
+                        time.sleep(delay)
+                        delay = min(delay * 1.5, 0.1)
+            try:
+                yield target
+            finally:
+                try:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+                except OSError:
+                    pass
+    finally:
+        os.close(descriptor)
+
+
+def _segment_match(
+    segment: str,
+    pattern_part: str,
+) -> bool:
+    return fnmatch.fnmatchcase(segment, pattern_part)
+
+
+def _match_segments_anchored(
+    path_parts: tuple[str, ...],
+    pattern_parts: tuple[str, ...],
+) -> bool:
+    """Iterative, polynomial O(N*M) state-set match of pattern_parts to path_parts."""
+    if not pattern_parts:
+        return not path_parts
+    m = len(pattern_parts)
+
+    def closure(
+        states: set[int],
+    ) -> set[int]:
+        stack = list(states)
+        expanded = set(states)
+        while stack:
+            s = stack.pop()
+            if s < m and pattern_parts[s] == "**":
+                if (s + 1) not in expanded:
+                    expanded.add(s + 1)
+                    stack.append(s + 1)
+        return expanded
+
+    active = closure({0})
+    for part in path_parts:
+        if not active:
+            break
+        next_states: set[int] = set()
+        for s in active:
+            if s < m:
+                if pattern_parts[s] == "**":
+                    next_states.add(s)
+                elif _segment_match(part, pattern_parts[s]):
+                    next_states.add(s + 1)
+        active = closure(next_states)
+    return m in active
+
+
+def match_path_glob(
+    path: str | Path,
+    pattern: str,
+    *,
+    anchored: bool = False,
+) -> bool:
+    """Match a filesystem path against a glob pattern with ** support.
+
+    Parameters
+    ----------
+    path : str | Path
+        Filesystem path to test.
+    pattern : str
+        Glob pattern. Segments can contain '*' and '?' wildcards, and '**'
+        matches zero or more path segments.
+    anchored : bool, default=False
+        If True, requires the pattern to match from the beginning of path.
+        If False, matches if pattern matches the entire path or any trailing
+        suffix (mirroring pathlib.PurePath.match).
+
+    Returns
+    -------
+    bool
+        True if the path matches the pattern.
+    """
+    if not pattern:
+        return False
+    normalized = Path(path)
+    path_parts = tuple(
+        part for part in normalized.parts if part and part != "/"
+    )
+    pattern_parts = tuple(
+        part for part in pattern.replace("\\", "/").split("/") if part
+    )
+    if not pattern_parts:
+        return not path_parts
+    if anchored:
+        return _match_segments_anchored(path_parts, pattern_parts)
+    for start in range(len(path_parts) + 1):
+        if _match_segments_anchored(path_parts[start:], pattern_parts):
+            return True
+    return False
+
+
+def matches_any_glob(
+    path: str | Path,
+    patterns: Iterable[str],
+    *,
+    anchored: bool = False,
+) -> bool:
+    """Return whether path matches any of the supplied glob patterns.
+
+    Parameters
+    ----------
+    path : str | Path
+        Filesystem path to test.
+    patterns : Iterable[str]
+        Glob patterns to match against.
+    anchored : bool, default=False
+        Whether matching must be anchored to the root.
+
+    Returns
+    -------
+    bool
+        True if any pattern matches path.
+    """
+    for pattern in patterns:
+        if pattern and match_path_glob(path, pattern, anchored=anchored):
+            return True
+    return False
+
+
+def walk_files(
+    root: str | Path,
+    *,
+    include: Iterable[str] = (),
+    exclude: Iterable[str] = (),
+    extensions: Iterable[str] = (),
+    follow_symlinks: bool = False,
+) -> Iterator[Path]:
+    """Deterministically walk directory tree, pruning excluded subtrees early.
+
+    Parameters
+    ----------
+    root : str | Path
+        Root directory to traverse.
+    include : Iterable[str], default=()
+        Optional glob patterns; if provided, only files matching at least one
+        pattern are yielded.
+    exclude : Iterable[str], default=()
+        Optional glob patterns; matching files or directories are excluded.
+        Matching directories are pruned and not descended into.
+    extensions : Iterable[str], default=()
+        Optional file suffixes (e.g. ('.py', '.json')). If provided, only files
+        with matching extensions are yielded.
+    follow_symlinks : bool, default=False
+        Whether to follow directory symlinks. Default False prevents symlink loops.
+
+    Yields
+    ------
+    Path
+        Matching regular file paths in deterministic sorted order.
+    """
+    base = Path(root).resolve()
+    if not base.is_dir():
+        raise NotADirectoryError(f"root is not a directory: {base}")
+
+    inc_patterns = tuple(include)
+    exc_patterns = tuple(exclude)
+    ext_set = tuple(
+        ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+        for ext in extensions
+    )
+
+    for current_dir, dir_names, file_names in os.walk(
+        base, topdown=True, followlinks=follow_symlinks
+    ):
+        dir_names.sort()
+        for d in list(dir_names):
+            rel_dir = (Path(current_dir) / d).relative_to(base)
+            if exc_patterns and matches_any_glob(rel_dir, exc_patterns):
+                dir_names.remove(d)
+
+        file_names.sort()
+        for f in file_names:
+            file_path = Path(current_dir) / f
+            if not follow_symlinks and file_path.is_symlink():
+                continue
+            if not file_path.is_file():
+                continue
+            rel_file = file_path.relative_to(base)
+            if ext_set and not any(f.lower().endswith(ext) for ext in ext_set):
+                continue
+            if exc_patterns and matches_any_glob(rel_file, exc_patterns):
+                continue
+            if inc_patterns and not matches_any_glob(rel_file, inc_patterns):
+                continue
+            yield file_path
+
+
 __all__ = [
+    "advisory_file_lock",
     "atomic_write_bytes",
     "contained_path",
     "lexical_contained_path",
+    "match_path_glob",
+    "matches_any_glob",
     "transactional_directory",
+    "walk_files",
 ]
