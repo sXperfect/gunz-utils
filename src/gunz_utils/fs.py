@@ -24,6 +24,7 @@ from typing import Any, cast
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
+from .hashing import SUPPORTED_ALGOS
 from .io import atomic_write
 
 
@@ -227,9 +228,6 @@ def advisory_file_lock(
     """
     if not str(path):
         raise ValueError("lock path must not be empty")
-    target = Path(path)
-    if target.is_symlink():
-        raise ValueError("lock path must not be a symlink")
     if timeout is not None and (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
@@ -246,6 +244,10 @@ def advisory_file_lock(
     ):
         raise ValueError("mode must be an integer between 0 and 0o7777")
 
+    target = Path(path)
+    if target.is_symlink():
+        raise ValueError("lock path must not be a symlink")
+
     target.parent.mkdir(parents=True, exist_ok=True)
     flags = os.O_CREAT | os.O_RDWR
     if hasattr(os, "O_CLOEXEC"):
@@ -253,7 +255,12 @@ def advisory_file_lock(
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
 
-    descriptor = os.open(target, flags, mode)
+    try:
+        descriptor = os.open(target, flags, mode)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise ValueError("lock path must not be a symlink") from exc
+        raise
     try:
         desc_stat = os.fstat(descriptor)
         path_stat = target.lstat()
@@ -284,11 +291,12 @@ def advisory_file_lock(
                         )
                         break
                     except OSError:
-                        if time.monotonic() >= deadline:
+                        now = time.monotonic()
+                        if now >= deadline:
                             raise TimeoutError(
                                 f"timed out waiting for lock on {target}"
                             ) from None
-                        time.sleep(delay)
+                        time.sleep(min(delay, max(0.0, deadline - now)))
                         delay = min(delay * 1.5, 0.1)
             try:
                 yield target
@@ -306,6 +314,11 @@ def advisory_file_lock(
             except ImportError as exc:
                 raise RuntimeError("POSIX fcntl support is unavailable") from exc
 
+            contention_errnos = {
+                errno.EACCES,
+                errno.EAGAIN,
+                getattr(errno, "EWOULDBLOCK", errno.EAGAIN),
+            }
             lock_op = fcntl.LOCK_SH if shared else fcntl.LOCK_EX
             if timeout is None:
                 fcntl.flock(descriptor, lock_op)
@@ -313,9 +326,11 @@ def advisory_file_lock(
                 try:
                     fcntl.flock(descriptor, lock_op | fcntl.LOCK_NB)
                 except OSError as exc:
-                    raise TimeoutError(
-                        f"timed out waiting for lock on {target}"
-                    ) from exc
+                    if exc.errno in contention_errnos:
+                        raise TimeoutError(
+                            f"timed out waiting for lock on {target}"
+                        ) from exc
+                    raise
             else:
                 deadline = time.monotonic() + timeout
                 delay = 0.005
@@ -323,12 +338,15 @@ def advisory_file_lock(
                     try:
                         fcntl.flock(descriptor, lock_op | fcntl.LOCK_NB)
                         break
-                    except OSError:
-                        if time.monotonic() >= deadline:
+                    except OSError as exc:
+                        if exc.errno not in contention_errnos:
+                            raise
+                        now = time.monotonic()
+                        if now >= deadline:
                             raise TimeoutError(
                                 f"timed out waiting for lock on {target}"
                             ) from None
-                        time.sleep(delay)
+                        time.sleep(min(delay, max(0.0, deadline - now)))
                         delay = min(delay * 1.5, 0.1)
             try:
                 yield target
@@ -457,54 +475,14 @@ def matches_any_glob(
     return False
 
 
-def walk_files(
-    root: str | Path,
-    *,
-    include: Iterable[str] = (),
-    exclude: Iterable[str] = (),
-    extensions: Iterable[str] = (),
-    follow_symlinks: bool = False,
-    max_depth: int | None = None,
+def _walk_files_iter(
+    base: Path,
+    inc_patterns: tuple[str, ...],
+    exc_patterns: tuple[str, ...],
+    ext_set: tuple[str, ...],
+    follow_symlinks: bool,
+    max_depth: int | None,
 ) -> Iterator[Path]:
-    """Deterministically walk directory tree, pruning excluded subtrees early.
-
-    Parameters
-    ----------
-    root : str | Path
-        Root directory to traverse.
-    include : Iterable[str], default=()
-        Optional glob patterns; if provided, only files matching at least one
-        pattern are yielded.
-    exclude : Iterable[str], default=()
-        Optional glob patterns; matching files or directories are excluded.
-        Matching directories are pruned and not descended into.
-    extensions : Iterable[str], default=()
-        Optional file suffixes (e.g. ('.py', '.json')). If provided, only files
-        with matching extensions are yielded.
-    follow_symlinks : bool, default=False
-        Whether to follow directory symlinks. Default False prevents symlink loops.
-    max_depth : int | None, default=None
-        Maximum directory descent depth relative to root. None imposes no bound.
-
-    Yields
-    ------
-    Path
-        Matching regular file paths in deterministic sorted order.
-    """
-    if max_depth is not None and (type(max_depth) is not int or max_depth < 0):
-        raise ValueError("max_depth must be a non-negative integer or None")
-
-    base = Path(root).resolve()
-    if not base.is_dir():
-        raise NotADirectoryError(f"root is not a directory: {base}")
-
-    inc_patterns = tuple(include)
-    exc_patterns = tuple(exclude)
-    ext_set = tuple(
-        ext.lower() if ext.startswith(".") else f".{ext.lower()}"
-        for ext in extensions
-    )
-
     visited_dirs: set[tuple[int, int]] = set()
 
     for current_dir, dir_names, file_names in os.walk(
@@ -553,6 +531,66 @@ def walk_files(
             yield file_path
 
 
+def walk_files(
+    root: str | Path,
+    *,
+    include: Iterable[str] = (),
+    exclude: Iterable[str] = (),
+    extensions: Iterable[str] = (),
+    follow_symlinks: bool = False,
+    max_depth: int | None = None,
+) -> Iterator[Path]:
+    """Deterministically walk directory tree, pruning excluded subtrees early.
+
+    Parameters
+    ----------
+    root : str | Path
+        Root directory to traverse.
+    include : Iterable[str], default=()
+        Optional glob patterns; if provided, only files matching at least one
+        pattern are yielded.
+    exclude : Iterable[str], default=()
+        Optional glob patterns; matching files or directories are excluded.
+        Matching directories are pruned and not descended into.
+    extensions : Iterable[str], default=()
+        Optional file suffixes (e.g. ('.py', '.json')). If provided, only files
+        with matching extensions are yielded.
+    follow_symlinks : bool, default=False
+        Whether to follow directory symlinks. Default False prevents symlink loops.
+    max_depth : int | None, default=None
+        Maximum directory descent depth relative to root. None imposes no bound.
+
+    Yields
+    ------
+    Path
+        Matching regular file paths in deterministic sorted order.
+    """
+    if not isinstance(follow_symlinks, bool):
+        raise TypeError("follow_symlinks must be bool")
+    if max_depth is not None and (type(max_depth) is not int or max_depth < 0):
+        raise ValueError("max_depth must be a non-negative integer or None")
+
+    base = Path(root).resolve()
+    if not base.is_dir():
+        raise NotADirectoryError(f"root is not a directory: {base}")
+
+    inc_patterns = tuple(include)
+    exc_patterns = tuple(exclude)
+    ext_set = tuple(
+        ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+        for ext in extensions
+    )
+
+    return _walk_files_iter(
+        base,
+        inc_patterns,
+        exc_patterns,
+        ext_set,
+        follow_symlinks,
+        max_depth,
+    )
+
+
 def tree_fingerprint(
     root: str | Path,
     *,
@@ -575,13 +613,18 @@ def tree_fingerprint(
     extensions : Iterable[str], default=()
         Filter for specific file extensions (e.g. ('.py',)).
     algorithm : str, default='sha256'
-        Hash algorithm name accepted by hashlib.new.
+        Hash algorithm name in :data:`gunz_utils.hashing.SUPPORTED_ALGOS`.
 
     Returns
     -------
     str
         Hexadecimal digest string representing directory contents.
     """
+    if algorithm not in SUPPORTED_ALGOS:
+        allowed = sorted(SUPPORTED_ALGOS)
+        raise ValueError(
+            f"unsupported algorithm {algorithm!r}; expected one of {allowed}"
+        )
     base = Path(root).resolve()
     hasher = hashlib.new(algorithm)
     for file_path in walk_files(
@@ -592,13 +635,17 @@ def tree_fingerprint(
     ):
         rel_posix = file_path.relative_to(base).as_posix()
         try:
-            st = file_path.stat()
+            st = file_path.lstat()
         except OSError:
             continue
-        hasher.update(rel_posix.encode("utf-8"))
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+            continue
+        rel_bytes = rel_posix.encode("utf-8")
+        hasher.update(len(rel_bytes).to_bytes(8, "big", signed=False))
+        hasher.update(rel_bytes)
         hasher.update(b"\x00")
         hasher.update(st.st_size.to_bytes(8, "big", signed=False))
-        hasher.update(st.st_mtime_ns.to_bytes(8, "big", signed=False))
+        hasher.update(st.st_mtime_ns.to_bytes(8, "big", signed=True))
     return hasher.hexdigest()
 
 

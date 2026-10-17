@@ -529,18 +529,24 @@ def summarize(
         or outlier_threshold <= 0
     ):
         raise ValueError("outlier_threshold must be finite and > 0")
-    requested = tuple(float(q) for q in percentiles)
+    raw_percentiles = tuple(percentiles)
+    for raw_q in raw_percentiles:
+        if (
+            isinstance(raw_q, bool)
+            or not isinstance(raw_q, (int, float))
+            or not math.isfinite(raw_q)
+            or not 0.0 <= raw_q <= 1.0
+        ):
+            raise ValueError("percentile q must be finite and between 0 and 1")
+    requested = tuple(float(q) for q in raw_percentiles)
     if len(set(requested)) != len(requested):
         raise ValueError("percentiles must not contain duplicates")
-    for q in requested:
-        if not math.isfinite(q) or not 0.0 <= q <= 1.0:
-            raise ValueError("percentile q must be finite and between 0 and 1")
 
     if _accel_fast_summary is not None and isinstance(values, (list, tuple)):
-        try:
-            raw_summary = _accel_fast_summary(
-                values, requested, outlier_threshold
-            )
+        raw_summary = _accel_fast_summary(
+            values, requested, outlier_threshold
+        )
+        if raw_summary is not None:
             return SummaryStats(
                 count=raw_summary["count"],
                 minimum=raw_summary["minimum"],
@@ -556,8 +562,6 @@ def summarize(
                 percentiles=raw_summary["percentiles"],
                 outlier_indices=raw_summary["outlier_indices"],
             )
-        except (TypeError, ValueError):
-            raise
 
     data = _finite_values(values, name="samples")
     ordered = sorted(data)
@@ -644,11 +648,18 @@ class RunningStats:
         if not math.isfinite(val):
             raise ValueError("value must be finite")
 
-        self._count += 1
+        new_count = self._count + 1
         delta = val - self._mean
-        self._mean += delta / self._count
-        delta2 = val - self._mean
-        self._m2 += delta * delta2
+        new_mean = self._mean + delta / new_count
+        delta2 = val - new_mean
+        new_m2 = self._m2 + delta * delta2
+        if not math.isfinite(new_mean) or not math.isfinite(new_m2):
+            raise OverflowError(
+                "running statistics overflowed finite float range"
+            )
+        self._count = new_count
+        self._mean = new_mean
+        self._m2 = new_m2
         self._total += val
         if val < self._min:
             self._min = val
@@ -658,11 +669,20 @@ class RunningStats:
     def extend(self,
         values: Iterable[float],
     ) -> None:
-        """Add multiple sample values."""
+        """Add multiple sample values atomically."""
         if _accel_update_running_stats is not None and isinstance(
             values, (list, tuple)
         ):
-            try:
+            accel_result = _accel_update_running_stats(
+                self._count,
+                self._mean,
+                self._m2,
+                self._min,
+                self._max,
+                self._total,
+                values,
+            )
+            if accel_result is not None:
                 (
                     self._count,
                     self._mean,
@@ -670,20 +690,18 @@ class RunningStats:
                     self._min,
                     self._max,
                     self._total,
-                ) = _accel_update_running_stats(
-                    self._count,
-                    self._mean,
-                    self._m2,
-                    self._min,
-                    self._max,
-                    self._total,
-                    values,
-                )
+                ) = accel_result
                 return
-            except (TypeError, ValueError):
-                raise
+
+        staged = self.copy()
         for value in values:
-            self.update(value)
+            staged.update(value)
+        self._count = staged._count
+        self._mean = staged._mean
+        self._m2 = staged._m2
+        self._min = staged._min
+        self._max = staged._max
+        self._total = staged._total
 
     def merge(self,
         other: RunningStats,
@@ -705,6 +723,10 @@ class RunningStats:
             + other._m2
             + (delta * delta) * (self._count * other._count / combined._count)
         )
+        if not math.isfinite(combined._mean) or not math.isfinite(combined._m2):
+            raise OverflowError(
+                "running statistics overflowed finite float range"
+            )
         combined._total = self._total + other._total
         combined._min = min(self._min, other._min)
         combined._max = max(self._max, other._max)
@@ -793,6 +815,38 @@ class ParetoObjective:
             raise TypeError("lower_is_better must be bool")
 
 
+def _validate_objectives(
+    objectives: Sequence[ParetoObjective],
+) -> tuple[ParetoObjective, ...]:
+    obj_tuple = tuple(objectives)
+    if not obj_tuple:
+        raise ValueError("at least one objective is required")
+    for obj in obj_tuple:
+        if not isinstance(obj, ParetoObjective):
+            raise TypeError("objectives must contain ParetoObjective instances")
+    return obj_tuple
+
+
+def _validate_objective_point(
+    raw_point: Sequence[float],
+    num_dims: int,
+    *,
+    error_message: str,
+) -> tuple[float, ...]:
+    raw_tuple = tuple(raw_point)
+    if len(raw_tuple) != num_dims:
+        raise ValueError(error_message)
+    converted: list[float] = []
+    for value in raw_tuple:
+        if isinstance(value, bool) or not isinstance(value, Real):
+            raise TypeError("objective values must be real numeric")
+        fval = float(value)
+        if not math.isfinite(fval):
+            raise ValueError("objective values must be finite")
+        converted.append(fval)
+    return tuple(converted)
+
+
 def pareto_dominates(
     a: Sequence[float],
     b: Sequence[float],
@@ -803,16 +857,22 @@ def pareto_dominates(
     Point a dominates point b iff a is no worse than b across all objectives,
     and strictly better than b on at least one objective.
     """
-    if len(a) != len(objectives) or len(b) != len(objectives):
-        raise ValueError("point dimensions must match number of objectives")
-    if not objectives:
-        raise ValueError("at least one objective is required")
+    obj_tuple = _validate_objectives(objectives)
+    num_dims = len(obj_tuple)
+    pt_a = _validate_objective_point(
+        a,
+        num_dims,
+        error_message="point dimensions must match number of objectives",
+    )
+    pt_b = _validate_objective_point(
+        b,
+        num_dims,
+        error_message="point dimensions must match number of objectives",
+    )
 
     no_worse = True
     strictly_better = False
-    for val_a, val_b, obj in zip(a, b, objectives, strict=True):
-        if not math.isfinite(val_a) or not math.isfinite(val_b):
-            raise ValueError("objective values must be finite")
+    for val_a, val_b, obj in zip(pt_a, pt_b, obj_tuple, strict=True):
         if obj.lower_is_better:
             if val_a > val_b:
                 no_worse = False
@@ -838,21 +898,21 @@ def pareto_frontier(
     Uses an O(N log N) lexicographical sweep for 2D objectives, and
     sorted-frontier early pruning for higher dimensions.
     """
+    obj_tuple = _validate_objectives(objectives)
     item_list = list(items)
     if not item_list:
         return []
-    obj_tuple = tuple(objectives)
-    if not obj_tuple:
-        raise ValueError("at least one objective is required")
-
-    points = [tuple(float(v) for v in key(item)) for item in item_list]
-    for pt in points:
-        if len(pt) != len(obj_tuple):
-            raise ValueError("key dimensions must match number of objectives")
-        if not all(math.isfinite(v) for v in pt):
-            raise ValueError("all objective values must be finite")
 
     num_dims = len(obj_tuple)
+    points = [
+        _validate_objective_point(
+            key(item),
+            num_dims,
+            error_message="key dimensions must match number of objectives",
+        )
+        for item in item_list
+    ]
+
     #? Orient coordinates so lower is always better
     norm_points = [
         tuple(
@@ -868,7 +928,7 @@ def pareto_frontier(
         return [
             item
             for item, p in zip(item_list, norm_points, strict=True)
-            if math.isclose(p[0], min_val, abs_tol=1e-15)
+            if p[0] <= min_val
         ]
 
     #? Special case 2D: O(N log N) sorting + monotone sweep
@@ -884,18 +944,17 @@ def pareto_frontier(
         while idx < n_items:
             curr_x = norm_points[sorted_indices[idx]][0]
             group: list[int] = []
-            while idx < n_items and math.isclose(
-                norm_points[sorted_indices[idx]][0], curr_x, abs_tol=1e-15
+            while (
+                idx < n_items
+                and norm_points[sorted_indices[idx]][0] <= curr_x
             ):
                 group.append(sorted_indices[idx])
                 idx += 1
 
-            group_min_y = min(norm_points[i][1] for i in group)
+            group_min_y = norm_points[group[0]][1]
             if group_min_y < min_y:
                 for i in group:
-                    if math.isclose(
-                        norm_points[i][1], group_min_y, abs_tol=1e-15
-                    ):
+                    if norm_points[i][1] <= group_min_y:
                         frontier_indices.append(i)
                 min_y = group_min_y
         frontier_set = set(frontier_indices)

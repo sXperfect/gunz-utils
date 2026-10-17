@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.abc
 import importlib.machinery
 import importlib.util
+import os
 import stat
 import sys
 from collections.abc import Sequence
@@ -138,12 +139,22 @@ class GunzFileFinder(importlib.abc.MetaPathFinder):
         if not fullname.startswith(_FILE_MODULE_PREFIX):
             return None
         hex_encoded = fullname[len(_FILE_MODULE_PREFIX) :]
+        if not hex_encoded:
+            return None
         try:
             raw_path = bytes.fromhex(hex_encoded).decode("utf-8")
-        except Exception:
+        except (ValueError, UnicodeDecodeError):
+            return None
+        if "\x00" in raw_path:
             return None
         file_path = Path(raw_path)
-        if not file_path.is_file():
+        if not file_path.is_absolute():
+            return None
+        try:
+            st = file_path.lstat()
+        except OSError:
+            return None
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
             return None
         return importlib.util.spec_from_file_location(fullname, file_path)
 
@@ -166,6 +177,8 @@ def make_file_module_name(
     prefix: str = _FILE_MODULE_PREFIX,
 ) -> str:
     """Generate a deterministic, reversible synthetic module name for a file path."""
+    if not isinstance(prefix, str) or not prefix.isidentifier():
+        raise ValueError("prefix must be a valid Python identifier")
     resolved_posix = Path(path).resolve().as_posix()
     hex_str = resolved_posix.encode("utf-8").hex()
     return f"{prefix}{hex_str}"
@@ -198,17 +211,31 @@ def load_module_from_path(
     FileNotFoundError
         If path does not exist.
     ValueError
-        If path is a symlink.
+        If path is a symlink, not a regular file, or prefix is invalid.
+    TypeError
+        If reload is not a bool.
     ImportError
         If module spec creation fails.
     """
+    if not isinstance(reload, bool):
+        raise TypeError("reload must be bool")
+    if not isinstance(prefix, str) or not prefix.isidentifier():
+        raise ValueError("prefix must be a valid Python identifier")
+
     raw_path = Path(path)
-    if raw_path.is_symlink():
+    raw_stat = raw_path.lstat()
+    if stat.S_ISLNK(raw_stat.st_mode):
         raise ValueError("module file must not be a symbolic link")
+    if not stat.S_ISREG(raw_stat.st_mode):
+        raise ValueError(f"module file must be a regular file: {raw_path}")
+
     target = raw_path.resolve()
-    if not target.is_file():
-        raise FileNotFoundError(f"Python source file not found: {target}")
-    if not stat.S_ISREG(target.stat().st_mode):
+    target_stat = target.lstat()
+    if (
+        stat.S_ISLNK(target_stat.st_mode)
+        or not stat.S_ISREG(target_stat.st_mode)
+        or not os.path.samestat(raw_stat, target_stat)
+    ):
         raise ValueError(f"module file must be a regular file: {target}")
 
     install_file_module_finder()

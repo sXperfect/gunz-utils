@@ -23,6 +23,7 @@ TESTS = (
     "tests/test_core/test_parser_native_resource_audit.py",
     "tests/test_core/test_stats.py",
     "tests/test_core/test_v1_17_capabilities.py",
+    "tests/test_core/test_v1_17_1_audit_regressions.py",
 )
 
 

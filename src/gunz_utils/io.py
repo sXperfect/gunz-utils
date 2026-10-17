@@ -331,15 +331,14 @@ class FileSnapshot:
         OSError
             If the target changed since the snapshot, is a symlink, or write fails.
         """
+        if not isinstance(durable, bool):
+            raise TypeError("durable must be bool")
         if isinstance(new_content, str):
             payload = new_content.encode(self.encoding)
         elif isinstance(new_content, (bytes, bytearray)):
             payload = bytes(new_content)
         else:
             raise TypeError("new_content must be str or bytes")
-
-        if payload == self.raw:
-            return
 
         if self.path.is_symlink():
             raise OSError(f"cannot modify symbolic link: {self.path}")
@@ -349,6 +348,9 @@ class FileSnapshot:
             raise OSError(f"target is not a regular file: {self.path}")
         if _stat_identity(initial) != self.stat_identity:
             raise OSError(f"file changed before modification: {self.path}")
+
+        if payload == self.raw:
+            return
 
         mode = stat.S_IMODE(initial.st_mode)
         fd, tmp_path = tempfile.mkstemp(
@@ -416,40 +418,53 @@ def read_file_snapshot(
     if max_bytes is not None and (type(max_bytes) is not int or max_bytes <= 0):
         raise ValueError("max_bytes must be a positive integer or None")
 
-    if max_bytes is not None:
-        raw = read_regular_bytes(target, max_bytes=max_bytes)
-        st = target.lstat()
-    else:
-        if target.is_symlink():
+    if target.is_symlink():
+        raise ValueError("path must be a non-symlink regular file")
+    before_path = target.lstat()
+    if not stat.S_ISREG(before_path.st_mode):
+        raise ValueError("path must be a non-symlink regular file")
+
+    flags = os.O_RDONLY
+    for name in ("O_CLOEXEC", "O_NOFOLLOW", "O_NONBLOCK", "O_BINARY"):
+        flags |= getattr(os, name, 0)
+    fd = os.open(target, flags)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or not os.path.samestat(
+            before, before_path
+        ):
             raise ValueError("path must be a non-symlink regular file")
-        flags = os.O_RDONLY
-        for name in ("O_CLOEXEC", "O_NOFOLLOW", "O_NONBLOCK", "O_BINARY"):
-            flags |= getattr(os, name, 0)
-        fd = os.open(target, flags)
-        try:
-            before = os.fstat(fd)
-            before_path = target.lstat()
-            if not stat.S_ISREG(before.st_mode) or not os.path.samestat(
-                before, before_path
-            ):
-                raise ValueError("path must be a non-symlink regular file")
-            chunks: list[bytes] = []
-            while True:
-                chunk = os.read(fd, 1 << 20)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-            raw = b"".join(chunks)
-            after = os.fstat(fd)
-            after_path = target.lstat()
-            if (
-                _stat_identity(before) != _stat_identity(after)
-                or not os.path.samestat(before, after_path)
-            ):
-                raise OSError(f"file changed while reading: {target}")
-            st = after
-        finally:
-            os.close(fd)
+        if max_bytes is not None and before.st_size > max_bytes:
+            raise ValueError(f"file exceeds size limit ({max_bytes} bytes)")
+
+        chunks: list[bytes] = []
+        remaining = (max_bytes + 1) if max_bytes is not None else None
+        while remaining is None or remaining > 0:
+            read_size = (
+                min(remaining, 1 << 20) if remaining is not None else (1 << 20)
+            )
+            chunk = os.read(fd, read_size)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            if remaining is not None:
+                remaining -= len(chunk)
+        raw = b"".join(chunks)
+        if max_bytes is not None and len(raw) > max_bytes:
+            raise ValueError(f"file exceeds size limit ({max_bytes} bytes)")
+
+        after = os.fstat(fd)
+        after_path = target.lstat()
+        if (
+            not stat.S_ISREG(after_path.st_mode)
+            or _stat_identity(before) != _stat_identity(after)
+            or not os.path.samestat(before, after_path)
+            or len(raw) != after.st_size
+        ):
+            raise OSError(f"file changed while reading: {target}")
+        st = after
+    finally:
+        os.close(fd)
 
     text = raw.decode(encoding)
     newline_match = _PHYSICAL_NEWLINE.search(text)

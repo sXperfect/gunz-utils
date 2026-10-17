@@ -195,17 +195,17 @@ directories, sampled process-tree observations, and caller-owned input budgets.
 | ALG-079 | SingleFlight producer resource ownership | `cache.SingleFlight.run` | A3 | shared producer lifetime, waiter cancellation, registry release after completion, rejected coroutine submission closure | RS-01/RP-02 bounded lifetime and cache proofs pass on both Python versions; broader family guarantees are not inferred from this ownership packet |
 | ALG-080 | TOCTOU-safe regular file reading | `io.read_regular_bytes` | A4 | `O_NOFOLLOW` descriptor open, max size enforcement, pre- and post-read inode/device signature check | verified in `test_io.py` |
 | ALG-081 | Strict JSON object decoding | `serialization.decode_json_object`, `load_json_object` | A4 | duplicate key rejection, non-finite float rejection, UTF-8 validity, max nesting depth bounding (default 64) | verified in `test_serialization.py` |
-| ALG-082 | Summary statistics & outlier detection | `stats.SummaryStats`, `percentile`, `median_absolute_deviation`, `mad_outlier_indices`, `summarize` | A4 | linear interpolation percentiles, normal consistency scaling, MAD-based outlier detection, single-pass summary | verified in `test_stats.py` |
+| ALG-082 | Summary statistics & outlier detection | `stats.SummaryStats`, `percentile`, `median_absolute_deviation`, `mad_outlier_indices`, `summarize` | A4 | linear interpolation percentiles, normal consistency scaling, MAD-based outlier detection, single-pass summary, bool rejection in percentiles | verified in `test_stats.py`, `test_v1_17_1_audit_regressions.py` |
 | ALG-083 | Terminal presentation escaping | `formatting.escape_terminal`, `supports_color` | A4 | non-printable control escaping, `NO_COLOR` / `FORCE_COLOR` standards adherence | verified in `test_formatting.py` |
 | ALG-084 | Polynomial state-set glob matching & filtered directory walk | `fs.match_path_glob`, `matches_any_glob`, `walk_files` | A4 | $O(N \times M)$ deterministic state-set transition, recursive `**` evaluation without exponential backtracking, sorted path traversal, early excluded directory subtree pruning | verified in `test_v1_16_capabilities.py` |
-| ALG-085 | Online streaming accumulator & parallel variance merge | `stats.RunningStats` | A4 | $O(1)$ space, Welford one-pass mean and variance update, Chan parallel pairwise variance combination, monotonic min/max bounds | verified in `test_v1_16_capabilities.py` |
+| ALG-085 | Online streaming accumulator & parallel variance merge | `stats.RunningStats` | A4 | $O(1)$ space, Welford one-pass mean and variance update, Chan parallel pairwise variance combination, monotonic min/max bounds, failure-atomic `extend` & finite overflow guards | verified in `test_v1_16_capabilities.py`, `test_v1_17_1_audit_regressions.py` |
 | ALG-086 | Exact rational mass empirical cumulative distribution | `stats.ecdf`, `stats.ECDFPoint` | A4 | Exact step-function cumulative distribution, duplicate collation, exact integer frequency counting, bounded probabilities $[0.0, 1.0]$ | verified in `test_v1_16_capabilities.py` |
-| ALG-087 | Multi-objective Pareto dominance & frontier filtering | `stats.pareto_dominates`, `stats.pareto_frontier`, `stats.ParetoObjective` | A4 | Component-wise weak dominance with strict superiority in at least one dimension, user-defined directional objectives (min/max), non-dominated set extraction | verified in `test_v1_16_capabilities.py` |
-| ALG-088 | Cross-process advisory file locking & optimistic CAS file snapshot | `fs.advisory_file_lock`, `io.FileSnapshot`, `io.read_file_snapshot`, `io.read_source_file`, `io.physical_lines` | A4 | Symlink rejection, non-blocking/timed acquire, cross-platform locking (POSIX flock / Windows locking), inode/mtime CAS verification before atomic replacement, physical line ending preservation | verified in `test_v1_16_capabilities.py` |
-| ALG-089 | $O(N \log N)$ 2D Pareto sweep & sorted candidate pruning | `stats.pareto_frontier` | A4 | $O(N \log N)$ monotone running-minimum sweep for $D=2$, sorted non-dominated set pruning for $D \ge 3$, stable preservation of tie points | verified in `test_v1_17_capabilities.py` |
-| ALG-090 | Depth-bounded directory walking & symlink cycle detection | `fs.walk_files` | A4 | Deterministic `visited_dirs` inode tracking on `follow_symlinks=True`, `max_depth` directory pruning | verified in `test_v1_17_capabilities.py` |
-| ALG-091 | Stat-based directory tree fingerprinting | `fs.tree_fingerprint` | A4 | Deterministic SHA-256 fingerprinting of relative POSIX paths, file sizes, and nanosecond modification timestamps without full file body reads | verified in `test_v1_17_capabilities.py` |
-| ALG-092 | Native C statistical vector acceleration | `native/_accel.c`, `stats.RunningStats.extend`, `stats.summarize` | A4 | Native C Welford batch update, introselect percentile/median, MAD outlier classification with exact pure-Python fallback parity | verified in `verify_native.py` |
+| ALG-087 | Multi-objective Pareto dominance & frontier filtering | `stats.pareto_dominates`, `stats.pareto_frontier`, `stats.ParetoObjective` | A4 | Component-wise weak dominance with strict superiority in at least one dimension, user-defined directional objectives (min/max), non-dominated set extraction, eager objective validation & bool coordinate rejection | verified in `test_v1_16_capabilities.py`, `test_v1_17_1_audit_regressions.py` |
+| ALG-088 | Cross-process advisory file locking & optimistic CAS file snapshot | `fs.advisory_file_lock`, `io.FileSnapshot`, `io.read_file_snapshot`, `io.read_source_file`, `io.physical_lines` | A4 | Symlink rejection (`O_NOFOLLOW`), non-blocking/timed acquire, cross-platform locking, single-descriptor `O_NOFOLLOW` snapshot read, inode/mtime CAS verification before atomic replacement or no-op short-circuit | verified in `test_v1_16_capabilities.py`, `test_v1_17_1_audit_regressions.py` |
+| ALG-089 | $O(N \log N)$ 2D Pareto sweep & sorted candidate pruning | `stats.pareto_frontier` | A4 | $O(N \log N)$ monotone running-minimum sweep for $D=2$, sorted non-dominated set pruning for $D \ge 3$, exact sub-$10^{-15}$ scale equivalence with `pareto_dominates`, stable preservation of tie points | verified in `test_v1_17_capabilities.py`, `test_v1_17_1_audit_regressions.py` |
+| ALG-090 | Depth-bounded directory walking & symlink cycle detection | `fs.walk_files` | A4 | Eager precondition validation before iteration, deterministic `visited_dirs` inode tracking on `follow_symlinks=True`, `max_depth` directory pruning | verified in `test_v1_17_capabilities.py`, `test_v1_17_1_audit_regressions.py` |
+| ALG-091 | Stat-based directory tree fingerprinting | `fs.tree_fingerprint` | A4 | Allowed digest validation, length-prefixed relative POSIX paths, regular-file `lstat` verification, signed 64-bit nanosecond mtime encoding | verified in `test_v1_17_capabilities.py`, `test_v1_17_1_audit_regressions.py` |
+| ALG-092 | Native C statistical vector acceleration | `native/_accel.c`, `stats.RunningStats.extend`, `stats.summarize` | A4 | Zero-leak `Py_BuildValue` dict construction, overflow/OOM guards, exact `float`/`int` check with `Real` delegation to Python fallback, near-zero mean CV parity | verified in `verify_native.py`, `test_v1_17_1_audit_regressions.py` |
 
 
 ## A0 sweep result
@@ -554,3 +554,42 @@ and handler/environment ownership are explicitly cooperative/caller-controlled.
 Full interpreter/native suites and offline static/docs/artifact variants pass.
 No canonical A4 promotion is claimed from reused cached dependencies or
 unexecuted Windows/macOS hosts. Input SHA256: `b912b51a45747a6325e2cf930e27948696360e989c0ce9cb8cabc664c59d91fb`.
+
+
+## Deep security & algorithm audit — 2026-10-17 (v1.17.1)
+
+Post-v1.17.0 deep audit of `native/src/_accel.c`, `stats.py`, `io.py`,
+`plugins.py`, and `fs.py`:
+
+- **ALG-092 (`native/src/_accel.c`):** Eliminated 9 `PyObject` reference leaks per
+  `py_fast_summary` call by constructing the return dictionary via
+  `Py_BuildValue("{s:n,s:d,...,s:N,s:N}")`; added allocation overflow and OOM
+  guards; aligned `coefficient_of_variation` near-zero mean threshold
+  (`fabs(mean) > 1e-15`) with the pure-Python fallback; restricted native fast
+  paths to exact `int`/`float` items and finite Welford intermediates so custom
+  `Real` types (such as `Fraction`) and overflow edge cases delegate cleanly to
+  the Python fallback.
+- **ALG-087 / ALG-089 (`stats.pareto_frontier`, `stats.pareto_dominates`):**
+  Replaced `math.isclose(..., abs_tol=1e-15)` in the 1D and 2D sweep paths with
+  sorted-order exact comparisons (`<=`), restoring 100% oracle equivalence with
+  `pareto_dominates` at sub-$10^{-15}$ coordinate scales. Enforced eager
+  objective validation before empty-`items` short-circuiting and rejected
+  boolean coordinates.
+- **ALG-082 / ALG-085 (`stats.RunningStats`, `stats.summarize`):** Made
+  `RunningStats.extend` failure-atomic across pure-Python/generator inputs via
+  staged copy commit, added finite-float overflow guards (`OverflowError`) to
+  `update`/`extend`/`merge`, and rejected booleans in `summarize(..., percentiles=...)`.
+- **ALG-088 (`io.read_file_snapshot`, `io.FileSnapshot.write_if_unchanged`):**
+  Unified `read_file_snapshot(max_bytes=...)` into the single `O_NOFOLLOW` +
+  `fstat` descriptor read loop (eliminating the split `read_regular_bytes` +
+  separate `lstat()` TOCTOU window) and verified on-disk `lstat()` identity
+  before the no-op `payload == self.raw` short-circuit.
+- **ALG-090 / ALG-091 (`fs.walk_files`, `fs.tree_fingerprint`, `fs.advisory_file_lock`) & `plugins.py`:**
+  Made `walk_files` validate arguments eagerly at call time; hardened
+  `tree_fingerprint` with `SUPPORTED_ALGOS` validation, `lstat()` regular-file
+  checks, length-prefixed path framing, and signed 64-bit `st_mtime_ns`
+  encoding; hardened `advisory_file_lock` to translate `ELOOP` on `O_NOFOLLOW`
+  open to `ValueError` and bound retry sleep to the remaining timeout; hardened
+  `GunzFileFinder.find_spec` and `load_module_from_path` to inspect `lstat()`
+  before `.resolve()` so symlinked plugins or directories are rejected.
+
