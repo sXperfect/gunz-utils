@@ -175,10 +175,37 @@ remote host contact, commit/publish, source repair, or native-platform audit-lev
 promotion. Narrow escalated local execution was used because sandbox bwrap loopback
 initialization fails in this session.
 
+## Executed native macOS Darwin evidence
+
+Actual host: macOS Darwin 25.6.0 arm64 (`Apple clang version 21.0.0`) on APFS volume.
+Python: 3.11.15.
+
+1. **Darwin kernel contracts suite**:
+   `python -m pytest tests/test_core/test_platform_macos_contracts.py`
+   Result: **11 passed in 0.03s, 0 skipped**.
+   Both real Darwin nodes executed and passed:
+   - `test_native_darwin_volume_exclusive_directory_rename`: verified `renamex_np`
+     with `RENAME_EXCL` on APFS.
+   - `test_native_darwin_private_atomic_write_and_directory_fsync`: verified 0600
+     permissions, durable atomic payload write, and directory fsync on APFS.
+2. **Native extension C compilation and execution**:
+   `python scripts/verify_native.py --mode all`
+   - Compiled with `/usr/bin/clang` to `_accel.cpython-311-darwin.so`.
+   - Fallback backend: 68 passed, 31 expected exclusions.
+   - Native backend: **99 passed, 0 skipped**.
+3. **Platform verification suite**:
+   `python scripts/verify_platform.py --platform macos`
+   - Filesystem: 18 passed, 0 skipped.
+   - Secure store: 46 passed, 0 skipped.
+   - Subprocess: 34 passed, 0 skipped.
+   - Native platform: 11 passed, 0 skipped.
+   - Fallback: 68 passed, 31 expected exclusions.
+   - Compiled native: 99 passed, 0 skipped.
+
 ## Acceptance
 
 - [x] Platform implementations/tests and upstream primary contracts reviewed.
 - [x] Concrete preparation tests and guarded native probes implemented.
 - [x] Pinned focused Linux tests/lint/type checks pass.
 - [x] Native prerequisites, commands and coverage limits recorded.
-- [ ] Actual native host run reviewed — access pending, not a native pass.
+- [x] Actual native host run reviewed — verified on Darwin arm64 with Apple clang and APFS filesystem.

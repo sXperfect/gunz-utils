@@ -298,6 +298,8 @@ def process_map(
 
     if isinstance(threshold, bool) or not isinstance(threshold, int) or threshold < 0:
         raise ValueError("threshold must be a non-negative integer")
+    if not isinstance(fallback_serial, bool):
+        raise ValueError("fallback_serial must be bool")
 
     item_list = list(items) if not isinstance(items, list) else items
     total = len(item_list)
@@ -383,6 +385,8 @@ def process_imap(
             raise ValueError("chunksize must be a positive integer or None")
     if isinstance(threshold, bool) or not isinstance(threshold, int) or threshold < 0:
         raise ValueError("threshold must be a non-negative integer")
+    if not isinstance(fallback_serial, bool):
+        raise ValueError("fallback_serial must be bool")
 
     iterator = iter(items)
     if workers == 1:

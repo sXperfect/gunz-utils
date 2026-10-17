@@ -10,6 +10,8 @@ Current workflow and policy live in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 
 ## 2026
 
+- [2026-10-17-audit-network-dict-streaming-fixes](tasks/done/2026-10-17-audit-network-dict-streaming-fixes.md)
+- [2026-10-16-audit-correctness-repairs](tasks/done/2026-10-16-audit-correctness-repairs.md)
 - [2026-10-12-offline-rounds6-9](tasks/done/2026-10-12-offline-rounds6-9.md)
 - [2026-10-11-round7-9-local-handoff](tasks/done/2026-10-11-round7-9-local-handoff.md)
 

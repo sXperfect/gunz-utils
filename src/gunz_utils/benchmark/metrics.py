@@ -80,10 +80,10 @@ def process_metrics(
     """
     wall = profile.wall_seconds
     samples = profile.samples
-    memory_time = 0.0
-    for previous, current in zip(samples, samples[1:], strict=False):
-        duration = current.elapsed - previous.elapsed
-        memory_time += previous.rss_bytes * max(0.0, duration)
+    memory_time = math.fsum(
+        previous.rss_bytes * max(0.0, current.elapsed - previous.elapsed)
+        for previous, current in zip(samples, samples[1:], strict=False)
+    )
     return {
         "average_cpu_cores": profile.average_cpu_cores,
         "read_bytes_per_second": None if wall == 0 else profile.read_bytes / wall,

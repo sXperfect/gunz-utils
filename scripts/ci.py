@@ -26,6 +26,10 @@ local surface match the intended hosted gates so a passing local run is
 truthful evidence for the CI checks.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import argparse
@@ -44,14 +48,14 @@ DOCS_SOURCE = PROJECT_ROOT / "docs" / "source"
 BUILD_DOCS_SCRIPT = PROJECT_ROOT / "scripts" / "build_docs.sh"
 RELEASE_SCRIPT = PROJECT_ROOT / "scripts" / "release.py"
 
-# The packaging isolation gate forbids these optional packages from being
-# imported by the zero-dependency core package.
+#? The packaging isolation gate forbids these optional packages from being
+#? imported by the zero-dependency core package.
 FORBIDDEN_OPTIONAL_MODULES = {"pydantic", "cryptography", "git", "loguru"}
 
-# Scratch locations for the packaging isolation matrix. These live inside the
-# worktree's ``tmp/`` (fresh venvs) so the shared environment is never touched;
-# the outside-checkout CWD used by the source-shadowing guard is a dedicated
-# empty dir in the system temp space.
+#? Scratch locations for the packaging isolation matrix. These live inside the
+#? worktree's ``tmp/`` (fresh venvs) so the shared environment is never touched;
+#? the outside-checkout CWD used by the source-shadowing guard is a dedicated
+#? empty dir in the system temp space.
 VENV_BASE = PROJECT_ROOT / "tmp" / "c05-venvs"
 DIST_DIR = PROJECT_ROOT / "tmp" / "c05-dist"
 OUTSIDE_CWD = Path("/tmp/gunz-c05-outside")
@@ -69,7 +73,9 @@ def _env() -> dict[str, str]:
     return env
 
 
-def _origin_ok(path: str | None) -> bool:
+def _origin_ok(
+    path: str | None,
+) -> bool:
     """Return True when ``gunz_utils`` resolves inside this worktree's ``src``.
 
     This is the deliberate-import-origin guard: a local check that imports a
@@ -116,7 +122,11 @@ def _verify_import_origin() -> None:
         sys.exit(result.returncode or 3)
 
 
-def _run(cmd: Sequence[str], *, env: Mapping[str, str] | None = None) -> int:
+def _run(
+    cmd: Sequence[str],
+    *,
+    env: Mapping[str, str] | None = None,
+) -> int:
     """Run ``cmd`` from the project root and return its exit code.
 
     Returns (rather than raising) so callers can aggregate gate statuses; the
@@ -165,7 +175,11 @@ def _clean_env() -> dict[str, str]:
     return env
 
 
-def _run_venv(cmd: Sequence[str], *, cwd: Path | None = None) -> int:
+def _run_venv(
+    cmd: Sequence[str],
+    *,
+    cwd: Path | None = None,
+) -> int:
     """Run ``cmd`` in a clean env (no ``PYTHONPATH``) from ``cwd``.
 
     Unlike ``_run`` this never injects the worktree ``src/`` onto ``sys.path``,
@@ -183,7 +197,9 @@ def _run_venv(cmd: Sequence[str], *, cwd: Path | None = None) -> int:
     return result.returncode
 
 
-def _fresh_venv_python(name: str) -> tuple[Path, Path]:
+def _fresh_venv_python(
+    name: str,
+) -> tuple[Path, Path]:
     """Create a fresh venv for ``name`` under ``tmp/c05-venvs``; return (py, dir).
 
     Any previous scratch venv of the same name is removed first so each case
@@ -208,12 +224,17 @@ def _fresh_venv_python(name: str) -> tuple[Path, Path]:
     return venv_dir / "bin" / "python", venv_dir
 
 
-def _pip_install(py: Path, *args: str) -> int:
+def _pip_install(
+    py: Path,
+    *args: str,
+) -> int:
     """``pip install <args>`` inside a venv (quiet, version-check disabled)."""
     return _run_venv([str(py), "-m", "pip", "install", "--quiet", *args])
 
 
-def _site_packages(venv_dir: Path) -> Path:
+def _site_packages(
+    venv_dir: Path,
+) -> Path:
     """Return the ``site-packages`` directory of a freshly created venv."""
     lib = venv_dir / "lib"
     py_dirs = [p for p in lib.iterdir() if p.is_dir() and p.name.startswith("python")]
@@ -253,8 +274,8 @@ def _case_stdlib() -> int:
     status = _pip_install(py, ".", "pytest==9.0.3")
     if status != 0:
         return status
-    # The development pytest configuration otherwise reinserts src/ even with
-    # PYTHONPATH cleared, concealing defects in the installed distribution.
+    #? The development pytest configuration otherwise reinserts src/ even with
+    #? PYTHONPATH cleared, concealing defects in the installed distribution.
     status = _run_venv(
         [str(py), "-m", "pytest", "-o", "pythonpath=", "-q", "tests/test_ext_stdlib"]
     )
@@ -273,14 +294,17 @@ def _case_stdlib() -> int:
     return _run_venv([str(py), "-c", code])
 
 
-def _case_extra(extra: str, test_dir: str) -> int:
+def _case_extra(
+    extra: str,
+    test_dir: str,
+) -> int:
     """Install ``.[<extra>]`` in a fresh venv and run that extra's test directory."""
     py, _ = _fresh_venv_python(extra)
     status = _pip_install(py, f".[{extra}]", "pytest==9.0.3")
     if status != 0:
         return status
-    # pyproject.toml adds src/ for ordinary development tests. Disable that
-    # setting here so pytest exercises the freshly installed distribution.
+    #? pyproject.toml adds src/ for ordinary development tests. Disable that
+    #? setting here so pytest exercises the freshly installed distribution.
     return _run_venv(
         [str(py), "-m", "pytest", "-o", "pythonpath=", "-q", f"tests/{test_dir}"]
     )
@@ -310,7 +334,10 @@ def _case_plot() -> int:
     return _run_venv([str(py), "-c", code])
 
 
-def _check_distribution_contents(wheel: Path, sdist: Path) -> None:
+def _check_distribution_contents(
+    wheel: Path,
+    sdist: Path,
+) -> None:
     """Require pure wheels and advertised optional native source/build support."""
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
@@ -334,7 +361,10 @@ def _check_distribution_contents(wheel: Path, sdist: Path) -> None:
             raise ValueError(f"sdist missing required files: {sorted(missing)}")
 
 
-def _extract_sdist(sdist: Path, destination: Path) -> Path:
+def _extract_sdist(
+    sdist: Path,
+    destination: Path,
+) -> Path:
     """Extract regular files/directories without allowing archive path redirection."""
     destination.mkdir(parents=True, exist_ok=True)
     roots: set[str] = set()
@@ -363,7 +393,10 @@ def _extract_sdist(sdist: Path, destination: Path) -> Path:
     return destination / roots.pop()
 
 
-def _check_installed_artifact(py: Path, venv: Path) -> int:
+def _check_installed_artifact(
+    py: Path,
+    venv: Path,
+) -> int:
     """Verify installed origin, typing marker and zero-dependency fallback."""
     sp = _site_packages(venv)
     OUTSIDE_CWD.mkdir(parents=True, exist_ok=True)
@@ -428,8 +461,8 @@ def _case_wheel_sdist() -> int:
     OUTSIDE_CWD.mkdir(parents=True, exist_ok=True)
     for kind, artifact in (("wheel", wheels[0]), ("sdist", sdists[0])):
         install_py, install_venv = _fresh_venv_python(f"{kind}-install")
-        # In particular, the sdist must rebuild from its contents rather than
-        # reusing a wheel cached from an earlier source distribution.
+        #? In particular, the sdist must rebuild from its contents rather than
+        #? reusing a wheel cached from an earlier source distribution.
         status = _pip_install(install_py, "--no-cache-dir", str(artifact))
         if status != 0:
             return status
@@ -598,7 +631,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(
+    argv: Sequence[str] | None = None,
+) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 

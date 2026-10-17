@@ -79,9 +79,11 @@ try:
     import resource
 except ImportError:
     pass
-else:
-    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-    resource.setrlimit(resource.RLIMIT_STACK, (1048576, 1048576))
+    try:
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        resource.setrlimit(resource.RLIMIT_STACK, (1048576, 1048576))
+    except (ValueError, OSError):
+        pass
 sys.path.insert(0, {str(source_root)!r})
 native_path = {native_path!r}
 if native_path is None:

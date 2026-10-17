@@ -342,3 +342,75 @@ def test_policy_guard_and_encryption_share_sqlite_write_exclusion(
         assert attempts == [True]
         assert _snapshot(tmp_path)[0]["key_check"] == marker
         assert store.get("future") == "synthetic-future-value"
+
+
+def test_read_private_rejects_oversized_files(
+    tmp_path: Path,
+) -> None:
+    key_file = tmp_path / "master.key"
+    key_file.write_bytes(b"a" * 4097)
+    key_file.chmod(0o600)
+    with pytest.raises(ValueError, match="exceeds maximum size limit"):
+        SecureStore._read_private(key_file, max_bytes=4096)
+
+
+def test_derive_key_rejects_malformed_salt_before_pbkdf(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    #? Ensure PBKDF2HMAC is never constructed on invalid salt length
+    def _fail_on_kdf(
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        raise AssertionError("PBKDF2HMAC must not run on malformed salt")
+
+    monkeypatch.setattr("gunz_utils.ext.secure_store.PBKDF2HMAC", _fail_on_kdf)
+    with pytest.raises(ValueError, match="salt must be exactly 16 bytes"):
+        SecureStore._derive_key("synthetic-passphrase", b"short-salt")
+
+    with pytest.raises(ValueError, match="salt must be exactly 16 bytes"):
+        SecureStore._derive_key("synthetic-passphrase", b"x" * 17)
+
+
+def test_unlock_passphrase_skips_malformed_salt_without_kdf(
+    tmp_path: Path,
+) -> None:
+    with SecureStore(base_dir=tmp_path) as store:
+        store.unlock("synthetic-passphrase")
+        store.set("secret", "synthetic-value")
+
+    #? Damage the primary salt file with invalid length
+    salt_file = tmp_path / "master.salt"
+    salt_file.write_bytes(b"invalid-salt-len")
+    salt_file.chmod(0o600)
+
+    #? Attempt unlock with damaged primary salt and no pending candidate
+    with SecureStore(base_dir=tmp_path) as rejected:
+        with pytest.raises(InvalidToken):
+            rejected.unlock("synthetic-passphrase")
+        assert not rejected.is_unlocked()
+
+
+def test_decrypt_rejects_malformed_fixed_envelope_lengths_without_payload_unhex(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unhex_calls: list[bytes | str] = []
+    original_unhexlify = secure_crypto.binascii.unhexlify
+
+    def _tracking_unhex(
+        data: bytes | str,
+    ) -> bytes:
+        unhex_calls.append(data)
+        return original_unhexlify(data)
+
+    monkeypatch.setattr(secure_crypto.binascii, "unhexlify", _tracking_unhex)
+
+    #? Malformed salt length (30 hex chars instead of 32)
+    malformed_salt_wire = (
+        f"aes256:v2:{'00' * 15}:{'00' * 12}:{'00' * 16}:{'ff' * 1000}"
+    )
+    with pytest.raises(ValueError, match="Invalid encrypted format"):
+        secure_crypto.decrypt(malformed_salt_wire, "synthetic-passphrase")
+
+    #? Payload ('ff' * 1000) was never passed to unhexlify
+    assert not any(len(str(call)) >= 2000 for call in unhex_calls)

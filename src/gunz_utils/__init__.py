@@ -116,8 +116,10 @@ def __getattr__(
 
     #? _LAZY is a static allowlist of literal module names, so this lazy
     #? import is not an arbitrary dynamic import (GS045 is a false positive).
-    # gunz-style: ignore[GS045]
-    return getattr(importlib.import_module(_LAZY[name], __name__), name)
+    return getattr(
+        importlib.import_module(_LAZY[name], __name__),  # gunz-style: ignore[GS045]
+        name,
+    )
 
 
 def __dir__() -> list[str]:

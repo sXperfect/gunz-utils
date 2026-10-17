@@ -10,7 +10,14 @@ import asyncio
 import inspect
 import math
 import time
-from collections.abc import Callable, Coroutine, Mapping, MutableMapping, Sequence
+from collections.abc import (
+    Callable,
+    Coroutine,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any
@@ -163,35 +170,39 @@ class WorkflowDAG:
         temporary: set[str] = set()
         permanent: set[str] = set()
 
-        def visit(
-            name: str,
-        ) -> None:
-            """visit() function.
+        for start_name in self.stages:
+            if start_name in permanent:
+                continue
+            temporary.add(start_name)
+            stack: list[tuple[str, Iterator[str]]] = [
+                (start_name, iter(self.stages[start_name].dependencies))
+            ]
 
-            Parameters
-            ----------
-            name : str
-                name parameter.
-            """
-            if name in permanent:
-                return
-            if name in temporary:
-                raise ValueError("workflow DAG cycle detected")
+            while stack:
+                name, it = stack[-1]
+                try:
+                    dependency = next(it)
+                except StopIteration:
+                    stack.pop()
+                    temporary.remove(name)
+                    permanent.add(name)
+                    result.append(name)
+                    continue
 
-            stage = self.stages[name]
-            temporary.add(name)
-            for dependency in stage.dependencies:
                 if dependency not in self.stages:
                     raise KeyError(
                         f"missing stage dependency {dependency!r}"
                     )
-                visit(dependency)
-            temporary.remove(name)
-            permanent.add(name)
-            result.append(name)
+                if dependency in permanent:
+                    continue
+                if dependency in temporary:
+                    raise ValueError("workflow DAG cycle detected")
 
-        for name in self.stages:
-            visit(name)
+                temporary.add(dependency)
+                stack.append(
+                    (dependency, iter(self.stages[dependency].dependencies))
+                )
+
         return tuple(result)
 
     def order(self) -> tuple[str, ...]:
@@ -216,50 +227,51 @@ class WorkflowDAG:
             raise KeyError(name)
 
         memo: dict[str, str | None] = {}
+        stack: list[tuple[str, Iterator[str]]] = [
+            (name, iter(self.stages[name].dependencies))
+        ]
+        visited: set[str] = {name}
 
-        def resolve(
-            stage_name: str,
-        ) -> str | None:
-            """resolve() function.
-
-            Parameters
-            ----------
-            stage_name : str
-                stage_name parameter.
-
-            Returns
-            -------
-            str | None
-                The result of the operation.
-            """
-            if stage_name in memo:
-                return memo[stage_name]
-
-            stage = self.stages[stage_name]
-            if stage.fingerprint is None:
-                memo[stage_name] = None
-                return None
-
-            dependencies: dict[str, str] = {}
-            for dependency in stage.dependencies:
-                token = resolve(dependency)
-                if token is None:
+        while stack:
+            stage_name, it = stack[-1]
+            try:
+                dependency = next(it)
+            except StopIteration:
+                stack.pop()
+                stage = self.stages[stage_name]
+                if stage.fingerprint is None:
                     memo[stage_name] = None
-                    return None
-                dependencies[dependency] = token
+                    continue
 
-            token = structured_hash(
-                {
-                    "name": stage.name,
-                    "fingerprint": stage.fingerprint,
-                    "dependency_order": list(stage.dependencies),
-                    "dependency_fingerprints": dependencies,
-                }
-            )
-            memo[stage_name] = token
-            return token
+                dependencies: dict[str, str] = {}
+                any_none = False
+                for dep in stage.dependencies:
+                    token = memo.get(dep)
+                    if token is None:
+                        any_none = True
+                        break
+                    dependencies[dep] = token
 
-        return resolve(name)
+                if any_none:
+                    memo[stage_name] = None
+                else:
+                    memo[stage_name] = structured_hash(
+                        {
+                            "name": stage.name,
+                            "fingerprint": stage.fingerprint,
+                            "dependency_order": list(stage.dependencies),
+                            "dependency_fingerprints": dependencies,
+                        }
+                    )
+                continue
+
+            if dependency not in memo and dependency not in visited:
+                visited.add(dependency)
+                stack.append(
+                    (dependency, iter(self.stages[dependency].dependencies))
+                )
+
+        return memo[name]
 
     def _rollback_sync(self,
         completed_order: list[str],

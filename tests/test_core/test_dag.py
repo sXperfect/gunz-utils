@@ -273,3 +273,28 @@ def test_workflow_stage_rejects_ambiguous_declarations() -> None:
             "stage",
             object(),
         )
+
+
+def test_deep_chain_does_not_hit_recursion_limit() -> None:
+    depth = 1500
+    stages = [
+        WorkflowStage(
+            "stage_0",
+            lambda _deps: 0,
+            fingerprint="fp_0",
+        )
+    ]
+    for i in range(1, depth):
+        stages.append(
+            WorkflowStage(
+                f"stage_{i}",
+                lambda _deps: 0,
+                dependencies=(f"stage_{i - 1}",),
+                fingerprint=f"fp_{i}",
+            )
+        )
+
+    dag = WorkflowDAG(stages)
+    assert len(dag.order()) == depth
+    assert dag.order()[-1] == f"stage_{depth - 1}"
+    assert dag.effective_fingerprint(f"stage_{depth - 1}") is not None

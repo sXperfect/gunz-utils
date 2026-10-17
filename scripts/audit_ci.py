@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Aggregate repository verification without hiding independent failures."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import argparse
@@ -45,12 +49,16 @@ def _run(
     return result.returncode
 
 
-def run_gate(name: str) -> int:
+def run_gate(
+    name: str,
+) -> int:
     """Run one canonical gate through scripts/ci.py."""
     return _run((sys.executable, str(CI_SCRIPT), name))
 
 
-def run_compatibility(python_executable: str) -> int:
+def run_compatibility(
+    python_executable: str,
+) -> int:
     """Run the canonical test gate with a second Python interpreter."""
     env = dict(os.environ)
     env["PYTHONPATH"] = str(SRC_DIR)
@@ -107,7 +115,9 @@ def collect_results(
     return results
 
 
-def _summary_payload(results: Sequence[GateResult]) -> dict[str, object]:
+def _summary_payload(
+    results: Sequence[GateResult],
+) -> dict[str, object]:
     """Return the stable machine-readable result document."""
     return {
         "schema_version": 1,
@@ -130,7 +140,9 @@ def write_json_summary(
     )
 
 
-def write_github_summary(results: Sequence[GateResult]) -> None:
+def write_github_summary(
+    results: Sequence[GateResult],
+) -> None:
     """Append a compact table to GitHub's step summary when available."""
     target = os.environ.get("GITHUB_STEP_SUMMARY")
     if not target:
@@ -151,7 +163,9 @@ def write_github_summary(results: Sequence[GateResult]) -> None:
         stream.write("\n".join(lines))
 
 
-def print_summary(results: Sequence[GateResult]) -> None:
+def print_summary(
+    results: Sequence[GateResult],
+) -> None:
     """Print all gate statuses after execution."""
     print()
     print("=" * 72)
@@ -202,7 +216,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(
+    argv: Sequence[str] | None = None,
+) -> int:
     """Run the aggregate verifier."""
     args = build_parser().parse_args(argv)
     gates = [

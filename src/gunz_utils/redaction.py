@@ -185,8 +185,7 @@ def redact_dict(
     """
     if patterns is None:
         patterns = SECRET_PATTERNS
-    if show_chars < 0:
-        raise ValueError("show_chars must be non-negative")
+    _validate_show_chars(show_chars)
 
     def _walk(
         value: object,

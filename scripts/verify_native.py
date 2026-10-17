@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Require real native activation and fallback in isolated source copies."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import argparse
@@ -20,7 +24,11 @@ TESTS = (
 )
 
 
-def activation_code(source: Path, *, native: bool) -> str:
+def activation_code(
+    source: Path,
+    *,
+    native: bool,
+) -> str:
     """Return an independent import/dispatch check run before the proof suite."""
     return (
         "from pathlib import Path\n"
@@ -39,7 +47,10 @@ def activation_code(source: Path, *, native: bool) -> str:
     )
 
 
-def verify(*, mode: str = "all") -> int:
+def verify(
+    *,
+    mode: str = "all",
+) -> int:
     """Build/test outside src; compiler failures remain visible gate failures."""
     scratch = ROOT / "tmp"
     scratch.mkdir(exist_ok=True)

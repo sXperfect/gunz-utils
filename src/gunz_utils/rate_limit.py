@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import sys
 import time
 
@@ -36,9 +37,15 @@ class AsyncRateLimiter:
             The result of the operation.
         """
         elapsed = time.monotonic() - self._updated
-        return min(self.capacity, self._tokens + elapsed * self.rate)
+        try:
+            tokens = self._tokens + elapsed * self.rate
+        except OverflowError:
+            tokens = self.capacity
+        return min(self.capacity, tokens)
 
-    async def try_acquire(self,
+    #? GS046 false positive: 'tokens' parameter is token-bucket capacity,
+    #? not an authentication credential or secret token.
+    async def try_acquire(self,  # gunz-style: ignore[GS046]
         tokens: float = 1.0,
     ) -> bool:
         """Consume tokens immediately when available without waiting.
@@ -61,7 +68,9 @@ class AsyncRateLimiter:
             self._tokens -= tokens
             return True
 
-    async def acquire(self,
+    #? GS046 false positive: 'tokens' parameter is token-bucket capacity,
+    #? not an authentication credential or secret token.
+    async def acquire(self,  # gunz-style: ignore[GS046]
         tokens: float = 1.0,
         *,
         timeout: float | None = None,
@@ -96,12 +105,20 @@ class AsyncRateLimiter:
                         raise TimeoutError("rate-limit acquisition timed out")
                     self._tokens -= tokens
                     return
-                wait = (tokens - self._tokens) / self.rate
+                deficit = tokens - self._tokens
+                try:
+                    wait = deficit / self.rate
+                except OverflowError:
+                    wait = float("inf")
             first_attempt = False
             if deadline is not None:
                 budget = deadline - time.monotonic()
-                if budget <= 0 or wait > budget:
+                if budget <= 0 or wait > budget or not math.isfinite(wait):
                     raise TimeoutError("rate-limit acquisition timed out")
+            elif not math.isfinite(wait):
+                raise OverflowError(
+                    "calculated rate-limit wait duration is non-finite"
+                )
             await asyncio.sleep(wait)
 
     @staticmethod
@@ -160,7 +177,11 @@ class AsyncRateLimiter:
         """
         now = time.monotonic()
         elapsed = now - self._updated
-        self._tokens = min(self.capacity, self._tokens + elapsed * self.rate)
+        try:
+            tokens = self._tokens + elapsed * self.rate
+        except OverflowError:
+            tokens = self.capacity
+        self._tokens = min(self.capacity, tokens)
         self._updated = now
 
     async def __aenter__(self) -> AsyncRateLimiter:

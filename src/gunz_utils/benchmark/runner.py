@@ -281,7 +281,7 @@ def benchmark(
         while len(samples) < max_iterations:
             sample = _sample(func, args, kwargs, actual_loops)
             samples.append(sample)
-            measured += sample * actual_loops
+            measured = math.fsum(samples) * actual_loops
             enough_count = len(samples) >= iterations
             enough_time = min_time is None or measured >= min_time
             if enough_count and enough_time:

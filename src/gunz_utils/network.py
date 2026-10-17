@@ -10,6 +10,7 @@ import ipaddress
 import math
 import re
 import socket
+import time
 from collections.abc import Mapping, Sequence
 from urllib.parse import quote, urlencode, urlunsplit
 
@@ -255,11 +256,15 @@ def tcp_reachable(
             "connection to non-public IP addresses is disallowed"
         )
 
+    deadline = time.monotonic() + float(timeout)
     for address in resolved:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0.0:
+            return False
         try:
             with socket.create_connection(
                 (address, port),
-                timeout=timeout,
+                timeout=remaining,
             ):
                 return True
         except OSError:

@@ -4,6 +4,10 @@
 Runs deterministic workloads, records artifacts, and checks for regressions.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import argparse
@@ -25,12 +29,16 @@ except ImportError:
         "Install it via: pip install gunz-bench"
     )
 
-# Add repo root and src to sys.path so workloads can import gunz_utils
+#? Add repo root and src to sys.path so workloads can import gunz_utils
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+    sys.path.insert(0, str(REPO_ROOT))  # gunz-style: ignore[GS007]
 if str(REPO_ROOT / "src") not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT / "src"))
+    sys.path.insert(0, str(REPO_ROOT / "src"))  # gunz-style: ignore[GS007]
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 
 from benchmarks.workloads import get_specs  # noqa: E402
 
@@ -45,7 +53,7 @@ def run_benchmarks(
 ) -> int:
     specs = get_specs()
     if profile == "smoke":
-        # Scale down repetitions for rapid smoke check
+        #? Scale down repetitions for rapid smoke check
         scaled_specs = []
         for s in specs:
             scaled_specs.append(
@@ -67,7 +75,7 @@ def run_benchmarks(
     runner = BenchmarkRunner(registry)
     run = runner.run()
 
-    # Save artifact
+    #? Save artifact
     out_dir = output_dir or (REPO_ROOT / "tmp" / "benchmarks")
     out_dir.mkdir(parents=True, exist_ok=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")

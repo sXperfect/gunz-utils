@@ -34,7 +34,7 @@ DEFAULT_MAX_INPUT_LENGTH = 1024  #? Security: Prevent DoS via long strings
 
 # ? Backward-compat alias for the module-level constant. New code should
 # ? reference `cls.DEFAULT_MAX_INPUT_LENGTH` (the class attribute).
-_MAX_INPUT_LENGTH = DEFAULT_MAX_INPUT_LENGTH
+_MAX_INPUT_LENGTH = DEFAULT_MAX_INPUT_LENGTH  # gunz-style: ignore[GS057]
 
 # ? mypy cannot see StrEnum ``ClassVar`` attributes as their declared type
 # ? (it resolves ``cls.<attr>`` to the enum member type instead), and ruff's
@@ -44,7 +44,9 @@ _FUZZY_LOOKUP_MAPS: dict[type, dict[str, Any]] = {}
 _NAME_LOOKUP_MAPS: dict[type, dict[str, Any]] = {}
 
 
-def _max_input_length(cls: type) -> int:
+def _max_input_length(
+    cls: type,
+) -> int:
     """Return the effective input-length limit for ``cls``, honoring overrides.
 
     Reads the resolved ``DEFAULT_MAX_INPUT_LENGTH`` from the class ``__dict__``
@@ -54,7 +56,7 @@ def _max_input_length(cls: type) -> int:
     """
     for klass in cls.__mro__:
         value = klass.__dict__.get("DEFAULT_MAX_INPUT_LENGTH")
-        if isinstance(value, int):
+        if not isinstance(value, bool) and isinstance(value, int) and value > 0:
             return value
     return DEFAULT_MAX_INPUT_LENGTH
 
@@ -137,6 +139,9 @@ class BaseStrEnum(enum.StrEnum):
         Attempts to find a member by alias, normalized value, or case-insensitive name.
         Raises ValueError if no match is found.
         """
+        if not isinstance(value_str, str):
+            raise TypeError("value_str must be a string")
+
         #? Security check to prevent DoS via excessive string processing.
         #? Uses the class attribute so subclasses can override the limit.
         max_len = _max_input_length(cls)
@@ -144,12 +149,23 @@ class BaseStrEnum(enum.StrEnum):
             raise ValueError(f"Input string too long (max {max_len} chars)")
 
         value_lower = value_str.lower()
+        normalized_value_input = value_lower.replace("-", "_").replace(" ", "_")
         _aliases = cls.__ALIASES__
 
         #? 1. Check for defined aliases (string -> target_string_value)
-        if value_lower in _aliases:
-            alias_target_value = _aliases[value_lower]
+        alias_target_value: str | None = _aliases.get(value_lower)
+        if alias_target_value is None and _aliases:
+            for alias_key, alias_val in _aliases.items():
+                alias_lower = alias_key.lower()
+                if (
+                    value_lower == alias_lower
+                    or normalized_value_input
+                    == alias_lower.replace("-", "_").replace(" ", "_")
+                ):
+                    alias_target_value = alias_val
+                    break
 
+        if alias_target_value is not None:
             #? Check internal map first
             if alias_target_value in cls._value2member_map_:
                 #? mypy's enum stubs type _value2member_map_ as dict[Any, Any];
@@ -175,8 +191,6 @@ class BaseStrEnum(enum.StrEnum):
             return fuzzy_map[value_lower]
 
         #? 3. Normalize separators and case for fuzzy matching
-        normalized_value_input = value_lower.replace("-", "_").replace(" ", "_")
-
         if normalized_value_input in fuzzy_map:
             return fuzzy_map[normalized_value_input]
 
@@ -383,6 +397,9 @@ class BaseIntEnum(enum.IntEnum):
         Attempts to find a member by alias (string->int), case-insensitive name, or
         string-to-int conversion.
         """
+        if not isinstance(value_str, str):
+            raise TypeError("value_str must be a string")
+
         #? Security check to prevent DoS via excessive string processing.
         #? Uses the class attribute so subclasses can override the limit.
         max_len = _max_input_length(cls)
@@ -390,12 +407,23 @@ class BaseIntEnum(enum.IntEnum):
             raise ValueError(f"Input string too long (max {max_len} chars)")
 
         value_lower = value_str.lower()
+        normalized_value_input = value_lower.replace("-", "_").replace(" ", "_")
         _aliases = cls.__ALIASES__
 
         #? 1. Check for aliases (string -> int_value)
-        if value_lower in _aliases:
-            int_target_value = _aliases[value_lower]
+        int_target_value: int | None = _aliases.get(value_lower)
+        if int_target_value is None and _aliases:
+            for alias_key, alias_val in _aliases.items():
+                alias_lower = alias_key.lower()
+                if (
+                    value_lower == alias_lower
+                    or normalized_value_input
+                    == alias_lower.replace("-", "_").replace(" ", "_")
+                ):
+                    int_target_value = alias_val
+                    break
 
+        if int_target_value is not None:
             if int_target_value in cls._value2member_map_:
                 #? mypy's enum stubs type _value2member_map_ as dict[Any, Any];
                 #? the runtime value is Self, so cast at the boundary.
@@ -409,11 +437,13 @@ class BaseIntEnum(enum.IntEnum):
                     f"member value for {cls.__name__}"
                 ) from exc
 
-        #? 2. Check for member name matches (case-insensitive)
+        #? 2. Check for member name matches (case-insensitive & separator-insensitive)
         #? Optimization: Use cached lookup map instead of iterating
         name_map = cls._get_name_lookup_map()
         if value_lower in name_map:
             return name_map[value_lower]
+        if normalized_value_input in name_map:
+            return name_map[normalized_value_input]
 
         #? 3. Try to convert to int if it's a string representation of a number
         try:
@@ -486,7 +516,7 @@ class BaseIntEnum(enum.IntEnum):
         if isinstance(value, cls):
             return value
 
-        if value is None:
+        if value is None or isinstance(value, bool):
             return None
 
         try:

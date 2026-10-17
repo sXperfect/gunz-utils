@@ -14,7 +14,7 @@ from unittest.mock import patch
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 
-from gunz_utils import atomic_write
+from gunz_utils.io import atomic_write, read_regular_bytes
 
 
 class TestAtomicWrite(unittest.TestCase):
@@ -90,5 +90,50 @@ class TestAtomicWrite(unittest.TestCase):
             self.assertEqual(path.read_text(), "durable")
 
 
+class TestReadRegularBytes(unittest.TestCase):
+    def test_basic_read_success(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "test.bin"
+            content = b"\x01\x02\x03\x04\x05"
+            path.write_bytes(content)
+            result = read_regular_bytes(path, max_bytes=100)
+            self.assertEqual(result, content)
+
+    def test_max_bytes_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "test.bin"
+            path.write_bytes(b"content")
+            with self.assertRaises(ValueError):
+                read_regular_bytes(path, max_bytes=0)
+            with self.assertRaises(ValueError):
+                read_regular_bytes(path, max_bytes=-5)
+
+    def test_rejects_exceeding_max_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "test.bin"
+            path.write_bytes(b"1234567890")
+            with self.assertRaisesRegex(ValueError, "exceeds size limit"):
+                read_regular_bytes(path, max_bytes=5)
+
+    def test_rejects_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            real_file = pathlib.Path(directory) / "real.txt"
+            real_file.write_bytes(b"hello")
+            symlink = pathlib.Path(directory) / "link.txt"
+            symlink.symlink_to(real_file)
+            msg = "must be a non-symlink regular file"
+            with self.assertRaisesRegex(ValueError, msg):
+                read_regular_bytes(symlink, max_bytes=100)
+
+    def test_rejects_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            sub = pathlib.Path(directory) / "subdir"
+            sub.mkdir()
+            msg = "must be a non-symlink regular file"
+            with self.assertRaisesRegex(ValueError, msg):
+                read_regular_bytes(sub, max_bytes=100)
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -257,3 +257,11 @@ class TestProcessMap(unittest.TestCase):
         )
         self.assertEqual(results, [i + 10 for i in range(12)])
 
+    def test_process_map_invalid_fallback_serial(self) -> None:
+        with self.assertRaises(ValueError):
+            process_map(
+                _multiprocess_test_square,
+                [1, 2],
+                fallback_serial=1,  # type: ignore[arg-type]
+            )
+

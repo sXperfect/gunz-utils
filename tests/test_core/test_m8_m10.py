@@ -66,6 +66,36 @@ class TestM8M10(unittest.TestCase):
         self.assertEqual(fingerprint({"a": 1, "b": 2}), fingerprint({"b": 2, "a": 1}))
         self.assertEqual(len(hash_stream(io.BytesIO(b"abc"))), 64)
 
+    def test_iter_jsonl_max_line_length_enforced(self) -> None:
+        #? A line exceeding max_line_length must raise ValueError
+        payload = '{"short": 1}\n{"long": "' + "x" * 200 + '"}\n'
+        stream = io.StringIO(payload)
+        gen = iter_jsonl(stream, max_line_length=50)
+        self.assertEqual(next(gen), {"short": 1})
+        with self.assertRaises(ValueError) as ctx:
+            next(gen)
+        self.assertIn("exceeds maximum line length", str(ctx.exception))
+
+    def test_iter_jsonl_max_line_length_validation(self) -> None:
+        stream = io.StringIO('{"a": 1}\n')
+        with self.assertRaises(ValueError):
+            list(iter_jsonl(stream, max_line_length=0))
+
+        with self.assertRaises(ValueError):
+            list(iter_jsonl(stream, max_line_length=-10))
+
+        with self.assertRaises(ValueError):
+            list(iter_jsonl(stream, max_line_length=True))  # type: ignore[arg-type]
+
+        with self.assertRaises(ValueError):
+            list(iter_jsonl(stream, max_line_length="50"))  # type: ignore[arg-type]
+
+    def test_iter_jsonl_within_max_line_length(self) -> None:
+        stream = io.StringIO('{"a": 1}\n{"b": 2}\n')
+        records = list(iter_jsonl(stream, max_line_length=50))
+        self.assertEqual(records, [{"a": 1}, {"b": 2}])
+
 
 if __name__ == "__main__":
     unittest.main()
+

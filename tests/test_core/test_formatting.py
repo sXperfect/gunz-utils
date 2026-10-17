@@ -9,7 +9,13 @@ import unittest
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 
-from gunz_utils.formatting import format_bytes, format_count, format_duration
+from gunz_utils.formatting import (
+    escape_terminal,
+    format_bytes,
+    format_count,
+    format_duration,
+    supports_color,
+)
 
 
 class TestFormatBytes(unittest.TestCase):
@@ -123,5 +129,50 @@ class TestFormatCount(unittest.TestCase):
         self.assertEqual(format_count(-999), "-999")
 
 
+class TestEscapeTerminal(unittest.TestCase):
+    def test_printable_text_untouched(self) -> None:
+        self.assertEqual(escape_terminal("hello world! 123"), "hello world! 123")
+
+    def test_escapes_tabs_and_newlines(self) -> None:
+        self.assertEqual(escape_terminal("a\tb\nc\r"), r"a\tb\nc\r")
+
+    def test_multiline_preserves_newline(self) -> None:
+        self.assertEqual(escape_terminal("a\nb\n", multiline=True), "a\nb\n")
+
+    def test_escapes_ansi_and_control_chars(self) -> None:
+        self.assertEqual(escape_terminal("\x1b[31mred\x1b[0m"), r"\x1b[31mred\x1b[0m")
+        self.assertEqual(escape_terminal("\x00\x07"), r"\x00\x07")
+
+    def test_escapes_bidi_controls(self) -> None:
+        self.assertEqual(escape_terminal("\u202eRTL"), r"\u202eRTL")
+
+
+class TestSupportsColor(unittest.TestCase):
+    def test_no_color_flag_overrides_everything(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {"FORCE_COLOR": "1"}):
+            self.assertFalse(supports_color(no_color_flag=True))
+
+    def test_no_color_env_var(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {"NO_COLOR": "1", "FORCE_COLOR": "1"}):
+            self.assertFalse(supports_color())
+
+    def test_force_color_env_var(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        env = dict(os.environ)
+        env.pop("NO_COLOR", None)
+        env["FORCE_COLOR"] = "1"
+        with patch.dict(os.environ, env, clear=True):
+            self.assertTrue(supports_color())
+
+
 if __name__ == "__main__":
     unittest.main()
+

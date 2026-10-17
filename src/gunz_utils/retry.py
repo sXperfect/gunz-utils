@@ -52,7 +52,11 @@ def _delay(
         delay = float(max_delay)
     else:
         exponent = attempt - 1
-        saturation = math.log2(max_delay) - math.log2(base_delay)
+        try:
+            ratio = max_delay / base_delay
+            saturation = math.log2(ratio) if math.isfinite(ratio) else float("inf")
+        except (OverflowError, ZeroDivisionError, ValueError):
+            saturation = float("inf")
         if exponent >= saturation:
             delay = float(max_delay)
         else:

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import math
 import socket
 from unittest.mock import patch
 
@@ -242,10 +243,83 @@ def test_tcp_reachable_connects_to_validated_public_numeric_address() -> None:
             allow_private=False,
         )
 
-    connect.assert_called_once_with(
-        ("93.184.216.34", 443),
-        timeout=5.0,
-    )
+    assert connect.call_count == 1
+    call_target, call_kwargs = connect.call_args
+    assert call_target == (("93.184.216.34", 443),)
+    #? The timeout is bounded by the deadline budget (approx 5.0s).
+    assert math.isclose(call_kwargs["timeout"], 5.0, abs_tol=0.1)
+
+
+def test_tcp_reachable_cumulative_timeout_across_addresses() -> None:
+    address_info = [
+        (
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP,
+            "",
+            ("93.184.216.34", 443),
+        ),
+        (
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP,
+            "",
+            ("93.184.216.35", 443),
+        ),
+        (
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP,
+            "",
+            ("93.184.216.36", 443),
+        ),
+    ]
+
+    current_time = 100.0
+
+    def mock_monotonic() -> float:
+        return current_time
+
+    observed_timeouts: list[float] = []
+
+    def mock_create_connection(
+        target: tuple[str, int],
+        *,
+        timeout: float,
+    ) -> None:
+        nonlocal current_time
+        observed_timeouts.append(timeout)
+        #? Advance simulated clock by 3.0 seconds per attempt
+        current_time += 3.0
+        raise OSError("connection timed out")
+
+    with (
+        patch(
+            "gunz_utils.network.socket.getaddrinfo",
+            return_value=address_info,
+        ),
+        patch(
+            "gunz_utils.network.time.monotonic",
+            side_effect=mock_monotonic,
+        ),
+        patch(
+            "gunz_utils.network.socket.create_connection",
+            side_effect=mock_create_connection,
+        ),
+    ):
+        result = tcp_reachable(
+            "example.test",
+            443,
+            timeout=5.0,
+            allow_private=False,
+        )
+
+    #? Total budget is 5.0s. First attempt takes 3.0s, leaving 2.0s for second attempt.
+    #? Second attempt takes 3.0s, exceeding budget; third attempt is not executed.
+    assert result is False
+    assert len(observed_timeouts) == 2
+    assert math.isclose(observed_timeouts[0], 5.0, abs_tol=0.01)
+    assert math.isclose(observed_timeouts[1], 2.0, abs_tol=0.01)
 
 
 def test_tcp_reachable_validates_allow_private_type() -> None:

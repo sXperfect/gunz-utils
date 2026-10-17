@@ -1,0 +1,6 @@
+- Consolidate general-purpose utilities into `gunz_utils`:
+  - `gunz_utils.io.read_regular_bytes`: TOCTOU-safe regular file reading with `O_NOFOLLOW`, maximum size limits, and pre/post-read stat inode/dev signature verification.
+  - `gunz_utils.serialization.decode_json_object` & `load_json_object`: Strict JSON decoding rejecting duplicate dictionary keys, non-finite floats, non-UTF8 encodings, and deeply nested payloads.
+  - `gunz_utils.stats`: Summary statistics suite (`SummaryStats`, `percentile`, `median_absolute_deviation`, `mad_outlier_indices`, `summarize`) for robust data summarization and outlier detection.
+  - `gunz_utils.formatting`: Terminal presentation utilities (`escape_terminal`, `supports_color`) supporting `NO_COLOR` and `FORCE_COLOR` standards.
+- Modernize `scripts/release.py` with multi-repo support (`--root`), dynamic project package discovery, fragment heading injection protection, transactional fragment unlinking rollback, AST version literal scanning, and git-based fragment verification (`check-fragment --base <rev>`).

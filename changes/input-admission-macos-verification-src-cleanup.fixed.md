@@ -1,0 +1,9 @@
+- Clean up advisory warnings in `src/gunz_utils`:
+  - Use `math.fsum` for exact floating-point summation in `benchmark.metrics`, `benchmark.process`, and `benchmark.runner`.
+  - Suppress false-positive advisories with targeted inline directives.
+- Implement security input admission and early validation (`INPUT-ADMISSION-2026-10-08`):
+  - Enforce bounded reading (`max_bytes=4096`) in `SecureStore._read_private` with both pre-read file size check and post-read byte bounds.
+  - Enforce strict salt length validation (`len(salt) == 16`) before constructing `PBKDF2HMAC` in `SecureStore._derive_key`.
+  - Validate fixed crypto envelope header lengths in `secure_crypto.decrypt` before unhexing or allocating variable ciphertext payload.
+- Execute and verify native macOS Darwin APFS platform contracts (`NP-02` / `GAP-010`), passing all 11 Darwin kernel contract tests and compiling native C extension with Apple clang.
+- Update `docs/audits/algorithm-registry.md` resolving `GAP-002` (iterative graph traversal), registering `ALG-080`..`ALG-083`, and synchronizing `scripts/release.py` across sibling repositories (`gunz-style`, `gunz-bench`).

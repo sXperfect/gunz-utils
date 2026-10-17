@@ -263,6 +263,10 @@ def rsync_mirror(
     transfers, and publish delayed updates. Cross-filesystem and hard-link
     policy is intentionally left to callers through extra_args.
     """
+    if not isinstance(lock, bool):
+        raise ValueError("lock must be bool")
+    if not isinstance(delete, bool):
+        raise ValueError("delete must be bool")
     if timeout is not None and (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
@@ -279,16 +283,26 @@ def rsync_mirror(
             "max_output_bytes must be a non-negative integer or None"
         )
     if completion_marker is not None and (
-        not completion_marker
+        not isinstance(completion_marker, str)
+        or not completion_marker
         or "/" in completion_marker
         or "\\" in completion_marker
         or completion_marker in {".", ".."}
+        or any(
+            ord(character) < 0x20 or ord(character) == 0x7F
+            for character in completion_marker
+        )
     ):
         raise ValueError(
             "completion_marker must be a simple filename or None"
         )
-    if any(
-        not isinstance(argument, str) or not argument
+    if isinstance(extra_args, (str, bytes)) or any(
+        not isinstance(argument, str)
+        or not argument
+        or any(
+            ord(character) < 0x20 or ord(character) == 0x7F
+            for character in argument
+        )
         for argument in extra_args
     ):
         raise ValueError("extra_args must contain non-empty strings")
