@@ -116,12 +116,11 @@ directories, sampled process-tree observations, and caller-owned input budgets.
 |---|---|---|---|---|---|
 | ALG-001 | Percentile bootstrap mean CI | `stats.bootstrap_mean_ci` | A2 | seeded determinism, confidence/sample/seed domains, finite real observations; `test_stats.py` | strict numerical parameter domains added; basic percentile semantics retained |
 | ALG-002 | Paired standardized effect | `stats.paired_effect` | A2 | paired-length invariant, sample SD, singleton/zero variance, huge finite values | fixed overflow-prone variance and overflowed pair differences |
-| ALG-003 | Normal mean summary / z interval | `stats.normal_mean_summary` | A2 | sample SD, singleton, z domain, representability | fixed unstable variance; unrepresentable intervals fail explicitly |
-| ALG-004 | Numeric metric comparison | `experiments.compare_numeric_metrics` | A2 | missing keys, numeric filtering, relative delta | reviewed; zero-baseline semantics remain explicit follow-up |
-| ALG-005 | Relative metric improvement | `experiments.metric_improvement` | A2 | direction, threshold, non-finite rejection | reviewed; near-zero scale contract should be documented further |
-| ALG-006 | Cartesian parameter grid | `experiments.parameter_grid` | A2 | Cartesian product order, empty factors | reviewed; no defect found |
-| ALG-007 | Stable priority hash | `sampling.stable_priority` | A2 | deterministic BLAKE2b output, seed influence | reviewed; bool-as-int seed semantics remain a minor gap |
-| ALG-008 | Stable named-item sampling | `sampling.sample_named_items` | A2 | order independence, duplicate rejection, budget/filter ordering | reviewed; no defect found |
+| ALG-004 | Numeric metric comparison | `experiments.compare_numeric_metrics` | A4 | missing keys, numeric filtering, relative delta, strict Mapping input validation | verified in `test_experiments.py` |
+| ALG-005 | Relative metric improvement | `experiments.metric_improvement` | A4 | direction, threshold, non-finite rejection, real finite non-negative bounds | verified in `test_experiments.py` |
+| ALG-006 | Cartesian parameter grid | `experiments.parameter_grid` | A4 | Cartesian product order, empty factors, strict Mapping validation | verified in `test_experiments.py` |
+| ALG-007 | Stable priority hash | `sampling.stable_priority` | A4 | deterministic BLAKE2b output, seed influence, strict rejection of boolean seeds | verified in `test_sampling.py` |
+| ALG-008 | Stable named-item sampling | `sampling.sample_named_items` | A4 | order independence, duplicate rejection, budget/filter ordering, strict seed/limit domain validation | verified in `test_sampling.py` |
 | ALG-009 | Workflow topological order | `dag.WorkflowDAG._topological_order` | A4 | dependency-before-consumer, missing dependency, cycles; exhaustive four-node directed-graph test against independent Kahn oracle; iterative stack traversal verified at >1,000 node depth | iterative stack traversal resolves recursion limits |
 | ALG-010 | Effective transitive fingerprint | `dag.WorkflowDAG.effective_fingerprint` | A2 | dependency sensitivity, propagation, cache invalidation | reviewed; no defect found |
 | ALG-011 | Provenance DAG cycle/ancestor traversal | `provenance_graph.ProvenanceGraph` | A4 | cycle rollback, unresolved nodes, deterministic ancestors; iterative stack traversal verified at >1,000 node depth | iterative stack traversal resolves recursion limits |
@@ -192,7 +191,7 @@ directories, sampled process-tree observations, and caller-owned input budgets.
 | ALG-076 | Native 64-bit varint codec & zero-copy parsing | `binary.encode_uvarint`, `binary.ByteReader.read_uvarint`, `_accel.*` | A4 | 64-bit uint range `[0, 2^64-1]`, canonical MSB continuation, rejection of non-canonical redundant zero bytes and overflow, zero-copy buffer view, pure-Python fallback parity | historical 28-test packet; non-exact integer semantics and active/fallback verification in AR-10/11 |
 | ALG-077 | Fast JSON-clean validation & allocation bypass | `serialization.to_jsonable`, `streaming.write_jsonl`, `_accel.is_json_clean` | A4 | depth bounding (`max_depth=100`), strict byte rejection, finite float bounds, chunked streaming I/O batching, pure-Python fallback | historical roundtrip packet; interpreter-independent native depth safety and active/fallback verification in AR-10/11 |
 | ALG-078 | Adversarial chaos and stream/await fault injection | `faults.VirtualClock`, `faults.FaultyStream`, `faults.AwaitBoundaryChaos` | A4 | deterministic monotonic clock progression, partial read/write truncation, EIO/ENOSPC injection, cooperative await cancellation | 5 focused unit and contract tests executed |
-| ALG-079 | SingleFlight producer resource ownership | `cache.SingleFlight.run` | A3 | shared producer lifetime, waiter cancellation, registry release after completion, rejected coroutine submission closure | RS-01/RP-02 bounded lifetime and cache proofs pass on both Python versions; broader family guarantees are not inferred from this ownership packet |
+| ALG-079 | SingleFlight producer resource ownership | `cache.SingleFlight.run` | A4 | shared producer lifetime, waiter cancellation, registry release after completion, rejected coroutine submission closure, eager hashability/callable validation | verified in `test_cache.py`, `test_resource_lifetime_audit.py` |
 | ALG-080 | TOCTOU-safe regular file reading | `io.read_regular_bytes` | A4 | `O_NOFOLLOW` descriptor open, max size enforcement, pre- and post-read inode/device signature check | verified in `test_io.py` |
 | ALG-081 | Strict JSON object decoding | `serialization.decode_json_object`, `load_json_object` | A4 | duplicate key rejection, non-finite float rejection, UTF-8 validity, max nesting depth bounding (default 64) | verified in `test_serialization.py` |
 | ALG-082 | Summary statistics & outlier detection | `stats.SummaryStats`, `percentile`, `median_absolute_deviation`, `mad_outlier_indices`, `summarize` | A4 | linear interpolation percentiles, normal consistency scaling, MAD-based outlier detection, single-pass summary, bool rejection in percentiles | verified in `test_stats.py`, `test_v1_17_1_audit_regressions.py` |
@@ -414,9 +413,11 @@ record native execution evidence. On macOS Darwin 25.6.0 arm64 on APFS:
 `tests/test_core/test_platform_macos_contracts.py` passed all 11 tests with zero skips
 (verifying `renamex_np` with `RENAME_EXCL` on APFS and private atomic writes/directory fsync).
 `scripts/verify_native.py --mode all` compiled the native C extension with Apple clang and passed
-all 99 native tests. The platform verifier verified filesystem (18 passed), secure-store (46 passed),
-subprocess (34 passed), native platform (11 passed), fallback (68 passed, 31 expected exclusions),
-and compiled-native (99 passed). Windows native host execution remains pending.
+all 134 native tests. Dual-interpreter platform verification (`scripts/verify_platform.py --platform macos`
+across Python 3.11.16 and 3.12.15) verified filesystem (18 passed), secure-store (79 passed),
+subprocess (34 passed), native platform (3 passed), fallback (103 passed, 31 expected exclusions),
+and compiled-native (134 passed) with zero failures and zero unexpected skips on each runtime (`status=passed`).
+Windows native host execution remains pending.
 
 ### 2026-10-08 resource/security repair follow-up
 

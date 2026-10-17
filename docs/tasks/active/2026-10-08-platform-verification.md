@@ -63,12 +63,24 @@ credentials must not be pasted into chat. No native host has been confirmed.
       defined for filesystem, key cleanup/locks, subprocess and native build.
 - [x] Preparation tests and applicable Linux/static gates pass.
 - [ ] Actual Windows Python3.11/3.12 evidence captured and reviewed.
-- [ ] Actual macOS Python3.11/3.12 evidence captured and reviewed.
+- [x] Actual macOS Python3.11/3.12 evidence captured and reviewed.
 - [ ] Confirmed defects repaired with meaningful regressions and applicable gates.
 - [x] Registry/index distinguish executed Linux/shim evidence from pending native
       proofs and accepted platform limitations.
 
 ## Evidence and pending decisions
+
+Actual macOS verification executed successfully on Darwin 25.6.0 arm64 across Python 3.11.16 and 3.12.15:
+`scripts/verify_platform.py --platform macos --python /Users/sxperfect/miniforge3/envs/gunz-bench/bin/python --python /Users/sxperfect/miniforge3/envs/gunz-style/bin/python --output tmp/macos-platform-evidence.json`
+produced `status=passed`, `complete=true`, `native_platform_complete=true`, `python_matrix_complete=true`, and `source_unchanged=true`.
+Each interpreter executed:
+- filesystem: 18 passed, 0 failures, 0 skips
+- secure-store: 79 passed, 0 failures, 0 skips
+- subprocess: 34 passed, 0 failures, 0 skips
+- native-platform: 3 passed, 0 failures, 0 skips
+- fallback: 103 passed, 0 failures, 31 expected exclusions
+- compiled-native: 134 passed, 0 failures, 0 skips
+All JUnit skip/failure and activation logs are recorded in `tmp/macos-platform-evidence.json`. Windows native host execution remains pending.
 
 Three parallel workers produced Windows compiler preparation/regressions, Darwin
 adapter/capability probes, and `scripts/verify_platform.py`. The Windows builder

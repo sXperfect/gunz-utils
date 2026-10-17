@@ -435,6 +435,13 @@ class SingleFlight:
         T
             The result of the operation.
         """
+        if not callable(factory):
+            raise TypeError("factory must be callable")
+        try:
+            hash(key)
+        except TypeError as exc:
+            raise TypeError(f"key must be hashable, got {type(key).__name__}") from exc
+
         async with self._lock:
             task = self._tasks.get(key)
             if task is None:

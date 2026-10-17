@@ -1,0 +1,1 @@
+Promote ALG-004 through ALG-008 and ALG-079 to A4 following strict parameter domain hardening, waiter cancellation tests, and real macOS Darwin arm64 dual-interpreter verification evidence in GAP-010.

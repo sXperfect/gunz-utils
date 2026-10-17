@@ -44,7 +44,7 @@ def stable_priority(
     """
     if not isinstance(name, str):
         raise TypeError(f"name must be str, got {type(name).__name__}")
-    if not isinstance(seed, int):
+    if isinstance(seed, bool) or not isinstance(seed, int):
         raise TypeError(f"seed must be int, got {type(seed).__name__}")
 
     payload = f"{seed}:{name}".encode()
@@ -88,6 +88,10 @@ def sample_named_items(
     TypeError
         If an item name is not a string.
     """
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError(f"seed must be int, got {type(seed).__name__}")
+    if isinstance(limit, bool) or (limit is not None and not isinstance(limit, int)):
+        raise TypeError(f"limit must be int or None, got {type(limit).__name__}")
     if limit is not None and limit < 0:
         raise ValueError("limit must be non-negative or None")
 

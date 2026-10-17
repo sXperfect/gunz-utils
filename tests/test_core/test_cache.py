@@ -129,6 +129,39 @@ class TestSingleFlight(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(results, [7, 7, 7])
         self.assertEqual(calls, 1)
 
+    async def test_unhashable_key_rejected(self) -> None:
+        flight = SingleFlight()
+
+        async def work() -> int:
+            return 1
+
+        with self.assertRaises(TypeError):
+            await flight.run([1, 2], work)  # type: ignore[arg-type]
+
+    async def test_non_callable_factory_rejected(self) -> None:
+        flight = SingleFlight()
+
+        with self.assertRaises(TypeError):
+            await flight.run("key", None)  # type: ignore[arg-type]
+
+    async def test_partial_waiter_cancellation_does_not_abort_peer(self) -> None:
+        flight = SingleFlight()
+        started = asyncio.Event()
+
+        async def slow_work() -> str:
+            started.set()
+            await asyncio.sleep(0.02)
+            return "ok"
+
+        task1 = asyncio.create_task(flight.run("k", slow_work))
+        task2 = asyncio.create_task(flight.run("k", slow_work))
+        await started.wait()
+        task1.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task1
+        self.assertEqual(await task2, "ok")
+
+
 
 
 class TestRecencyTTLPolicy(unittest.TestCase):

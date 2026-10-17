@@ -94,3 +94,15 @@ def test_sample_named_items_rejects_duplicate_names() -> None:
             ],
             limit=1,
         )
+
+
+def test_sampling_rejects_bool_seeds_and_limits() -> None:
+    with pytest.raises(TypeError, match="seed must be int"):
+        stable_priority("name", seed=True)  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match="seed must be int"):
+        sample_named_items([("a", 1)], limit=1, seed=False)  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match="limit must be int or None"):
+        sample_named_items([("a", 1)], limit=True)  # type: ignore[arg-type]
+

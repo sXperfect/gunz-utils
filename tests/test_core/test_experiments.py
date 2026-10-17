@@ -256,3 +256,30 @@ def test_parameter_grid_rejects_empty_factor_values() -> None:
         parameter_grid(
             {"empty": []}
         )
+
+
+def test_experiments_rejects_invalid_parameter_domains() -> None:
+    with pytest.raises(TypeError, match="must be mappings"):
+        compare_numeric_metrics("not_a_mapping", {})  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match="must be mappings"):
+        compare_numeric_metrics({}, "not_a_mapping")  # type: ignore[arg-type]
+
+    with pytest.raises(
+        TypeError, match="minimum_relative_improvement must be a real number"
+    ):
+        metric_improvement(
+            {}, variant="c", metric="m", minimum_relative_improvement=True
+        )  # type: ignore[arg-type]
+
+    with pytest.raises(
+        ValueError,
+        match="minimum_relative_improvement must be a finite non-negative number",
+    ):
+        metric_improvement(
+            {}, variant="c", metric="m", minimum_relative_improvement=float("nan")
+        )
+
+    with pytest.raises(TypeError, match="factors must be a Mapping"):
+        parameter_grid(["not_a_mapping"])  # type: ignore[arg-type]
+

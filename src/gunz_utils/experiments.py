@@ -113,6 +113,8 @@ def compare_numeric_metrics(
     Booleans are treated as categorical rather than numeric, even though bool
     is a subclass of int in Python.
     """
+    if not isinstance(baseline, Mapping) or not isinstance(candidate, Mapping):
+        raise TypeError("baseline and candidate must be mappings")
     keys = sorted(set(baseline) | set(candidate))
     result: dict[str, dict[str, Any]] = {}
 
@@ -219,8 +221,17 @@ def metric_improvement(
     """
     if direction not in {"lower", "higher"}:
         raise ValueError("direction must be lower or higher")
-    if minimum_relative_improvement < 0:
-        raise ValueError("minimum_relative_improvement must be non-negative")
+    if isinstance(minimum_relative_improvement, bool) or not isinstance(
+        minimum_relative_improvement, (int, float)
+    ):
+        raise TypeError("minimum_relative_improvement must be a real number")
+    if (
+        not math.isfinite(minimum_relative_improvement)
+        or minimum_relative_improvement < 0
+    ):
+        raise ValueError(
+            "minimum_relative_improvement must be a finite non-negative number"
+        )
 
     comparison = matrix.get("comparisons", {}).get(variant, {}).get(metric)
     if not comparison or not comparison.get("numeric"):
@@ -281,9 +292,13 @@ def parameter_grid(
 
     Raises
     ------
+    TypeError
+        If factors is not a Mapping.
     ValueError
         If a factor name is empty or any factor has no candidate values.
     """
+    if not isinstance(factors, Mapping):
+        raise TypeError("factors must be a Mapping")
     names = list(factors)
     for name in names:
         if not isinstance(name, str) or not name:
