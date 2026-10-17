@@ -1,9 +1,0 @@
-- Fix `tcp_reachable` cumulative timeout tracking across multiple resolved IP addresses to respect the overall timeout deadline.
-- Add `max_depth` parameter and recursion depth checking to `deep_merge` to protect against call-stack exhaustion on deeply nested dictionaries.
-- Add `max_line_length` guard to `iter_jsonl` to bound memory consumption when reading streaming JSON Lines records.
-- Move `# gunz-style: ignore[GS007]` comments to same-line in `project_gitpython.py` and `project_stdlib.py` for AST-based rule suppression.
-- Improve numerical stability of backoff saturation calculation in `retry._delay` using ratio logarithm.
-- Correct `format_duration(0)` docstring example in `formatting.py` to match `'0ms'` return value.
-- Enable file descriptor leak testing on macOS/BSD via `/dev/fd` in `test_resource_lifetime_audit.py`.
-- Harden `BaseStrEnum` and `BaseIntEnum` fuzzy lookup and `get_or_none` to reject non-string/boolean inputs cleanly and normalize alias and member-name separators consistently.
-- Harden `rsync_mirror` and `process_map`/`process_imap` argument validation against control characters in `completion_marker`/`extra_args`, bare string `extra_args`, and non-boolean flag parameters.

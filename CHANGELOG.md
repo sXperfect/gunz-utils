@@ -7,7 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Unreleased changes are collected as conflict-free fragments in `changes/`.
+Run `python scripts/release.py status` to inspect their release impact.
+
+## [1.15.0] — 2026-10-17
+
 Unreleased changes are collected as conflict-free fragments in `changes/`. Run `python scripts/release.py status` to inspect them.
+
+### Added
+
+- Consolidate general-purpose utilities into `gunz_utils`:
+  - `gunz_utils.io.read_regular_bytes`: TOCTOU-safe regular file reading with `O_NOFOLLOW`, maximum size limits, and pre/post-read stat inode/dev signature verification.
+  - `gunz_utils.serialization.decode_json_object` & `load_json_object`: Strict JSON decoding rejecting duplicate dictionary keys, non-finite floats, non-UTF8 encodings, and deeply nested payloads.
+  - `gunz_utils.stats`: Summary statistics suite (`SummaryStats`, `percentile`, `median_absolute_deviation`, `mad_outlier_indices`, `summarize`) for robust data summarization and outlier detection.
+  - `gunz_utils.formatting`: Terminal presentation utilities (`escape_terminal`, `supports_color`) supporting `NO_COLOR` and `FORCE_COLOR` standards.
+- Modernize `scripts/release.py` with multi-repo support (`--root`), dynamic project package discovery, fragment heading injection protection, transactional fragment unlinking rollback, AST version literal scanning, and git-based fragment verification (`check-fragment --base <rev>`).
+
+### Fixed
+
+- Fix `parsing.safe_float` to catch `OverflowError` on extreme integer/exponent values returning `default`, and strictly reject `bool` inputs.
+- Refactor `WorkflowDAG` and `ProvenanceGraph` topological ordering, validation, and ancestor traversal to iterative stack algorithms, eliminating `RecursionError` on deep graph structures (>1000 nodes).
+- Harden `AsyncRateLimiter` against subnormal positive rates and arithmetic overflow during token deficit calculations and refills.
+- Enforce upfront `show_chars` parameter validation in `redact_dict` regardless of whether the dictionary contains matching secret keys.
+- Make RLIMIT_STACK configuration cross-platform safe on macOS systems.
+
+- Clean up advisory warnings in `src/gunz_utils`:
+  - Use `math.fsum` for exact floating-point summation in `benchmark.metrics`, `benchmark.process`, and `benchmark.runner`.
+  - Suppress false-positive advisories with targeted inline directives.
+- Implement security input admission and early validation (`INPUT-ADMISSION-2026-10-08`):
+  - Enforce bounded reading (`max_bytes=4096`) in `SecureStore._read_private` with both pre-read file size check and post-read byte bounds.
+  - Enforce strict salt length validation (`len(salt) == 16`) before constructing `PBKDF2HMAC` in `SecureStore._derive_key`.
+  - Validate fixed crypto envelope header lengths in `secure_crypto.decrypt` before unhexing or allocating variable ciphertext payload.
+- Execute and verify native macOS Darwin APFS platform contracts (`NP-02` / `GAP-010`), passing all 11 Darwin kernel contract tests and compiling native C extension with Apple clang.
+- Update `docs/audits/algorithm-registry.md` resolving `GAP-002` (iterative graph traversal), registering `ALG-080`..`ALG-083`, and synchronizing `scripts/release.py` across sibling repositories (`gunz-style`, `gunz-bench`).
+
+- Fix `tcp_reachable` cumulative timeout tracking across multiple resolved IP addresses to respect the overall timeout deadline.
+- Add `max_depth` parameter and recursion depth checking to `deep_merge` to protect against call-stack exhaustion on deeply nested dictionaries.
+- Add `max_line_length` guard to `iter_jsonl` to bound memory consumption when reading streaming JSON Lines records.
+- Move `# gunz-style: ignore[GS007]` comments to same-line in `project_gitpython.py` and `project_stdlib.py` for AST-based rule suppression.
+- Improve numerical stability of backoff saturation calculation in `retry._delay` using ratio logarithm.
+- Correct `format_duration(0)` docstring example in `formatting.py` to match `'0ms'` return value.
+- Enable file descriptor leak testing on macOS/BSD via `/dev/fd` in `test_resource_lifetime_audit.py`.
+- Harden `BaseStrEnum` and `BaseIntEnum` fuzzy lookup and `get_or_none` to reject non-string/boolean inputs cleanly and normalize alias and member-name separators consistently.
+- Harden `rsync_mirror` and `process_map`/`process_imap` argument validation against control characters in `completion_marker`/`extra_args`, bare string `extra_args`, and non-boolean flag parameters.
 
 ## [1.14.2] — 2026-10-12
 

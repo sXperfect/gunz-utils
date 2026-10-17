@@ -1,5 +1,0 @@
-- Fix `parsing.safe_float` to catch `OverflowError` on extreme integer/exponent values returning `default`, and strictly reject `bool` inputs.
-- Refactor `WorkflowDAG` and `ProvenanceGraph` topological ordering, validation, and ancestor traversal to iterative stack algorithms, eliminating `RecursionError` on deep graph structures (>1000 nodes).
-- Harden `AsyncRateLimiter` against subnormal positive rates and arithmetic overflow during token deficit calculations and refills.
-- Enforce upfront `show_chars` parameter validation in `redact_dict` regardless of whether the dictionary contains matching secret keys.
-- Make RLIMIT_STACK configuration cross-platform safe on macOS systems.
