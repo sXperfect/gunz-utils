@@ -139,6 +139,46 @@ class TestCircuitBreaker(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(CircuitOpenError):
             await breaker.call(op_new)
 
+    async def test_half_open_concurrent_probe_rejection(self) -> None:
+        """In HALF_OPEN state, only 1 probe can run; others get CircuitOpenError."""
+        breaker = AsyncCircuitBreaker(
+            failure_threshold=1,
+            recovery_timeout=0.01,
+        )
+
+        async def init_fail() -> None:
+            raise ValueError("down")
+
+        with self.assertRaises(ValueError):
+            await breaker.call(init_fail)
+
+        self.assertEqual(breaker.state, CircuitState.OPEN)
+        await asyncio.sleep(0.015)
+        self.assertEqual(breaker.state, CircuitState.HALF_OPEN)
+
+        probe_entered = asyncio.Event()
+        probe_proceed = asyncio.Event()
+
+        async def probe_op() -> str:
+            probe_entered.set()
+            await probe_proceed.wait()
+            return "recovered"
+
+        probe_task = asyncio.create_task(breaker.call(probe_op))
+        await probe_entered.wait()
+
+        #? While probe is in flight, concurrent caller must receive CircuitOpenError
+        async def concurrent_op() -> str:
+            return "should_not_run"
+
+        with self.assertRaises(CircuitOpenError):
+            await breaker.call(concurrent_op)
+
+        probe_proceed.set()
+        res = await probe_task
+        self.assertEqual(res, "recovered")
+        self.assertEqual(breaker.state, CircuitState.CLOSED)
+
 
 class TestBulkhead(unittest.IsolatedAsyncioTestCase):
     async def test_bounds_concurrency(self) -> None:
@@ -193,6 +233,51 @@ class TestBulkhead(unittest.IsolatedAsyncioTestCase):
                         lambda: asyncio.sleep(0),
                         timeout=value,
                     )
+
+    async def test_cancellation_releases_permit_during_execution(self) -> None:
+        bulkhead = AsyncBulkhead(1)
+        entered = asyncio.Event()
+
+        async def hung_work() -> None:
+            entered.set()
+            await asyncio.sleep(100.0)
+
+        task = asyncio.create_task(bulkhead.run(hung_work))
+        await entered.wait()
+        self.assertEqual(bulkhead.available, 0)
+
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+
+        self.assertEqual(bulkhead.available, 1)
+
+    async def test_cancellation_releases_waiter_before_permit(self) -> None:
+        bulkhead = AsyncBulkhead(1)
+        entered = asyncio.Event()
+        can_finish = asyncio.Event()
+
+        async def holder_op() -> None:
+            entered.set()
+            await can_finish.wait()
+
+        holder_task = asyncio.create_task(bulkhead.run(holder_op))
+        await entered.wait()
+        self.assertEqual(bulkhead.available, 0)
+
+        async def waiter_op() -> None:
+            pass
+
+        waiter_task = asyncio.create_task(bulkhead.run(waiter_op))
+        await asyncio.sleep(0.005)
+        waiter_task.cancel()
+
+        with self.assertRaises(asyncio.CancelledError):
+            await waiter_task
+
+        can_finish.set()
+        await holder_task
+        self.assertEqual(bulkhead.available, 1)
 
 
 if __name__ == "__main__":

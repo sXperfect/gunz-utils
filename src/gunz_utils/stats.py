@@ -22,12 +22,20 @@ try:
     _accel_update_running_stats: Callable[
         ..., tuple[int, float, float, float, float, float]
     ] | None = getattr(_accel, "update_running_stats", None)
+    _accel_merge_running_stats: Callable[
+        ..., tuple[int, float, float, float, float, float]
+    ] | None = getattr(_accel, "merge_running_stats", None)
     _accel_fast_summary: Callable[..., dict[str, Any]] | None = getattr(
         _accel, "fast_summary", None
     )
+    _accel_fast_pareto_2d: Callable[
+        ..., tuple[int, ...]
+    ] | None = getattr(_accel, "fast_pareto_2d", None)
 except (ImportError, AttributeError):  # pragma: no cover
     _accel_update_running_stats = None
+    _accel_merge_running_stats = None
     _accel_fast_summary = None
+    _accel_fast_pareto_2d = None
 
 T = TypeVar("T")
 
@@ -714,6 +722,36 @@ class RunningStats:
         if other._count == 0:
             return self.copy()
 
+        if _accel_merge_running_stats is not None:
+            try:
+                accel_res = _accel_merge_running_stats(
+                    self._count,
+                    self._mean,
+                    self._m2,
+                    self._min,
+                    self._max,
+                    self._total,
+                    other._count,
+                    other._mean,
+                    other._m2,
+                    other._min,
+                    other._max,
+                    other._total,
+                )
+                if accel_res is not None:
+                    combined = RunningStats()
+                    (
+                        combined._count,
+                        combined._mean,
+                        combined._m2,
+                        combined._min,
+                        combined._max,
+                        combined._total,
+                    ) = accel_res
+                    return combined
+            except OverflowError:
+                raise
+
         combined = RunningStats()
         combined._count = self._count + other._count
         delta = other._mean - self._mean
@@ -933,6 +971,16 @@ def pareto_frontier(
 
     #? Special case 2D: O(N log N) sorting + monotone sweep
     if num_dims == 2:
+        if _accel_fast_pareto_2d is not None:
+            accel_frontier = _accel_fast_pareto_2d(norm_points)
+            if accel_frontier is not None:
+                frontier_set = set(accel_frontier)
+                return [
+                    item
+                    for i, item in enumerate(item_list)
+                    if i in frontier_set
+                ]
+
         sorted_indices = sorted(
             range(len(item_list)),
             key=lambda i: (norm_points[i][0], norm_points[i][1]),

@@ -627,6 +627,166 @@ static PyObject *py_fast_summary(PyObject *self, PyObject *args) {
     );
 }
 
+static PyObject *py_merge_running_stats(PyObject *self, PyObject *args) {
+    long long count_a, count_b;
+    double mean_a, m2_a, min_a, max_a, total_a;
+    double mean_b, m2_b, min_b, max_b, total_b;
+    if (!PyArg_ParseTuple(
+        args,
+        "LdddddLddddd",
+        &count_a, &mean_a, &m2_a, &min_a, &max_a, &total_a,
+        &count_b, &mean_b, &m2_b, &min_b, &max_b, &total_b
+    )) {
+        return NULL;
+    }
+    if (count_a == 0) {
+        return Py_BuildValue("Lddddd", count_b, mean_b, m2_b, min_b, max_b, total_b);
+    }
+    if (count_b == 0) {
+        return Py_BuildValue("Lddddd", count_a, mean_a, m2_a, min_a, max_a, total_a);
+    }
+    long long combined_count = count_a + count_b;
+    double delta = mean_b - mean_a;
+    double combined_mean = mean_a + delta * ((double)count_b / (double)combined_count);
+    double combined_m2 = m2_a + m2_b + (delta * delta) * ((double)count_a * (double)count_b / (double)combined_count);
+    if (!isfinite(combined_mean) || !isfinite(combined_m2)) {
+        PyErr_SetString(PyExc_OverflowError, "running statistics overflowed finite float range");
+        return NULL;
+    }
+    double combined_total = total_a + total_b;
+    double combined_min = (min_a < min_b) ? min_a : min_b;
+    double combined_max = (max_a > max_b) ? max_a : max_b;
+    return Py_BuildValue("Lddddd", combined_count, combined_mean, combined_m2, combined_min, combined_max, combined_total);
+}
+
+typedef struct {
+    double x;
+    double y;
+    Py_ssize_t original_index;
+} Point2D;
+
+static int compare_points_2d(const void *a, const void *b) {
+    const Point2D *p1 = (const Point2D *)a;
+    const Point2D *p2 = (const Point2D *)b;
+    if (p1->x < p2->x) return -1;
+    if (p1->x > p2->x) return 1;
+    if (p1->y < p2->y) return -1;
+    if (p1->y > p2->y) return 1;
+    return 0;
+}
+
+static PyObject *py_fast_pareto_2d(PyObject *self, PyObject *args) {
+    PyObject *seq_obj;
+    if (!PyArg_ParseTuple(args, "O", &seq_obj)) {
+        return NULL;
+    }
+    PyObject *fast = PySequence_Fast(seq_obj, "points must be a sequence");
+    if (!fast) return NULL;
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
+    if (n == 0) {
+        Py_DECREF(fast);
+        return PyTuple_New(0);
+    }
+    if ((size_t)n > SIZE_MAX / sizeof(Point2D)) {
+        Py_DECREF(fast);
+        return PyErr_NoMemory();
+    }
+    Point2D *pts = (Point2D *)malloc((size_t)n * sizeof(Point2D));
+    if (!pts) {
+        Py_DECREF(fast);
+        return PyErr_NoMemory();
+    }
+    PyObject **items = PySequence_Fast_ITEMS(fast);
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *pt = items[i];
+        if (!PyTuple_Check(pt) || PyTuple_GET_SIZE(pt) != 2) {
+            free(pts);
+            Py_DECREF(fast);
+            Py_RETURN_NONE;
+        }
+        PyObject *item_x = PyTuple_GET_ITEM(pt, 0);
+        PyObject *item_y = PyTuple_GET_ITEM(pt, 1);
+        if (PyBool_Check(item_x) || PyBool_Check(item_y)) {
+            free(pts);
+            Py_DECREF(fast);
+            Py_RETURN_NONE;
+        }
+        if (!PyFloat_CheckExact(item_x) && !PyLong_CheckExact(item_x)) {
+            free(pts);
+            Py_DECREF(fast);
+            Py_RETURN_NONE;
+        }
+        if (!PyFloat_CheckExact(item_y) && !PyLong_CheckExact(item_y)) {
+            free(pts);
+            Py_DECREF(fast);
+            Py_RETURN_NONE;
+        }
+        double x = PyFloat_AsDouble(item_x);
+        double y = PyFloat_AsDouble(item_y);
+        if (PyErr_Occurred()) {
+            free(pts);
+            Py_DECREF(fast);
+            return NULL;
+        }
+        if (isnan(x) || isinf(x) || isnan(y) || isinf(y)) {
+            free(pts);
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_ValueError, "objective values must be finite");
+            return NULL;
+        }
+        pts[i].x = x;
+        pts[i].y = y;
+        pts[i].original_index = i;
+    }
+    Py_DECREF(fast);
+
+    qsort(pts, (size_t)n, sizeof(Point2D), compare_points_2d);
+
+    Py_ssize_t *frontier = (Py_ssize_t *)malloc((size_t)n * sizeof(Py_ssize_t));
+    if (!frontier) {
+        free(pts);
+        return PyErr_NoMemory();
+    }
+    Py_ssize_t frontier_len = 0;
+    double min_y = INFINITY;
+    Py_ssize_t idx = 0;
+
+    while (idx < n) {
+        double curr_x = pts[idx].x;
+        Py_ssize_t group_start = idx;
+        while (idx < n && pts[idx].x <= curr_x) {
+            idx++;
+        }
+        double group_min_y = pts[group_start].y;
+        if (group_min_y < min_y) {
+            for (Py_ssize_t j = group_start; j < idx; j++) {
+                if (pts[j].y <= group_min_y) {
+                    frontier[frontier_len++] = pts[j].original_index;
+                }
+            }
+            min_y = group_min_y;
+        }
+    }
+    free(pts);
+
+    PyObject *result_tuple = PyTuple_New(frontier_len);
+    if (!result_tuple) {
+        free(frontier);
+        return NULL;
+    }
+    for (Py_ssize_t i = 0; i < frontier_len; i++) {
+        PyObject *idx_obj = PyLong_FromSsize_t(frontier[i]);
+        if (!idx_obj) {
+            Py_DECREF(result_tuple);
+            free(frontier);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(result_tuple, i, idx_obj);
+    }
+    free(frontier);
+    return result_tuple;
+}
+
 static PyObject *py_has_accel(PyObject *self, PyObject *Py_UNUSED(ignored)) {
     Py_RETURN_TRUE;
 }
@@ -636,7 +796,9 @@ static PyMethodDef AccelMethods[] = {
     {"decode_uvarint", py_decode_uvarint, METH_VARARGS, "Zero-copy decode uint64 varint from buffer at offset."},
     {"is_json_clean", py_is_json_clean, METH_VARARGS, "Check if object graph consists solely of pure JSON primitives."},
     {"update_running_stats", py_update_running_stats, METH_VARARGS, "Batch update RunningStats in C."},
+    {"merge_running_stats", py_merge_running_stats, METH_VARARGS, "Chan parallel merge of two RunningStats in C."},
     {"fast_summary", py_fast_summary, METH_VARARGS, "Fast vector summary computation in C."},
+    {"fast_pareto_2d", py_fast_pareto_2d, METH_VARARGS, "Fast O(N log N) 2D Pareto frontier sweep in C."},
     {"has_accel", py_has_accel, METH_NOARGS, "Return True indicating native C acceleration is active."},
     {NULL, NULL, 0, NULL}
 };

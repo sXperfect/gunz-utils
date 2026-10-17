@@ -66,6 +66,59 @@ class TestTTLCache(unittest.TestCase):
         self.assertEqual(work([1]), 1)
         self.assertEqual(calls, 2)
 
+    def test_lru_capacity_eviction(self) -> None:
+        calls = 0
+
+        @ttl_cache(ttl=60, maxsize=2)
+        def work(
+            x: int,
+        ) -> int:
+            nonlocal calls
+            calls += 1
+            return x * 10
+
+        self.assertEqual(work(1), 10)
+        self.assertEqual(work(2), 20)
+        self.assertEqual(calls, 2)
+        self.assertEqual(work.cache_info().size, 2)
+
+        #? Access 1 to make it most recently used
+        self.assertEqual(work(1), 10)
+        self.assertEqual(calls, 2)
+
+        #? Add 3, which must evict 2 (least recently used)
+        self.assertEqual(work(3), 30)
+        self.assertEqual(calls, 3)
+        self.assertEqual(work.cache_info().size, 2)
+
+        #? 2 was evicted, so it must trigger a re-computation
+        self.assertEqual(work(2), 20)
+        self.assertEqual(calls, 4)
+
+    def test_ttl_expiry(self) -> None:
+        calls = 0
+
+        @ttl_cache(ttl=0.01, maxsize=10)
+        def work(
+            x: int,
+        ) -> int:
+            nonlocal calls
+            calls += 1
+            return x + 1
+
+        self.assertEqual(work(1), 2)
+        self.assertEqual(calls, 1)
+        self.assertEqual(work(1), 2)
+        self.assertEqual(calls, 1)
+
+        import time
+
+        time.sleep(0.015)
+
+        self.assertEqual(work(1), 2)
+        self.assertEqual(calls, 2)
+
+
     def test_cache_clear_does_not_reinsert_inflight_sync_result(self) -> None:
         started = threading.Event()
         release = threading.Event()
@@ -298,6 +351,37 @@ class TestAsyncTTLCache(unittest.IsolatedAsyncioTestCase):
 
         await asyncio.sleep(0.1)
         self.assertEqual(len(flight._tasks), 0)
+
+    async def test_async_ttl_cache_coalesced_concurrent_misses(self) -> None:
+        calls = 0
+
+        @async_ttl_cache(ttl=60.0, maxsize=10)
+        async def work(
+            x: int,
+        ) -> int:
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0.02)
+            return x * 100
+
+        results = await asyncio.gather(*(work(5) for _ in range(5)))
+        self.assertEqual(results, [500, 500, 500, 500, 500])
+        self.assertEqual(calls, 1)
+
+    async def test_async_ttl_cache_unhashable_arguments(self) -> None:
+        calls = 0
+
+        @async_ttl_cache(ttl=60.0, maxsize=10)
+        async def work(
+            items: list[int],
+        ) -> int:
+            nonlocal calls
+            calls += 1
+            return len(items)
+
+        self.assertEqual(await work([1, 2]), 2)
+        self.assertEqual(await work([1, 2]), 2)
+        self.assertEqual(calls, 2)
 
 
 class TestCacheMethodBinding(unittest.IsolatedAsyncioTestCase):

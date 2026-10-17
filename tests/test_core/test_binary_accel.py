@@ -20,6 +20,7 @@ import pytest
 
 from gunz_utils import binary
 from gunz_utils.binary import ByteReader, encode_uvarint
+from gunz_utils.stats import ParetoObjective, RunningStats, pareto_frontier
 
 
 def test_native_extension_is_compiled_and_active() -> None:
@@ -217,3 +218,55 @@ def test_byte_reader_invalid_size_leaves_state_unmutated() -> None:
     assert bytes(chunk) == b"abc"
     assert reader.offset == 3
     assert reader.remaining == 3
+
+
+def test_native_running_stats_merge_differential_parity() -> None:
+    """Verify RunningStats.merge produces identical results in native and fallback."""
+    import math
+
+    a_vals = [1.0, 2.0, 3.5, 4.0, 5.5, 10.0]
+    b_vals = [0.5, 2.5, 3.0, 7.0, 8.0]
+
+    s1 = RunningStats.from_iterable(a_vals)
+    s2 = RunningStats.from_iterable(b_vals)
+    merged = s1.merge(s2)
+
+    all_vals = a_vals + b_vals
+    expected = RunningStats.from_iterable(all_vals)
+
+    assert merged.count == expected.count
+    assert math.isclose(merged.mean, expected.mean, rel_tol=1e-12)
+    assert math.isclose(merged.variance, expected.variance, rel_tol=1e-12)
+    assert math.isclose(merged.minimum, expected.minimum, rel_tol=1e-12)
+    assert math.isclose(merged.maximum, expected.maximum, rel_tol=1e-12)
+    assert math.isclose(merged.total, expected.total, rel_tol=1e-12)
+
+    #? Empty accumulator merge properties
+    empty = RunningStats()
+    assert empty.merge(s1).mean == s1.mean
+    assert s1.merge(empty).mean == s1.mean
+
+
+def test_native_pareto_2d_differential_parity() -> None:
+    """Verify 2D Pareto frontier sweep parity between native and fallback."""
+    items = [
+        {"id": "a", "cost": 10.0, "latency": 100.0},
+        {"id": "b", "cost": 20.0, "latency": 50.0},
+        {"id": "c", "cost": 15.0, "latency": 80.0},
+        {"id": "d", "cost": 30.0, "latency": 120.0},
+        {"id": "e", "cost": 5.0, "latency": 200.0},
+        {"id": "f", "cost": 10.0, "latency": 100.0},
+    ]
+    objectives = [
+        ParetoObjective(name="cost", lower_is_better=True),
+        ParetoObjective(name="latency", lower_is_better=True),
+    ]
+
+    frontier = pareto_frontier(
+        items,
+        key=lambda item: (item["cost"], item["latency"]),
+        objectives=objectives,
+    )
+    frontier_ids = [item["id"] for item in frontier]
+    assert frontier_ids == ["a", "b", "c", "e", "f"]
+

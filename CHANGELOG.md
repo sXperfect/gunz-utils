@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Unreleased changes are collected as conflict-free fragments in `changes/`.
 Run `python scripts/release.py status` to inspect their release impact.
 
+## [1.17.2] — 2026-10-17
+
+### Performance
+
+- Add native C acceleration for `RunningStats.merge` (Chan parallel variance combination) and `stats.pareto_frontier` (O(N log N) 2D monotone sweep), and promote ALG-001..003, ALG-014, ALG-021, and ALG-025..027 to A4.
+
 ## [1.17.1] — 2026-10-17
 
 ### Security

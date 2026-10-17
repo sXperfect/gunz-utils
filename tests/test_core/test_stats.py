@@ -252,3 +252,105 @@ def test_summarize_sample_metrics() -> None:
     with pytest.raises(ValueError, match="finite"):
         summarize([1.0, math.nan])
 
+
+def test_bootstrap_mean_ci_adversarial_domain_invariants() -> None:
+    #? Boolean rejection across all parameters
+    with pytest.raises(ValueError, match="confidence"):
+        bootstrap_mean_ci([1.0, 2.0], confidence=True)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="samples"):
+        bootstrap_mean_ci([1.0, 2.0], samples=True)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="seed"):
+        bootstrap_mean_ci([1.0, 2.0], seed=True)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="real numeric"):
+        bootstrap_mean_ci([1.0, True, 2.0])  # type: ignore[list-item]
+
+    with pytest.raises(ValueError, match="real numeric"):
+        bootstrap_mean_ci(["not_a_number"])  # type: ignore[list-item]
+
+    #? Boundary and non-finite confidence
+    for conf in (0.0, 1.0, -0.5, 1.5, math.nan, math.inf, -math.inf):
+        with pytest.raises(ValueError, match="confidence"):
+            bootstrap_mean_ci([1.0, 2.0], confidence=conf)
+
+    #? Samples count bounds
+    for s in (0, -1, -100):
+        with pytest.raises(ValueError, match="samples"):
+            bootstrap_mean_ci([1.0, 2.0], samples=s)
+
+    #? Seed type checking
+    with pytest.raises(ValueError, match="seed"):
+        bootstrap_mean_ci([1.0, 2.0], seed="invalid")  # type: ignore[arg-type]
+
+    #? Single observation bootstrap
+    single = bootstrap_mean_ci([42.0], samples=100, seed=1)
+    assert math.isclose(single.mean, 42.0)
+    assert math.isclose(single.low, 42.0)
+    assert math.isclose(single.high, 42.0)
+    assert single.observations == 1
+
+
+def test_paired_effect_adversarial_domain_invariants() -> None:
+    #? Boolean rejection
+    with pytest.raises(ValueError, match="real numeric"):
+        paired_effect([True, 1.0], [0.0, 1.0])  # type: ignore[list-item]
+
+    with pytest.raises(ValueError, match="real numeric"):
+        paired_effect([0.0, 1.0], [False, 1.0])  # type: ignore[list-item]
+
+    #? Non-numeric objects
+    with pytest.raises(ValueError, match="real numeric"):
+        paired_effect(["a", "b"], [1.0, 2.0])  # type: ignore[list-item]
+
+    #? Empty sequences
+    with pytest.raises(ValueError, match="empty"):
+        paired_effect([], [])
+
+    #? Non-finite in left or right
+    for bad in (math.nan, math.inf, -math.inf):
+        with pytest.raises(ValueError, match="finite"):
+            paired_effect([bad, 1.0], [0.0, 1.0])
+        with pytest.raises(ValueError, match="finite"):
+            paired_effect([0.0, 1.0], [bad, 1.0])
+
+    #? Identical samples: zero difference, zero sd, standardized_effect is None
+    res = paired_effect([1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+    assert math.isclose(res.mean_difference, 0.0, abs_tol=1e-15)
+    assert math.isclose(res.standard_deviation, 0.0, abs_tol=1e-15)
+    assert res.standardized_effect is None
+    assert res.observations == 3
+
+
+def test_normal_mean_summary_adversarial_domain_invariants() -> None:
+    #? Boolean rejection
+    with pytest.raises(ValueError, match="confidence_z"):
+        normal_mean_summary([1.0, 2.0], confidence_z=True)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="real numeric"):
+        normal_mean_summary([True, 2.0])  # type: ignore[list-item]
+
+    #? Negative and non-finite confidence_z
+    for z in (-0.01, -1.0, math.nan, math.inf, -math.inf):
+        with pytest.raises(ValueError, match="confidence_z"):
+            normal_mean_summary([1.0, 2.0], confidence_z=z)
+
+    #? Empty observations
+    with pytest.raises(ValueError, match="empty"):
+        normal_mean_summary([])
+
+    #? Non-numeric observations
+    with pytest.raises(ValueError, match="real numeric"):
+        normal_mean_summary(["foo", "bar"])  # type: ignore[list-item]
+
+    #? Single observation collapses margin to zero
+    res = normal_mean_summary([10.5], confidence_z=2.5)
+    assert res.observations == 1
+    assert math.isclose(res.mean, 10.5)
+    assert math.isclose(res.standard_deviation, 0.0, abs_tol=1e-15)
+    assert math.isclose(res.low, 10.5)
+    assert math.isclose(res.high, 10.5)
+    assert math.isclose(res.confidence_z, 2.5)
+
+
