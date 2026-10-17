@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Unreleased changes are collected as conflict-free fragments in `changes/`.
 Run `python scripts/release.py status` to inspect their release impact.
 
+## [1.17.0] — 2026-10-17
+
+### Added
+
+- Add native C statistical acceleration (`stats.summarize`, `stats.RunningStats.extend`), $O(N \log N)$ 2D Pareto frontier sweep (`stats.pareto_frontier`), stat-based directory tree fingerprinting (`fs.tree_fingerprint`), and harden directory walking against symlink loops (`fs.walk_files`) and file readers against unbounded payloads (`io.read_file_snapshot`).
+
 ## [1.16.0] — 2026-10-17
 
 ### Added
