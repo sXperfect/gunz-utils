@@ -39,6 +39,17 @@ int gunz_native_decode_uvarint(
     size_t *out_bytes_read
 );
 
+/*
+ * O(N) introselect for double arrays.
+ */
+void gunz_native_introselect(
+    double *arr,
+    size_t left,
+    size_t right,
+    size_t k,
+    int depth_limit
+);
+
 #ifdef __cplusplus
 }
 #endif

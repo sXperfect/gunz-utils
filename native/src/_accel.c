@@ -270,6 +270,311 @@ static PyObject *py_decode_uvarint(PyObject *self, PyObject *args) {
     }
 }
 
+static inline void swap_double(double *a, double *b) {
+    double t = *a;
+    *a = *b;
+    *b = t;
+}
+
+static int compare_doubles_c(const void *a, const void *b) {
+    double da = *(const double *)a;
+    double db = *(const double *)b;
+    if (da < db) return -1;
+    if (da > db) return 1;
+    return 0;
+}
+
+void gunz_native_introselect(double *arr, size_t left, size_t right, size_t k, int depth_limit) {
+    while (left < right) {
+        if (right - left < 16) {
+            for (size_t i = left + 1; i <= right; ++i) {
+                double key = arr[i];
+                size_t j = i;
+                while (j > left && arr[j - 1] > key) {
+                    arr[j] = arr[j - 1];
+                    j--;
+                }
+                arr[j] = key;
+            }
+            return;
+        }
+
+        if (depth_limit <= 0) {
+            qsort(arr + left, right - left + 1, sizeof(double), compare_doubles_c);
+            return;
+        }
+        depth_limit--;
+
+        size_t mid = left + (right - left) / 2;
+        if (arr[mid] < arr[left]) swap_double(&arr[left], &arr[mid]);
+        if (arr[right] < arr[left]) swap_double(&arr[left], &arr[right]);
+        if (arr[right] < arr[mid]) swap_double(&arr[mid], &arr[right]);
+
+        double pivot = arr[mid];
+        size_t lt = left;
+        size_t gt = right;
+        size_t i = left;
+        while (i <= gt) {
+            if (arr[i] < pivot) {
+                swap_double(&arr[lt], &arr[i]);
+                lt++;
+                i++;
+            } else if (arr[i] > pivot) {
+                swap_double(&arr[i], &arr[gt]);
+                if (gt == 0) break;
+                gt--;
+            } else {
+                i++;
+            }
+        }
+
+        if (k >= lt && k <= gt) {
+            return;
+        } else if (k < lt) {
+            if (lt == 0) return;
+            right = lt - 1;
+        } else {
+            left = gt + 1;
+        }
+    }
+}
+
+static PyObject *py_update_running_stats(PyObject *self, PyObject *args) {
+    long long count;
+    double mean, m2, min_val, max_val, total;
+    PyObject *iterable;
+    if (!PyArg_ParseTuple(args, "LdddddO", &count, &mean, &m2, &min_val, &max_val, &total, &iterable)) {
+        return NULL;
+    }
+    PyObject *fast = PySequence_Fast(iterable, "values must be an iterable sequence");
+    if (!fast) return NULL;
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
+    PyObject **items = PySequence_Fast_ITEMS(fast);
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *item = items[i];
+        if (PyBool_Check(item) || (!PyFloat_Check(item) && !PyLong_Check(item))) {
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_TypeError, "value must be real numeric");
+            return NULL;
+        }
+        double val = PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            Py_DECREF(fast);
+            return NULL;
+        }
+        if (isnan(val) || isinf(val)) {
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_ValueError, "value must be finite");
+            return NULL;
+        }
+        count++;
+        double delta = val - mean;
+        mean += delta / count;
+        double delta2 = val - mean;
+        m2 += delta * delta2;
+        total += val;
+        if (val < min_val) min_val = val;
+        if (val > max_val) max_val = val;
+    }
+    Py_DECREF(fast);
+    return Py_BuildValue("Lddddd", count, mean, m2, min_val, max_val, total);
+}
+
+static PyObject *py_fast_summary(PyObject *self, PyObject *args) {
+    PyObject *iterable;
+    PyObject *percentiles_obj;
+    double threshold = 3.5;
+    if (!PyArg_ParseTuple(args, "OO|d", &iterable, &percentiles_obj, &threshold)) {
+        return NULL;
+    }
+    if (threshold <= 0 || isnan(threshold) || isinf(threshold)) {
+        PyErr_SetString(PyExc_ValueError, "outlier_threshold must be finite and > 0");
+        return NULL;
+    }
+
+    PyObject *fast = PySequence_Fast(iterable, "values must be an iterable");
+    if (!fast) return NULL;
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
+    if (n == 0) {
+        Py_DECREF(fast);
+        PyErr_SetString(PyExc_ValueError, "samples must not be empty");
+        return NULL;
+    }
+
+    double *data = (double *)malloc((size_t)n * sizeof(double));
+    if (!data) {
+        Py_DECREF(fast);
+        return PyErr_NoMemory();
+    }
+
+    PyObject **items = PySequence_Fast_ITEMS(fast);
+    double min_val = INFINITY;
+    double max_val = -INFINITY;
+    double total = 0.0;
+    double mean = 0.0;
+    double m2 = 0.0;
+
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *item = items[i];
+        if (PyBool_Check(item) || (!PyFloat_Check(item) && !PyLong_Check(item))) {
+            free(data);
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_ValueError, "samples must contain only real numeric values");
+            return NULL;
+        }
+        double val = PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            free(data);
+            Py_DECREF(fast);
+            return NULL;
+        }
+        if (isnan(val) || isinf(val)) {
+            free(data);
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_ValueError, "samples must contain only finite values");
+            return NULL;
+        }
+        data[i] = val;
+        double delta = val - mean;
+        mean += delta / (i + 1);
+        double delta2 = val - mean;
+        m2 += delta * delta2;
+        total += val;
+        if (val < min_val) min_val = val;
+        if (val > max_val) max_val = val;
+    }
+    Py_DECREF(fast);
+
+    double variance = (n >= 1) ? (m2 / (double)n) : 0.0;
+    double stdev = sqrt(variance);
+    double cv = (mean != 0.0 && n >= 1) ? (stdev / fabs(mean)) : NAN;
+
+    /* Sorted copy for median and percentiles */
+    double *sorted_data = (double *)malloc((size_t)n * sizeof(double));
+    if (!sorted_data) {
+        free(data);
+        return PyErr_NoMemory();
+    }
+    memcpy(sorted_data, data, (size_t)n * sizeof(double));
+    qsort(sorted_data, (size_t)n, sizeof(double), compare_doubles_c);
+
+    /* Median using presorted linear interpolation */
+    double median_val;
+    if (n % 2 == 1) {
+        median_val = sorted_data[n / 2];
+    } else {
+        median_val = (sorted_data[n / 2 - 1] + sorted_data[n / 2]) / 2.0;
+    }
+
+    /* Absolute deviations from median */
+    double *devs = (double *)malloc((size_t)n * sizeof(double));
+    if (!devs) {
+        free(sorted_data);
+        free(data);
+        return PyErr_NoMemory();
+    }
+    for (Py_ssize_t i = 0; i < n; i++) {
+        devs[i] = fabs(data[i] - median_val);
+    }
+    qsort(devs, (size_t)n, sizeof(double), compare_doubles_c);
+    double mad_val;
+    if (n % 2 == 1) {
+        mad_val = devs[n / 2];
+    } else {
+        mad_val = (devs[n / 2 - 1] + devs[n / 2]) / 2.0;
+    }
+    free(devs);
+
+    /* Percentiles dictionary */
+    PyObject *pct_fast = PySequence_Fast(percentiles_obj, "percentiles must be an iterable");
+    if (!pct_fast) {
+        free(sorted_data);
+        free(data);
+        return NULL;
+    }
+    Py_ssize_t num_pct = PySequence_Fast_GET_SIZE(pct_fast);
+    PyObject *pct_dict = PyDict_New();
+    if (!pct_dict) {
+        Py_DECREF(pct_fast);
+        free(sorted_data);
+        free(data);
+        return NULL;
+    }
+    PyObject **pct_items = PySequence_Fast_ITEMS(pct_fast);
+    for (Py_ssize_t i = 0; i < num_pct; i++) {
+        double q = PyFloat_AsDouble(pct_items[i]);
+        if (PyErr_Occurred() || q < 0.0 || q > 1.0 || isnan(q)) {
+            Py_DECREF(pct_dict);
+            Py_DECREF(pct_fast);
+            free(sorted_data);
+            free(data);
+            PyErr_SetString(PyExc_ValueError, "percentile q must be between 0.0 and 1.0");
+            return NULL;
+        }
+        double pos = (double)(n - 1) * q;
+        Py_ssize_t lower = (Py_ssize_t)floor(pos);
+        Py_ssize_t upper = (Py_ssize_t)ceil(pos);
+        double pct_val;
+        if (lower == upper) {
+            pct_val = sorted_data[lower];
+        } else {
+            double frac = pos - (double)lower;
+            pct_val = sorted_data[lower] + (sorted_data[upper] - sorted_data[lower]) * frac;
+        }
+        PyObject *py_q = PyFloat_FromDouble(q);
+        PyObject *py_val = PyFloat_FromDouble(pct_val);
+        PyDict_SetItem(pct_dict, py_q, py_val);
+        Py_DECREF(py_q);
+        Py_DECREF(py_val);
+    }
+    Py_DECREF(pct_fast);
+    free(sorted_data);
+
+    /* Outliers */
+    PyObject *outliers_list = PyList_New(0);
+    if (!outliers_list) {
+        Py_DECREF(pct_dict);
+        free(data);
+        return NULL;
+    }
+    if (mad_val > 1e-15) {
+        double scale = 0.6744897501960817;
+        double inv_denom = scale / mad_val;
+        for (Py_ssize_t i = 0; i < n; i++) {
+            if (fabs(data[i] - median_val) * inv_denom > threshold) {
+                PyObject *idx = PyLong_FromSsize_t(i);
+                PyList_Append(outliers_list, idx);
+                Py_DECREF(idx);
+            }
+        }
+    }
+    free(data);
+    PyObject *outliers_tuple = PyList_AsTuple(outliers_list);
+    Py_DECREF(outliers_list);
+
+    PyObject *result = PyDict_New();
+    PyDict_SetItemString(result, "count", PyLong_FromSsize_t(n));
+    PyDict_SetItemString(result, "minimum", PyFloat_FromDouble(min_val));
+    PyDict_SetItemString(result, "maximum", PyFloat_FromDouble(max_val));
+    PyDict_SetItemString(result, "mean", PyFloat_FromDouble(mean));
+    PyDict_SetItemString(result, "median", PyFloat_FromDouble(median_val));
+    PyDict_SetItemString(result, "variance", PyFloat_FromDouble(variance));
+    PyDict_SetItemString(result, "stdev", PyFloat_FromDouble(stdev));
+    if (isnan(cv)) {
+        Py_INCREF(Py_None);
+        PyDict_SetItemString(result, "coefficient_of_variation", Py_None);
+    } else {
+        PyDict_SetItemString(result, "coefficient_of_variation", PyFloat_FromDouble(cv));
+    }
+    PyDict_SetItemString(result, "mad", PyFloat_FromDouble(mad_val));
+    PyDict_SetItemString(result, "percentiles", pct_dict);
+    Py_DECREF(pct_dict);
+    PyDict_SetItemString(result, "outlier_indices", outliers_tuple);
+    Py_DECREF(outliers_tuple);
+
+    return result;
+}
+
 static PyObject *py_has_accel(PyObject *self, PyObject *Py_UNUSED(ignored)) {
     Py_RETURN_TRUE;
 }
@@ -278,6 +583,8 @@ static PyMethodDef AccelMethods[] = {
     {"encode_uvarint", py_encode_uvarint, METH_VARARGS, "Encode uint64 into canonical varint bytes in C."},
     {"decode_uvarint", py_decode_uvarint, METH_VARARGS, "Zero-copy decode uint64 varint from buffer at offset."},
     {"is_json_clean", py_is_json_clean, METH_VARARGS, "Check if object graph consists solely of pure JSON primitives."},
+    {"update_running_stats", py_update_running_stats, METH_VARARGS, "Batch update RunningStats in C."},
+    {"fast_summary", py_fast_summary, METH_VARARGS, "Fast vector summary computation in C."},
     {"has_accel", py_has_accel, METH_NOARGS, "Return True indicating native C acceleration is active."},
     {NULL, NULL, 0, NULL}
 };
