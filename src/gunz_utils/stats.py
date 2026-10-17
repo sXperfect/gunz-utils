@@ -40,7 +40,7 @@ except (ImportError, AttributeError):  # pragma: no cover
 T = TypeVar("T")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BootstrapMeanCI:
     """Bootstrap confidence interval for an arithmetic mean."""
 
@@ -52,7 +52,7 @@ class BootstrapMeanCI:
     observations: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PairedEffect:
     """Mean paired difference and standardized within-pair effect."""
 
@@ -62,7 +62,7 @@ class PairedEffect:
     observations: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SummaryStats:
     """Summary statistics for a sample distribution."""
 
@@ -292,7 +292,7 @@ def paired_effect(
 
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NormalMeanSummary:
     """Arithmetic mean, sample deviation, and z-based confidence interval."""
 
@@ -839,7 +839,7 @@ class RunningStats:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParetoObjective:
     """One objective direction for multi-objective Pareto analysis."""
 
@@ -1034,7 +1034,7 @@ def pareto_frontier(
     return [item for i, item in enumerate(item_list) if i in frontier_set]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ECDFPoint:
     """One discrete step of an empirical cumulative distribution function."""
 

@@ -17,7 +17,7 @@ class BudgetExceededError(ValueError):
     """Raised when a consumable resource budget is exceeded."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Limits:
     """Stateless upper bounds for defensive parsing and processing."""
 

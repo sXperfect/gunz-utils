@@ -23,7 +23,7 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CacheInfo:
     """Snapshot of cache activity and capacity."""
 
@@ -33,11 +33,16 @@ class CacheInfo:
     maxsize: int
 
 
+_KW_SENTINEL: object = object()
+
+
 def _cache_key(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
 ) -> Hashable | None:
-    """_cache_key() function.
+    """Compute a hashable cache key from arguments.
+
+    Includes a zero-allocation fast path for positional-only calls.
 
     Parameters
     ----------
@@ -51,7 +56,10 @@ def _cache_key(
     Hashable | None
         The result of the operation.
     """
-    key: Hashable = (args, tuple(sorted(kwargs.items())))
+    if not kwargs:
+        key: Hashable = args
+    else:
+        key = (args, _KW_SENTINEL, tuple(sorted(kwargs.items())))
     try:
         hash(key)
     except TypeError:

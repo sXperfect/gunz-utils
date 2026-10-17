@@ -19,7 +19,7 @@ from .io import atomic_write
 from .serialization import json_dumps
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PartitionManifest:
     """Immutable named partitions with overlap and duplicate validation.
 

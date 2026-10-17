@@ -25,7 +25,7 @@ except (ImportError, AttributeError):  # pragma: no cover
 
 
 
-@dataclass
+@dataclass(slots=True)
 class ByteReader:
     data: memoryview
     offset: int = 0

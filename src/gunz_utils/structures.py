@@ -10,6 +10,7 @@ __license__ = "Clear BSD"
 # =============================================================================
 import copy
 import heapq
+import math
 import typing as t  #? Community-standard alias for typing imports.
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
@@ -174,7 +175,7 @@ def retain_priority_and_recent(
     ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DeepDifference:
     """One structural or scalar mismatch between nested Python values.
 
@@ -240,6 +241,10 @@ def deep_diff(
     values should implement scalar boolean equality. Specialized array/tensor
     equality belongs in the owning numerical package.
     """
+    if left is right and (
+        not isinstance(left, float) or not math.isnan(left)
+    ):
+        return []
     differences: list[DeepDifference] = []
     #? Track id pairs of already-visited containers to stop traversal on
     #? shared or cyclic substructure without an unbounded recursion.
@@ -290,6 +295,10 @@ def deep_diff(
         -------
         None
         """
+        if left_value is right_value and (
+            not isinstance(left_value, float) or not math.isnan(left_value)
+        ):
+            return
         pair = (id(left_value), id(right_value))
         if pair in visited:
             return

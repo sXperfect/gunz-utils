@@ -15,7 +15,7 @@ E = TypeVar("E")
 U = TypeVar("U")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Result(Generic[T, E]):
     """A tagged success or error with no payload in the inactive variant.
 

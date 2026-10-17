@@ -44,7 +44,7 @@ class WorkflowExecutionError(RuntimeError):
         self.compensation_errors = tuple(compensation_errors)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WorkflowStage:
     """One named stage in a dependency DAG.
 

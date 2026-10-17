@@ -787,6 +787,72 @@ static PyObject *py_fast_pareto_2d(PyObject *self, PyObject *args) {
     return result_tuple;
 }
 
+static PyObject *py_fast_physical_lines(PyObject *self, PyObject *args) {
+    PyObject *text_obj;
+    int keepends = 0;
+    if (!PyArg_ParseTuple(args, "O|p", &text_obj, &keepends)) {
+        return NULL;
+    }
+    if (!PyUnicode_Check(text_obj)) {
+        PyErr_SetString(PyExc_TypeError, "text must be a string");
+        return NULL;
+    }
+    Py_ssize_t length = PyUnicode_GET_LENGTH(text_obj);
+    if (length == 0) {
+        return PyList_New(0);
+    }
+    int kind = PyUnicode_KIND(text_obj);
+    const void *data = PyUnicode_DATA(text_obj);
+
+    PyObject *lines = PyList_New(0);
+    if (!lines) {
+        return NULL;
+    }
+
+    Py_ssize_t line_start = 0;
+    for (Py_ssize_t i = 0; i < length; i++) {
+        Py_UCS4 ch = PyUnicode_READ(kind, data, i);
+        if (ch == '\r' || ch == '\n') {
+            Py_ssize_t match_start = i;
+            Py_ssize_t newline_len = 1;
+            if (ch == '\r' && (i + 1 < length) && PyUnicode_READ(kind, data, i + 1) == '\n') {
+                newline_len = 2;
+            }
+            Py_ssize_t match_end = match_start + newline_len;
+            Py_ssize_t slice_end = keepends ? match_end : match_start;
+            PyObject *line = PyUnicode_Substring(text_obj, line_start, slice_end);
+            if (!line) {
+                Py_DECREF(lines);
+                return NULL;
+            }
+            if (PyList_Append(lines, line) < 0) {
+                Py_DECREF(line);
+                Py_DECREF(lines);
+                return NULL;
+            }
+            Py_DECREF(line);
+            line_start = match_end;
+            if (newline_len == 2) {
+                i++;
+            }
+        }
+    }
+    if (line_start < length) {
+        PyObject *line = PyUnicode_Substring(text_obj, line_start, length);
+        if (!line) {
+            Py_DECREF(lines);
+            return NULL;
+        }
+        if (PyList_Append(lines, line) < 0) {
+            Py_DECREF(line);
+            Py_DECREF(lines);
+            return NULL;
+        }
+        Py_DECREF(line);
+    }
+    return lines;
+}
+
 static PyObject *py_has_accel(PyObject *self, PyObject *Py_UNUSED(ignored)) {
     Py_RETURN_TRUE;
 }
@@ -799,6 +865,7 @@ static PyMethodDef AccelMethods[] = {
     {"merge_running_stats", py_merge_running_stats, METH_VARARGS, "Chan parallel merge of two RunningStats in C."},
     {"fast_summary", py_fast_summary, METH_VARARGS, "Fast vector summary computation in C."},
     {"fast_pareto_2d", py_fast_pareto_2d, METH_VARARGS, "Fast O(N log N) 2D Pareto frontier sweep in C."},
+    {"fast_physical_lines", py_fast_physical_lines, METH_VARARGS, "Fast zero-regex physical line splitting in C."},
     {"has_accel", py_has_accel, METH_NOARGS, "Return True indicating native C acceleration is active."},
     {NULL, NULL, 0, NULL}
 };

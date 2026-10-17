@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Unreleased changes are collected as conflict-free fragments in `changes/`.
 Run `python scripts/release.py status` to inspect their release impact.
 
+## [1.17.4] — 2026-10-18
+
+### Performance
+
+- Universal `slots=True` on core high-volume dataclasses (`Result`, `SummaryStats`, `FileSnapshot`, `Limits`, `CacheInfo`, `DeepDifference`, `StoredArtifact`, `PartitionManifest`, `CommandResult`, `WorkflowStage`, `ByteReader`) reducing per-instance memory by ~60-75%; hot-path micro-optimizations in `_cache_key` (zero-allocation positional fast path), `deep_diff` (identity shortcut), and `match_path_glob` (literal boundary fast rejection); native C extension acceleration for `physical_lines` newline scanning in `_accel.c` with 100% pure-Python fallback parity.
+
 ## [1.17.3] — 2026-10-17
 
 ### Documentation

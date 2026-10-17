@@ -50,7 +50,7 @@ def _publication_lock(
         yield
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StoredArtifact:
     """One file stored under its content digest."""
 

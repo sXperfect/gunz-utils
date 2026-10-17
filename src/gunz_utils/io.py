@@ -6,11 +6,13 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import pathlib
 import re
 import stat
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,6 +21,14 @@ from typing import Any
 # =============================================================================
 from ._version import __version__ as __version__
 from .serialization import json_dumps
+
+try:
+    _accel = importlib.import_module("._accel", package=__package__)
+    _accel_physical_lines: Callable[[str, bool], list[str]] | None = getattr(
+        _accel, "fast_physical_lines", None
+    )
+except (ImportError, AttributeError):  # pragma: no cover
+    _accel_physical_lines = None
 
 __author__ = "Yeremia Gunz"
 __email__ = "yeremiag@gmail.com"
@@ -288,6 +298,8 @@ def physical_lines(
     """
     if not isinstance(text, str):
         raise TypeError("text must be a string")
+    if _accel_physical_lines is not None:
+        return _accel_physical_lines(text, keepends)
     lines: list[str] = []
     start = 0
     for match in _PHYSICAL_NEWLINE.finditer(text):
@@ -301,7 +313,7 @@ def physical_lines(
     return lines
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileSnapshot:
     """An immutable file snapshot capturing contents and exact stat identity."""
 

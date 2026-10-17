@@ -439,7 +439,21 @@ def match_path_glob(
     )
     if not pattern_parts:
         return not path_parts
+    if (
+        pattern_parts[-1] != "**"
+        and "*" not in pattern_parts[-1]
+        and "?" not in pattern_parts[-1]
+    ):
+        if not path_parts or path_parts[-1] != pattern_parts[-1]:
+            return False
     if anchored:
+        if (
+            pattern_parts[0] != "**"
+            and "*" not in pattern_parts[0]
+            and "?" not in pattern_parts[0]
+        ):
+            if not path_parts or path_parts[0] != pattern_parts[0]:
+                return False
         return _match_segments_anchored(path_parts, pattern_parts)
     for start in range(len(path_parts) + 1):
         if _match_segments_anchored(path_parts[start:], pattern_parts):

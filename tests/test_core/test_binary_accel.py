@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import re
+
 # isort: split
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -20,6 +22,7 @@ import pytest
 
 from gunz_utils import binary
 from gunz_utils.binary import ByteReader, encode_uvarint
+from gunz_utils.io import physical_lines
 from gunz_utils.stats import ParetoObjective, RunningStats, pareto_frontier
 
 
@@ -269,4 +272,44 @@ def test_native_pareto_2d_differential_parity() -> None:
     )
     frontier_ids = [item["id"] for item in frontier]
     assert frontier_ids == ["a", "b", "c", "e", "f"]
+
+
+def test_native_physical_lines_differential_parity() -> None:
+    """Verify physical_lines parity across mixed newlines, keepends, and edge cases."""
+    cases = [
+        "",
+        "single line without newline",
+        "line 1\nline 2",
+        "line 1\r\nline 2",
+        "line 1\rline 2",
+        "line 1\nline 2\r\nline 3\rline 4",
+        "trailing lf\n",
+        "trailing crlf\r\n",
+        "trailing cr\r",
+        "\n",
+        "\r\n",
+        "\r",
+        "\n\n\n",
+        "\r\n\r\n",
+        "unicode line separator \u2028 preserved\nnext line",
+        "unicode paragraph separator \u2029 preserved\r\nnext line",
+    ]
+
+    for text in cases:
+        for keepends in (False, True):
+            native_res = physical_lines(text, keepends=keepends)
+            #? Reference implementation with regex
+            lines = []
+            start = 0
+            for match in re.finditer(r"\r\n|\r|\n", text):
+                end = match.end() if keepends else match.start()
+                lines.append(text[start:end])
+                start = match.end()
+            if start < len(text):
+                lines.append(text[start:])
+            elif not text:
+                lines = []
+            assert native_res == lines, (
+                f"Mismatch for text={text!r}, keepends={keepends}"
+            )
 

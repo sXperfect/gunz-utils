@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import BinaryIO
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CommandResult:
     """Captured subprocess result with elapsed wall-clock duration."""
 
@@ -48,7 +48,7 @@ class CommandOutputLimitError(RuntimeError):
     """Raised when captured command output exceeds the configured limit."""
 
 
-@dataclass
+@dataclass(slots=True)
 class _CaptureState:
     total: int = 0
     exceeded: bool = False
