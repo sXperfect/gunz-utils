@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Unreleased changes are collected as conflict-free fragments in `changes/`.
 Run `python scripts/release.py status` to inspect their release impact.
 
+## [1.16.0] — 2026-10-17
+
+### Added
+
+- Add cross-process advisory file locking (`fs.advisory_file_lock`), optimistic CAS file snapshots (`io.FileSnapshot`, `io.read_file_snapshot`, `io.read_source_file`, `io.physical_lines`), polynomial state-set glob matching (`fs.match_path_glob`, `fs.matches_any_glob`, `fs.walk_files`), online statistics & multi-objective optimization (`stats.RunningStats`, `stats.ecdf`, `stats.pareto_frontier`), and dynamic module loading (`plugins.load_module_from_path`, `plugins.GunzFileFinder`).
+
 ## [1.15.0] — 2026-10-17
 
 Unreleased changes are collected as conflict-free fragments in `changes/`. Run `python scripts/release.py status` to inspect them.
