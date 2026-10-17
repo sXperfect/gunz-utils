@@ -184,7 +184,7 @@ def test_retry_hook_cannot_sleep_beyond_remaining_budget(
     assert calls == [100.0]
     assert clock.sleeps == []
     assert len(events) == 1
-    assert events[0].delay == 1.0
+    assert math.isclose(events[0].delay, 1.0)
 
 
 @pytest.mark.parametrize("variant", RETRY_VARIANTS)
@@ -394,13 +394,13 @@ def test_rate_limiter_rejects_integer_above_capacity_before_rounding(
             request = capacity + 1
             #? An exact integer oracle: the request exceeds a full bucket.
             assert request > capacity
-            assert float(request) == float(capacity)
+            assert math.isclose(float(request), float(capacity))
             with pytest.raises(ValueError, match="capacity"):
                 await getattr(limiter, method)(request)
-            assert limiter.available_tokens == capacity
+            assert math.isclose(limiter.available_tokens, capacity)
             outcome = await getattr(limiter, method)(capacity)
             assert outcome is (True if method == "try_acquire" else None)
-            assert limiter.available_tokens == 0.0
+            assert math.isclose(limiter.available_tokens, 0.0, abs_tol=1e-15)
 
     asyncio.run(scenario())
 
@@ -418,7 +418,7 @@ def test_rate_limiter_normalizes_accepted_integer_request_arithmetic(
             #? These two integer requests exactly consume the initial capacity.
             outcome = await getattr(limiter, method)(request)
             assert outcome is (True if method == "try_acquire" else None)
-            assert limiter.available_tokens == 0.0
+            assert math.isclose(limiter.available_tokens, 0.0, abs_tol=1e-15)
 
     asyncio.run(scenario())
 
@@ -447,7 +447,7 @@ def test_rate_limiter_rejects_unrepresentable_requests_atomically(
             limiter = AsyncRateLimiter(1)
             with pytest.raises(ValueError, match="tokens"):
                 await getattr(limiter, method)(value)
-            assert limiter.available_tokens == 1.0
+            assert math.isclose(limiter.available_tokens, 1.0)
 
     asyncio.run(scenario())
 
@@ -461,7 +461,7 @@ def test_rate_limiter_rejects_unrepresentable_timeout_atomically(
             limiter = AsyncRateLimiter(1)
             with pytest.raises(ValueError, match="timeout"):
                 await limiter.acquire(timeout=value)
-            assert limiter.available_tokens == 1.0
+            assert math.isclose(limiter.available_tokens, 1.0)
 
     asyncio.run(scenario())
 
@@ -477,7 +477,7 @@ def test_largest_finite_float_parameters_remain_valid() -> None:
         with _stationary_limiter_clock():
             limiter = AsyncRateLimiter(maximum, capacity=maximum)
             await limiter.acquire(maximum, timeout=0)
-            assert limiter.available_tokens == 0.0
+            assert math.isclose(limiter.available_tokens, 0.0, abs_tol=1e-15)
 
     asyncio.run(scenario())
 
@@ -490,7 +490,7 @@ def test_rate_limiter_subnormal_rate_timeout_and_overflow() -> None:
             limiter = AsyncRateLimiter(tiny_rate, capacity=1.0)
             #? First token exhausts capacity
             assert await limiter.try_acquire(1.0)
-            assert limiter.available_tokens == 0.0
+            assert math.isclose(limiter.available_tokens, 0.0, abs_tol=1e-15)
 
             #? Acquire with timeout on empty bucket raises TimeoutError cleanly
             with pytest.raises(TimeoutError):

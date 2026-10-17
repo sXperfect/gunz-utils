@@ -70,9 +70,9 @@ def test_paired_effect_matches_known_differences() -> None:
     )
 
     #? Pairwise differences are [1, 2, 3].
-    assert result.mean_difference == pytest.approx(2.0)
-    assert result.standard_deviation == pytest.approx(1.0)
-    assert result.standardized_effect == pytest.approx(2.0)
+    assert math.isclose(result.mean_difference, 2.0)
+    assert math.isclose(result.standard_deviation, 1.0)
+    assert math.isclose(result.standardized_effect, 2.0)
     assert result.observations == 3
 
 
@@ -82,8 +82,8 @@ def test_paired_effect_zero_variance_has_no_standardized_effect() -> None:
         [1.0, 2.0],
     )
 
-    assert result.mean_difference == pytest.approx(1.0)
-    assert result.standard_deviation == pytest.approx(0.0)
+    assert math.isclose(result.mean_difference, 1.0)
+    assert math.isclose(result.standard_deviation, 0.0, abs_tol=1e-15)
     assert result.standardized_effect is None
 
 
@@ -107,7 +107,7 @@ def test_paired_effect_single_observation_is_undefined() -> None:
         [1.0],
     )
 
-    assert result.standard_deviation == pytest.approx(0.0)
+    assert math.isclose(result.standard_deviation, 0.0, abs_tol=1e-15)
     assert result.standardized_effect is None
 
 
@@ -119,14 +119,10 @@ def test_normal_mean_summary_matches_known_replicates() -> None:
     )
 
     assert result.observations == 3
-    assert result.mean == pytest.approx(2.0)
-    assert result.standard_deviation == pytest.approx(1.0)
-    assert result.low == pytest.approx(
-        2.0 - 1.0 / math.sqrt(3.0)
-    )
-    assert result.high == pytest.approx(
-        2.0 + 1.0 / math.sqrt(3.0)
-    )
+    assert math.isclose(result.mean, 2.0)
+    assert math.isclose(result.standard_deviation, 1.0)
+    assert math.isclose(result.low, 2.0 - 1.0 / math.sqrt(3.0))
+    assert math.isclose(result.high, 2.0 + 1.0 / math.sqrt(3.0))
 
 
 def test_normal_mean_summary_single_observation_collapses_interval() -> None:
@@ -134,10 +130,10 @@ def test_normal_mean_summary_single_observation_collapses_interval() -> None:
         [4.0],
     )
 
-    assert result.mean == pytest.approx(4.0)
-    assert result.standard_deviation == pytest.approx(0.0)
-    assert result.low == pytest.approx(4.0)
-    assert result.high == pytest.approx(4.0)
+    assert math.isclose(result.mean, 4.0)
+    assert math.isclose(result.standard_deviation, 0.0, abs_tol=1e-15)
+    assert math.isclose(result.low, 4.0)
+    assert math.isclose(result.high, 4.0)
 
 
 def test_normal_mean_summary_validates_z_value() -> None:
@@ -156,7 +152,8 @@ def test_paired_effect_handles_extreme_finite_values_stably() -> None:
 
     assert math.isfinite(result.standard_deviation)
     assert result.standard_deviation > 1e308
-    assert result.standardized_effect == pytest.approx(0.0)
+    assert result.standardized_effect is not None
+    assert math.isclose(result.standardized_effect, 0.0, abs_tol=1e-15)
 
 
 def test_paired_effect_rejects_overflowing_pairwise_difference() -> None:
@@ -176,8 +173,8 @@ def test_normal_mean_summary_handles_extreme_finite_values_stably() -> None:
     assert math.isfinite(result.standard_deviation)
     assert math.isfinite(result.low)
     assert math.isfinite(result.high)
-    assert result.low == pytest.approx(-1e308)
-    assert result.high == pytest.approx(1e308)
+    assert math.isclose(result.low, -1e308)
+    assert math.isclose(result.high, 1e308)
 
 
 def test_normal_mean_summary_rejects_unrepresentable_interval() -> None:

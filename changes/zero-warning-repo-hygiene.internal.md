@@ -1,0 +1,1 @@
+Eliminated all 84 advisory `gunz-style` warnings across `tests/`, `scripts/`, and `benchmarks/` (`GS032`, `GS020`, `GS105`, `GS107`, `GS102`, `GS045`, `GS044`), achieving 0 violations and 0 warnings across all 255 files repository-wide, and configured `scripts/ci.py` to enforce `--warnings-as-errors` on `src`, `scripts`, `tests`, and `benchmarks`.

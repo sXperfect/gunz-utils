@@ -111,7 +111,9 @@ def test_real_worker_failure_never_replays_completed_work(
                 fallback_serial=True,
             )
         )
-    assert [(tmp_path / str(n)).read_text() for n in range(2)] == ["called\n"] * 2
+    assert [tmp_path.joinpath(str(n)).read_text() for n in range(2)] == [
+        "called\n"
+    ] * 2
     assert not any(child.is_alive() for child in multiprocessing.active_children())
 
 
@@ -250,7 +252,9 @@ def test_abrupt_worker_death_propagates_without_serial_replay(
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "worker-death-propagated"
-    assert [(tmp_path / str(n)).read_text() for n in range(2)] == ["called\n"] * 2
+    assert [tmp_path.joinpath(str(n)).read_text() for n in range(2)] == [
+        "called\n"
+    ] * 2
 
 
 def test_input_failure_after_prefix_propagates_before_window_execution(

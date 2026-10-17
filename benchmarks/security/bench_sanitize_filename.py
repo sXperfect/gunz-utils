@@ -1,29 +1,39 @@
-import os
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
+from __future__ import annotations
+
 import random
 import string
-import sys
 import timeit
 
-# Ensure the local `src` is correctly importable
-sys.path.insert(0, os.path.abspath('src'))
+# isort: split
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.security import sanitize_filename
 
 random.seed(42)
 
-def generate_random_filename(length=10):
+
+def generate_random_filename(
+    length: int = 10,
+) -> str:
     stem = "".join(random.choices(string.ascii_letters + string.digits, k=length))
     return stem + ".txt"
 
-def benchmark():
-    # Mix of mostly normal filenames and a few reserved
+
+def benchmark() -> None:
+    #? Mix of mostly normal filenames and a few reserved
     filenames = [generate_random_filename(random.randint(5, 20)) for _ in range(1000)]
 
-    # Pre-warm
+    #? Pre-warm
     for f in filenames:
         sanitize_filename(f)
 
-    def run_benchmark():
+    def run_benchmark() -> None:
         for f in filenames:
             sanitize_filename(f)
 
@@ -32,6 +42,7 @@ def benchmark():
         f"Time taken to sanitize {len(filenames)} normal files 1000 times: "
         f"{time_taken:.4f} seconds"
     )
+
 
 if __name__ == "__main__":
     benchmark()

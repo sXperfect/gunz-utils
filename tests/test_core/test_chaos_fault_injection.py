@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import math
 
 # isort: split
 # =============================================================================
@@ -31,11 +32,11 @@ from gunz_utils.faults import (
 
 def test_virtual_clock_advance_and_bounds() -> None:
     clock = VirtualClock(start_time=100.0)
-    assert clock.now() == 100.0
+    assert math.isclose(clock.now(), 100.0)
     assert clock.now_ns() == 100_000_000_000
 
     clock.advance(2.5)
-    assert clock.now() == 102.5
+    assert math.isclose(clock.now(), 102.5)
     assert clock.now_ns() == 102_500_000_000
 
     err_start = "start_time must be a finite non-negative number"

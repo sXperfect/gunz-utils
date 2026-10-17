@@ -54,7 +54,7 @@ def test_package_version_matches_installed_distribution() -> None:
 def test_historical_module_versions_match_package_version() -> None:
     for module_name in _VERSION_COMPAT_MODULES:
         try:
-            module = importlib.import_module(module_name)
+            module = importlib.import_module(module_name)  # noqa: GS045
         except (ImportError, ModuleNotFoundError):
             continue
         assert module.__version__ == gunz_utils.__version__, module_name

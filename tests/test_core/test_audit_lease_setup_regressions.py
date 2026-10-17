@@ -60,7 +60,7 @@ def test_rejected_heartbeat_coroutine_is_closed_by_production(
             assert isinstance(rejected[0], CoroutineType)
             assert rejected[0].cr_frame is None
             rejected.clear()
-            gc.collect()
+            gc.collect()  # noqa: GS020
             await asyncio.sleep(0)
         assert observed.value is failure
         assert asyncio.all_tasks() == baseline

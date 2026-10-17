@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 
 # isort: split
 # =============================================================================
@@ -33,7 +34,7 @@ def test_lease_timing_validates_renewal_cadence() -> None:
         heartbeat_interval=30.0,
     )
 
-    assert timing.lease_seconds == pytest.approx(120.0)
+    assert math.isclose(timing.lease_seconds, 120.0)
 
     with pytest.raises(ValueError, match="shorter"):
         LeaseTiming(

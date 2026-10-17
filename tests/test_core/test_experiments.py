@@ -51,8 +51,8 @@ def test_run_variant_matrix_rebuilds_state_per_variant() -> None:
     )
 
     assert len(setup_calls) == 2
-    assert matrix["results"]["baseline"].metrics["loss"] == pytest.approx(10.0)
-    assert matrix["results"]["half"].metrics["loss"] == pytest.approx(5.0)
+    assert math.isclose(matrix["results"]["baseline"].metrics["loss"], 10.0)
+    assert math.isclose(matrix["results"]["half"].metrics["loss"], 5.0)
 
 
 def test_run_variant_matrix_captures_candidate_failure() -> None:
@@ -100,8 +100,8 @@ def test_compare_numeric_metrics_preserves_structure_and_bool_semantics() -> Non
         },
     )
 
-    assert result["loss"]["delta"] == pytest.approx(-2.0)
-    assert result["loss"]["relative_delta"] == pytest.approx(-0.2)
+    assert math.isclose(result["loss"]["delta"], -2.0)
+    assert math.isclose(result["loss"]["relative_delta"], -0.2)
     assert not result["enabled"]["numeric"]
     assert not result["enabled"]["equal"]
     assert result["only_baseline"]["missing_candidate"]
@@ -144,9 +144,9 @@ def test_metric_improvement_supports_lower_and_higher_metrics() -> None:
     )
 
     assert lower["supported"]
-    assert lower["relative_improvement"] == pytest.approx(0.5)
+    assert math.isclose(lower["relative_improvement"], 0.5)
     assert higher["supported"]
-    assert higher["relative_improvement"] == pytest.approx(0.25)
+    assert math.isclose(higher["relative_improvement"], 0.25)
 
 
 def test_metric_improvement_rejects_nonfinite_comparison() -> None:

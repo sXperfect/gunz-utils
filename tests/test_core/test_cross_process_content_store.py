@@ -425,7 +425,7 @@ def test_existing_corrupt_process_entry_is_rejected(
         assert _receive(connection) == ("error", "ValueError")
         children.finish(publisher)
     assert (
-        root / digest[:2] / digest
+        root.joinpath(digest[:2], digest)
     ).read_bytes() == b"independent corrupt competitor"
     assert list(root.glob(".incoming.*")) == []
 

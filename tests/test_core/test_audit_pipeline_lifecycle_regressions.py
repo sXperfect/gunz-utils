@@ -64,7 +64,7 @@ def test_partial_setup_closes_coroutine_and_drains_tasks(
                 scope.setattr(asyncio, "create_task", submit)
                 with pytest.raises(RuntimeError) as observed:
                     await anext(stream)
-            gc.collect()
+            gc.collect()  # noqa: GS020
             await asyncio.sleep(0)
         assert observed.value is failure
         assert all(task.done() for task in created)

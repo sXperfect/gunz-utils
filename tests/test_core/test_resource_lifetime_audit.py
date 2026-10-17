@@ -1,5 +1,7 @@
 """Finite resource ownership regressions and GC evidence for async coordinators."""
 
+# gunz-style: ignore-file[GS020]
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================

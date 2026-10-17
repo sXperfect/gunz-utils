@@ -1,5 +1,7 @@
 """Finite parser allocation, export lifetime, and optional C reference proofs."""
 
+# gunz-style: ignore-file[GS020]
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================

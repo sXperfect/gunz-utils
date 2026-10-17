@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -214,8 +215,8 @@ def test_profile_retains_exited_children_and_separates_reused_pids() -> None:
     ):
         profile = process_module.profile_command(["command"])
 
-    assert profile.cpu_user_seconds == 14.0
-    assert profile.cpu_system_seconds == 4.0
+    assert math.isclose(profile.cpu_user_seconds, 14.0)
+    assert math.isclose(profile.cpu_system_seconds, 4.0)
     assert profile.read_bytes == 140
     assert profile.write_bytes == 143
     assert profile.minor_faults == 14

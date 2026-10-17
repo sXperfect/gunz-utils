@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from unittest.mock import patch
 
 # isort: split
@@ -106,9 +107,9 @@ def test_retry_policy_delay_override_none_uses_existing_backoff() -> None:
         delay_override=lambda _attempt, _result, _error: None,
     )
 
-    assert policy.delay(1) == pytest.approx(2.0)
-    assert policy.delay(2) == pytest.approx(4.0)
-    assert policy.delay(4) == pytest.approx(10.0)
+    assert math.isclose(policy.delay(1), 2.0)
+    assert math.isclose(policy.delay(2), 4.0)
+    assert math.isclose(policy.delay(4), 10.0)
 
 
 @pytest.mark.parametrize(

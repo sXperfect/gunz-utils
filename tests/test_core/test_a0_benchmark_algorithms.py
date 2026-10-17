@@ -244,7 +244,8 @@ def test_perf_stat_parses_non_finite_counter_as_unknown(
     result = perf_stat(["command"], events=("cycles",))
     assert result.counters[0].event == "cycles"
     assert result.counters[0].value is None
-    assert result.counters[1].value == 123.0
+    assert result.counters[1].value is not None
+    assert math.isclose(result.counters[1].value, 123.0)
 
 
 @pytest.mark.parametrize("events", [("",), (1,)])

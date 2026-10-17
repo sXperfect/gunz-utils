@@ -72,7 +72,7 @@ def test_formatting_boundaries_and_arbitrary_size_integer_count() -> None:
     assert format_bytes(999) == "999 B"
     assert format_bytes(1_000) == "1.0 KB"
     assert format_bytes(1_024, binary=True) == "1.0 KiB"
-    assert format_duration(0.5) == "500ms"
+    assert format_duration(0.5) == "500ms"  # noqa: GS032
     assert format_duration(3_661) == "1h 1m 1s"
     assert format_count(999) == "999"
     assert format_count(1_000) == "1.0K"

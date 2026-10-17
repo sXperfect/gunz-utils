@@ -183,7 +183,7 @@ def test_invariant_redact_containment() -> None:
     ) -> None:
         masked = redact(secret, show_chars=0)
         assert isinstance(masked, str)
-        assert secret not in masked
+        assert secret not in masked  # noqa: GS105
         assert "*" in masked
 
     checked = check_property(

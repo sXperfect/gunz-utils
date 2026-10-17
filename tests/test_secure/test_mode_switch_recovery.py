@@ -155,6 +155,6 @@ def test_post_cleanup_fsync_failure_does_not_lose_committed_current_key(
         ):
             with pytest.raises(OSError, match="synthetic fsync"):
                 store.unlock(credential)
-    assert (tmp_path / current_name).read_bytes() == current
+    assert tmp_path.joinpath(current_name).read_bytes() == current
     assert len(_material(tmp_path)) == 1
     _assert_recovered(tmp_path, credential)

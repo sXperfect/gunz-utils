@@ -416,7 +416,7 @@ def test_rotation_recovers_after_acknowledged_process_death(
     staged_name = (
         ".master.salt.pending" if new_passphrase is not None else ".master.key.pending"
     )
-    assert (base / staged_name).exists() is pending
+    assert base.joinpath(staged_name).exists() is pending
     recovered_passphrase = new_passphrase if committed else old_passphrase
     _assert_envelopes(
         after,

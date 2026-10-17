@@ -204,7 +204,7 @@ def test_gate_exception_output_redacts_exception_message(
     def runner(
         _name: str,
     ) -> int:
-        raise RuntimeError(secret)
+        raise RuntimeError(secret)  # noqa: GS107
 
     results = audit_ci.collect_results(
         gates=("lint",),
@@ -214,7 +214,7 @@ def test_gate_exception_output_redacts_exception_message(
     captured = capsys.readouterr()
     assert results == [audit_ci.GateResult("lint", 70)]
     assert "RuntimeError" in captured.err
-    assert secret not in captured.err
+    assert secret not in captured.err  # noqa: GS105
 
 
 def test_audit_ci_skips_packaging_when_requested(

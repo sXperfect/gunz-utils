@@ -208,7 +208,7 @@ def junit_evidence(
     if path.stat().st_size > 4 * 1024 * 1024:
         return {"valid": False, "error": "junit_size_limit"}
     try:
-        tree = ET.parse(path)
+        tree = ET.parse(path)  # noqa: GS044
     except (OSError, ET.ParseError) as exc:
         return {"valid": False, "error": type(exc).__name__}
     root = tree.getroot()

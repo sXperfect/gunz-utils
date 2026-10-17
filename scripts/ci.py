@@ -508,7 +508,18 @@ def run_lint() -> int:
     if os.environ.get("GUNZ_STYLE_SKIP") == "1":
         print("gunz-style: local-only check skipped by GUNZ_STYLE_SKIP=1")
         return status
-    style_status = _run([sys.executable, "-m", "gunz_style.cli"])
+    style_status = _run(
+        [
+            sys.executable,
+            "-m",
+            "gunz_style.cli",
+            "--warnings-as-errors",
+            "src",
+            "scripts",
+            "tests",
+            "benchmarks",
+        ]
+    )
     if status == 0:
         status = style_status
     return status

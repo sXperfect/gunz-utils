@@ -96,7 +96,7 @@ def test_fanout_swap_cannot_redirect_publication(
     with pytest.raises(ValueError, match="symlink|directory changed"):
         store.put_bytes(b"payload")
     assert list(outside.iterdir()) == []
-    assert (detached / digest).read_bytes() == b"payload"
+    assert detached.joinpath(digest).read_bytes() == b"payload"
     assert list(store.root.glob(".incoming.*")) == []
 
 

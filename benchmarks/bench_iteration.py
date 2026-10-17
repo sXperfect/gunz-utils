@@ -1,13 +1,23 @@
-"""Microbenchmarks for iteration batching helpers."""
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 
 from __future__ import annotations
 
 import timeit
 
+# isort: split
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+
 from gunz_utils.iteration import batched, chunked
 
 
-def benchmark(size: int = 1_000_000, batch_size: int = 64) -> dict[str, float]:
+def benchmark(
+    size: int = 1_000_000,
+    batch_size: int = 64,
+) -> dict[str, float]:
     data = list(range(size))
     return {
         "chunked_seconds": min(

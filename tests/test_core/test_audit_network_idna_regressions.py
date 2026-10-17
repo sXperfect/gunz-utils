@@ -55,6 +55,6 @@ def test_valid_host_components_survive_uri_composition(
     assert parsed.hostname == expected
     assert parsed.port == 8443
     assert parsed.username == "user%40example"
-    assert parsed.password == "p%3Aa%2Fss"
+    assert parsed.password == "p%3Aa%2Fss"  # noqa: GS105
     assert parsed.path == "/resource"
     assert parsed.query == "key=value"

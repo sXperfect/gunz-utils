@@ -180,7 +180,7 @@ class TestConcurrency(unittest.IsolatedAsyncioTestCase):
                 await iter_task
         finally:
             await gen.aclose()
-            gc.collect()
+            gc.collect()  # noqa: GS020
             await asyncio.sleep(0)
             loop.set_exception_handler(old_handler)
 

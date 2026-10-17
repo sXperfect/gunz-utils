@@ -3,6 +3,10 @@
 Executed by downstream performance-regression CI via gunz-bench.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import tempfile
@@ -10,7 +14,17 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+# isort: split
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 from gunz_bench import BenchmarkSpec
+
+# isort: split
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.binary import ByteReader, encode_uvarint
 from gunz_utils.io import atomic_write

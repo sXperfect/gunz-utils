@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import sys
 from collections.abc import Coroutine
@@ -112,7 +113,7 @@ def _install_stop(
         *,
         terminate_grace: float,
     ) -> None:
-        assert terminate_grace == 0.01
+        assert math.isclose(terminate_grace, 0.01)
         stops.append("stopped")
         process.returncode = (
             process.returncode if process.returncode is not None else -15
