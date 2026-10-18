@@ -1,7 +1,7 @@
 # NP-03: Portable platform evidence harness
 
 **Date:** 2026-10-08
-**Status:** Adversarial repairs and stable Linux preparation verified; native hosts unavailable
+**Status:** Verified on Linux and macOS; real Windows host pending
 **Parent:** [Native platform verification](2026-10-08-platform-verification.md)
 **Base:** `a3f224ba5b14fe98b4f41833c9a73f297754a3af` plus preserved user edits
 
@@ -23,8 +23,8 @@ rules. Finish bounded preparation independently; tell coordinator when ready.
 - [x] Implementation/test inventory and platform contracts reviewed.
 - [x] Preparation or verifier implementation is concrete and reviewable.
 - [x] Pinned focused tests/lint/type checks execute successfully.
-- [x] Native prerequisites, command, evidence format and coverage gaps recorded.
-- [ ] Actual native host run reviewed (pending access).
+- [x] Actual macOS host run reviewed — executed and verified on macOS Darwin 25.6.0 arm64 across Python 3.11 and 3.12 (native_platform_complete=True, python_matrix_complete=True, status="passed").
+- [ ] Actual Windows host run reviewed (pending access).
 
 ## Implementation and coverage contract
 
@@ -252,3 +252,32 @@ The coordinator's final canonical aggregate gate also passed all six gates;
 Both full Python suites passed 1,370 tests with 29 documented skips and each
 compiled-native proof suite passed 57 tests. Initial and earlier-phase evidence
 is retained with its original fingerprint rather than substituted for this run.
+
+## Native macOS host execution
+
+Executed on native Darwin 25.6.0 arm64 with Apple Clang 21.1.8 and APFS filesystem:
+
+```bash
+/Users/sxperfect/miniforge3/envs/gunz-bench/bin/python scripts/verify_platform.py \
+  --platform macos \
+  --python /Users/sxperfect/miniforge3/envs/gunz-bench/bin/python \
+  --python /Users/sxperfect/miniforge3/envs/gunz-style/bin/python \
+  --output tmp/platform-evidence.json
+```
+
+Output: `passed: tmp/platform-evidence.json`
+- `actual_platform`: `"macos"`
+- `complete`: `true`
+- `native_platform_complete`: `true`
+- `python_matrix_complete`: `true`
+- `source_unchanged`: `true`
+- `status`: `"passed"`
+
+Both Python 3.11.16 and Python 3.12.15 passed all phases:
+- Filesystem: 18 passed, 0 skipped.
+- SecureStore: 46 passed, 0 skipped.
+- Subprocess (including NP-04 async drain): 34 passed, 14 subtests passed, 0 skipped.
+- Native Darwin contracts (`renamex_np` with `RENAME_EXCL`, directory fsync): 11 passed, 0 skipped.
+- Fallback: 68 passed, 31 expected exclusions.
+- Compiled native C: 99 passed, 0 skipped.
+

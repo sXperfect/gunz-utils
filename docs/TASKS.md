@@ -7,13 +7,10 @@ in [`docs/tasks/README.md`](tasks/README.md); completed work is indexed in
 | Task ID | Date | Description | Status |
 |:---|:---:|:---|:---:|
 | ALGORITHM-2026-09-28 | 2026-09-28 | [Repository-wide algorithm proof program](tasks/active/2026-09-28-algorithm-correctness-audit.md) | Active — remaining proofs/limitations |
-| Task ID | Date | Description | Status |
-|:---|:---:|:---|:---:|
-| ALGORITHM-2026-09-28 | 2026-09-28 | [Repository-wide algorithm proof program](tasks/active/2026-09-28-algorithm-correctness-audit.md) | Active — remaining proofs/limitations |
 | PLATFORM-2026-10-08 | 2026-10-08 | [Native Windows/macOS verification](tasks/active/2026-10-08-platform-verification.md) | Active; macOS verified, Windows pending |
 | NP-01 | 2026-10-08 | [Windows readiness and contracts](tasks/active/2026-10-08-platform-windows.md) | Preparation complete; native host pending |
-| NP-03 | 2026-10-08 | [Portable platform verifier](tasks/active/2026-10-08-platform-verifier.md) | Linux & macOS preparation verified; Windows pending |
-| NP-04 | 2026-10-08 | [Async pipe deadline follow-up](tasks/active/2026-10-08-platform-async-drain.md) | Repaired and integrated on Linux; native proofs pending |
+| NP-03 | 2026-10-08 | [Portable platform verifier](tasks/active/2026-10-08-platform-verifier.md) | Verified on Linux & macOS; Windows pending |
+| NP-04 | 2026-10-08 | [Async pipe deadline follow-up](tasks/active/2026-10-08-platform-async-drain.md) | Verified on Linux & macOS; Windows pending |
 
 The [2026-10-17 general-purpose utilities consolidation](tasks/done/2026-10-17-consolidate-general-purpose-utils.md)
 is complete; read_regular_bytes, strict JSON decoding (decode_json_object/load_json_object),

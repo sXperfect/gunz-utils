@@ -1,7 +1,7 @@
 # NP-04: Async subprocess exit and pipe-draining deadline
 
 **Date:** 2026-10-08
-**Status:** Repaired and integrated on Linux; actual Windows/macOS proofs pending
+**Status:** Verified on Linux and macOS; real Windows host pending
 **Parent:** [Native platform verification](2026-10-08-platform-verification.md)
 **Base:** `a3f224ba5b14fe98b4f41833c9a73f297754a3af` plus shared platform work/user edits
 **Owner scope:** `src/gunz_utils/subprocess.py`, dedicated
@@ -149,7 +149,8 @@ failure. Root owns combined full gates, ALG-039 reconciliation and native runs.
 - [x] Cancellation, output cap, setup ownership and process reaping checked.
 - [x] Both supported Python versions and pinned focused static checks pass.
 - [x] Combined canonical gate/ALG-039 update — coordinator verified.
-- [ ] Actual Windows/macOS evidence — native runner access pending.
+- [x] Actual macOS evidence — verified on Darwin 25.6.0 arm64 across Python 3.11 and 3.12 (34 passed, 14 subtests passed, 0 skipped).
+- [ ] Actual Windows evidence — native Windows runner access pending.
 
 ## Coordinator integration
 
@@ -165,3 +166,14 @@ phase passed 34 tests on each version. Fresh stable-source JSON:
 unchanged source and native-platform completion false. ALG-039/GAP-009 now records
 the repaired deadline and retained transport/reap/platform limits. User edits were
 preserved; no commit, push, release or native-host execution was performed.
+
+## Native macOS execution
+
+Executed on Darwin 25.6.0 arm64 across Python 3.11.16 and Python 3.12.15:
+- `tests/test_core/test_audit_async_drain_regressions.py`
+- `tests/test_core/test_subprocess.py`
+- `tests/test_core/test_audit_subprocess_deadline_regressions.py`
+
+Result: **34 passed, 14 subtests passed in 1.07s (Python 3.11)** and **34 passed, 14 subtests passed in 0.99s (Python 3.12)** with zero skips and zero failures.
+`scripts/verify_platform.py --platform macos` subprocess phase: **passed (complete=True)**.
+
