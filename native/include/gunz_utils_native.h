@@ -40,6 +40,30 @@ int gunz_native_decode_uvarint(
 );
 
 /*
+ * Encode a signed 64-bit integer into a canonical zigzag varint.
+ * Out buffer must have at least 10 bytes capacity.
+ * Returns the number of bytes written (1 to 10).
+ */
+size_t gunz_native_encode_zigzag(int64_t value, uint8_t *out);
+
+/*
+ * Decode a signed 64-bit integer from a canonical zigzag varint buffer.
+ * Parameters:
+ *   buf: pointer to buffer start
+ *   len: available bytes in buffer
+ *   out_val: pointer to receive the decoded int64_t
+ *   out_bytes_read: pointer to receive the number of bytes read
+ *
+ * Returns status code identical to gunz_native_decode_uvarint.
+ */
+int gunz_native_decode_zigzag(
+    const uint8_t *buf,
+    size_t len,
+    int64_t *out_val,
+    size_t *out_bytes_read
+);
+
+/*
  * O(N) introselect for double arrays.
  */
 void gunz_native_introselect(

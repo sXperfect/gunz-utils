@@ -61,6 +61,31 @@ int gunz_native_decode_uvarint(
 }
 
 /*
+ * Pure C implementation of canonical signed 64-bit zigzag varint encoding.
+ */
+size_t gunz_native_encode_zigzag(int64_t value, uint8_t *out) {
+    uint64_t uval = (uint64_t)((value << 1) ^ (value >> 63));
+    return gunz_native_encode_uvarint(uval, out);
+}
+
+/*
+ * Pure C implementation of canonical signed 64-bit zigzag varint decoding.
+ */
+int gunz_native_decode_zigzag(
+    const uint8_t *buf,
+    size_t len,
+    int64_t *out_val,
+    size_t *out_bytes_read
+) {
+    uint64_t uval = 0;
+    int rc = gunz_native_decode_uvarint(buf, len, &uval, out_bytes_read);
+    if (rc == 0) {
+        *out_val = (int64_t)((uval >> 1) ^ (-(int64_t)(uval & 1)));
+    }
+    return rc;
+}
+
+/*
  * Recursive validation of pure JSON objects (no custom classes or byte objects).
  */
 static int check_json_clean(PyObject *obj, int depth, int max_depth);
@@ -268,6 +293,332 @@ static PyObject *py_decode_uvarint(PyObject *self, PyObject *args) {
         PyErr_SetString(PyExc_RuntimeError, "unexpected varint decode error");
         return NULL;
     }
+}
+
+/*
+ * Python C API wrapper for encode_zigzag.
+ */
+static PyObject *py_encode_zigzag(PyObject *self, PyObject *args) {
+    PyObject *py_val;
+    if (!PyArg_ParseTuple(args, "O", &py_val)) {
+        return NULL;
+    }
+    if (PyBool_Check(py_val) || !PyLong_Check(py_val)) {
+        PyErr_SetString(PyExc_TypeError, "value must be an integer (not bool)");
+        return NULL;
+    }
+
+    if (!PyLong_CheckExact(py_val)) {
+        PyObject *module = PyImport_ImportModule("gunz_utils.binary");
+        if (!module) return NULL;
+        PyObject *encoder = PyObject_GetAttrString(module, "_py_encode_zigzag");
+        Py_DECREF(module);
+        if (!encoder) return NULL;
+        PyObject *result = PyObject_CallOneArg(encoder, py_val);
+        Py_DECREF(encoder);
+        return result;
+    }
+
+    int overflow = 0;
+    long long val = PyLong_AsLongLongAndOverflow(py_val, &overflow);
+    if (overflow != 0) {
+        PyErr_SetString(PyExc_ValueError, "signed zigzag varint requires a 64-bit signed integer");
+        return NULL;
+    }
+
+    uint8_t out[10];
+    size_t n = gunz_native_encode_zigzag((int64_t)val, out);
+    return PyBytes_FromStringAndSize((const char *)out, (Py_ssize_t)n);
+}
+
+/*
+ * Python C API wrapper for decode_zigzag.
+ * Signature: decode_zigzag(buffer, offset) -> (value, new_offset)
+ */
+static PyObject *py_decode_zigzag(PyObject *self, PyObject *args) {
+    PyObject *obj;
+    Py_ssize_t offset = 0;
+    if (!PyArg_ParseTuple(args, "On", &obj, &offset)) {
+        return NULL;
+    }
+
+    Py_buffer view;
+    if (PyObject_GetBuffer(obj, &view, PyBUF_SIMPLE) != 0) {
+        return NULL;
+    }
+
+    if (offset < 0 || offset > view.len) {
+        PyBuffer_Release(&view);
+        PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+        return NULL;
+    }
+
+    size_t remaining = (size_t)(view.len - offset);
+    if (remaining == 0) {
+        PyBuffer_Release(&view);
+        PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+        return NULL;
+    }
+
+    int64_t val = 0;
+    size_t bytes_read = 0;
+    const uint8_t *ptr = (const uint8_t *)view.buf + offset;
+    int rc = gunz_native_decode_zigzag(ptr, remaining, &val, &bytes_read);
+    PyBuffer_Release(&view);
+
+    if (rc == 0) {
+        PyObject *py_val = PyLong_FromLongLong(val);
+        if (!py_val) return NULL;
+        PyObject *py_offset = PyLong_FromSsize_t(offset + (Py_ssize_t)bytes_read);
+        if (!py_offset) {
+            Py_DECREF(py_val);
+            return NULL;
+        }
+        PyObject *tuple = PyTuple_New(2);
+        if (!tuple) {
+            Py_DECREF(py_val);
+            Py_DECREF(py_offset);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(tuple, 0, py_val);
+        PyTuple_SET_ITEM(tuple, 1, py_offset);
+        return tuple;
+    } else if (rc == -1) {
+        PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+        return NULL;
+    } else if (rc == -2) {
+        PyErr_SetString(PyExc_ValueError, "varint exceeds 64 bits");
+        return NULL;
+    } else if (rc == -3) {
+        PyErr_SetString(PyExc_ValueError, "varint is too long");
+        return NULL;
+    } else if (rc == -4) {
+        PyErr_SetString(PyExc_ValueError, "non-canonical varint");
+        return NULL;
+    } else {
+        PyErr_SetString(PyExc_RuntimeError, "unexpected varint decode error");
+        return NULL;
+    }
+}
+
+/*
+ * Python C API wrapper for fast_decode_uvarints.
+ * Signature: fast_decode_uvarints(buffer, offset, count) -> (list, new_offset)
+ */
+static PyObject *py_fast_decode_uvarints(PyObject *self, PyObject *args) {
+    PyObject *obj;
+    Py_ssize_t offset = 0;
+    Py_ssize_t count = 0;
+    if (!PyArg_ParseTuple(args, "Onn", &obj, &offset, &count)) {
+        return NULL;
+    }
+
+    if (count < 0) {
+        PyErr_SetString(PyExc_ValueError, "count must be non-negative");
+        return NULL;
+    }
+
+    Py_buffer view;
+    if (PyObject_GetBuffer(obj, &view, PyBUF_SIMPLE) != 0) {
+        return NULL;
+    }
+
+    if (offset < 0 || offset > view.len) {
+        PyBuffer_Release(&view);
+        PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+        return NULL;
+    }
+
+    if (count == 0) {
+        PyBuffer_Release(&view);
+        PyObject *list = PyList_New(0);
+        if (!list) return NULL;
+        PyObject *py_offset = PyLong_FromSsize_t(offset);
+        if (!py_offset) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *tuple = PyTuple_New(2);
+        if (!tuple) {
+            Py_DECREF(list);
+            Py_DECREF(py_offset);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(tuple, 0, list);
+        PyTuple_SET_ITEM(tuple, 1, py_offset);
+        return tuple;
+    }
+
+    PyObject *list = PyList_New(count);
+    if (!list) {
+        PyBuffer_Release(&view);
+        return NULL;
+    }
+
+    Py_ssize_t curr_offset = offset;
+    for (Py_ssize_t i = 0; i < count; i++) {
+        size_t remaining = (size_t)(view.len - curr_offset);
+        if (remaining == 0) {
+            PyBuffer_Release(&view);
+            Py_DECREF(list);
+            PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+            return NULL;
+        }
+        uint64_t val = 0;
+        size_t bytes_read = 0;
+        const uint8_t *ptr = (const uint8_t *)view.buf + curr_offset;
+        int rc = gunz_native_decode_uvarint(ptr, remaining, &val, &bytes_read);
+        if (rc != 0) {
+            PyBuffer_Release(&view);
+            Py_DECREF(list);
+            if (rc == -1) {
+                PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+            } else if (rc == -2) {
+                PyErr_SetString(PyExc_ValueError, "varint exceeds 64 bits");
+            } else if (rc == -3) {
+                PyErr_SetString(PyExc_ValueError, "varint is too long");
+            } else if (rc == -4) {
+                PyErr_SetString(PyExc_ValueError, "non-canonical varint");
+            } else {
+                PyErr_SetString(PyExc_RuntimeError, "unexpected varint decode error");
+            }
+            return NULL;
+        }
+        PyObject *py_val = PyLong_FromUnsignedLongLong(val);
+        if (!py_val) {
+            PyBuffer_Release(&view);
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, py_val);
+        curr_offset += (Py_ssize_t)bytes_read;
+    }
+    PyBuffer_Release(&view);
+
+    PyObject *py_offset = PyLong_FromSsize_t(curr_offset);
+    if (!py_offset) {
+        Py_DECREF(list);
+        return NULL;
+    }
+    PyObject *tuple = PyTuple_New(2);
+    if (!tuple) {
+        Py_DECREF(list);
+        Py_DECREF(py_offset);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(tuple, 0, list);
+    PyTuple_SET_ITEM(tuple, 1, py_offset);
+    return tuple;
+}
+
+/*
+ * Python C API wrapper for fast_decode_zigzags.
+ * Signature: fast_decode_zigzags(buffer, offset, count) -> (list, new_offset)
+ */
+static PyObject *py_fast_decode_zigzags(PyObject *self, PyObject *args) {
+    PyObject *obj;
+    Py_ssize_t offset = 0;
+    Py_ssize_t count = 0;
+    if (!PyArg_ParseTuple(args, "Onn", &obj, &offset, &count)) {
+        return NULL;
+    }
+
+    if (count < 0) {
+        PyErr_SetString(PyExc_ValueError, "count must be non-negative");
+        return NULL;
+    }
+
+    Py_buffer view;
+    if (PyObject_GetBuffer(obj, &view, PyBUF_SIMPLE) != 0) {
+        return NULL;
+    }
+
+    if (offset < 0 || offset > view.len) {
+        PyBuffer_Release(&view);
+        PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+        return NULL;
+    }
+
+    if (count == 0) {
+        PyBuffer_Release(&view);
+        PyObject *list = PyList_New(0);
+        if (!list) return NULL;
+        PyObject *py_offset = PyLong_FromSsize_t(offset);
+        if (!py_offset) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *tuple = PyTuple_New(2);
+        if (!tuple) {
+            Py_DECREF(list);
+            Py_DECREF(py_offset);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(tuple, 0, list);
+        PyTuple_SET_ITEM(tuple, 1, py_offset);
+        return tuple;
+    }
+
+    PyObject *list = PyList_New(count);
+    if (!list) {
+        PyBuffer_Release(&view);
+        return NULL;
+    }
+
+    Py_ssize_t curr_offset = offset;
+    for (Py_ssize_t i = 0; i < count; i++) {
+        size_t remaining = (size_t)(view.len - curr_offset);
+        if (remaining == 0) {
+            PyBuffer_Release(&view);
+            Py_DECREF(list);
+            PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+            return NULL;
+        }
+        int64_t val = 0;
+        size_t bytes_read = 0;
+        const uint8_t *ptr = (const uint8_t *)view.buf + curr_offset;
+        int rc = gunz_native_decode_zigzag(ptr, remaining, &val, &bytes_read);
+        if (rc != 0) {
+            PyBuffer_Release(&view);
+            Py_DECREF(list);
+            if (rc == -1) {
+                PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+            } else if (rc == -2) {
+                PyErr_SetString(PyExc_ValueError, "varint exceeds 64 bits");
+            } else if (rc == -3) {
+                PyErr_SetString(PyExc_ValueError, "varint is too long");
+            } else if (rc == -4) {
+                PyErr_SetString(PyExc_ValueError, "non-canonical varint");
+            } else {
+                PyErr_SetString(PyExc_RuntimeError, "unexpected varint decode error");
+            }
+            return NULL;
+        }
+        PyObject *py_val = PyLong_FromLongLong(val);
+        if (!py_val) {
+            PyBuffer_Release(&view);
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, py_val);
+        curr_offset += (Py_ssize_t)bytes_read;
+    }
+    PyBuffer_Release(&view);
+
+    PyObject *py_offset = PyLong_FromSsize_t(curr_offset);
+    if (!py_offset) {
+        Py_DECREF(list);
+        return NULL;
+    }
+    PyObject *tuple = PyTuple_New(2);
+    if (!tuple) {
+        Py_DECREF(list);
+        Py_DECREF(py_offset);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(tuple, 0, list);
+    PyTuple_SET_ITEM(tuple, 1, py_offset);
+    return tuple;
 }
 
 static inline void swap_double(double *a, double *b) {
@@ -860,6 +1211,10 @@ static PyObject *py_has_accel(PyObject *self, PyObject *Py_UNUSED(ignored)) {
 static PyMethodDef AccelMethods[] = {
     {"encode_uvarint", py_encode_uvarint, METH_VARARGS, "Encode uint64 into canonical varint bytes in C."},
     {"decode_uvarint", py_decode_uvarint, METH_VARARGS, "Zero-copy decode uint64 varint from buffer at offset."},
+    {"encode_zigzag", py_encode_zigzag, METH_VARARGS, "Encode int64 into canonical zigzag varint bytes in C."},
+    {"decode_zigzag", py_decode_zigzag, METH_VARARGS, "Zero-copy decode int64 zigzag varint from buffer at offset."},
+    {"fast_decode_uvarints", py_fast_decode_uvarints, METH_VARARGS, "Fast batch decode uint64 varints from buffer in C."},
+    {"fast_decode_zigzags", py_fast_decode_zigzags, METH_VARARGS, "Fast batch decode int64 zigzag varints from buffer in C."},
     {"is_json_clean", py_is_json_clean, METH_VARARGS, "Check if object graph consists solely of pure JSON primitives."},
     {"update_running_stats", py_update_running_stats, METH_VARARGS, "Batch update RunningStats in C."},
     {"merge_running_stats", py_merge_running_stats, METH_VARARGS, "Chan parallel merge of two RunningStats in C."},
