@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Unreleased changes are collected as conflict-free fragments in `changes/`.
 Run `python scripts/release.py status` to inspect their release impact.
 
+## [1.17.5] — 2026-10-18
+
+### Performance
+
+- Accelerate `binary.py` with native C 64-bit zigzag codec (`encode_zigzag`, `decode_zigzag`, `ByteReader.read_zigzag`) and zero-allocation transactional batch varint buffer decoding (`ByteReader.read_uvarints`, `ByteReader.read_zigzags`), registered as ALG-094 with 100% pure-Python fallback parity.
+
 ## [1.17.4] — 2026-10-18
 
 ### Performance
