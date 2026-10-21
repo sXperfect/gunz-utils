@@ -1,0 +1,4 @@
+-e .[all]
+pytest>=8.0.0
+ruff
+mypy

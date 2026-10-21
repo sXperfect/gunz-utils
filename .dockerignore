@@ -1,0 +1,11 @@
+.git
+.gitignore
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.gunz_style_cache.json
+.gemini
+tmp
+docs/_build
+**/__pycache__
+*.pyc
