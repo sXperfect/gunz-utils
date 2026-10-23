@@ -73,7 +73,8 @@ class TestUpstreamError(unittest.TestCase):
 class TestUpstreamErrorSubclasses(unittest.TestCase):
     """Each subclass must be catchable as UpstreamError and carry its own type."""
 
-    cases = [
+    #? The case table is read-only test data shared by the class.
+    cases = [  # gunz-style: ignore[GS124]
         (UpstreamTimeoutError, "UpstreamTimeoutError"),
         (UpstreamAuthError, "UpstreamAuthError"),
         (UpstreamNotFoundError, "UpstreamNotFoundError"),

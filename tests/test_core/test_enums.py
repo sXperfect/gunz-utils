@@ -16,7 +16,8 @@ class TestBaseStrEnum(unittest.TestCase):
     def setUp(self):
         class Color(BaseStrEnum):
             #? _ignore_ = ["ALIASES"] # No longer needed with __ALIASES__
-            __ALIASES__ = {"dark": "dark_blue", "crimson": "red"}
+            #? An enum maps its aliases as class-level data by design.
+            __ALIASES__ = {"dark": "dark_blue", "crimson": "red"}  # noqa: GS124
             RED = "red"
             BLUE = "blue"
             DARK_BLUE = "dark_blue"
@@ -91,7 +92,8 @@ class TestBaseStrEnum(unittest.TestCase):
 
     def test_from_fuzzy_string_uppercase_and_separator_aliases(self):
         class UpperAliasColor(BaseStrEnum):
-            __ALIASES__ = {"DARK-SHADE": "dark_blue"}
+            #? An enum maps its aliases as class-level data by design.
+            __ALIASES__ = {"DARK-SHADE": "dark_blue"}  # gunz-style: ignore[GS124]
             DARK_BLUE = "dark_blue"
 
         self.assertEqual(
@@ -133,7 +135,8 @@ class TestBaseIntEnum(unittest.TestCase):
     def setUp(self):
         class ErrorCode(BaseIntEnum):
             #? _ignore_ = ["ALIASES"]
-            __ALIASES__ = {"missing": 404, "ok": 200, "NOT-HERE": 404}
+            #? An enum maps its aliases as class-level data by design.
+            __ALIASES__ = {"missing": 404, "ok": 200, "NOT-HERE": 404}  # noqa: GS124
             OK = 200
             NOT_FOUND = 404
             ONE = 1
