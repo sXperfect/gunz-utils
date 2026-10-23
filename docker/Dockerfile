@@ -28,4 +28,5 @@ COPY --chown=$MAMBA_USER:$MAMBA_USER tests ./tests
 
 # Default: run the pytest suite (deselecting slow/resource-heavy tests).
 ENV PYTHONDONTWRITEBYTECODE=1
+USER $MAMBA_USER
 CMD ["micromamba", "run", "-n", "base", "python", "-m", "pytest", "-m", "not slow", "-q", "-p", "no:cacheprovider"]
