@@ -1,3 +1,7 @@
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import os
 import sys
 from importlib.metadata import PackageNotFoundError, version as package_version
@@ -30,11 +34,11 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
-# Mock imports for external dependencies
+#? Mock imports for external dependencies
 autodoc_mock_imports = [
     "pydantic", "pydantic_core", "cryptography", "git", "gitpython", "loguru",
 ]
 
-# Napoleon settings
+#? Napoleon settings
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
