@@ -20,6 +20,7 @@ import functools
 import pathlib
 import subprocess
 import sys
+import typing as t
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
@@ -65,9 +66,70 @@ def _walk_up_for_marker(
     return None
 
 
+def _build_injection_entries(
+    root: pathlib.Path,
+    src: bool,
+    subpaths: t.Sequence[str | pathlib.Path],
+) -> list[pathlib.Path]:
+    """Build the ordered list of sys.path entries for a resolved root.
+
+    The root comes first (lowest priority); `src` and each `subpath` are
+    appended after it so they take higher import priority (inserted last wins
+    the position-0 slot).
+
+    Parameters
+    ----------
+    root : pathlib.Path
+        The resolved project root.
+    src : bool
+        Whether to include ``root / "src"``.
+    subpaths : t.Sequence[str | pathlib.Path]
+        Additional relative subpaths of `root` to include.
+
+    Returns
+    -------
+    list[pathlib.Path]
+        The ordered list of paths to inject into ``sys.path``.
+    """
+    entries = [root]
+    if src:
+        entries.append(root / "src")
+    for subpath in subpaths:
+        entries.append(root / subpath)
+    return entries
+
+
+def _inject_to_sys_path(
+    entries: list[pathlib.Path],
+) -> None:
+    """Insert resolved entries at the front of ``sys.path``, deduped.
+
+    Later entries are inserted at position 0, so entries listed last end up
+    with the highest import priority.
+
+    Parameters
+    ----------
+    entries : list[pathlib.Path]
+        The paths to inject, in priority order.
+    """
+    resolved: list[str] = []
+    for entry in entries:
+        path_str = str(entry)
+        if path_str in sys.path or path_str in resolved:
+            continue
+        resolved.append(path_str)
+    #? Intentional, documented, opt-in side effect of
+    #? ``inject_to_sys_path`` (tested); not a hidden mutation.
+    #? The entries are prepended in one slice assignment, so the import
+    #? path is not rebuilt for every entry.
+    sys.path[:0] = reversed(resolved)  # gunz-style: ignore[GS007]
+
+
 def resolve_project_root(
     anchor: str = ".",
     inject_to_sys_path: bool = True,
+    src: bool = False,
+    subpaths: t.Sequence[str | pathlib.Path] = (),
 ) -> pathlib.Path:
     """Return the project root for `anchor`.
 
@@ -76,8 +138,31 @@ def resolve_project_root(
       2. Subprocess fallback `git rev-parse --show-toplevel` (5s timeout).
       3. Raise `RuntimeError`.
 
-    Caches the result. When `inject_to_sys_path` is True, inserts the
-    resolved root at `sys.path[0]` (deduped).
+    Parameters
+    ----------
+    anchor : str, optional
+        The path to start searching from, by default current working directory.
+    inject_to_sys_path : bool, optional
+        If True, adds the root directory to `sys.path` to enable imports,
+        by default True.
+    src : bool, optional
+        If True, also adds the ``src/`` subdirectory of the project root to
+        ``sys.path`` (in addition to the root itself), enabling imports of
+        package source laid out under ``src/``. By default False.
+    subpaths : t.Sequence[str | pathlib.Path], optional
+        Additional subdirectories of the project root to add to ``sys.path``
+        (e.g. ``("scripts",)``). Each is resolved relative to the root and
+        given higher import priority than the root. By default empty.
+
+    Returns
+    -------
+    pathlib.Path
+        The project root.
+
+    Raises
+    ------
+    RuntimeError
+        If the project root cannot be found.
     """
     global _PROJECT_ANCHOR, _PROJECT_ROOT
 
@@ -88,11 +173,9 @@ def resolve_project_root(
         and (start == _PROJECT_ROOT or _PROJECT_ROOT in start.parents)
     ):
         if inject_to_sys_path:
-            root_str = str(_PROJECT_ROOT)
-            if root_str not in sys.path:
-                #? Intentional, documented, opt-in side effect of
-                #? ``inject_to_sys_path`` (tested); not a hidden mutation.
-                sys.path.insert(0, root_str)  # gunz-style: ignore[GS007]
+            _inject_to_sys_path(
+                _build_injection_entries(_PROJECT_ROOT, src, subpaths)
+            )
         return _PROJECT_ROOT
     root = _walk_up_for_marker(start) or _git_rev_parse_toplevel(str(start))
     if root is None:
@@ -108,10 +191,6 @@ def resolve_project_root(
     _PROJECT_ANCHOR = start
 
     if inject_to_sys_path:
-        root_str = str(root)
-        if root_str not in sys.path:
-            #? Intentional, documented, opt-in side effect of
-            #? ``inject_to_sys_path`` (tested); not a hidden mutation.
-            sys.path.insert(0, root_str)  # gunz-style: ignore[GS007]
+        _inject_to_sys_path(_build_injection_entries(root, src, subpaths))
 
     return _PROJECT_ROOT

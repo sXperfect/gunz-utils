@@ -1,0 +1,1 @@
+Extended `resolve_project_root` (both the gitpython and stdlib backends): added a `subpaths` argument for injecting additional root subdirectories into `sys.path`, alongside the existing `src` convenience flag. Both `src` and `subpaths` are given higher import priority than the root.

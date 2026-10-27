@@ -56,6 +56,36 @@ class TestProject(unittest.TestCase):
         resolve_project_root(inject_to_sys_path=False)
         self.assertEqual(sys.path, original_path)
 
+    def test_resolve_project_root_injects_src(self):
+        project_module._PROJECT_ROOT = None
+        root = resolve_project_root(inject_to_sys_path=True, src=True)
+        self.assertIn(str(root), sys.path)
+        self.assertIn(str(root / "src"), sys.path)
+        self.assertEqual(sys.path.index(str(root / "src")), 0)
+
+    def test_resolve_project_root_src_default_off(self):
+        project_module._PROJECT_ROOT = None
+        original_path = sys.path.copy()
+        root = resolve_project_root(inject_to_sys_path=True)
+        self.assertIn(str(root), sys.path)
+        self.assertNotIn(str(root / "src"), sys.path)
+        sys.path[:] = original_path
+
+    def test_resolve_project_root_injects_subpaths(self):
+        project_module._PROJECT_ROOT = None
+        original_path = sys.path.copy()
+        try:
+            root = resolve_project_root(
+                inject_to_sys_path=True,
+                subpaths=("scripts", "notebooks"),
+            )
+            self.assertIn(str(root), sys.path)
+            self.assertIn(str(root / "scripts"), sys.path)
+            self.assertIn(str(root / "notebooks"), sys.path)
+            self.assertEqual(sys.path.index(str(root / "notebooks")), 0)
+        finally:
+            sys.path[:] = original_path
+
     def test_cache_does_not_cross_project_anchors(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             first = pathlib.Path(tmpdir) / "first"

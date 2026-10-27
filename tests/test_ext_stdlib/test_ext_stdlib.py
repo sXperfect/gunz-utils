@@ -153,6 +153,33 @@ class TestStdlibResolveProjectRoot(unittest.TestCase):
         finally:
             sys.path[:] = original_path
 
+    def test_injects_src_into_sys_path(self):
+        repo = self._make_repo()
+        os.chdir(str(repo))
+        original_path = list(sys.path)
+        try:
+            stdlib_resolve_project_root(inject_to_sys_path=True, src=True)
+            self.assertEqual(sys.path[0], str(repo / "src"))
+            self.assertIn(str(repo), sys.path)
+            self.assertIn(str(repo / "src"), sys.path)
+        finally:
+            sys.path[:] = original_path
+
+    def test_injects_subpaths_into_sys_path(self):
+        repo = self._make_repo()
+        os.chdir(str(repo))
+        original_path = list(sys.path)
+        try:
+            stdlib_resolve_project_root(
+                inject_to_sys_path=True,
+                subpaths=("scripts", "notebooks"),
+            )
+            self.assertEqual(sys.path[0], str(repo / "notebooks"))
+            self.assertIn(str(repo / "scripts"), sys.path)
+            self.assertIn(str(repo / "notebooks"), sys.path)
+        finally:
+            sys.path[:] = original_path
+
     def test_cache_does_not_cross_project_anchors(self):
         first = pathlib.Path(self._tmpdir) / "first"
         second = pathlib.Path(self._tmpdir) / "second"

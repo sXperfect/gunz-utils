@@ -306,6 +306,11 @@ from :mod:`gunz_utils`.
    :undoc-members:
    :show-inheritance:
 
+.. automodule:: gunz_utils.notebook
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 
 Benchmarking namespace
 ----------------------

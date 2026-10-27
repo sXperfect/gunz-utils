@@ -104,6 +104,42 @@ from gunz_utils import SecureStore, resolve_project_root, setup_logging, type_ch
 
 Install the corresponding extras before using those symbols.
 
+### Project root resolution
+
+`resolve_project_root` locates the enclosing git repository and optionally
+adds it (and subdirectories) to `sys.path` so local source is importable:
+
+```python
+from gunz_utils import resolve_project_root
+
+root = resolve_project_root()              # root only on sys.path
+root = resolve_project_root(src=True)      # also add <root>/src
+root = resolve_project_root(
+    src=True,
+    subpaths=("scripts",),                 # also add <root>/scripts
+)
+```
+
+Subdirectories passed via `src`/`subpaths` are given higher import priority
+than the root. A stdlib-only backend is available as
+`gunz_utils.ext.project_stdlib.resolve_project_root`.
+
+### Notebook bootstrap
+
+`setup_notebook` is a one-call helper for Jupyter notebooks that need to import
+project source; it injects the root (and `src` by default) into `sys.path` and
+optionally enables IPython `%autoreload`:
+
+```python
+from gunz_utils import setup_notebook
+
+ROOT = setup_notebook()        # src=True, autoreload=True by default
+```
+
+Because `setup_notebook` requires `gunz_utils` to be importable, kernels that
+do not have the package installed should first run a small self-contained
+snippet that adds the root and `src` to `sys.path` before importing it.
+
 ## Benchmarking and profiling
 
 The [`gunz_utils.benchmark`](src/gunz_utils/benchmark/) package provides

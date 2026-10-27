@@ -62,6 +62,7 @@ from .subprocess import (
     run_command_async,
 )
 from .testing import eventually, eventually_async, temporary_env
+from .text import blank_spans, deduplicate_spans, strip_problematic_chars, word_pattern
 from .time_utils import expired, monotonic_deadline, remaining, utc_now
 from .timing import Timer, timer
 from .upstream_protocol import (
@@ -96,6 +97,7 @@ _LAZY: dict[str, str] = {
     "GunzBaseModel": ".models",
     "type_checked": ".ext.validation_pydantic",
     "resolve_project_root": ".ext.project_gitpython",
+    "setup_notebook": ".notebook",
     "setup_logging": ".ext.observability_loguru",
     "encrypt": ".ext.secure_crypto",
     "decrypt": ".ext.secure_crypto",
@@ -224,6 +226,7 @@ __all__ = [
     "GunzBaseModel",
     "type_checked",
     "resolve_project_root",
+    "setup_notebook",
     "setup_logging",
     "encrypt",
     "decrypt",
@@ -231,5 +234,9 @@ __all__ = [
     "get_system_passphrase",
     "SecureStore",
     "SecretMetadata",
+    "blank_spans",
+    "deduplicate_spans",
+    "strip_problematic_chars",
+    "word_pattern",
     "__version__",
 ]

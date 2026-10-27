@@ -1,0 +1,1 @@
+Added `setup_notebook`, a Jupyter notebook bootstrap helper that resolves the project root, injects the root and `src` (plus optional subpaths) into `sys.path`, and optionally enables IPython `%autoreload`. Exported from `gunz_utils` and available as `gunz_utils.notebook.setup_notebook`.
