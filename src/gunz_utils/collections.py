@@ -11,6 +11,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 K = TypeVar("K")
+_BOOL_SENTINEL = object()
 
 
 def unique(
@@ -32,15 +33,18 @@ def unique(
     list[T]
         The result of the operation.
     """
+    if key is not None and not callable(key):
+        raise TypeError("key must be callable or None")
     seen: set[object] = set()
     seen_unhashable: list[object] = []
     out: list[T] = []
     for item in items:
         marker: object = item if key is None else key(item)
+        marker_key = (_BOOL_SENTINEL, marker) if isinstance(marker, bool) else marker
         try:
-            if marker in seen:
+            if marker_key in seen:
                 continue
-            seen.add(marker)
+            seen.add(marker_key)
         except TypeError:
             if any(marker == previous for previous in seen_unhashable):
                 continue
@@ -67,6 +71,8 @@ def group_by(
     dict[K, list[T]]
         The result of the operation.
     """
+    if not callable(key):
+        raise TypeError("key must be callable")
     out: dict[K, list[T]] = {}
     for item in items:
         out.setdefault(key(item), []).append(item)
@@ -76,6 +82,8 @@ def group_by(
 def index_by(
     items: Iterable[T],
     key: Callable[[T], K],
+    *,
+    strict: bool = False,
 ) -> dict[K, T]:
     """Index items by key; later items replace earlier duplicate keys.
 
@@ -85,13 +93,23 @@ def index_by(
         items parameter.
     key : Callable[[T], K]
         key parameter.
+    strict : bool, default=False
+        If True, raise ValueError on duplicate keys.
 
     Returns
     -------
     dict[K, T]
         The result of the operation.
     """
-    return {key(item): item for item in items}
+    if not callable(key):
+        raise TypeError("key must be callable")
+    out: dict[K, T] = {}
+    for item in items:
+        k = key(item)
+        if strict and k in out:
+            raise ValueError(f"duplicate key in index_by: {k!r}")
+        out[k] = item
+    return out
 
 
 def partition(
@@ -112,6 +130,8 @@ def partition(
     tuple[list[T], list[T]]
         The result of the operation.
     """
+    if not callable(predicate):
+        raise TypeError("predicate must be callable")
     yes: list[T] = []
     no: list[T] = []
     for item in items:

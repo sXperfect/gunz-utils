@@ -160,8 +160,15 @@ class _TTLCache(Generic[P, T]):
         value = func(*args, **kwargs)
         with self._lock:
             if generation == self._generation:
-                self._cache[key] = (time.monotonic(), value)
+                now_write = time.monotonic()
+                self._cache[key] = (now_write, value)
                 self._cache.move_to_end(key)
+                if len(self._cache) > self._maxsize:
+                    for k in list(self._cache.keys()):
+                        if now_write - self._cache[k][0] > self._ttl:
+                            self._cache.pop(k, None)
+                            if len(self._cache) <= self._maxsize:
+                                break
                 while len(self._cache) > self._maxsize:
                     self._cache.popitem(last=False)
         return value
@@ -265,6 +272,8 @@ class _AsyncTTLCache(Generic[P, T]):
         self._maxsize = maxsize
         self._cache: OrderedDict[Hashable, tuple[float, T]] = OrderedDict()
         self._in_flight: dict[Hashable, asyncio.Task[T]] = {}
+        self._hits = 0
+        self._misses = 0
         self._generation = 0
         self._lock = asyncio.Lock()
 
@@ -296,9 +305,11 @@ class _AsyncTTLCache(Generic[P, T]):
             entry = self._cache.get(key)
             if entry is not None and now - entry[0] <= self._ttl:
                 self._cache.move_to_end(key)
+                self._hits += 1
                 return entry[1]
             if entry is not None:
                 self._cache.pop(key, None)
+            self._misses += 1
             task = self._in_flight.get(key)
             if task is None:
                 generation = self._generation
@@ -316,8 +327,15 @@ class _AsyncTTLCache(Generic[P, T]):
                         async with self._lock:
                             if generation != self._generation:
                                 return val
-                            self._cache[key] = (time.monotonic(), val)
+                            now_write = time.monotonic()
+                            self._cache[key] = (now_write, val)
                             self._cache.move_to_end(key)
+                            if len(self._cache) > self._maxsize:
+                                for k in list(self._cache.keys()):
+                                    if now_write - self._cache[k][0] > self._ttl:
+                                        self._cache.pop(k, None)
+                                        if len(self._cache) <= self._maxsize:
+                                            break
                             while len(self._cache) > self._maxsize:
                                 self._cache.popitem(last=False)
                         return val
@@ -360,9 +378,23 @@ class _AsyncTTLCache(Generic[P, T]):
         async with self._lock:
             self._generation += 1
             self._cache.clear()
+            self._hits = 0
+            self._misses = 0
             #? Detach old producers without cancelling callers already awaiting
             #? them. A subsequent lookup starts a fresh generation.
             self._in_flight.clear()
+
+    def cache_info(self) -> CacheInfo:
+        """Return a snapshot of cache activity and capacity.
+
+        Returns
+        -------
+        CacheInfo
+            The result of the operation.
+        """
+        return CacheInfo(
+            self._hits, self._misses, len(self._cache), self._maxsize
+        )
 
 
 def async_ttl_cache(
@@ -580,7 +612,7 @@ class RecencyTTLPolicy:
         if observed_at.tzinfo is None or observed_at.utcoffset() is None:
             raise ValueError("observed_at must be timezone-aware")
 
-        reference = now or datetime.now(UTC)
+        reference = datetime.now(UTC) if now is None else now
         if not isinstance(reference, datetime):
             raise TypeError("now must be datetime or None")
         if reference.tzinfo is None or reference.utcoffset() is None:

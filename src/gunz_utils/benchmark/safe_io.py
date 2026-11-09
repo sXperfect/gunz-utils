@@ -99,12 +99,17 @@ def load_result_checked(
     max_bytes = _non_negative_int(max_bytes, name="max_bytes", positive=True)
 
     item = Path(path)
+    if not item.is_file():
+        raise ValueError("path must be a regular file")
     with item.open("rb") as handle:
         payload = handle.read(max_bytes + 1)
     if len(payload) > max_bytes:
         raise ValueError("benchmark result exceeds size limit")
 
-    data: Any = json.loads(payload.decode("utf-8"))
+    def _reject_constant(constant: str) -> None:
+        raise ValueError(f"non-standard JSON constant {constant!r} is not allowed")
+
+    data: Any = json.loads(payload.decode("utf-8"), parse_constant=_reject_constant)
     if not isinstance(data, dict):
         raise ValueError("benchmark result must be a JSON object")
 
@@ -163,6 +168,19 @@ def load_result_checked(
         name: _finite_non_negative(stats_data.get(name), name=f"stats.{name}")
         for name in stat_names
     }
+    if not (
+        normalized_stats["minimum"]
+        <= normalized_stats["median"]
+        <= normalized_stats["maximum"]
+    ):
+        raise ValueError("stats minimum, median, and maximum ordering invariant violated")
+    if not (
+        normalized_stats["minimum"]
+        <= normalized_stats["p95"]
+        <= normalized_stats["p99"]
+        <= normalized_stats["maximum"]
+    ):
+        raise ValueError("stats percentile ordering invariant violated")
     ops_value = stats_data.get("ops_per_second")
     if isinstance(ops_value, bool) or not isinstance(ops_value, (int, float)):
         raise ValueError("stats.ops_per_second must be numeric")

@@ -17,6 +17,7 @@ __license__ = "Clear BSD"
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import enum
+import weakref
 from typing import Any, ClassVar, Self, TypeVar, cast
 
 # =============================================================================
@@ -40,8 +41,13 @@ _MAX_INPUT_LENGTH = DEFAULT_MAX_INPUT_LENGTH  # gunz-style: ignore[GS057]
 # ? (it resolves ``cls.<attr>`` to the enum member type instead), and ruff's
 # ? B009 rejects ``getattr`` with a constant name. These private, per-class
 # ? lookup maps are therefore stored at module level, keyed by the enum class.
-_FUZZY_LOOKUP_MAPS: dict[type, dict[str, Any]] = {}
-_NAME_LOOKUP_MAPS: dict[type, dict[str, Any]] = {}
+# ? WeakKeyDictionary prevents leaking dynamic enum classes.
+_FUZZY_LOOKUP_MAPS: weakref.WeakKeyDictionary[type, dict[str, Any]] = (
+    weakref.WeakKeyDictionary()
+)
+_NAME_LOOKUP_MAPS: weakref.WeakKeyDictionary[type, dict[str, Any]] = (
+    weakref.WeakKeyDictionary()
+)
 
 
 def _max_input_length(
@@ -534,13 +540,13 @@ class BaseIntEnum(enum.IntEnum):
         return None
 
     @classmethod
-    def choices(cls) -> list[Any]:
-        """choices() function.
+    def choices(cls) -> list[int]:
+        """Return all valid integer values for this enum.
 
         Returns
         -------
-        list[Any]
-            The result of the operation.
+        list[int]
+            The list of valid integer values.
         """
         return cls.values()
 

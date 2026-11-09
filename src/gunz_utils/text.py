@@ -59,14 +59,22 @@ def word_pattern(
     tail = words[-1]
     head = " ".join(words[:-1])
 
+    if tail.endswith("y") and len(tail) > 1 and tail[-2].lower() not in "aeiou":
+        stem = tail[:-1]
+        tail_pattern = rf"(?:{re.escape(tail)}(?:s|ed|ing)?|{re.escape(stem)}ies)"
+    elif tail.endswith("e") and len(tail) > 1:
+        stem = tail[:-1]
+        tail_pattern = rf"(?:{re.escape(tail)}(?:s|d)?|{re.escape(stem)}(?:ed|ing|es)?)"
+    else:
+        tail_pattern = rf"{re.escape(tail)}{_SUFFIXES}"
+
     if head:
         head_pattern = _SEPARATOR.join(re.escape(word) for word in head.split(" "))
         pattern = (
-            rf"(?<!\w){head_pattern}{_SEPARATOR}{re.escape(tail)}"
-            rf"{_SUFFIXES}(?!\w)"
+            rf"(?<!\w){head_pattern}{_SEPARATOR}{tail_pattern}(?!\w)"
         )
     else:
-        pattern = rf"(?<!\w){re.escape(tail)}{_SUFFIXES}(?!\w)"
+        pattern = rf"(?<!\w){tail_pattern}(?!\w)"
 
     return re.compile(pattern, re.IGNORECASE)
 
@@ -96,7 +104,7 @@ def blank_spans(
     for pattern in patterns:
         for match in pattern.finditer(text):
             for index in range(match.start(), min(match.end(), len(chars))):
-                if chars[index] != "\n":
+                if chars[index] not in ("\n", "\r"):
                     chars[index] = " "
     return "".join(chars)
 
@@ -122,7 +130,7 @@ def deduplicate_spans(
     """
     ordered = sorted(
         candidates,
-        key=lambda item: (item[0], -(item[1] - item[0]), str(item[2])),
+        key=lambda item: (-(item[1] - item[0]), item[0], str(item[2])),
     )
     kept: list[tuple[int, int, object]] = []
     occupied: list[tuple[int, int]] = []
@@ -136,6 +144,7 @@ def deduplicate_spans(
         occupied.append((start, end))
         kept.append((start, end, payload))
 
+    kept.sort(key=lambda item: (item[0], item[1]))
     return kept
 
 

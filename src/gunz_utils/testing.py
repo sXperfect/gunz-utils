@@ -69,6 +69,8 @@ def eventually(
     interval : float
         interval parameter.
     """
+    if not callable(predicate):
+        raise TypeError("predicate must be callable")
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
@@ -87,9 +89,11 @@ def eventually(
     while True:
         if predicate():
             return
-        if time.monotonic() >= deadline:
+        now = time.monotonic()
+        if now >= deadline:
             raise TimeoutError("condition did not become true before timeout")
-        time.sleep(interval)
+        remaining = deadline - now
+        time.sleep(min(float(interval), max(0.0001, remaining)))
 
 
 async def eventually_async(
@@ -112,6 +116,8 @@ async def eventually_async(
         ValueError: If timeout is negative or interval is not positive.
         TimeoutError: If the condition remains false until the deadline.
     """
+    if not callable(predicate):
+        raise TypeError("predicate must be callable")
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
@@ -130,9 +136,11 @@ async def eventually_async(
     while True:
         if await predicate():
             return
-        if time.monotonic() >= deadline:
+        now = time.monotonic()
+        if now >= deadline:
             raise TimeoutError("condition did not become true before timeout")
-        await asyncio.sleep(interval)
+        remaining = deadline - now
+        await asyncio.sleep(min(float(interval), max(0.0001, remaining)))
 
 
 __all__ = ["eventually", "eventually_async", "temporary_env"]

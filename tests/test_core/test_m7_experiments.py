@@ -38,6 +38,7 @@ class TestM7Experiments(unittest.TestCase):
             repetitions=2,
             warmup=0,
             iterations=1,
+            loops=1,
         )
         self.assertEqual(len(results), 8)
 

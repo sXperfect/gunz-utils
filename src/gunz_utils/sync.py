@@ -29,6 +29,9 @@ _FORBIDDEN_EXTRA_OPTIONS = frozenset(
         "-f",
         "-M",
         "--backup-dir",
+        "--config",
+        "--daemon",
+        "--dparam",
         "--files-from",
         "--include-from",
         "--exclude-from",
@@ -289,10 +292,15 @@ def rsync_mirror(
         raise ValueError(
             "completion_marker must not reuse the lock filename"
         )
+    target_text = str(target)
+    if not target_text:
+        raise ValueError("target must not be empty")
+    if target_text.startswith("-"):
+        raise ValueError("target must not start with a dash")
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in target_text):
+        raise ValueError("target contains invalid control characters")
     if shutil.which("rsync") is None:
         raise FileNotFoundError("rsync command not found")
-    if not str(target):
-        raise ValueError("target must not be empty")
 
     destination = Path(target).expanduser().resolve()
     destination.mkdir(parents=True, exist_ok=True)

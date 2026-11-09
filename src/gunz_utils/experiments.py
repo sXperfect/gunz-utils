@@ -144,23 +144,34 @@ def compare_numeric_metrics(
 
         if isinstance(left, int) and isinstance(right, int):
             delta = right - left
+            try:
+                rel = delta / abs(left) if left != 0 else None
+            except OverflowError:
+                rel = None
             result[key] = {
                 "numeric": True,
                 "baseline": left,
                 "candidate": right,
                 "finite": True,
                 "delta": delta,
-                "relative_delta": (
-                    delta / abs(left)
-                    if left != 0
-                    else None
-                ),
+                "relative_delta": rel,
             }
             continue
 
-        left_value = float(left)
-        right_value = float(right)
-        delta_f = right_value - left_value
+        try:
+            left_value = float(left)
+            right_value = float(right)
+            delta_f = right_value - left_value
+        except OverflowError:
+            result[key] = {
+                "numeric": True,
+                "baseline": left,
+                "candidate": right,
+                "finite": False,
+                "delta": None,
+                "relative_delta": None,
+            }
+            continue
         result[key] = {
             "numeric": True,
             "baseline": left_value,

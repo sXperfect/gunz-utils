@@ -29,6 +29,9 @@ __license__ = "Clear BSD"
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 
-from .ext.project_gitpython import resolve_project_root
+try:
+    from .ext.project_gitpython import resolve_project_root
+except ImportError:
+    from .ext.project_stdlib import resolve_project_root
 
 __all__ = ["resolve_project_root"]

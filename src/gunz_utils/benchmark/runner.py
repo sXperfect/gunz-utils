@@ -11,7 +11,7 @@ import math
 import os
 import statistics
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any, TypeVar
 
@@ -24,24 +24,28 @@ T = TypeVar("T")
 
 
 def _percentile(
-    values: list[float],
+    values: Sequence[float],
     percentile: float,
+    *,
+    is_sorted: bool = False,
 ) -> float:
     """_percentile() function.
 
     Parameters
     ----------
-    values : list[float]
+    values : Sequence[float]
         values parameter.
     percentile : float
         percentile parameter.
+    is_sorted : bool, default=False
+        Whether values are already sorted.
 
     Returns
     -------
     float
         The result of the operation.
     """
-    ordered = sorted(values)
+    ordered = values if is_sorted else sorted(values)
     if len(ordered) == 1:
         return ordered[0]
     position = (len(ordered) - 1) * percentile
@@ -277,24 +281,26 @@ def benchmark(
             _sample(func, args, kwargs, actual_loops)
 
         samples: list[float] = []
-        measured = 0.0
+        measured_sum = 0.0
         while len(samples) < max_iterations:
             sample = _sample(func, args, kwargs, actual_loops)
             samples.append(sample)
-            measured = math.fsum(samples) * actual_loops
+            measured_sum += sample
+            measured = measured_sum * actual_loops
             enough_count = len(samples) >= iterations
             enough_time = min_time is None or measured >= min_time
             if enough_count and enough_time:
                 break
 
+    sorted_samples = sorted(samples)
     mean = statistics.fmean(samples)
     stats = BenchmarkStats(
-        minimum=min(samples),
-        median=statistics.median(samples),
+        minimum=sorted_samples[0],
+        median=statistics.median(sorted_samples),
         mean=mean,
-        p95=_percentile(samples, 0.95),
-        p99=_percentile(samples, 0.99),
-        maximum=max(samples),
+        p95=_percentile(sorted_samples, 0.95, is_sorted=True),
+        p99=_percentile(sorted_samples, 0.99, is_sorted=True),
+        maximum=sorted_samples[-1],
         stddev=statistics.pstdev(samples),
         ops_per_second=float("inf") if mean == 0 else 1.0 / mean,
     )

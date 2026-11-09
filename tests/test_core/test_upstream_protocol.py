@@ -225,7 +225,7 @@ class TestBaseUpstream(unittest.TestCase):
 
 
 class TestPolicyUpstream(unittest.IsolatedAsyncioTestCase):
-    async def test_policy_rejects_invalid_bounds(self) -> None:
+    def test_policy_rejects_invalid_bounds(self) -> None:
         client = _ValidImpl()
         for value in (math.nan, math.inf, -math.inf, 0.0, -1.0, True):
             with self.subTest(timeout_seconds=value):

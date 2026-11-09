@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from .result import BenchmarkResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BenchmarkComparison:
     """Relative change between baseline and candidate timing statistics."""
 
@@ -111,6 +111,10 @@ def compare_results(
         "p95_threshold",
         p95_threshold,
     )
+    if not isinstance(baseline, BenchmarkResult):
+        raise TypeError(f"expected BenchmarkResult for baseline, got {type(baseline).__name__}")
+    if not isinstance(candidate, BenchmarkResult):
+        raise TypeError(f"expected BenchmarkResult for candidate, got {type(candidate).__name__}")
     before_median = _finite_non_negative(
         "baseline median",
         baseline.stats.median,

@@ -119,6 +119,7 @@ class BenchmarkSuite:
         *,
         warmup: int = 3,
         iterations: int = 20,
+        loops: int | None = None,
     ) -> list[BenchmarkResult]:
         """Run every case in insertion order.
 
@@ -128,6 +129,8 @@ class BenchmarkSuite:
             warmup parameter.
         iterations : int
             iterations parameter.
+        loops : int | None, optional
+            Number of inner loops per measurement. Defaults to auto-calibrated.
 
         Returns
         -------
@@ -141,6 +144,7 @@ class BenchmarkSuite:
                 name=f"{self.name}.{case.name}",
                 warmup=warmup,
                 iterations=iterations,
+                loops=loops,
                 parameters=case.parameters,
                 **case.kwargs,
             )

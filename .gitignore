@@ -19,6 +19,7 @@ build/
 .gemini/
 .jules/
 .wrangler/
+.kilo/
 
 # External knowledge base (Hyperhedron symlink farm)
 .hyperhedron

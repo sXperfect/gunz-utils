@@ -288,14 +288,18 @@ def _linux_snapshot(
         ):
             continue
 
-    tree = {root_pid}
-    changed = True
-    while changed:
-        changed = False
-        for pid, (ppid, _) in rows.items():
-            if ppid in tree and pid not in tree:
-                tree.add(pid)
-                changed = True
+    children: dict[int, list[int]] = {}
+    for pid, (ppid, _) in rows.items():
+        children.setdefault(ppid, []).append(pid)
+
+    tree: set[int] = set()
+    queue = [root_pid]
+    while queue:
+        curr = queue.pop()
+        tree.add(curr)
+        for child in children.get(curr, ()):
+            if child not in tree:
+                queue.append(child)
 
     ticks = os.sysconf("SC_CLK_TCK")
     page_size = os.sysconf("SC_PAGE_SIZE")

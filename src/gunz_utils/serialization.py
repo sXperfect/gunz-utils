@@ -96,6 +96,8 @@ def to_jsonable(
     if isinstance(value, Mapping):
         converted: dict[str, Any] = {}
         for key, item in value.items():
+            if isinstance(key, (bytes, bytearray, memoryview)):
+                raise TypeError(f"bytes mapping key {key!r} is not JSON-serializable")
             normalized = str(key)
             if normalized in converted:
                 raise ValueError(
@@ -260,6 +262,8 @@ def decode_json_object(
     dict[str, Any]
         Parsed JSON object mapping.
     """
+    if isinstance(max_depth, bool) or not isinstance(max_depth, int) or max_depth < 1:
+        raise ValueError("max_depth must be an integer >= 1")
     if isinstance(payload, bytes):
         try:
             text = payload.decode("utf-8")

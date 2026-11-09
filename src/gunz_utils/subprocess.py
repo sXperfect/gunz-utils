@@ -398,19 +398,30 @@ def run_command(
     _validate_output_limit(max_output_bytes)
     started = time.perf_counter()
     if max_output_bytes is None:
-        completed = subprocess.run(
+        p = subprocess.Popen(
             list(args),
             stdin=subprocess.DEVNULL,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=False,
-            timeout=timeout,
-            check=False,
             cwd=cwd,
             env=None if env is None else {**os.environ, **env},
+            start_new_session=os.name == "posix",
         )
-        returncode = completed.returncode
-        stdout_b = completed.stdout
-        stderr_b = completed.stderr
+        try:
+            stdout_b, stderr_b = p.communicate(timeout=timeout)
+            returncode = p.returncode
+        except subprocess.TimeoutExpired:
+            _kill_process(p)
+            p.wait()
+            raise
+        except BaseException:
+            _kill_process(p)
+            try:
+                p.wait(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                pass
+            raise
     else:
         returncode, stdout_b, stderr_b = _run_command_bounded(
             args,
@@ -729,7 +740,7 @@ async def run_command_async(
                 process.communicate(),
                 timeout=timeout,
             )
-        except (TimeoutError, asyncio.CancelledError):
+        except BaseException:
             await _cleanup_async_process(process, terminate_grace=terminate_grace)
             raise
     else:

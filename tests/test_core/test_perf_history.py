@@ -21,8 +21,8 @@ from gunz_utils.benchmark import (
 
 class TestBenchmarkHistory(unittest.TestCase):
     def test_trend(self) -> None:
-        first = benchmark(lambda: None, warmup=0, iterations=2)
-        second = benchmark(lambda: None, warmup=0, iterations=2)
+        first = benchmark(lambda: None, warmup=0, iterations=2, loops=1)
+        second = benchmark(lambda: None, warmup=0, iterations=2, loops=1)
         history = BenchmarkHistory().add("a", first).add("b", second)
         trend = history.trend("median")
         self.assertEqual(trend.metric, "median")

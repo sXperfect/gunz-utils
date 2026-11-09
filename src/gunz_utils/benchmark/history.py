@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,6 +46,15 @@ class BenchmarkHistory:
         points: Iterable[HistoryPoint] = (),
     ) -> None:
         self.points = list(points)
+
+    def __len__(self) -> int:
+        return len(self.points)
+
+    def __iter__(self) -> Iterator[HistoryPoint]:
+        return iter(self.points)
+
+    def __getitem__(self, index: int | slice) -> HistoryPoint | list[HistoryPoint]:
+        return self.points[index]
 
     def add(self,
         label: str,

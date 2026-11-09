@@ -31,7 +31,11 @@ def merge_configs(
         The result of the operation.
     """
     result: dict[str, Any] = {}
-    for config in configs:
+    for idx, config in enumerate(configs):
+        if not isinstance(config, Mapping):
+            raise TypeError(
+                f"config at index {idx} must be a Mapping, got {type(config).__name__}"
+            )
         result = deep_merge(result, config)
     return result
 
@@ -58,11 +62,14 @@ def env_overrides(
     dict[str, Any]
         The result of the operation.
     """
+    if not isinstance(environ, Mapping):
+        raise TypeError("environ must be a Mapping")
     if not isinstance(prefix, str) or not prefix.strip("_"):
         raise ValueError("prefix must be a non-empty string")
     if not isinstance(separator, str) or not separator:
         raise ValueError("separator must be a non-empty string")
     out: dict[str, Any] = {}
+    seen_paths: dict[tuple[str, ...], str] = {}
     prefix_value = prefix.upper().rstrip("_") + "_"
     for name, value in environ.items():
         upper = name.upper()
@@ -74,6 +81,12 @@ def env_overrides(
         parts = [part.lower() for part in suffix.split(separator)]
         if any(not part for part in parts):
             raise ValueError(f"environment key {name!r} contains an empty path segment")
+        parts_tuple = tuple(parts)
+        if parts_tuple in seen_paths:
+            raise ValueError(
+                f"environment key {name!r} collides with {seen_paths[parts_tuple]!r}"
+            )
+        seen_paths[parts_tuple] = name
         cursor = out
         for part in parts[:-1]:
             existing = cursor.setdefault(part, {})

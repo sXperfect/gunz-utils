@@ -69,7 +69,7 @@ class TestDeepAuditRound2(unittest.IsolatedAsyncioTestCase):
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc required")
     @pytest.mark.usefixtures("compatible_procfs")
-    async def test_profile_has_no_empty_post_exit_tail(self) -> None:
+    def test_profile_has_no_empty_post_exit_tail(self) -> None:
         profile = profile_command(
             [sys.executable, "-c", "import time;time.sleep(.02)"],
             interval=0.002,

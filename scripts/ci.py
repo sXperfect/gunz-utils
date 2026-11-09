@@ -58,7 +58,7 @@ FORBIDDEN_OPTIONAL_MODULES = {"pydantic", "cryptography", "git", "loguru"}
 #? empty dir in the system temp space.
 VENV_BASE = PROJECT_ROOT / "tmp" / "c05-venvs"
 DIST_DIR = PROJECT_ROOT / "tmp" / "c05-dist"
-OUTSIDE_CWD = Path("/tmp/gunz-c05-outside")
+OUTSIDE_CWD = Path(os.environ.get("TMPDIR", "/tmp")).resolve() / "gunz-c05-outside"
 
 
 def _env() -> dict[str, str]:
@@ -221,6 +221,8 @@ def _fresh_venv_python(
             file=sys.stderr,
         )
         raise SystemExit(result.returncode or 3)
+    if sys.platform == "win32":
+        return venv_dir / "Scripts" / "python.exe", venv_dir
     return venv_dir / "bin" / "python", venv_dir
 
 
@@ -236,6 +238,11 @@ def _site_packages(
     venv_dir: Path,
 ) -> Path:
     """Return the ``site-packages`` directory of a freshly created venv."""
+    if sys.platform == "win32":
+        sp = venv_dir / "Lib" / "site-packages"
+        if not sp.is_dir():
+            raise SystemExit(f"no site-packages in venv {venv_dir}")
+        return sp
     lib = venv_dir / "lib"
     py_dirs = [p for p in lib.iterdir() if p.is_dir() and p.name.startswith("python")]
     if not py_dirs:

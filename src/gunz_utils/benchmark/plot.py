@@ -48,6 +48,8 @@ def plot_benchmark(
     Any
         The result of the operation.
     """
+    if not isinstance(result, BenchmarkResult):
+        raise TypeError(f"expected BenchmarkResult, got {type(result).__name__}")
     plt = _pyplot()
     figure, axis = plt.subplots()
     axis.plot(range(1, len(result.samples) + 1), result.samples)
@@ -75,6 +77,10 @@ def plot_history(
         AttributeError: If the metric is not a BenchmarkStats attribute.
         RuntimeError: If the optional matplotlib dependency is unavailable.
     """
+    if not isinstance(history, BenchmarkHistory):
+        raise TypeError(f"expected BenchmarkHistory, got {type(history).__name__}")
+    if not isinstance(metric, str) or not metric.strip():
+        raise ValueError("metric must be a non-empty string")
     if not history.points:
         raise ValueError("benchmark history is empty")
     values = [float(getattr(point.result.stats, metric)) for point in history.points]

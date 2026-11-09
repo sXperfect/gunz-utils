@@ -377,6 +377,9 @@ class PolicyUpstream:
                         self._stats["failures"] += 1
                         raise
                     self._stats["retries"] += 1
+                except BaseException:
+                    self._stats["failures"] += 1
+                    raise
         raise RuntimeError("unreachable retry state")
 
     async def health_check(self) -> bool:

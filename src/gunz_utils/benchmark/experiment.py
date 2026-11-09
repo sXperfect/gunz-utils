@@ -32,6 +32,7 @@ def run_experiment(
     repetitions: int = 1,
     warmup: int = 3,
     iterations: int = 20,
+    loops: int | None = None,
     name: str | None = None,
 ) -> list[ExperimentResult]:
     """Run a Cartesian parameter matrix with explicit repetitions.
@@ -75,6 +76,7 @@ def run_experiment(
                 name=name,
                 warmup=warmup,
                 iterations=iterations,
+                loops=loops,
                 parameters={**kwargs, "_repetition": repetition},
                 **kwargs,
             )

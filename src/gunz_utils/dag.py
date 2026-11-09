@@ -316,6 +316,8 @@ class WorkflowDAG:
     async def _rollback_async(self,
         completed_order: list[str],
         outputs: Mapping[str, Any],
+        *,
+        collected_errors: list[tuple[str, BaseException]] | None = None,
     ) -> list[tuple[str, BaseException]]:
         """Roll back completed stages in reverse execution order asynchronously.
 
@@ -331,7 +333,9 @@ class WorkflowDAG:
         list[tuple[str, BaseException]]
             The result of the operation.
         """
-        errors: list[tuple[str, BaseException]] = []
+        errors: list[tuple[str, BaseException]] = (
+            collected_errors if collected_errors is not None else []
+        )
         rev_order = list(reversed(completed_order))
         for idx, name in enumerate(rev_order):
             current_task = asyncio.current_task()
@@ -385,8 +389,11 @@ class WorkflowDAG:
 
         Execution is bounded by timeout when configured.
         """
+        collected: list[tuple[str, BaseException]] = []
         rollback_task = asyncio.create_task(
-            self._rollback_async(completed_order, outputs)
+            self._rollback_async(
+                completed_order, outputs, collected_errors=collected
+            )
         )
         effective_timeout = (
             timeout if timeout is not None else self.rollback_timeout
@@ -441,14 +448,8 @@ class WorkflowDAG:
                     ),
                 )
             ]
-            if rollback_task.done() and not rollback_task.cancelled():
-                try:
-                    res = rollback_task.result()
-                    if isinstance(res, list):
-                        errors.extend(res)
-                except Exception:
-                    pass
-            elif not rollback_task.done():
+            errors.extend(collected)
+            if not rollback_task.done():
                 errors.append(
                     (
                         "rollback_unfinished",
@@ -460,18 +461,24 @@ class WorkflowDAG:
             return errors
 
         if rollback_task.cancelled():
-            return [
+            res_errors: list[tuple[str, BaseException]] = [
                 (
                     "rollback_cancelled",
                     asyncio.CancelledError("rollback was cancelled"),
                 )
             ]
+            res_errors.extend(collected)
+            return res_errors
         try:
             return rollback_task.result()
         except asyncio.CancelledError as exc:
-            return [("rollback_cancelled", exc)]
+            res_errors = [("rollback_cancelled", exc)]
+            res_errors.extend(collected)
+            return res_errors
         except BaseException as exc:
-            return [("rollback_error", exc)]
+            res_errors = [("rollback_error", exc)]
+            res_errors.extend(collected)
+            return res_errors
 
     def execute(self,
         *,
@@ -513,6 +520,13 @@ class WorkflowDAG:
             }
             try:
                 output = stage.run(dependency_outputs)
+                if inspect.isawaitable(output):
+                    if asyncio.iscoroutine(output):
+                        output.close()
+                    raise TypeError(
+                        f"stage {name!r} returned an awaitable in synchronous execute(); "
+                        "use async_execute() instead"
+                    )
             except BaseException as exc:
                 compensation_errors = self._rollback_sync(executed_order, outputs)
                 raise WorkflowExecutionError(
@@ -767,6 +781,7 @@ class WorkflowDAG:
                 current_key = k
                 store[k] = v
                 published_keys.append(k)
+                current_key = None
         except BaseException as exc:
             keys_to_clean = list(published_keys)
             if current_key is not None and current_key not in keys_to_clean:

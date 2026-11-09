@@ -32,7 +32,7 @@ class TestContext(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await asyncio.create_task(child()), "request-1")
         self.assertIsNone(correlation_id())
 
-    async def test_ensure_correlation_id_is_stable(self) -> None:
+    def test_ensure_correlation_id_is_stable(self) -> None:
         first = ensure_correlation_id()
         self.assertEqual(ensure_correlation_id(), first)
 

@@ -49,17 +49,17 @@ class TestAuditRegressions(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(OSError):
             _ = [value async for value in worker_map(work, range(5), workers=2)]
 
-    async def test_varint_failure_is_transactional(self) -> None:
+    def test_varint_failure_is_transactional(self) -> None:
         reader = ByteReader(b"\x80")
         with self.assertRaises(EOFError):
             reader.read_uvarint()
         self.assertEqual(reader.offset, 0)
 
-    async def test_varint_rejects_overflow(self) -> None:
+    def test_varint_rejects_overflow(self) -> None:
         with self.assertRaises(ValueError):
             encode_uvarint(2**64)
 
-    async def test_lexical_containment(self) -> None:
+    def test_lexical_containment(self) -> None:
         root = Path("/tmp/root")
         self.assertEqual(lexical_contained_path(root, "a/b"), root / "a/b")
         with self.assertRaises(ValueError):
@@ -67,7 +67,7 @@ class TestAuditRegressions(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             lexical_contained_path(root, "/absolute")
 
-    async def test_run_directory_rejects_symlink_artifact_source(self) -> None:
+    def test_run_directory_rejects_symlink_artifact_source(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             target = root / "target.bin"
@@ -91,7 +91,7 @@ class TestAuditRegressions(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "symlink"):
                 save_run_directory(run, root / "run")
 
-    async def test_duplicate_artifact_basenames_are_preserved(self) -> None:
+    def test_duplicate_artifact_basenames_are_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             first_dir, second_dir = root / "a", root / "b"

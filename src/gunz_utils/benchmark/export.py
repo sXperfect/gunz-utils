@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import csv
+import html
 import io
 from pathlib import Path
 from typing import Protocol
@@ -15,6 +16,7 @@ from typing import Protocol
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
+from ..io import atomic_write
 from .plot import plot_process_samples
 from .process import ProcessProfile
 from .report import format_process_profile
@@ -114,16 +116,16 @@ def save_process_html(
         images.append((metric, _figure_data_uri(figure)))
     summary = format_process_profile(profile)
     rows = "\n".join(
-        f"<tr><td>{line.split('|')[1].strip()}</td>"
-        f"<td>{line.split('|')[2].strip()}</td></tr>"
+        f"<tr><td>{html.escape(line.split('|')[1].strip())}</td>"
+        f"<td>{html.escape(line.split('|')[2].strip())}</td></tr>"
         for line in summary.splitlines()[2:]
         if line.startswith("|")
     )
     plots = "\n".join(
-        f"<h2>{name}</h2><img src=\"{uri}\" alt=\"{name}\">"
+        f"<h2>{html.escape(name)}</h2><img src=\"{uri}\" alt=\"{html.escape(name)}\">"
         for name, uri in images
     )
-    html = (
+    html_content = (
         "<!doctype html><meta charset=\"utf-8\">"
         "<title>Process profile</title>"
         "<style>body{font-family:sans-serif;max-width:1100px;margin:2rem auto;}"
@@ -134,7 +136,7 @@ def save_process_html(
         + "</table>"
         + plots
     )
-    Path(path).write_text(html, encoding="utf-8")
+    atomic_write(path, html_content, mode="w", encoding="utf-8")
 
 
 __all__ = ["save_process_csv", "save_process_html"]

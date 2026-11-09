@@ -51,20 +51,21 @@ class ProvenanceNode:
             or not self.producer
         ):
             raise ValueError("producer must be None or a non-empty string")
+        inputs_tuple = tuple(self.inputs)
         if any(
             not isinstance(item, str) or not item
-            for item in self.inputs
+            for item in inputs_tuple
         ):
             raise ValueError("inputs must contain non-empty string identifiers")
-        if len(set(self.inputs)) != len(self.inputs):
+        if len(set(inputs_tuple)) != len(inputs_tuple):
             raise ValueError("inputs must not contain duplicates")
-        if self.identifier in self.inputs:
+        if self.identifier in inputs_tuple:
             raise ValueError("node cannot directly depend on itself")
 
         object.__setattr__(
             self,
             "inputs",
-            tuple(self.inputs),
+            inputs_tuple,
         )
         object.__setattr__(
             self,
@@ -122,10 +123,14 @@ class ProvenanceGraph:
 
         Raises
         ------
+        TypeError
+            If node is not a ProvenanceNode.
         ValueError
             If the identifier already exists without replace, or the resulting
             known graph contains a cycle.
         """
+        if not isinstance(node, ProvenanceNode):
+            raise TypeError(f"expected ProvenanceNode, got {type(node).__name__}")
         existing = self._nodes.get(node.identifier)
         if existing is not None and not replace:
             if existing == node:
@@ -229,6 +234,80 @@ class ProvenanceGraph:
             stack.append(iter(self._nodes[parent].inputs))
 
         return tuple(result)
+
+    def descendants(self,
+        identifier: str,
+    ) -> tuple[str, ...]:
+        """Return known transitive child identifiers in stable traversal order.
+
+        Parameters
+        ----------
+        identifier : str
+            Node identifier whose descendants to find.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Transitive child identifiers.
+        """
+        if identifier not in self._nodes:
+            raise KeyError(identifier)
+
+        children: dict[str, list[str]] = {}
+        for nid, node in self._nodes.items():
+            for parent in node.inputs:
+                children.setdefault(parent, []).append(nid)
+
+        result: list[str] = []
+        seen: set[str] = set()
+        stack: list[Iterator[str]] = [iter(children.get(identifier, ()))]
+
+        while stack:
+            try:
+                child = next(stack[-1])
+            except StopIteration:
+                stack.pop()
+                continue
+
+            if child in seen or child not in self._nodes:
+                continue
+            seen.add(child)
+            result.append(child)
+            stack.append(iter(children.get(child, ())))
+
+        return tuple(result)
+
+    def topological_order(self) -> tuple[ProvenanceNode, ...]:
+        """Return all known nodes in topological order (parents before children).
+
+        Returns
+        -------
+        tuple[ProvenanceNode, ...]
+            Nodes ordered such that all parents appear before dependent nodes.
+        """
+        from collections import deque
+
+        in_degree = {nid: 0 for nid in self._nodes}
+        adj: dict[str, list[str]] = {nid: [] for nid in self._nodes}
+        for nid, node in self._nodes.items():
+            for parent in node.inputs:
+                if parent in self._nodes:
+                    adj[parent].append(nid)
+                    in_degree[nid] += 1
+
+        queue = deque(sorted(nid for nid, deg in in_degree.items() if deg == 0))
+        order: list[ProvenanceNode] = []
+        while queue:
+            curr = queue.popleft()
+            order.append(self._nodes[curr])
+            for child in sorted(adj[curr]):
+                in_degree[child] -= 1
+                if in_degree[child] == 0:
+                    queue.append(child)
+
+        if len(order) != len(self._nodes):
+            raise ValueError("provenance graph cycle detected")
+        return tuple(order)
 
     def lineage(self,
         identifier: str,

@@ -15,7 +15,9 @@ from typing import BinaryIO, cast
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
+from . import security
 from ._version import __version__ as __version__
+from .serialization import canonical_json
 
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
@@ -258,8 +260,6 @@ def structured_hash(
     Mapping key order and set iteration order do not affect the resulting
     digest because serialization is canonicalized first.
     """
-    from .serialization import canonical_json
-
     return content_hash(
         canonical_json(value),
         algo=algo,
@@ -337,7 +337,6 @@ def directory_manifest(
         if not os.path.samestat(directory.lstat(), expected):
             raise ValueError("directory changed during manifest traversal")
     files.sort(key=lambda path: path.relative_to(base).as_posix())
-    from .security import open_path_under_base
 
     manifest: dict[str, str] = {}
     for path in files:
@@ -345,7 +344,7 @@ def directory_manifest(
         #? Do not silently produce a partial integrity manifest when a file
         #? changes or secure opening rejects a previously enumerated path.
         #? Symlinks are already excluded during enumeration.
-        with open_path_under_base(
+        with security.open_path_under_base(
             str(base),
             relative,
             mode="rb",

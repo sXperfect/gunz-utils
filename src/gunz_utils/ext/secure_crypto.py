@@ -25,6 +25,17 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from .._version import __version__ as __version__
 from ..deprecation import deprecated
 
+__all__ = [
+    "ITERATIONS",
+    "IV_LENGTH",
+    "KEY_LENGTH",
+    "SALT_LENGTH",
+    "decrypt",
+    "encrypt",
+    "get_derived_key",
+    "get_system_passphrase",
+]
+
 IV_LENGTH = 12
 SALT_LENGTH = 16
 KEY_LENGTH = 32
@@ -59,14 +70,14 @@ def get_derived_key(
     Parameters
     ----------
     salt : bytes
-        salt parameter.
-    passphrase : str | None
-        passphrase parameter.
+        Cryptographic salt, exactly 16 bytes.
+    passphrase : str | None, optional
+        Passphrase used to derive the key.
 
     Returns
     -------
     bytes
-        The result of the operation.
+        Derived 32-byte key.
     """
     if not isinstance(salt, bytes) or len(salt) != SALT_LENGTH:
         raise ValueError(f"salt must be exactly {SALT_LENGTH} bytes")
@@ -94,14 +105,14 @@ def encrypt(
     Parameters
     ----------
     text : str
-        text parameter.
-    passphrase : str | None
-        passphrase parameter.
+        Plaintext string to encrypt.
+    passphrase : str | None, optional
+        Secret passphrase used for key derivation.
 
     Returns
     -------
     str
-        The result of the operation.
+        Formatted ciphertext string with version, salt, IV, tag, and ciphertext.
     """
     if not isinstance(text, str):
         raise TypeError("text must be a string")

@@ -4,12 +4,13 @@ from __future__ import annotations
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
-__all__ = ["chunked", "batched", "flatten", "first"]
+__all__ = ["chunked", "batched", "flatten", "first", "windowed"]
 
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 
+from collections import deque
 from collections.abc import Iterable, Iterator
 from itertools import islice
 from typing import Any, TypeVar, cast
@@ -110,6 +111,48 @@ def batched(
         if not group:
             return
         yield group
+
+
+def windowed(
+    iterable: Iterable[T],
+    n: int,
+    *,
+    step: int = 1,
+) -> Iterator[tuple[T, ...]]:
+    """Yield a sliding window of width ``n`` over ``iterable``.
+
+    Parameters
+    ----------
+    iterable : Iterable[T]
+        Source sequence or iterable.
+    n : int
+        Window width. Must be a positive integer.
+    step : int, default=1
+        Number of steps to advance the window each time. Must be a positive integer.
+
+    Yields
+    ------
+    tuple[T, ...]
+        Successive n-tuples representing sliding windows across the input.
+    """
+    if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
+        raise ValueError(f"n must be a positive integer, got {n!r}")
+    if isinstance(step, bool) or not isinstance(step, int) or step <= 0:
+        raise ValueError(f"step must be a positive integer, got {step!r}")
+
+    it = iter(iterable)
+    window = deque(islice(it, n), maxlen=n)
+    if len(window) < n:
+        return
+    yield tuple(window)
+
+    while True:
+        for _ in range(step):
+            try:
+                window.append(next(it))
+            except StopIteration:
+                return
+        yield tuple(window)
 
 
 def flatten(

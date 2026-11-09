@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -35,13 +36,20 @@ def activation_code(
     """Return an independent import/dispatch check run before the proof suite."""
     return (
         "from pathlib import Path\n"
-        "from gunz_utils import binary, serialization, stats\n"
+        "from gunz_utils import binary, io, serialization, stats\n"
         f"source = Path({str(source)!r}).resolve()\n"
         "if not Path(binary.__file__).resolve().is_relative_to(source):\n"
         "    raise SystemExit('native verification imported outside isolated source')\n"
-        "hooks = (binary._accel_encode, binary._accel_decode, "
-        "serialization._accel_is_json_clean, stats._accel_fast_summary, "
-        "stats._accel_update_running_stats)\n"
+        "hooks = (\n"
+        "    binary._accel_encode, binary._accel_decode,\n"
+        "    binary._accel_encode_zigzag, binary._accel_decode_zigzag,\n"
+        "    binary._accel_encode_uvarints, binary._accel_encode_zigzags,\n"
+        "    binary._accel_decode_uvarints, binary._accel_decode_zigzags,\n"
+        "    serialization._accel_is_json_clean,\n"
+        "    stats._accel_fast_summary, stats._accel_update_running_stats,\n"
+        "    stats._accel_merge_running_stats, stats._accel_fast_pareto_2d,\n"
+        "    io._accel_physical_lines,\n"
+        ")\n"
         f"native = {native!r}\n"
         "if native and not all(hook is not None for hook in hooks):\n"
         "    raise SystemExit('native activation required; fallback is not proof')\n"
@@ -91,8 +99,12 @@ def verify(
             )
             if result.returncode:
                 return result.returncode
+            if importlib.util.find_spec("pytest") is not None:
+                test_cmd = [sys.executable, "-m", "pytest", "-o", f"pythonpath={source}", *TESTS]
+            else:
+                test_cmd = [sys.executable, str(ROOT / "scripts" / "run_tests.py"), *TESTS]
             result = subprocess.run(
-                [sys.executable, "-m", "pytest", "-o", f"pythonpath={source}", *TESTS],
+                test_cmd,
                 cwd=ROOT,
                 env=env,
                 timeout=180,

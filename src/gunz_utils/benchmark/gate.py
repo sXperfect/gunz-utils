@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 # =============================================================================
@@ -14,7 +15,7 @@ from dataclasses import dataclass
 from .policy import MetricDecision, MetricPolicy, evaluate_metric
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RegressionGate:
     """Aggregate decision for a performance comparison."""
 
@@ -24,8 +25,8 @@ class RegressionGate:
 
 
 def evaluate_regression_gate(
-    baseline: dict[str, float],
-    candidate: dict[str, float],
+    baseline: Mapping[str, float],
+    candidate: Mapping[str, float],
     policies: tuple[MetricPolicy, ...],
     *,
     warnings: tuple[str, ...] = (),
@@ -35,9 +36,9 @@ def evaluate_regression_gate(
 
     Parameters
     ----------
-    baseline : dict[str, float]
+    baseline : Mapping[str, float]
         baseline parameter.
-    candidate : dict[str, float]
+    candidate : Mapping[str, float]
         candidate parameter.
     policies : tuple[MetricPolicy, ...]
         policies parameter.
@@ -51,6 +52,10 @@ def evaluate_regression_gate(
     RegressionGate
         The result of the operation.
     """
+    if not isinstance(baseline, Mapping):
+        raise TypeError(f"expected Mapping for baseline, got {type(baseline).__name__}")
+    if not isinstance(candidate, Mapping):
+        raise TypeError(f"expected Mapping for candidate, got {type(candidate).__name__}")
     decisions: list[MetricDecision] = []
     for policy in policies:
         if policy.name not in baseline or policy.name not in candidate:

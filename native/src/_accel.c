@@ -64,7 +64,7 @@ int gunz_native_decode_uvarint(
  * Pure C implementation of canonical signed 64-bit zigzag varint encoding.
  */
 size_t gunz_native_encode_zigzag(int64_t value, uint8_t *out) {
-    uint64_t uval = (uint64_t)((value << 1) ^ (value >> 63));
+    uint64_t uval = ((uint64_t)value << 1) ^ (uint64_t)(value >> 63);
     return gunz_native_encode_uvarint(uval, out);
 }
 
@@ -188,14 +188,14 @@ static PyObject *py_encode_uvarint(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "O", &py_val)) {
         return NULL;
     }
-    if (!PyLong_Check(py_val)) {
+    if (PyBool_Check(py_val) || !PyLong_Check(py_val)) {
         PyErr_SetString(PyExc_TypeError, "an integer is required");
         return NULL;
     }
 
     /* Python integer subclasses may override arithmetic/comparison. Delegate
      * them to the reference instead of silently bypassing those semantics. */
-    if (!PyLong_CheckExact(py_val) && !PyBool_Check(py_val)) {
+    if (!PyLong_CheckExact(py_val)) {
         PyObject *module = PyImport_ImportModule("gunz_utils.binary");
         if (!module) return NULL;
         PyObject *encoder = PyObject_GetAttrString(module, "_py_encode_uvarint");
@@ -449,6 +449,12 @@ static PyObject *py_fast_decode_uvarints(PyObject *self, PyObject *args) {
         return tuple;
     }
 
+    if ((size_t)count > (size_t)(view.len - offset)) {
+        PyBuffer_Release(&view);
+        PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+        return NULL;
+    }
+
     PyObject *list = PyList_New(count);
     if (!list) {
         PyBuffer_Release(&view);
@@ -559,6 +565,12 @@ static PyObject *py_fast_decode_zigzags(PyObject *self, PyObject *args) {
         return tuple;
     }
 
+    if ((size_t)count > (size_t)(view.len - offset)) {
+        PyBuffer_Release(&view);
+        PyErr_SetString(PyExc_EOFError, "binary read exceeds available data");
+        return NULL;
+    }
+
     PyObject *list = PyList_New(count);
     if (!list) {
         PyBuffer_Release(&view);
@@ -619,6 +631,118 @@ static PyObject *py_fast_decode_zigzags(PyObject *self, PyObject *args) {
     PyTuple_SET_ITEM(tuple, 0, list);
     PyTuple_SET_ITEM(tuple, 1, py_offset);
     return tuple;
+}
+
+/*
+ * Python C API wrapper for fast_encode_uvarints.
+ * Signature: fast_encode_uvarints(sequence) -> bytes
+ */
+static PyObject *py_fast_encode_uvarints(PyObject *self, PyObject *args) {
+    PyObject *seq_obj;
+    if (!PyArg_ParseTuple(args, "O", &seq_obj)) {
+        return NULL;
+    }
+    PyObject *fast = PySequence_Fast(seq_obj, "values must be an iterable sequence");
+    if (!fast) return NULL;
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
+    if (n == 0) {
+        Py_DECREF(fast);
+        return PyBytes_FromStringAndSize("", 0);
+    }
+    if ((size_t)n > SIZE_MAX / 10) {
+        Py_DECREF(fast);
+        return PyErr_NoMemory();
+    }
+    size_t max_buf_size = (size_t)n * 10;
+    uint8_t *buffer = (uint8_t *)malloc(max_buf_size);
+    if (!buffer) {
+        Py_DECREF(fast);
+        return PyErr_NoMemory();
+    }
+    PyObject **items = PySequence_Fast_ITEMS(fast);
+    size_t total_bytes = 0;
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *item = items[i];
+        if (PyBool_Check(item) || !PyLong_Check(item)) {
+            free(buffer);
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_TypeError, "value must be an integer (not bool)");
+            return NULL;
+        }
+        int overflow = 0;
+        long long val_signed = PyLong_AsLongLongAndOverflow(item, &overflow);
+        if (overflow < 0 || (overflow == 0 && val_signed < 0)) {
+            free(buffer);
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_ValueError, "unsigned varint requires a 64-bit unsigned integer");
+            return NULL;
+        }
+        unsigned long long val = PyLong_AsUnsignedLongLong(item);
+        if (PyErr_Occurred()) {
+            free(buffer);
+            Py_DECREF(fast);
+            PyErr_Clear();
+            PyErr_SetString(PyExc_ValueError, "unsigned varint requires a 64-bit unsigned integer");
+            return NULL;
+        }
+        total_bytes += gunz_native_encode_uvarint((uint64_t)val, buffer + total_bytes);
+    }
+    Py_DECREF(fast);
+    PyObject *res = PyBytes_FromStringAndSize((const char *)buffer, (Py_ssize_t)total_bytes);
+    free(buffer);
+    return res;
+}
+
+/*
+ * Python C API wrapper for fast_encode_zigzags.
+ * Signature: fast_encode_zigzags(sequence) -> bytes
+ */
+static PyObject *py_fast_encode_zigzags(PyObject *self, PyObject *args) {
+    PyObject *seq_obj;
+    if (!PyArg_ParseTuple(args, "O", &seq_obj)) {
+        return NULL;
+    }
+    PyObject *fast = PySequence_Fast(seq_obj, "values must be an iterable sequence");
+    if (!fast) return NULL;
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
+    if (n == 0) {
+        Py_DECREF(fast);
+        return PyBytes_FromStringAndSize("", 0);
+    }
+    if ((size_t)n > SIZE_MAX / 10) {
+        Py_DECREF(fast);
+        return PyErr_NoMemory();
+    }
+    size_t max_buf_size = (size_t)n * 10;
+    uint8_t *buffer = (uint8_t *)malloc(max_buf_size);
+    if (!buffer) {
+        Py_DECREF(fast);
+        return PyErr_NoMemory();
+    }
+    PyObject **items = PySequence_Fast_ITEMS(fast);
+    size_t total_bytes = 0;
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *item = items[i];
+        if (PyBool_Check(item) || !PyLong_Check(item)) {
+            free(buffer);
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_TypeError, "value must be an integer (not bool)");
+            return NULL;
+        }
+        int overflow = 0;
+        long long val_signed = PyLong_AsLongLongAndOverflow(item, &overflow);
+        if (overflow != 0) {
+            free(buffer);
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_ValueError, "signed zigzag varint requires a 64-bit signed integer");
+            return NULL;
+        }
+        total_bytes += gunz_native_encode_zigzag((int64_t)val_signed, buffer + total_bytes);
+    }
+    Py_DECREF(fast);
+    PyObject *res = PyBytes_FromStringAndSize((const char *)buffer, (Py_ssize_t)total_bytes);
+    free(buffer);
+    return res;
 }
 
 static inline void swap_double(double *a, double *b) {
@@ -722,6 +846,11 @@ static PyObject *py_update_running_stats(PyObject *self, PyObject *args) {
             PyErr_SetString(PyExc_ValueError, "value must be finite");
             return NULL;
         }
+        if (count < 0 || count >= 9223372036854775807LL) {
+            Py_DECREF(fast);
+            PyErr_SetString(PyExc_OverflowError, "running statistics count overflowed integer range");
+            return NULL;
+        }
         count++;
         double delta = val - mean;
         mean += delta / (double)count;
@@ -730,7 +859,7 @@ static PyObject *py_update_running_stats(PyObject *self, PyObject *args) {
         total += val;
         if (val < min_val) min_val = val;
         if (val > max_val) max_val = val;
-        if (!isfinite(mean) || !isfinite(m2)) {
+        if (!isfinite(mean) || !isfinite(m2) || !isfinite(total)) {
             Py_DECREF(fast);
             PyErr_SetString(PyExc_OverflowError, "running statistics overflowed finite float range");
             return NULL;
@@ -859,12 +988,16 @@ static PyObject *py_fast_summary(PyObject *self, PyObject *args) {
             Py_RETURN_NONE;
         }
     }
-    qsort(devs, (size_t)n, sizeof(double), compare_doubles_c);
     double mad_val;
     if (n % 2 == 1) {
+        gunz_native_introselect(devs, 0, (size_t)(n - 1), (size_t)(n / 2), 64);
         mad_val = devs[n / 2];
     } else {
-        mad_val = devs[n / 2 - 1] + (devs[n / 2] - devs[n / 2 - 1]) * 0.5;
+        gunz_native_introselect(devs, 0, (size_t)(n - 1), (size_t)(n / 2), 64);
+        double mid_right = devs[n / 2];
+        gunz_native_introselect(devs, 0, (size_t)(n / 2 - 1), (size_t)(n / 2 - 1), 64);
+        double mid_left = devs[n / 2 - 1];
+        mad_val = mid_left + (mid_right - mid_left) * 0.5;
     }
     free(devs);
 
@@ -885,6 +1018,14 @@ static PyObject *py_fast_summary(PyObject *self, PyObject *args) {
     }
     PyObject **pct_items = PySequence_Fast_ITEMS(pct_fast);
     for (Py_ssize_t i = 0; i < num_pct; i++) {
+        if (PyBool_Check(pct_items[i])) {
+            Py_DECREF(pct_dict);
+            Py_DECREF(pct_fast);
+            free(sorted_data);
+            free(data);
+            PyErr_SetString(PyExc_ValueError, "percentile q must be a real numeric value (not bool)");
+            return NULL;
+        }
         double q = PyFloat_AsDouble(pct_items[i]);
         if (PyErr_Occurred() || q < 0.0 || q > 1.0 || isnan(q)) {
             Py_DECREF(pct_dict);
@@ -990,6 +1131,10 @@ static PyObject *py_merge_running_stats(PyObject *self, PyObject *args) {
     )) {
         return NULL;
     }
+    if (count_a < 0 || count_b < 0 || count_a > 9223372036854775807LL - count_b) {
+        PyErr_SetString(PyExc_OverflowError, "combined count overflowed integer range");
+        return NULL;
+    }
     if (count_a == 0) {
         return Py_BuildValue("Lddddd", count_b, mean_b, m2_b, min_b, max_b, total_b);
     }
@@ -1000,7 +1145,8 @@ static PyObject *py_merge_running_stats(PyObject *self, PyObject *args) {
     double delta = mean_b - mean_a;
     double combined_mean = mean_a + delta * ((double)count_b / (double)combined_count);
     double combined_m2 = m2_a + m2_b + (delta * delta) * ((double)count_a * (double)count_b / (double)combined_count);
-    if (!isfinite(combined_mean) || !isfinite(combined_m2)) {
+    double combined_total = total_a + total_b;
+    if (!isfinite(combined_mean) || !isfinite(combined_m2) || !isfinite(combined_total)) {
         PyErr_SetString(PyExc_OverflowError, "running statistics overflowed finite float range");
         return NULL;
     }
@@ -1023,6 +1169,8 @@ static int compare_points_2d(const void *a, const void *b) {
     if (p1->x > p2->x) return 1;
     if (p1->y < p2->y) return -1;
     if (p1->y > p2->y) return 1;
+    if (p1->original_index < p2->original_index) return -1;
+    if (p1->original_index > p2->original_index) return 1;
     return 0;
 }
 
@@ -1060,7 +1208,8 @@ static PyObject *py_fast_pareto_2d(PyObject *self, PyObject *args) {
         if (PyBool_Check(item_x) || PyBool_Check(item_y)) {
             free(pts);
             Py_DECREF(fast);
-            Py_RETURN_NONE;
+            PyErr_SetString(PyExc_TypeError, "objective values must be real numeric");
+            return NULL;
         }
         if (!PyFloat_CheckExact(item_x) && !PyLong_CheckExact(item_x)) {
             free(pts);
@@ -1148,6 +1297,9 @@ static PyObject *py_fast_physical_lines(PyObject *self, PyObject *args) {
         PyErr_SetString(PyExc_TypeError, "text must be a string");
         return NULL;
     }
+    if (PyUnicode_READY(text_obj) < 0) {
+        return NULL;
+    }
     Py_ssize_t length = PyUnicode_GET_LENGTH(text_obj);
     if (length == 0) {
         return PyList_New(0);
@@ -1213,6 +1365,8 @@ static PyMethodDef AccelMethods[] = {
     {"decode_uvarint", py_decode_uvarint, METH_VARARGS, "Zero-copy decode uint64 varint from buffer at offset."},
     {"encode_zigzag", py_encode_zigzag, METH_VARARGS, "Encode int64 into canonical zigzag varint bytes in C."},
     {"decode_zigzag", py_decode_zigzag, METH_VARARGS, "Zero-copy decode int64 zigzag varint from buffer at offset."},
+    {"fast_encode_uvarints", py_fast_encode_uvarints, METH_VARARGS, "Fast batch encode uint64 varints to bytes in C."},
+    {"fast_encode_zigzags", py_fast_encode_zigzags, METH_VARARGS, "Fast batch encode int64 zigzag varints to bytes in C."},
     {"fast_decode_uvarints", py_fast_decode_uvarints, METH_VARARGS, "Fast batch decode uint64 varints from buffer in C."},
     {"fast_decode_zigzags", py_fast_decode_zigzags, METH_VARARGS, "Fast batch decode int64 zigzag varints from buffer in C."},
     {"is_json_clean", py_is_json_clean, METH_VARARGS, "Check if object graph consists solely of pure JSON primitives."},

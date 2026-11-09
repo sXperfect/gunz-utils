@@ -14,6 +14,10 @@ values whose keys match a known secret pattern.
 
 from __future__ import annotations
 
+import functools
+import re
+from collections.abc import Mapping, Set
+
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
@@ -29,21 +33,24 @@ __all__ = ["redact", "redact_dict", "SECRET_PATTERNS"]
 # ? and hashable, preventing accidental mutation at runtime.
 SECRET_PATTERNS: frozenset[str] = frozenset(
     {
-        "password",
-        "passwd",
-        "secret",
-        "token",
+        "access_key",
         "api_key",
         "apikey",
-        "access_key",
-        "secret_key",
         "auth",
         "authorization",
+        "bearer",
         "credential",
         "credentials",
+        "id_token",
+        "jwt",
+        "passwd",
+        "password",
         "private_key",
-        "session_token",
         "refresh_token",
+        "secret",
+        "secret_key",
+        "session_token",
+        "token",
     }
 )
 
@@ -123,6 +130,15 @@ def redact(
     return f"{value[:show_chars]}{_MASK}{value[-show_chars:]}"
 
 
+@functools.lru_cache(maxsize=32)
+def _get_patterns_regex(patterns: frozenset[str]) -> re.Pattern[str]:
+    """Compile a combined regular expression for fast secret key matching."""
+    escaped = [re.escape(p) for p in sorted(patterns) if p]
+    if not escaped:
+        return re.compile(r"(?!)")
+    return re.compile("|".join(escaped), re.IGNORECASE)
+
+
 def _is_secret_key(
     key: object,
     patterns: frozenset[str],
@@ -145,11 +161,7 @@ def _is_secret_key(
     """
     if not isinstance(key, str):
         return False
-    # ? Substring (rather than equality) match means a key like
-    # ? "user_password_hash" or "DB_PASSWORD" is still caught without
-    # ? enumerating every camelCase / snake_case permutation.
-    key_lower = key.lower()
-    return any(pattern in key_lower for pattern in patterns)
+    return bool(_get_patterns_regex(patterns).search(key))
 
 
 def redact_dict(
@@ -160,11 +172,11 @@ def redact_dict(
 ) -> object:
     """Recursively mask string values whose keys match secret patterns.
 
-    Dicts are walked key by key; for each key that matches ``patterns``
+    Dicts and mappings are walked key by key; for each key that matches ``patterns``
     the associated value is passed through :func:`redact`, otherwise
     the value is recursed into so nested dicts and lists are handled.
-    Lists are walked element by element. Anything that is neither a
-    ``dict`` nor a ``list`` is returned unchanged.
+    Lists, tuples, sets and frozensets are walked element by element. Anything else
+    is returned unchanged. Cyclic structures are rejected with ValueError.
 
     Parameters
     ----------
@@ -186,43 +198,51 @@ def redact_dict(
     if patterns is None:
         patterns = SECRET_PATTERNS
     _validate_show_chars(show_chars)
+    seen_ids: set[int] = set()
 
     def _walk(
         value: object,
         secret_context: bool = False,
     ) -> object:
-        """_walk() function.
+        if isinstance(value, (Mapping, list, tuple, Set)):
+            if id(value) in seen_ids:
+                raise ValueError("cyclic structure detected in redact_dict")
+            seen_ids.add(id(value))
+            try:
+                return _walk_collection(value, secret_context)
+            finally:
+                seen_ids.remove(id(value))
+        return _walk_scalar(value, secret_context)
 
-        Parameters
-        ----------
-        value : object
-            value parameter.
-        secret_context : bool
-            secret_context parameter.
-
-        Returns
-        -------
-        object
-            The result of the operation.
-        """
+    def _walk_scalar(value: object, secret_context: bool) -> object:
         if secret_context:
-            if isinstance(value, dict):
+            if isinstance(value, (str, bytes, bytearray, memoryview)):
+                return _MASK
+            return value
+        return value
+
+    def _walk_collection(value: object, secret_context: bool) -> object:
+        if secret_context:
+            if isinstance(value, Mapping):
                 return {key: _walk(item, True) for key, item in value.items()}
             if isinstance(value, list):
                 return [_walk(item, True) for item in value]
             if isinstance(value, tuple):
                 return tuple(_walk(item, True) for item in value)
-            if isinstance(value, (str, bytes, bytearray, memoryview)):
-                return _MASK
+            if isinstance(value, frozenset):
+                return frozenset(_walk(item, True) for item in value)
+            if isinstance(value, Set):
+                return {_walk(item, True) for item in value}
             return value
-        if isinstance(value, dict):
+
+        if isinstance(value, Mapping):
             out: dict[object, object] = {}
             for key, item in value.items():
                 secret = _is_secret_key(key, patterns)
                 if secret:
                     if isinstance(item, str):
                         out[key] = redact(item, show_chars=show_chars)
-                    elif isinstance(item, (dict, list, tuple)):
+                    elif isinstance(item, (Mapping, list, tuple, Set)):
                         out[key] = _walk(item, True)
                     elif item is None:
                         out[key] = None
@@ -235,6 +255,10 @@ def redact_dict(
             return [_walk(item) for item in value]
         if isinstance(value, tuple):
             return tuple(_walk(item) for item in value)
+        if isinstance(value, frozenset):
+            return frozenset(_walk(item) for item in value)
+        if isinstance(value, Set):
+            return {_walk(item) for item in value}
         return value
 
     return _walk(d)

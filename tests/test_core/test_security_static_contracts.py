@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import ast
+import functools
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -22,6 +23,12 @@ _BANNED_CALLS = {
     ("yaml", "load"),
     ("yaml", "unsafe_load"),
 }
+
+
+@functools.lru_cache(maxsize=None)
+def _parsed_file(path: Path) -> tuple[str, ast.AST]:
+    text = path.read_text(encoding="utf-8")
+    return text, ast.parse(text, filename=str(path))
 
 
 def _qualified_name(
@@ -46,13 +53,13 @@ def test_all_package_sources_parse() -> None:
     files = _source_files()
     assert files
     for path in files:
-        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        _parsed_file(path)
 
 
 def test_package_sources_avoid_code_execution_and_unsafe_deserialization() -> None:
     offenders: list[str] = []
     for path in _source_files():
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        _, tree = _parsed_file(path)
         relative = path.relative_to(PROJECT_ROOT)
 
         for node in ast.walk(tree):
@@ -89,7 +96,7 @@ def test_package_sources_avoid_code_execution_and_unsafe_deserialization() -> No
 def test_package_sources_do_not_use_assert_for_runtime_validation() -> None:
     offenders: list[str] = []
     for path in _source_files():
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        _, tree = _parsed_file(path)
         relative = path.relative_to(PROJECT_ROOT)
         for node in ast.walk(tree):
             if isinstance(node, ast.Assert):
@@ -100,7 +107,7 @@ def test_package_sources_do_not_use_assert_for_runtime_validation() -> None:
 def test_package_sources_do_not_disable_tls_verification() -> None:
     offenders: list[str] = []
     for path in _source_files():
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        _, tree = _parsed_file(path)
         relative = path.relative_to(PROJECT_ROOT)
 
         for node in ast.walk(tree):

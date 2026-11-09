@@ -9,6 +9,7 @@ backends but without those runtime dependencies.
 
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -114,7 +115,7 @@ class TestStdlibResolveProjectRoot(unittest.TestCase):
 
     def tearDown(self):
         os.chdir(self._saved_cwd)
-        subprocess.run(["rm", "-rf", self._tmpdir], check=False)
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
         from gunz_utils.ext import project_stdlib
         project_stdlib._PROJECT_ROOT = None
         project_stdlib._PROJECT_ANCHOR = None
@@ -124,7 +125,7 @@ class TestStdlibResolveProjectRoot(unittest.TestCase):
     ) -> pathlib.Path:
         repo = pathlib.Path(self._tmpdir) / "myproj"
         repo.mkdir()
-        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        (repo / ".git").mkdir()
         if with_pyproject:
             (repo / "pyproject.toml").write_text("[project]\nname='x'\n")
         return repo.resolve()

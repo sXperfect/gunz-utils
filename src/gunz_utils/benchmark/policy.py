@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MetricPolicy:
     """Threshold policy for one metric."""
 
@@ -42,7 +42,7 @@ class MetricPolicy:
                 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MetricDecision:
     name: str
     baseline: float

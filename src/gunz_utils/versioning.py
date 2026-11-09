@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any
 
 
@@ -58,7 +59,7 @@ class VersionedEnvelope:
         _validate_version(self.version, name="version")
         if not isinstance(self.metadata, Mapping):
             raise TypeError("metadata must be a mapping")
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
     def to_dict(self) -> dict[str, Any]:
         """Return an envelope mapping suitable for JSON normalization.
@@ -154,6 +155,67 @@ class SchemaMigrator:
                 f"v{from_version}"
             )
         self._migrations[key] = migration
+
+    def can_migrate(
+        self,
+        schema_or_envelope: str | VersionedEnvelope,
+        from_version: int | None = None,
+        *,
+        target_version: int,
+    ) -> bool:
+        """Check whether a full migration path exists to target_version.
+
+        Parameters
+        ----------
+        schema_or_envelope : str | VersionedEnvelope
+            Schema name string or VersionedEnvelope instance.
+        from_version : int | None
+            Starting version (required if schema is a string).
+        target_version : int
+            Target schema version.
+
+        Returns
+        -------
+        bool
+            True if all intermediate migration steps are registered.
+        """
+        if isinstance(schema_or_envelope, VersionedEnvelope):
+            schema = schema_or_envelope.schema
+            from_v = schema_or_envelope.version
+        elif isinstance(schema_or_envelope, str):
+            schema = schema_or_envelope
+            if from_version is None:
+                raise ValueError("from_version must be provided when schema is a string")
+            from_v = from_version
+        else:
+            raise TypeError("first argument must be a schema string or VersionedEnvelope")
+        if target_version < from_v:
+            return False
+        v = from_v
+        while v < target_version:
+            if (schema, v) not in self._migrations:
+                return False
+            v += 1
+        return True
+
+    def latest_version(
+        self,
+        schema: str,
+    ) -> int | None:
+        """Return the highest reachable version registered for a schema.
+
+        Parameters
+        ----------
+        schema : str
+            Schema name.
+
+        Returns
+        -------
+        int | None
+            Highest version number, or None if no migrations exist.
+        """
+        versions = [from_v + 1 for (s, from_v) in self._migrations if s == schema]
+        return max(versions) if versions else None
 
     def migrate(self,
         envelope: VersionedEnvelope,

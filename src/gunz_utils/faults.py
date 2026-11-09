@@ -246,6 +246,19 @@ class VirtualClock:
         self._current = new_time
         return self._current
 
+    def sleep(self,
+        seconds: float,
+    ) -> None:
+        """Advance the clock by seconds, simulating a synchronous sleep."""
+        self.advance(seconds)
+
+    async def asleep(self,
+        seconds: float,
+    ) -> None:
+        """Advance the clock by seconds, simulating an asynchronous sleep."""
+        self.advance(seconds)
+        await asyncio.sleep(0)
+
 
 class FaultyStream:
     """Binary stream wrapper that injects short writes or I/O faults."""

@@ -44,6 +44,10 @@ class PerformanceRun:
     warnings: tuple[str, ...] = ()
     schema_version: int = 1
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "parameters", dict(self.parameters))
+        object.__setattr__(self, "metrics", dict(self.metrics))
+
     def to_dict(self) -> dict[str, Any]:
         """Return an envelope whose array fields satisfy the persisted schema.
 
@@ -56,6 +60,36 @@ class PerformanceRun:
         data["artifacts"] = list(data["artifacts"])
         data["warnings"] = list(data["warnings"])
         return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PerformanceRun:
+        """Reconstruct a PerformanceRun from a serialized dictionary."""
+        artifacts = tuple(
+            PerformanceArtifact(**art) if isinstance(art, dict) else art
+            for art in data.get("artifacts", ())
+        )
+        system_data = data["system"]
+        system = (
+            SystemInfo(**system_data)
+            if isinstance(system_data, dict)
+            else system_data
+        )
+        git_data = data.get("git")
+        git = (
+            GitInfo(**git_data)
+            if isinstance(git_data, dict)
+            else git_data
+        )
+        return cls(
+            name=data["name"],
+            system=system,
+            git=git,
+            parameters=dict(data.get("parameters", {})),
+            metrics=dict(data.get("metrics", {})),
+            artifacts=artifacts,
+            warnings=tuple(data.get("warnings", ())),
+            schema_version=data.get("schema_version", 1),
+        )
 
 
 __all__ = ["PerformanceArtifact", "PerformanceRun"]

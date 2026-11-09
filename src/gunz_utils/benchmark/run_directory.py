@@ -250,4 +250,35 @@ def save_run_directory(
         raise
 
 
-__all__ = ["save_run_directory"]
+def load_run_directory(
+    path: Path | str,
+) -> PerformanceRun:
+    """Load and validate a self-contained performance-run directory.
+
+    Parameters
+    ----------
+    path : Path | str
+        Path to the run directory containing run.json.
+
+    Returns
+    -------
+    PerformanceRun
+        Reconstructed performance run.
+    """
+    root = Path(path)
+    if not root.is_dir():
+        raise ValueError(
+            f"run directory {str(path)!r} does not exist or is not a directory"
+        )
+    run_file = root / "run.json"
+    if not run_file.is_file():
+        raise ValueError(f"run directory {str(path)!r} is missing run.json")
+    content = run_file.read_text(encoding="utf-8")
+    data = json.loads(content)
+    from .schema import validate_performance_run
+
+    validate_performance_run(data)
+    return PerformanceRun.from_dict(data)
+
+
+__all__ = ["load_run_directory", "save_run_directory"]

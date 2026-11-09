@@ -24,6 +24,7 @@ from .._version import __version__ as __version__
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
+__all__ = ["logger", "setup_logging"]
 
 _LOG_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _MAX_SESSION_ID_CHARS = 128
@@ -92,11 +93,12 @@ def setup_logging(
     Parameters
     ----------
     log_name : str
-        log_name parameter.
-    verbose : bool
-        verbose parameter.
-    project_root : Path | None
-        project_root parameter.
+        Base filename for the log file (without .log extension).
+    verbose : bool, default=False
+        Enable DEBUG level logging when True; defaults to INFO.
+    project_root : Path | None, optional
+        Project root directory where logs/ will be placed. When None,
+        only console logging is configured.
     """
     log_name = _validate_log_name(log_name)
     logger.remove()

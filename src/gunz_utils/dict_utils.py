@@ -20,13 +20,13 @@ from typing import Any, Literal, cast
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 from ._version import __version__ as __version__
+from .sentinels import UNSET
 
-__all__ = ["deep_get", "deep_set", "deep_merge"]
+__all__ = ["deep_get", "deep_set", "deep_merge", "deep_pop"]
 
-#? Singleton sentinel used to detect "no default supplied" distinctly from
-#? "default value is None". A plain object() works because identity comparison
-#? (`is _MISSING`) cannot collide with any user-supplied default.
-_MISSING: Any = object()
+#? Sentinel used to tag boolean values in keys so True/False do not collide
+#? with 1/0 during grouping and unique-hashing.
+_BOOL_SENTINEL: Any = object()
 
 
 def _normalize_path(
@@ -61,7 +61,7 @@ def deep_get(
     d: Mapping[str, Any],
     path: str | Sequence[str],
     *,
-    default: Any = _MISSING,
+    default: Any = UNSET,
     separator: str = ".",
 ) -> Any:
     """Retrieve a value from a nested mapping using a dotted-path key.
@@ -118,13 +118,13 @@ def deep_get(
             #? asked for something that doesn't structurally exist. Treat it
             #? as "not found" rather than raising TypeError so callers can
             #? probe config trees safely.
-            if default is _MISSING:
+            if default is UNSET:
                 raise KeyError(dotted)
             return default
         try:
             cursor = cursor[key]
         except (KeyError, IndexError, TypeError):
-            if default is _MISSING:
+            if default is UNSET:
                 raise KeyError(dotted) from None
             return default
     return cursor
@@ -190,6 +190,61 @@ def deep_set(
         else:
             cursor = next_node
     cursor[parts[-1]] = value
+
+
+def deep_pop(
+    d: MutableMapping[str, Any],
+    path: str | Sequence[str],
+    default: Any = UNSET,
+    *,
+    separator: str = ".",
+) -> Any:
+    """Pop and return a value from a nested mapping using a dotted-path key.
+
+    Removes the final key in the path from the innermost mapping. Intermediate
+    mappings are preserved. If any intermediate key or the final key is missing,
+    returns ``default`` (or raises ``KeyError`` if ``default`` was not provided).
+
+    Parameters
+    ----------
+    d : MutableMapping[str, Any]
+        Target mapping (mutated in place).
+    path : str | Sequence[str]
+        Path to the value to remove.
+    default : Any, optional
+        Fallback returned if the path does not exist. Raises KeyError if omitted.
+    separator : str, default="."
+        Separator for string paths.
+
+    Returns
+    -------
+    Any
+        The removed value, or default if missing.
+
+    Raises
+    ------
+    KeyError
+        If path is not found and default is not provided.
+    TypeError
+        If d is not a MutableMapping.
+    """
+    if not isinstance(d, MutableMapping):
+        raise TypeError(f"expected MutableMapping, got {type(d).__name__}")
+    parts = _normalize_path(path, separator)
+    current: Any = d
+    for part in parts[:-1]:
+        if not isinstance(current, MutableMapping) or part not in current:
+            if default is not UNSET:
+                return default
+            raise KeyError(f"path {path!r} not found at segment {part!r}")
+        current = current[part]
+
+    last = parts[-1]
+    if not isinstance(current, MutableMapping) or last not in current:
+        if default is not UNSET:
+            return default
+        raise KeyError(f"path {path!r} not found at leaf {last!r}")
+    return current.pop(last)
 
 
 def deep_merge(
@@ -321,6 +376,10 @@ def deep_merge(
             for v in val:
                 res_set.add(_isolate(v, depth + 1))
             return res_set
+        if isinstance(val, frozenset):
+            res_frozenset = frozenset(_isolate(v, depth + 1) for v in val)
+            memo[val_id] = res_frozenset
+            return res_frozenset
         if isinstance(val, tuple):
             y = [_isolate(v, depth + 1) for v in val]
             if val_id in memo:
@@ -396,10 +455,11 @@ def deep_merge(
             seen_unhashable: list[Any] = []
             result: list[Any] = []
             for item in (*a, *b):
+                marker = (_BOOL_SENTINEL, item) if isinstance(item, bool) else item
                 try:
-                    if item in seen_hashable:
+                    if marker in seen_hashable:
                         continue
-                    seen_hashable.add(item)
+                    seen_hashable.add(marker)
                 except TypeError:
                     if any(item == previous for previous in seen_unhashable):
                         continue

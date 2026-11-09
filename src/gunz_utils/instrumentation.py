@@ -23,21 +23,36 @@ class Counter:
     def add(self,
         amount: int = 1,
     ) -> int:
-        """add() function.
+        """Add to the counter atomically.
 
         Parameters
         ----------
-        amount : int
-            amount parameter.
+        amount : int, default=1
+            Amount to add. Must be a non-negative integer.
 
         Returns
         -------
         int
-            The result of the operation.
+            The updated counter value.
         """
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
+            raise ValueError("amount must be a non-negative integer")
         with self._lock:
             self.value += amount
             return self.value
+
+    def reset(self) -> int:
+        """Reset the counter to zero and return the previous value.
+
+        Returns
+        -------
+        int
+            The counter value prior to reset.
+        """
+        with self._lock:
+            prev = self.value
+            self.value = 0
+            return prev
 
 
 @dataclass(frozen=True)
@@ -51,9 +66,16 @@ class Timer:
     def __init__(self,
         name: str,
     ) -> None:
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("name must be a non-empty string")
         self.name = name
         self.started = 0.0
         self.result: Timing | None = None
+
+    def reset(self) -> None:
+        """Reset timer state and cleared recorded results."""
+        self.started = 0.0
+        self.result = None
 
     def __enter__(self) -> Timer:
         self.started = time.perf_counter()
@@ -69,6 +91,15 @@ class Timer:
             time.perf_counter() - self.started,
             exc is None,
         )
+
+    @property
+    def elapsed(self) -> float:
+        """Return elapsed duration in seconds."""
+        if self.result is not None:
+            return self.result.seconds
+        if self.started > 0.0:
+            return time.perf_counter() - self.started
+        return 0.0
 
 
 __all__ = ["Counter", "Timer", "Timing", "Trace", "TraceEvent"]

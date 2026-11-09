@@ -16,14 +16,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 from .benchmark.io import GitInfo, capture_git_info
 from .io import atomic_json_write
-from .redaction import SECRET_PATTERNS, redact
+from .redaction import SECRET_PATTERNS, redact, redact_dict
 from .structures import freeze_structure
 
 
@@ -74,16 +74,30 @@ def _redact_environment_value(
         parsed = urlsplit(value)
     except ValueError:
         return value
-    if not parsed.scheme or "@" not in parsed.netloc:
+    if not parsed.scheme:
         return value
 
-    userinfo, hostinfo = parsed.netloc.rsplit("@", 1)
-    if ":" not in userinfo:
-        return value
-    username, _password = userinfo.split(":", 1)
-    sanitized = parsed._replace(
-        netloc=f"{username}:****@{hostinfo}",
-    )
+    sanitized_netloc = parsed.netloc
+    if "@" in parsed.netloc:
+        userinfo, hostinfo = parsed.netloc.rsplit("@", 1)
+        if ":" in userinfo:
+            username, _password = userinfo.split(":", 1)
+            sanitized_netloc = f"{username}:****@{hostinfo}"
+        else:
+            sanitized_netloc = f"****@{hostinfo}"
+
+    sanitized_query = parsed.query
+    if parsed.query:
+        pairs = parse_qsl(parsed.query, keep_blank_values=True)
+        new_pairs = []
+        for qk, qv in pairs:
+            if any(pattern in qk.lower() for pattern in SECRET_PATTERNS):
+                new_pairs.append((qk, "****"))
+            else:
+                new_pairs.append((qk, qv))
+        sanitized_query = urlencode(new_pairs)
+
+    sanitized = parsed._replace(netloc=sanitized_netloc, query=sanitized_query)
     return urlunsplit(sanitized)
 
 
@@ -215,7 +229,7 @@ class ExecutionManifest:
         object.__setattr__(
             self,
             "config",
-            freeze_structure(dict(self.config)),
+            freeze_structure(redact_dict(dict(self.config), show_chars=0)),
         )
         object.__setattr__(
             self,

@@ -374,10 +374,10 @@ class GracefulShutdown:
 
         Returns
         -------
-        list[tuple[Callable[[], Any], BaseException]]
+        list[tuple[Callable[[], Any], Exception]]
             The result of the operation.
         """
-        errors: list[tuple[Callable[[], Any], BaseException]] = []
+        errors: list[tuple[Callable[[], Any], Exception]] = []
         for cb in reversed(self._callbacks):
             try:
                 res = cb()

@@ -13,10 +13,14 @@ from typing import Generic, TypeVar
 T = TypeVar("T")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ConfigValue(Generic[T]):
     value: T
     source: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.source, str) or not self.source.strip():
+            raise ValueError("source must be a non-empty string")
 
 
 def parse_bool(
@@ -64,6 +68,8 @@ def convert(
     ConfigValue[T]
         The result of the operation.
     """
+    if not callable(parser):
+        raise TypeError("parser must be callable")
     return ConfigValue(parser(value), source)
 
 

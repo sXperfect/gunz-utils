@@ -53,7 +53,7 @@ class TestExecutionControls(unittest.TestCase):
 
         suite = BenchmarkSuite("sweep")
         suite.add_parameters("sum", work, "size", [1, 10])
-        results = suite.run(warmup=0, iterations=1)
+        results = suite.run(warmup=0, iterations=1, loops=1)
         self.assertEqual(len(results), 2)
         self.assertEqual(results[0].parameters["size"], 1)
 

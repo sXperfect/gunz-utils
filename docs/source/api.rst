@@ -64,6 +64,16 @@ These modules have no third-party runtime dependencies.
    :undoc-members:
    :show-inheritance:
 
+.. automodule:: gunz_utils.sentinels
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.spec
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. automodule:: gunz_utils.streaming
    :members:
    :undoc-members:
@@ -292,6 +302,11 @@ from :mod:`gunz_utils`.
    :show-inheritance:
 
 .. automodule:: gunz_utils.testkit
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: gunz_utils.text
    :members:
    :undoc-members:
    :show-inheritance:

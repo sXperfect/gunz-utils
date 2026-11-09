@@ -26,15 +26,15 @@ from gunz_utils.benchmark import benchmark, compare_results, profile_command
 
 class TestBenchmark(unittest.TestCase):
     def test_runner_captures_samples_and_stats(self) -> None:
-        result = benchmark(lambda: sum(range(10)), warmup=1, iterations=4)
+        result = benchmark(lambda: sum(range(10)), warmup=1, iterations=4, loops=1)
         self.assertEqual(len(result.samples), 4)
         self.assertEqual(result.iterations, 4)
         self.assertGreaterEqual(result.stats.maximum, result.stats.minimum)
         json.dumps(result.to_dict())
 
     def test_comparison_detects_regression(self) -> None:
-        baseline = benchmark(lambda: None, iterations=2, warmup=0)
-        candidate = benchmark(lambda: None, iterations=2, warmup=0)
+        baseline = benchmark(lambda: None, iterations=2, warmup=0, loops=1)
+        candidate = benchmark(lambda: None, iterations=2, warmup=0, loops=1)
         comparison = compare_results(
             baseline,
             candidate,

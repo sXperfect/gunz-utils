@@ -24,6 +24,15 @@ class ManualClock:
 
     now: float = 0.0
 
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.now, bool)
+            or not isinstance(self.now, (int, float))
+            or not math.isfinite(float(self.now))
+        ):
+            raise TypeError("clock initial time must be a finite real number")
+        self.now = float(self.now)
+
     def monotonic(self) -> float:
         """monotonic() function.
 
@@ -105,6 +114,8 @@ def fuzz_integers(
     Iterator[int]
         The result of the operation.
     """
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError("seed must be an integer")
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     for name, value in (("minimum", minimum), ("maximum", maximum)):
@@ -148,6 +159,8 @@ def fuzz_floats(
     Iterator[float]
         The result of the operation.
     """
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError("seed must be an integer")
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     for name, value in (("minimum", minimum), ("maximum", maximum)):
@@ -173,7 +186,12 @@ def fuzz_floats(
         if specials and rng.random() < 0.1:
             yield rng.choice(specials)
         else:
-            yield rng.uniform(min_f, max_f)
+            diff = max_f - min_f
+            if math.isinf(diff):
+                t = rng.random()
+                yield (1.0 - t) * min_f + t * max_f
+            else:
+                yield rng.uniform(min_f, max_f)
 
 
 def fuzz_strings(
@@ -204,6 +222,8 @@ def fuzz_strings(
     Iterator[str]
         The result of the operation.
     """
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError("seed must be an integer")
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     for name, value in (("min_length", min_length), ("max_length", max_length)):
@@ -250,6 +270,8 @@ def fuzz_bytes(
     Iterator[bytes]
         The result of the operation.
     """
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError("seed must be an integer")
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     for name, value in (("min_length", min_length), ("max_length", max_length)):
@@ -283,6 +305,8 @@ def fuzz_primitives(
     Iterator[int | float | str | bool | None]
         The result of the operation.
     """
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError("seed must be an integer")
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
 
@@ -399,6 +423,8 @@ def fuzz_json_objects(
     Iterator[dict[str, Any] | list[Any]]
         The result of the operation.
     """
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError("seed must be an integer")
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("count must be a non-negative integer")
     if (

@@ -24,7 +24,12 @@ __license__ = "Clear BSD"
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
-from pydantic import BaseModel, ConfigDict
+try:
+    from pydantic import BaseModel, ConfigDict
+except ImportError as exc:
+    raise ImportError(
+        "pydantic is required for gunz_utils.models; install with 'pip install gunz-utils[pydantic]'"
+    ) from exc
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS

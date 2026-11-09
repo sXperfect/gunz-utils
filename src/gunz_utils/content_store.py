@@ -107,6 +107,7 @@ class ContentAddressedStore:
                 "content-addressed storage requires a collision-resistant "
                 f"algorithm; expected one of {sorted(_CONTENT_ID_ALGOS)}"
             )
+        self._digest_chars = hashlib.new(self.algo).digest_size * 2
         if (
             isinstance(self.chunk_size, bool)
             or not isinstance(self.chunk_size, int)
@@ -125,7 +126,7 @@ class ContentAddressedStore:
             or self.fanout_chars < 1
         ):
             raise ValueError("fanout_chars must be a positive integer")
-        if self.fanout_levels * self.fanout_chars > self.digest_chars:
+        if self.fanout_levels * self.fanout_chars > self._digest_chars:
             raise ValueError("fanout consumes more characters than the digest")
         if self.root.is_symlink():
             raise ValueError("content-addressed store root must not be a symlink")
@@ -144,7 +145,7 @@ class ContentAddressedStore:
         int
             The result of the operation.
         """
-        return hashlib.new(self.algo).digest_size * 2
+        return getattr(self, "_digest_chars", hashlib.new(self.algo).digest_size * 2)
 
     def _validate_digest(self,
         digest: str,
@@ -892,6 +893,30 @@ class ContentAddressedStore:
         except FileNotFoundError:
             raise KeyError(normalized) from None
         return target
+
+    def __contains__(self,
+        digest: object,
+    ) -> bool:
+        """Return whether an artifact with the given digest exists in the store.
+
+        Parameters
+        ----------
+        digest : object
+            Hexadecimal content digest.
+
+        Returns
+        -------
+        bool
+            True if the artifact is present in the store.
+        """
+        if not isinstance(digest, str):
+            return False
+        try:
+            skip_verification = False
+            self.get(digest, verify=skip_verification)
+            return True
+        except (KeyError, ValueError):
+            return False
 
     def verify(self,
         digest: str,

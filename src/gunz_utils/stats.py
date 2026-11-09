@@ -78,6 +78,21 @@ class SummaryStats:
     percentiles: Mapping[float, float]
     outlier_indices: tuple[int, ...]
 
+    @property
+    def iqr(self) -> float | None:
+        """Interquartile range (p75 - p25), or None if 0.25 and 0.75 quantiles are absent.
+
+        Returns
+        -------
+        float | None
+            Difference between the 75th and 25th percentiles.
+        """
+        p75 = self.percentiles.get(0.75)
+        p25 = self.percentiles.get(0.25)
+        if p75 is not None and p25 is not None:
+            return p75 - p25
+        return None
+
 
 
 def _finite_values(
@@ -605,8 +620,8 @@ def summarize(
 
     return SummaryStats(
         count=len(data),
-        minimum=min(data),
-        maximum=max(data),
+        minimum=ordered[0],
+        maximum=ordered[-1],
         mean=mean_value,
         median=med,
         variance=variance_value,
@@ -661,14 +676,19 @@ class RunningStats:
         new_mean = self._mean + delta / new_count
         delta2 = val - new_mean
         new_m2 = self._m2 + delta * delta2
-        if not math.isfinite(new_mean) or not math.isfinite(new_m2):
+        new_total = self._total + val
+        if (
+            not math.isfinite(new_mean)
+            or not math.isfinite(new_m2)
+            or not math.isfinite(new_total)
+        ):
             raise OverflowError(
                 "running statistics overflowed finite float range"
             )
         self._count = new_count
         self._mean = new_mean
         self._m2 = new_m2
-        self._total += val
+        self._total = new_total
         if val < self._min:
             self._min = val
         if val > self._max:
@@ -761,11 +781,16 @@ class RunningStats:
             + other._m2
             + (delta * delta) * (self._count * other._count / combined._count)
         )
-        if not math.isfinite(combined._mean) or not math.isfinite(combined._m2):
+        combined_total = self._total + other._total
+        if (
+            not math.isfinite(combined._mean)
+            or not math.isfinite(combined._m2)
+            or not math.isfinite(combined_total)
+        ):
             raise OverflowError(
                 "running statistics overflowed finite float range"
             )
-        combined._total = self._total + other._total
+        combined._total = combined_total
         combined._min = min(self._min, other._min)
         combined._max = max(self._max, other._max)
         return combined
@@ -1071,6 +1096,199 @@ def ecdf(
     return points
 
 
+def _compute_mid_ranks(seq: list[float]) -> list[float]:
+    """Assign average (mid-rank) ranks to a sequence of values."""
+    indexed = sorted(enumerate(seq), key=lambda item: item[1])
+    n = len(seq)
+    ranks = [0.0] * n
+    i = 0
+    while i < n:
+        j = i
+        while j < n and indexed[j][1] == indexed[i][1]:
+            j += 1
+        avg_rank = (i + 1 + j) / 2.0
+        for k in range(i, j):
+            ranks[indexed[k][0]] = avg_rank
+        i = j
+    return ranks
+
+
+def spearman_rank_correlation(
+    left: Sequence[float],
+    right: Sequence[float],
+) -> float:
+    """Compute Spearman's rank correlation coefficient with average-rank tie handling.
+
+    Parameters
+    ----------
+    left : Sequence[float]
+        First numeric sequence.
+    right : Sequence[float]
+        Second numeric sequence.
+
+    Returns
+    -------
+    float
+        Spearman rank correlation coefficient in [-1.0, 1.0].
+    """
+    if isinstance(left, (str, bytes, bytearray)) or isinstance(
+        right, (str, bytes, bytearray)
+    ):
+        raise TypeError("sequences must be numeric sequences, not text/bytes")
+    left_seq = list(left)
+    right_seq = list(right)
+    if len(left_seq) != len(right_seq):
+        raise ValueError("sequences must have equal length")
+    if len(left_seq) < 2:
+        raise ValueError("spearman rank correlation requires at least 2 observations")
+
+    left_floats: list[float] = []
+    for v in left_seq:
+        if isinstance(v, bool) or not isinstance(v, Real):
+            raise TypeError("sequence elements must be real numeric")
+        f = float(v)
+        if not math.isfinite(f):
+            raise ValueError("sequence elements must be finite")
+        left_floats.append(f)
+
+    right_floats: list[float] = []
+    for v in right_seq:
+        if isinstance(v, bool) or not isinstance(v, Real):
+            raise TypeError("sequence elements must be real numeric")
+        f = float(v)
+        if not math.isfinite(f):
+            raise ValueError("sequence elements must be finite")
+        right_floats.append(f)
+
+    ranks_x = _compute_mid_ranks(left_floats)
+    ranks_y = _compute_mid_ranks(right_floats)
+    n = len(ranks_x)
+    mean_rx = sum(ranks_x) / n
+    mean_ry = sum(ranks_y) / n
+    cov = sum(
+        (rx - mean_rx) * (ry - mean_ry)
+        for rx, ry in zip(ranks_x, ranks_y, strict=True)
+    )
+    var_x = sum((rx - mean_rx) ** 2 for rx in ranks_x)
+    var_y = sum((ry - mean_ry) ** 2 for ry in ranks_y)
+    denom = math.sqrt(var_x * var_y)
+    if denom == 0.0:
+        raise ValueError("cannot compute rank correlation with constant sequence")
+    corr = cov / denom
+    return max(-1.0, min(1.0, corr))
+
+
+def cosine_similarity(
+    left: Sequence[float],
+    right: Sequence[float],
+) -> float:
+    """Compute cosine similarity between two numeric vectors.
+
+    Parameters
+    ----------
+    left : Sequence[float]
+        First numeric sequence.
+    right : Sequence[float]
+        Second numeric sequence.
+
+    Returns
+    -------
+    float
+        Cosine similarity in [-1.0, 1.0].
+    """
+    if isinstance(left, (str, bytes, bytearray)) or isinstance(
+        right, (str, bytes, bytearray)
+    ):
+        raise TypeError("sequences must be numeric sequences, not text/bytes")
+    left_seq = list(left)
+    right_seq = list(right)
+    if len(left_seq) != len(right_seq):
+        raise ValueError("sequences must have equal length")
+    if not left_seq:
+        raise ValueError("sequences must not be empty")
+
+    left_floats: list[float] = []
+    for v in left_seq:
+        if isinstance(v, bool) or not isinstance(v, Real):
+            raise TypeError("sequence elements must be real numeric")
+        f = float(v)
+        if not math.isfinite(f):
+            raise ValueError("sequence elements must be finite")
+        left_floats.append(f)
+
+    right_floats: list[float] = []
+    for v in right_seq:
+        if isinstance(v, bool) or not isinstance(v, Real):
+            raise TypeError("sequence elements must be real numeric")
+        f = float(v)
+        if not math.isfinite(f):
+            raise ValueError("sequence elements must be finite")
+        right_floats.append(f)
+
+    dot_prod = 0.0
+    norm_a_sq = 0.0
+    norm_b_sq = 0.0
+    for u, v in zip(left_floats, right_floats, strict=True):
+        dot_prod += u * v
+        norm_a_sq += u * u
+        norm_b_sq += v * v
+    denom = math.sqrt(norm_a_sq) * math.sqrt(norm_b_sq)
+    if denom == 0.0:
+        raise ValueError("cosine similarity is undefined for zero-magnitude vectors")
+    sim = dot_prod / denom
+    return max(-1.0, min(1.0, sim))
+
+
+def ewma(
+    values: Sequence[float] | Iterable[float],
+    *,
+    alpha: float,
+) -> list[float]:
+    """Compute Exponentially Weighted Moving Average (EWMA) of a series.
+
+    Parameters
+    ----------
+    values : Sequence[float] | Iterable[float]
+        Sequence or iterable of numeric observations.
+    alpha : float
+        Smoothing factor in (0.0, 1.0]. Higher alpha discounts older observations faster.
+
+    Returns
+    -------
+    list[float]
+        EWMA smoothed values matching the input length.
+    """
+    if isinstance(values, (str, bytes, bytearray)):
+        raise TypeError("values must be numeric, not text/bytes")
+    if isinstance(alpha, bool) or not isinstance(alpha, Real):
+        raise TypeError("alpha must be a real numeric value")
+    alpha_f = float(alpha)
+    if not math.isfinite(alpha_f) or not (0.0 < alpha_f <= 1.0):
+        raise ValueError("alpha must be finite and in the range (0.0, 1.0]")
+
+    val_list = list(values)
+    if not val_list:
+        return []
+
+    val_floats: list[float] = []
+    for v in val_list:
+        if isinstance(v, bool) or not isinstance(v, Real):
+            raise TypeError("values must be real numeric")
+        f = float(v)
+        if not math.isfinite(f):
+            raise ValueError("values must be finite")
+        val_floats.append(f)
+
+    result: list[float] = [val_floats[0]]
+    prev = val_floats[0]
+    one_minus_alpha = 1.0 - alpha_f
+    for val in val_floats[1:]:
+        curr = alpha_f * val + one_minus_alpha * prev
+        result.append(curr)
+        prev = curr
+    return result
+
+
 __all__ = [
     "BootstrapMeanCI",
     "ECDFPoint",
@@ -1080,7 +1298,9 @@ __all__ = [
     "RunningStats",
     "SummaryStats",
     "bootstrap_mean_ci",
+    "cosine_similarity",
     "ecdf",
+    "ewma",
     "mad_outlier_indices",
     "median_absolute_deviation",
     "normal_mean_summary",
@@ -1088,6 +1308,7 @@ __all__ = [
     "pareto_dominates",
     "pareto_frontier",
     "percentile",
+    "spearman_rank_correlation",
     "summarize",
 ]
 

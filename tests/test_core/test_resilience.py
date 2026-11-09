@@ -22,7 +22,7 @@ from gunz_utils.resilience import (
 
 
 class TestCircuitBreaker(unittest.IsolatedAsyncioTestCase):
-    async def test_rejects_invalid_configuration(self) -> None:
+    def test_rejects_invalid_configuration(self) -> None:
         for value in (0, -1, True):
             with self.subTest(failure_threshold=value):
                 with self.assertRaises(ValueError):

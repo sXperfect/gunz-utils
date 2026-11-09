@@ -77,7 +77,7 @@ class TestAsyncCache(unittest.IsolatedAsyncioTestCase):
 
 
 class TestRetryBudget(unittest.IsolatedAsyncioTestCase):
-    async def test_sync_budget_prevents_sleep_past_deadline(self) -> None:
+    def test_sync_budget_prevents_sleep_past_deadline(self) -> None:
         calls = 0
 
         @retry(attempts=10, base_delay=1, jitter=False, timeout=0)

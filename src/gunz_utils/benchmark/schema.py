@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 PERFORMANCE_SCHEMA_VERSION = 1
@@ -16,15 +17,17 @@ class PerformanceSchemaError(ValueError):
 
 
 def validate_performance_run(
-    data: dict[str, Any],
+    data: Mapping[str, Any],
 ) -> None:
     """Validate required PerformanceRun fields and supported schema version.
 
     Parameters
     ----------
-    data : dict[str, Any]
+    data : Mapping[str, Any]
         data parameter.
     """
+    if not isinstance(data, Mapping):
+        raise PerformanceSchemaError(f"expected Mapping, got {type(data).__name__}")
     version = data.get("schema_version")
     if (
         isinstance(version, bool)

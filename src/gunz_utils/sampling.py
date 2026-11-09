@@ -94,6 +94,12 @@ def sample_named_items(
         raise TypeError(f"limit must be int or None, got {type(limit).__name__}")
     if limit is not None and limit < 0:
         raise ValueError("limit must be non-negative or None")
+    if isinstance(include_patterns, (str, bytes, bytearray)):
+        raise TypeError("include_patterns must be an iterable of strings, not a string")
+    if isinstance(exclude_patterns, (str, bytes, bytearray)):
+        raise TypeError("exclude_patterns must be an iterable of strings, not a string")
+    if limit == 0:
+        return []
 
     eligible: list[tuple[str, T]] = []
     seen_names: set[str] = set()
@@ -119,9 +125,10 @@ def sample_named_items(
             continue
         eligible.append((name, value))
 
+    priorities = {name: stable_priority(name, seed=seed) for name, _ in eligible}
     eligible.sort(
         key=lambda item: (
-            stable_priority(item[0], seed=seed),
+            priorities[item[0]],
             item[0],
         )
     )

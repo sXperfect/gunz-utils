@@ -1,0 +1,1 @@
+Strengthened C native accelerator bounds checks and introselect median-absolute-deviation, sanitized Windows and Unix path edge-cases, enhanced async circuit breaker and concurrency cancellation safety, and significantly optimized test execution speed with zero-dependency standalone test runner.

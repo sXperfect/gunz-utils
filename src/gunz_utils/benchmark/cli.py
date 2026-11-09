@@ -18,6 +18,9 @@ from .io import load_result
 from .process import profile_command
 
 
+__all__ = ["main"]
+
+
 def main(
     argv: list[str] | None = None,
 ) -> int:

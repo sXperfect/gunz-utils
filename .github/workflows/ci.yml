@@ -73,6 +73,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             base_sha="${{ github.event.pull_request.base.sha }}"
             git fetch origin "$base_sha" --depth=1
+            python scripts/release.py check-fragment --base "$base_sha"
             changed_files="$(git diff --name-only "$base_sha" HEAD)"
 
             if [[ -z "$changed_files" ]]; then

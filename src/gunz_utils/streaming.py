@@ -15,7 +15,7 @@ from typing import Any, BinaryIO, TextIO
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
-from .serialization import canonical_json
+from .serialization import canonical_json, to_jsonable
 
 
 def _reject_json_constant(
@@ -71,13 +71,21 @@ def iter_jsonl(
     ):
         raise ValueError("max_line_length must be a positive integer or None")
 
-    for line in handle:
-        if max_line_length is not None and len(line) > max_line_length:
-            raise ValueError(
-                f"JSON Lines record exceeds maximum line length ({max_line_length})"
-            )
-        if line.strip():
-            yield json.loads(line, parse_constant=_reject_json_constant)
+    if max_line_length is not None:
+        while True:
+            line = handle.readline(max_line_length + 1)
+            if not line:
+                break
+            if len(line) > max_line_length or (not line.endswith("\n") and bool(handle.readline(1))):
+                raise ValueError(
+                    f"JSON Lines record exceeds maximum line length ({max_line_length})"
+                )
+            if line.strip():
+                yield json.loads(line, parse_constant=_reject_json_constant)
+    else:
+        for line in handle:
+            if line.strip():
+                yield json.loads(line, parse_constant=_reject_json_constant)
 
 
 def write_jsonl(
@@ -103,7 +111,7 @@ def write_jsonl(
     for record in records:
         buffer.append(
             json.dumps(
-                record,
+                to_jsonable(record),
                 separators=(",", ":"),
                 allow_nan=False,
             )

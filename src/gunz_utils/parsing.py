@@ -30,7 +30,7 @@ _FALSE_STRINGS = frozenset({"0", "false", "f", "no", "n", "off"})
 def _stripped(
     value: Any,
 ) -> Any:
-    """Strip surrounding whitespace from strings while preserving other types.
+    """Strip surrounding whitespace from strings, bytes, or bytearrays while preserving other types.
 
     Parameters
     ----------
@@ -43,6 +43,8 @@ def _stripped(
         The result of the operation.
     """
     if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (bytes, bytearray)):
         return value.strip()
     return value
 
@@ -73,6 +75,10 @@ def safe_int(
     int or None
         Parsed integer, or ``default`` on failure.
     """
+    if isinstance(base, bool) or not isinstance(base, int) or not (base == 0 or 2 <= base <= 36):
+        return default
+    if min is not None and max is not None and min > max:
+        return default
     stripped = _stripped(value)
     if isinstance(stripped, bool):
         return default
@@ -120,6 +126,8 @@ def safe_float(
     float or None
         Parsed float, or ``default`` on failure.
     """
+    if min is not None and max is not None and min > max:
+        return default
     stripped = _stripped(value)
     if isinstance(stripped, bool):
         return default
@@ -136,6 +144,8 @@ def safe_float(
         return default
     if max is not None and result > max:
         return default
+    if result == 0.0:
+        result = 0.0
     return result
 
 
@@ -162,6 +172,11 @@ def safe_bool(
     if isinstance(value, int) and value in (0, 1):
         return bool(value)
     stripped = _stripped(value)
+    if isinstance(stripped, (bytes, bytearray)):
+        try:
+            stripped = stripped.decode("utf-8")
+        except UnicodeDecodeError:
+            return default
     if not isinstance(stripped, str):
         return default
     #? Case-insensitive canonical tokens make env/config values user-friendly.

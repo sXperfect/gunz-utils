@@ -16,7 +16,7 @@ from types import MappingProxyType
 # =============================================================================
 from .hashing import structured_hash
 from .io import atomic_write
-from .serialization import json_dumps
+from .serialization import json_dumps, json_loads
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,7 +46,9 @@ class PartitionManifest:
                 )
             values = tuple(identifiers)
             if any(
-                not isinstance(identifier, str) or not identifier
+                not isinstance(identifier, str)
+                or not identifier
+                or not identifier.strip()
                 for identifier in values
             ):
                 raise ValueError(
@@ -136,6 +138,41 @@ class PartitionManifest:
         )
         return target
 
+    @classmethod
+    def load(cls,
+        path: str | Path,
+    ) -> PartitionManifest:
+        """Load and validate partitions from a JSON manifest file.
+
+        Parameters
+        ----------
+        path : str | Path
+            Path to the JSON manifest.
+
+        Returns
+        -------
+        PartitionManifest
+            Loaded and verified manifest.
+
+        Raises
+        ------
+        ValueError
+            If the stored fingerprint does not match the computed fingerprint.
+        """
+        target = Path(path)
+        content = target.read_text(encoding="utf-8")
+        data = json_loads(content)
+        if not isinstance(data, Mapping) or "partitions" not in data:
+            raise ValueError("invalid partition manifest format")
+        manifest = cls(partitions=data["partitions"])
+        stored_fingerprint = data.get("fingerprint")
+        if stored_fingerprint is not None and stored_fingerprint != manifest.fingerprint:
+            raise ValueError(
+                f"partition manifest fingerprint mismatch: expected {stored_fingerprint!r}, "
+                f"computed {manifest.fingerprint!r}"
+            )
+        return manifest
+
 
 __all__ = [
     "PartitionManifest",
@@ -168,6 +205,10 @@ def partition_overlaps(
         if not isinstance(name, str) or not name.strip():
             raise ValueError(
                 "partition names must be non-empty strings"
+            )
+        if isinstance(values, (str, bytes, bytearray)):
+            raise TypeError(
+                f"partition {name!r} items must be an iterable of hashables, not a string"
             )
         try:
             groups[name] = set(values)

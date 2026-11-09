@@ -55,6 +55,12 @@ docs = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gunz_utils"]
+exclude = [
+    "src/gunz_utils/*.so",
+    "src/gunz_utils/*.pyd",
+    "src/gunz_utils/*.dylib",
+    "src/gunz_utils/*.dll",
+]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/", "native/", "scripts/build_native.py"]

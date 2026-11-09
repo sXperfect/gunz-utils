@@ -7,7 +7,14 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Iterable
+from collections.abc import (
+    AsyncIterable,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Coroutine,
+    Iterable,
+)
 from typing import Any, TypeVar, cast
 
 T = TypeVar("T")
@@ -17,7 +24,7 @@ _DONE = object()
 
 async def worker_map(
     func: Callable[[T], Awaitable[R]],
-    items: Iterable[T],
+    items: Iterable[T] | AsyncIterable[T],
     *,
     workers: int,
     queue_size: int | None = None,
@@ -27,19 +34,23 @@ async def worker_map(
     Parameters
     ----------
     func : Callable[[T], Awaitable[R]]
-        func parameter.
-    items : Iterable[T]
-        items parameter.
+        Async worker function.
+    items : Iterable[T] | AsyncIterable[T]
+        Synchronous or asynchronous iterable of items.
     workers : int
-        workers parameter.
+        Number of concurrent workers.
     queue_size : int | None
-        queue_size parameter.
+        Queue bounds, or None for 2 * workers.
 
     Returns
     -------
     AsyncIterator[R]
-        The result of the operation.
+        Async iterator of mapped results.
     """
+    if not callable(func):
+        raise TypeError("func must be callable")
+    if not isinstance(items, (Iterable, AsyncIterable)):
+        raise TypeError("items must be an Iterable or AsyncIterable")
     if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
         raise ValueError("workers must be a positive integer")
     if queue_size is not None and (
@@ -79,8 +90,12 @@ async def worker_map(
         """
         await started.wait()
         try:
-            for item in items:
-                await incoming.put(item)
+            if isinstance(items, AsyncIterable):
+                async for item in items:
+                    await incoming.put(item)
+            else:
+                for item in items:
+                    await incoming.put(item)
         except asyncio.CancelledError:
             raise
         except BaseException as exc:

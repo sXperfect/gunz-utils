@@ -30,7 +30,7 @@ try:
 except (ImportError, AttributeError):  # pragma: no cover
     _accel_physical_lines = None
 
-__author__ = "Yeremia Gunz"
+__author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = [
@@ -94,7 +94,9 @@ def atomic_write(
     elif not target.parent.exists():
         raise FileNotFoundError(f"Parent directory does not exist: {target.parent}")
 
-    is_binary = "b" in mode
+    if mode not in ("w", "wb"):
+        raise ValueError("mode must be 'w' or 'wb'")
+    is_binary = mode == "wb"
     if is_binary and isinstance(content, str):
         raise ValueError("Binary mode requires bytes content")
     if not is_binary and isinstance(content, bytes):
@@ -117,18 +119,11 @@ def atomic_write(
         )
         #? Keep raw ownership even if wrapper construction closes an incomplete
         #? wrapper before raising (for example for an unknown text encoding).
-        if is_binary:
-            with file_handle as file:
-                file.write(content)
-                if durable:
-                    file.flush()
-                    os.fsync(file.fileno())
-        else:
-            with file_handle as file:
-                file.write(content)
-                if durable:
-                    file.flush()
-                    os.fsync(file.fileno())
+        with file_handle as file:
+            file.write(content)
+            if durable:
+                file.flush()
+                os.fsync(file.fileno())
         os.replace(tmp_path, target)
         if durable and hasattr(os, "O_DIRECTORY"):
             dir_fd = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
@@ -407,7 +402,7 @@ class FileSnapshot:
 def read_file_snapshot(
     path: str | pathlib.Path,
     *,
-    encoding: str = "utf-8",
+    encoding: str | None = "utf-8",
     max_bytes: int | None = None,
 ) -> FileSnapshot:
     """Read a regular file once into an immutable snapshot.
@@ -478,14 +473,20 @@ def read_file_snapshot(
     finally:
         os.close(fd)
 
-    text = raw.decode(encoding)
-    newline_match = _PHYSICAL_NEWLINE.search(text)
-    newline = newline_match.group() if newline_match else "\n"
+    if encoding is not None:
+        text = raw.decode(encoding)
+        newline_match = _PHYSICAL_NEWLINE.search(text)
+        newline = newline_match.group() if newline_match else "\n"
+        effective_encoding = encoding
+    else:
+        text = ""
+        newline = "\n"
+        effective_encoding = "binary"
     return FileSnapshot(
         path=target,
         raw=raw,
         text=text,
-        encoding=encoding,
+        encoding=effective_encoding,
         newline=newline,
         stat_identity=_stat_identity(st),
     )
@@ -514,7 +515,7 @@ def read_source_file(
 
     target = pathlib.Path(path)
     snapshot = read_file_snapshot(
-        target, encoding="latin-1", max_bytes=max_bytes
+        target, encoding=None, max_bytes=max_bytes
     )
     raw = snapshot.raw
     probe = (line + b"\n" for line in _BYTE_NEWLINE.split(raw, maxsplit=2)[:2])

@@ -29,6 +29,7 @@ _MAX_FILENAME_INPUT_LENGTH = 4096  #? Security: limit input size to prevent DoS
 
 __all__ = [
     "NameAccessPolicy",
+    "is_safe_relative_path",
     "open_path_under_base",
     "safe_path_join",
     "sanitize_filename",
@@ -54,6 +55,40 @@ def _get_replacement_pattern(
     #? Replacement alphabets are tiny in practice, so a bounded cache avoids
     #? repeated compilation without allowing user input to grow memory forever.
     return re.compile(f"{re.escape(replacement)}+")
+
+
+_WINDOWS_RESERVED = frozenset({
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "COM0",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "COM¹",
+    "COM²",
+    "COM³",
+    "LPT0",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
+    "LPT¹",
+    "LPT²",
+    "LPT³",
+})
 
 
 def sanitize_filename(
@@ -111,12 +146,12 @@ def sanitize_filename(
     #? control characters to limit cache churn and string-allocation abuse.
     if len(replacement) > 16:
         raise ValueError("Replacement string is too long (max 16 chars)")
-    if any(ord(c) < 0x20 for c in replacement):
+    if any(ord(c) < 0x20 or ord(c) == 0x7F or 0x80 <= ord(c) <= 0x9F for c in replacement):
         raise ValueError("Replacement string contains control characters")
 
     #? 2. Get base name to avoid directories/path traversal via slashes
-    # ? os.path.basename strips any directory components, neutralizing ".." attacks
-    filename = os.path.basename(filename)
+    # ? Normalize backslashes before getting basename to handle Windows separators uniformly
+    filename = os.path.basename(filename.replace("\\", "/"))
 
     #? 3. Replace dangerous characters
     # ? Keep only alphanumeric, ., -, _ using negated character class
@@ -145,7 +180,13 @@ def sanitize_filename(
     if not filename:
         raise ValueError("Filename is empty after sanitization")
 
-    #? 7. Check length (common filesystem limit)
+    #? 7. Check for Windows reserved filenames
+    root = filename.partition(".")[0]
+    if root.upper() in _WINDOWS_RESERVED:
+        prefix = replacement if replacement else "_"
+        filename = prefix + filename
+
+    #? 8. Check length (common filesystem limit)
     encoded = filename.encode("utf-8")
     if len(encoded) > 255:
         encoded = encoded[:255]
@@ -155,53 +196,9 @@ def sanitize_filename(
                 break
             except UnicodeDecodeError:
                 encoded = encoded[:-1]
-        filename = filename.rstrip(replacement + ".")
+        filename = filename.rstrip(replacement + ".-")
         if not filename:
             raise ValueError("Filename is empty after byte-length truncation")
-
-    #? 8. Check for Windows reserved filenames
-    # ? CON, PRN, AUX, NUL, COM1-9, LPT1-9 are reserved on Windows
-    # ? See: https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
-    # ? Windows checks the "base" name up to the first dot.
-    # ? e.g. "CON.txt" and "CON.tar.gz" are both invalid.
-    # ? We use partition('.')[0] instead of os.path.splitext because
-    # ? splitext only splits the last extension.
-    root = filename.partition(".")[0]
-
-    # ? Performance Optimization (⚡ Bolt):
-    # ? Instead of indiscriminately doing .upper() and looking up in a set,
-    # ? we first check if the length of `root` is 3 or 4, since all reserved
-    # ? names are exactly 3 or 4 chars.
-    # ? Using `==` with `or` is measurably faster than `in {3, 4}` for simple
-    # ? integer checks.
-    root_len = len(root)
-    if (root_len == 3 or root_len == 4) and root.upper() in {
-        "CON",
-        "PRN",
-        "AUX",
-        "NUL",
-        "COM1",
-        "COM2",
-        "COM3",
-        "COM4",
-        "COM5",
-        "COM6",
-        "COM7",
-        "COM8",
-        "COM9",
-        "LPT1",
-        "LPT2",
-        "LPT3",
-        "LPT4",
-        "LPT5",
-        "LPT6",
-        "LPT7",
-        "LPT8",
-        "LPT9",
-    }:
-        #? Ensure we actually modify the filename even if replacement is empty
-        prefix = replacement if replacement else "_"
-        filename = prefix + filename
 
     return filename
 
@@ -296,7 +293,7 @@ def open_path_under_base(
     #? them so O_NOFOLLOW can reject both intermediate and final components.
     relative = os.path.join(*paths) if paths else "."
     parts = Path(relative).parts
-    if not parts or parts == (".",):
+    if not parts or parts == (".",) or any(part in ("..", ".") for part in parts) or any(not part for part in parts):
         raise ValueError("path must identify a regular file under base directory")
 
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -324,7 +321,11 @@ def open_path_under_base(
             raise
     finally:
         os.close(current_fd)
-    return os.fdopen(fd, mode)
+    try:
+        return os.fdopen(fd, mode)
+    except BaseException:
+        os.close(fd)
+        raise
 
 
 
@@ -447,3 +448,44 @@ class NameAccessPolicy:
         if not isinstance(name, str) or not name:
             raise ValueError("name must be a non-empty string")
         return name
+
+
+def is_safe_relative_path(
+    path: str | Path,
+) -> bool:
+    """Check if a relative path is safe from traversal and absolute resolution.
+
+    Returns False if path is absolute, contains '..', has Windows drive prefixes,
+    contains null bytes, or starts with a leading slash/backslash.
+
+    Parameters
+    ----------
+    path : str | Path
+        Relative path candidate.
+
+    Returns
+    -------
+    bool
+        True if the path is safely contained within a relative root.
+    """
+    if not isinstance(path, (str, Path)):
+        return False
+    text = str(path)
+    if not text:
+        return False
+    if "\0" in text:
+        return False
+    normalized = text.replace("\\", "/")
+    if normalized.startswith("/"):
+        return False
+    if len(normalized) >= 2 and normalized[1] == ":" and normalized[0].isalpha():
+        return False
+    parts = normalized.split("/")
+    depth = 0
+    for part in parts:
+        if not part or part == ".":
+            continue
+        if part == "..":
+            return False
+        depth += 1
+    return depth > 0

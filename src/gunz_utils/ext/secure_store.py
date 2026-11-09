@@ -197,6 +197,9 @@ class _ReentrantFileLock:
                     flags |= os.O_NOFOLLOW
                 fd = os.open(self._path, flags, _KEY_FILE_MODE)
                 try:
+                    st = os.fstat(fd)
+                    if not stat.S_ISREG(st.st_mode):
+                        raise ValueError("lock file must be a regular file")
                     if os.name == "posix":
                         os.fchmod(fd, _KEY_FILE_MODE)
                     _lock_fd(fd)
@@ -1877,7 +1880,7 @@ def main_unlock_interactive() -> SecureStore:
         The result of the operation.
     """
     store = SecureStore()
-    if store._salt_path.exists():
+    if store._salt_path.exists() or store._pending_salt_path.exists():
         import getpass
 
         pw = getpass.getpass("Master passphrase: ")

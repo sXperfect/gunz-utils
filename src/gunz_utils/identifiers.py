@@ -46,7 +46,7 @@ def deterministic_id(
 
 
 def short_id(
-    value: str,
+    value: str | bytes,
     *,
     length: int = 12,
 ) -> str:
@@ -54,7 +54,7 @@ def short_id(
 
     Parameters
     ----------
-    value : str
+    value : str | bytes
         value parameter.
     length : int
         length parameter.
@@ -64,8 +64,8 @@ def short_id(
     str
         The result of the operation.
     """
-    if not isinstance(value, str):
-        raise TypeError("value must be a string")
+    if not isinstance(value, (str, bytes)):
+        raise TypeError("value must be a string or bytes")
     if (
         isinstance(length, bool)
         or not isinstance(length, int)
@@ -73,7 +73,44 @@ def short_id(
         or length > 64
     ):
         raise ValueError("length must be between 4 and 64")
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:length]
+    raw = value.encode("utf-8") if isinstance(value, str) else value
+    return hashlib.sha256(raw).hexdigest()[:length]
 
 
-__all__ = ["deterministic_id", "new_id", "short_id"]
+def is_valid_uuid(
+    value: str,
+    *,
+    version: int | None = None,
+) -> bool:
+    """Validate whether value is a valid UUID string, optionally checking version.
+
+    Parameters
+    ----------
+    value : str
+        Candidate UUID string.
+    version : int | None
+        Expected UUID version (1-5) or None.
+
+    Returns
+    -------
+    bool
+        True if value is a valid UUID matching the version requirement.
+    """
+    if not isinstance(value, str):
+        return False
+    if version is not None and (
+        isinstance(version, bool)
+        or not isinstance(version, int)
+        or version not in (1, 2, 3, 4, 5)
+    ):
+        raise ValueError("version must be an integer between 1 and 5 or None")
+    try:
+        parsed = uuid.UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return False
+    if version is not None and parsed.version != version:
+        return False
+    return True
+
+
+__all__ = ["deterministic_id", "is_valid_uuid", "new_id", "short_id"]

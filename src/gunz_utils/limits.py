@@ -57,7 +57,7 @@ class Limits:
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
             raise ValueError("size must be a non-negative integer")
         if self.max_bytes is not None and size > self.max_bytes:
-            raise ValueError("byte limit exceeded")
+            raise BudgetExceededError("byte limit exceeded")
 
     def check_items(self,
         count: int,
@@ -72,7 +72,7 @@ class Limits:
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise ValueError("count must be a non-negative integer")
         if self.max_items is not None and count > self.max_items:
-            raise ValueError("item limit exceeded")
+            raise BudgetExceededError("item limit exceeded")
 
     def check_steps(self,
         count: int,
@@ -87,7 +87,22 @@ class Limits:
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise ValueError("count must be a non-negative integer")
         if self.max_steps is not None and count > self.max_steps:
-            raise ValueError("step limit exceeded")
+            raise BudgetExceededError("step limit exceeded")
+
+    def check_depth(self,
+        depth: int,
+    ) -> None:
+        """Verify depth does not exceed max_depth.
+
+        Parameters
+        ----------
+        depth : int
+            depth parameter.
+        """
+        if isinstance(depth, bool) or not isinstance(depth, int) or depth < 0:
+            raise ValueError("depth must be a non-negative integer")
+        if self.max_depth is not None and depth > self.max_depth:
+            raise BudgetExceededError("depth limit exceeded")
 
 
 class ResourceBudget:
@@ -162,6 +177,8 @@ class ResourceBudget:
         ResourceBudget
             The result of the operation.
         """
+        if not isinstance(limits, Limits):
+            raise TypeError(f"limits must be a Limits instance, got {type(limits).__name__}")
         return cls(
             max_bytes=limits.max_bytes,
             max_items=limits.max_items,
@@ -170,6 +187,25 @@ class ResourceBudget:
             max_steps=limits.max_steps,
             clock=clock,
         )
+
+    def snapshot(self) -> dict[str, int | float | None]:
+        """Return a snapshot of current resource utilization and limits.
+
+        Returns
+        -------
+        dict[str, int | float | None]
+            Mapping of metrics and limits.
+        """
+        return {
+            "bytes_used": self.bytes_used,
+            "max_bytes": self.max_bytes,
+            "items_used": self.items_used,
+            "max_items": self.max_items,
+            "steps_used": self.steps_used,
+            "max_steps": self.max_steps,
+            "max_depth": self.max_depth,
+            "timeout": self.timeout,
+        }
 
     def consume_bytes(self,
         amount: int,

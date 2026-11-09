@@ -11,6 +11,7 @@ ensuring scripts run correctly regardless of their execution directory.
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
+__all__ = ["resolve_project_root"]
 
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
@@ -94,7 +95,7 @@ def _inject_to_sys_path(
 
 
 def resolve_project_root(
-    anchor: str = ".",
+    anchor: str | pathlib.Path = ".",
     inject_to_sys_path: bool = True,
     src: bool = False,
     subpaths: t.Sequence[str | pathlib.Path] = (),

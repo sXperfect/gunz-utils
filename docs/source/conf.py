@@ -37,6 +37,7 @@ html_static_path = ['_static']
 #? Mock imports for external dependencies
 autodoc_mock_imports = [
     "pydantic", "pydantic_core", "cryptography", "git", "gitpython", "loguru",
+    "matplotlib", "IPython",
 ]
 
 #? Napoleon settings

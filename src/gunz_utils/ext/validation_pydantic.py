@@ -17,6 +17,7 @@ from pydantic import ValidationError, validate_call
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
+__all__ = ["type_checked"]
 
 
 def type_checked(

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 import math
 import sys
 import time
@@ -15,16 +16,23 @@ import time
 class AsyncRateLimiter:
     """Token-bucket limiter with bounded burst capacity."""
 
-    def __init__(self,
+    def __init__(
+        self,
         rate: float,
         *,
         capacity: float | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
+        if clock is not None and not callable(clock):
+            raise TypeError("clock must be callable")
+        self._clock: Callable[[], float] = (
+            clock if clock is not None else (lambda: time.monotonic())
+        )
         self.rate = self._finite_positive(rate, name="rate")
         raw_capacity = max(1.0, self.rate) if capacity is None else capacity
         self.capacity = self._finite_positive(raw_capacity, name="capacity")
         self._tokens = self.capacity
-        self._updated = time.monotonic()
+        self._updated = self._clock()
         self._lock = asyncio.Lock()
 
     @property
@@ -36,7 +44,7 @@ class AsyncRateLimiter:
         float
             The result of the operation.
         """
-        elapsed = time.monotonic() - self._updated
+        elapsed = max(0.0, self._clock() - self._updated)
         try:
             tokens = self._tokens + elapsed * self.rate
         except OverflowError:
@@ -91,7 +99,15 @@ class AsyncRateLimiter:
             or not 0 <= timeout <= sys.float_info.max
         ):
             raise ValueError("timeout must be a finite non-negative number or None")
-        deadline = None if timeout is None else time.monotonic() + timeout
+        if timeout is not None:
+            try:
+                deadline = self._clock() + timeout
+            except OverflowError:
+                raise OverflowError("timeout deadline calculation overflowed")
+            if not math.isfinite(deadline):
+                raise OverflowError("timeout deadline calculation overflowed")
+        else:
+            deadline = None
         first_attempt = True
         while True:
             async with self._lock:
@@ -100,7 +116,7 @@ class AsyncRateLimiter:
                     if (
                         not first_attempt
                         and deadline is not None
-                        and time.monotonic() > deadline
+                        and self._clock() > deadline
                     ):
                         raise TimeoutError("rate-limit acquisition timed out")
                     self._tokens -= tokens
@@ -112,7 +128,7 @@ class AsyncRateLimiter:
                     wait = float("inf")
             first_attempt = False
             if deadline is not None:
-                budget = deadline - time.monotonic()
+                budget = deadline - self._clock()
                 if budget <= 0 or wait > budget or not math.isfinite(wait):
                     raise TimeoutError("rate-limit acquisition timed out")
             elif not math.isfinite(wait):
@@ -175,8 +191,8 @@ class AsyncRateLimiter:
 
         No parameters and no return value.
         """
-        now = time.monotonic()
-        elapsed = now - self._updated
+        now = self._clock()
+        elapsed = max(0.0, now - self._updated)
         try:
             tokens = self._tokens + elapsed * self.rate
         except OverflowError:

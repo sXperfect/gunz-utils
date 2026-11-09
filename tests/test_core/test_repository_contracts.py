@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import ast
+import functools
 import re
 import tomllib
 from pathlib import Path
@@ -29,6 +30,7 @@ README = PROJECT_ROOT / "README.md"
 INSTALLATION = PROJECT_ROOT / "docs" / "source" / "installation.md"
 
 
+@functools.lru_cache(maxsize=None)
 def _declares_public_all(
     path: Path,
 ) -> bool:

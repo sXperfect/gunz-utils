@@ -23,7 +23,10 @@ import typing as t
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
-from .ext.project_gitpython import resolve_project_root
+try:
+    from .ext.project_gitpython import resolve_project_root
+except ImportError:
+    from .ext.project_stdlib import resolve_project_root
 
 try:
     from IPython import get_ipython

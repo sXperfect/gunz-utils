@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from .result import BenchmarkResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StabilityReport:
     """Noise diagnostics for one benchmark result."""
 
@@ -49,6 +49,8 @@ def analyze_stability(
     StabilityReport
         The result of the operation.
     """
+    if not isinstance(result, BenchmarkResult):
+        raise TypeError(f"expected BenchmarkResult, got {type(result).__name__}")
     for name, value in (
         ("max_cv", max_cv),
         ("max_relative_range", max_relative_range),

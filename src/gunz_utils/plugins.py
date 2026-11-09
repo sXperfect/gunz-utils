@@ -126,6 +126,7 @@ def discover_plugins(
 
 
 _FILE_MODULE_PREFIX = "_gunz_file_"
+_REGISTERED_FILE_MODULES: dict[str, Path] = {}
 
 
 class GunzFileFinder(importlib.abc.MetaPathFinder):
@@ -138,6 +139,9 @@ class GunzFileFinder(importlib.abc.MetaPathFinder):
     ) -> importlib.machinery.ModuleSpec | None:
         if not fullname.startswith(_FILE_MODULE_PREFIX):
             return None
+        registered_path = _REGISTERED_FILE_MODULES.get(fullname)
+        if registered_path is None:
+            return None
         hex_encoded = fullname[len(_FILE_MODULE_PREFIX) :]
         if not hex_encoded:
             return None
@@ -148,7 +152,7 @@ class GunzFileFinder(importlib.abc.MetaPathFinder):
         if "\x00" in raw_path:
             return None
         file_path = Path(raw_path)
-        if not file_path.is_absolute():
+        if file_path != registered_path or not file_path.is_absolute():
             return None
         try:
             st = file_path.lstat()
@@ -240,6 +244,7 @@ def load_module_from_path(
 
     install_file_module_finder()
     module_name = make_file_module_name(target, prefix=prefix)
+    _REGISTERED_FILE_MODULES[module_name] = target
 
     if not reload and module_name in sys.modules:
         return sys.modules[module_name]

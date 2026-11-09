@@ -124,7 +124,11 @@ def build(
         cc = os.environ.get("CC", "clang" if sys.platform == "darwin" else "gcc")
         cmd = [
             cc,
+            "-std=c11",
             "-O3",
+            "-Wall",
+            "-Wextra",
+            "-Wno-unused-parameter",
             "-shared",
             "-fPIC",
             f"-I{py_inc}",

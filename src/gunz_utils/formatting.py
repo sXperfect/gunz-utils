@@ -155,10 +155,12 @@ def format_bytes(
     )
     if n < base:
         return f"{int(n)} {suffixes[0]}"
-    for _i, suffix in enumerate(suffixes[1:], start=1):
-        n /= base
-        if n < base:
-            return f"{n:.{precision}f} {suffix}"
+    for idx, suffix in enumerate(suffixes[1:], start=1):
+        next_n = n / base
+        formatted = f"{next_n:.{precision}f}"
+        if float(formatted) < base or idx == len(suffixes) - 1:
+            return f"{formatted} {suffix}"
+        n = next_n
     return f"{n:.{precision}f} {suffixes[-1]}"
 
 
@@ -205,9 +207,15 @@ def format_duration(
     #? Sub-second values are reported as whole milliseconds to avoid
     #? log lines like "0.0001s" that bury the signal in noise.
     if seconds < 1:
-        return f"{int(seconds * 1000)}ms"
+        ms = int(seconds * 1000)
+        if ms < 1000:
+            return f"{ms}ms"
+        seconds = 1.0
     if seconds < 60:
-        return f"{seconds:.{precision}f}s"
+        formatted = f"{seconds:.{precision}f}"
+        if float(formatted) < 60:
+            return f"{formatted}s"
+        seconds = 60.0
     #? Composite segments (minutes and above) drop sub-second precision
     #? via int(): a 90.4s call becomes "1m 30s", which reads better than
     #? "1m 30.4s" in scrollback.
@@ -263,10 +271,12 @@ def format_count(
         return str(n)
     sign = "-" if n < 0 else ""
     value = Decimal(abs(n))
-    for suffix in ["K", "M", "B", "T"]:
+    suffixes = ["K", "M", "B", "T"]
+    for idx, suffix in enumerate(suffixes):
         value /= 1000
-        if value < 1000:
-            return f"{sign}{value:.{precision}f}{suffix}"
+        formatted = f"{value:.{precision}f}"
+        if Decimal(formatted) < 1000 or idx == len(suffixes) - 1:
+            return f"{sign}{formatted}{suffix}"
     return f"{sign}{value:.{precision}f}T"
 
 

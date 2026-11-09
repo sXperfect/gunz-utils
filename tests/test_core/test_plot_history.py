@@ -21,7 +21,7 @@ class TestPlotHistory(unittest.TestCase):
 
     def setUp(self) -> None:
         """Build deterministic statistics without depending on timer values."""
-        result = benchmark(lambda: None, warmup=0, iterations=2)
+        result = benchmark(lambda: None, warmup=0, iterations=2, loops=1)
         first = replace(result, stats=replace(result.stats, median=1.0, mean=2.0))
         second = replace(result, stats=replace(result.stats, median=3.0, mean=4.0))
         self.history = BenchmarkHistory().add("release", first).add("release", second)

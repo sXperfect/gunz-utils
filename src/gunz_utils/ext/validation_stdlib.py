@@ -87,13 +87,15 @@ def _check_one(
             for candidate in args
         )
 
-    if origin is list:
-        return isinstance(value, list) and (
+    if origin in (list, cabc.Sequence) and origin is not tuple:
+        if origin is cabc.Sequence and isinstance(value, (str, bytes, bytearray)):
+            return False
+        return isinstance(value, origin) and (
             not args or all(_check_one(item, args[0]) for item in value)
         )
 
-    if origin is dict:
-        if not isinstance(value, dict):
+    if origin in (dict, cabc.Mapping):
+        if not isinstance(value, origin):
             return False
         if len(args) != 2:
             return True
@@ -115,7 +117,7 @@ def _check_one(
             for item, expected in zip(value, args, strict=True)
         )
 
-    if origin in (set, frozenset):
+    if origin in (set, frozenset, cabc.Set):
         if not isinstance(value, origin):
             return False
         return not args or all(_check_one(item, args[0]) for item in value)

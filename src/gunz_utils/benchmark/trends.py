@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from .history import BenchmarkHistory
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HistorySummary:
     metric: str
     slope_per_step: float
@@ -72,11 +72,11 @@ def summarize_history(
         xs = list(range(len(values)))
         x_mean = statistics.fmean(xs)
         y_mean = statistics.fmean(values)
-        numerator = sum(
+        numerator = math.fsum(
             (x - x_mean) * (y - y_mean)
             for x, y in zip(xs, values, strict=True)
         )
-        denominator = sum((x - x_mean) ** 2 for x in xs)
+        denominator = math.fsum((x - x_mean) ** 2 for x in xs)
         slope = 0.0 if denominator == 0 else numerator / denominator
     previous = values[max(0, len(values) - baseline_window - 1):-1]
     baseline = statistics.median(previous) if previous else values[0]

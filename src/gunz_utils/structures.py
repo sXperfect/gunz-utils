@@ -13,11 +13,12 @@ import heapq
 import math
 import typing as t  #? Community-standard alias for typing imports.
 from collections import deque
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Set
 from dataclasses import dataclass
 from types import MappingProxyType
 
 T = t.TypeVar("T")
+_BOOL_SENTINEL = object()
 
 
 class RingBuffer(t.Generic[T]):
@@ -29,7 +30,13 @@ class RingBuffer(t.Generic[T]):
         if isinstance(capacity, bool) or not isinstance(capacity, int) or capacity < 1:
             raise ValueError("capacity must be a positive integer")
         #? deque(maxlen=...) evicts the oldest item once the cap is reached.
+        self._capacity = capacity
         self._data: deque[T] = deque(maxlen=capacity)
+
+    @property
+    def capacity(self) -> int:
+        """Return the maximum buffer capacity."""
+        return self._capacity
 
     def append(self,
         value: T,
@@ -47,6 +54,49 @@ class RingBuffer(t.Generic[T]):
         """
         self._data.append(value)
 
+    def extend(self,
+        values: Iterable[T],
+    ) -> None:
+        """Append multiple values, evicting older elements as needed."""
+        self._data.extend(values)
+
+    def clear(self) -> None:
+        """Remove all elements from the buffer."""
+        self._data.clear()
+
+    def to_list(self) -> list[T]:
+        """Return a copy of the buffer elements as a list from oldest to newest."""
+        return list(self._data)
+
+    def peek_oldest(self) -> T:
+        """Return the oldest element without removing it.
+
+        Raises
+        ------
+        IndexError
+            If the buffer is empty.
+        """
+        if not self._data:
+            raise IndexError("peek from empty RingBuffer")
+        return self._data[0]
+
+    def peek_newest(self) -> T:
+        """Return the newest element without removing it.
+
+        Raises
+        ------
+        IndexError
+            If the buffer is empty.
+        """
+        if not self._data:
+            raise IndexError("peek from empty RingBuffer")
+        return self._data[-1]
+
+    def __getitem__(self,
+        index: int,
+    ) -> T:
+        return self._data[index]
+
     def __iter__(self,
     ) -> Iterator[T]:
         return iter(self._data)
@@ -55,10 +105,27 @@ class RingBuffer(t.Generic[T]):
     ) -> int:
         return len(self._data)
 
+    def __bool__(self,
+    ) -> bool:
+        return bool(self._data)
+
+    def __eq__(self,
+        other: object,
+    ) -> bool:
+        if isinstance(other, RingBuffer):
+            return self._capacity == other._capacity and self._data == other._data
+        return False
+
+    def __repr__(self,
+    ) -> str:
+        return f"RingBuffer({list(self._data)!r}, capacity={self._capacity})"
+
 
 def top_k(
     items: Iterable[T],
     k: int,
+    *,
+    key: Callable[[T], Any] | None = None,
 ) -> list[T]:
     """Return the largest k values without sorting the complete input.
 
@@ -68,6 +135,8 @@ def top_k(
         Values to select from.
     k : int
         Number of largest values to return.
+    key : Callable[[T], Any] or None, optional
+        Function of one argument used to extract a comparison key.
 
     Returns
     -------
@@ -76,10 +145,40 @@ def top_k(
     """
     if isinstance(k, bool) or not isinstance(k, int) or k < 0:
         raise ValueError("k must be a non-negative integer")
+    if key is not None and not callable(key):
+        raise TypeError("key must be callable or None")
     #? heapq.nlargest is O(n log k) and keeps a bounded heap instead of a
     #? full sort, which is the point of this helper.
-    item_seq: Iterable[t.Any] = items
-    return list(heapq.nlargest(k, item_seq))
+    return list(heapq.nlargest(k, items, key=key))
+
+
+def bottom_k(
+    items: Iterable[T],
+    k: int,
+    *,
+    key: Callable[[T], Any] | None = None,
+) -> list[T]:
+    """Return the smallest k values without sorting the complete input.
+
+    Parameters
+    ----------
+    items : Iterable[T]
+        Values to select from.
+    k : int
+        Number of smallest values to return.
+    key : Callable[[T], Any] or None, optional
+        Function of one argument used to extract a comparison key.
+
+    Returns
+    -------
+    list[T]
+        The k smallest values in ascending order.
+    """
+    if isinstance(k, bool) or not isinstance(k, int) or k < 0:
+        raise ValueError("k must be a non-negative integer")
+    if key is not None and not callable(key):
+        raise TypeError("key must be callable or None")
+    return list(heapq.nsmallest(k, items, key=key))
 
 
 def stable_unique(
@@ -97,16 +196,18 @@ def stable_unique(
     Iterator[T]
         Each distinct value in its first-seen position.
     """
-    seen: set[T] = set()
+    seen: set[object] = set()
     for item in items:
-        if item not in seen:
-            seen.add(item)
+        marker = (_BOOL_SENTINEL, item) if isinstance(item, bool) else item
+        if marker not in seen:
+            seen.add(marker)
             yield item
 
 
 __all__ = [
     "DeepDifference",
     "RingBuffer",
+    "bottom_k",
     "deep_diff",
     "freeze_structure",
     "retain_priority_and_recent",
@@ -151,6 +252,8 @@ def retain_priority_and_recent(
     other priority records must never be discarded while routine records can be
     capped.
     """
+    if not callable(is_priority):
+        raise TypeError("is_priority must be callable")
     if max_recent is not None and (
         isinstance(max_recent, bool)
         or not isinstance(max_recent, int)
@@ -160,6 +263,8 @@ def retain_priority_and_recent(
     values = list(items)
     if max_recent is None:
         return values
+    if max_recent == 0:
+        return [item for item in values if is_priority(item)]
 
     #? Priority items are always kept; only the newest max_recent ordinary
     #? items survive, preserving their original order.
@@ -210,6 +315,8 @@ def deep_diff(
     *,
     #? --- Traversal control ---
     path: str = "",
+    nan_equal: bool = False,
+    max_depth: int | None = None,
 ) -> list[DeepDifference]:
     """Return ordered structural differences between nested Python values.
 
@@ -226,31 +333,32 @@ def deep_diff(
         Candidate value.
     path : str, optional
         Root path prefix for nested reports.
+    nan_equal : bool, default=False
+        Whether float NaN values should be treated as equal.
+    max_depth : int or None, optional
+        Maximum recursion depth to traverse into containers.
 
     Returns
     -------
     list[DeepDifference]
         Differences in deterministic traversal order.
-
-    Notes
-    -----
-    Alias topology is not compared. Mapping order is deterministic for keys with
-    stable, distinct representations; arbitrary custom repr methods are outside
-    that guarantee. This helper targets configuration, manifest, and metadata
-    structures. Leaf
-    values should implement scalar boolean equality. Specialized array/tensor
-    equality belongs in the owning numerical package.
     """
+    if max_depth is not None and (
+        isinstance(max_depth, bool) or not isinstance(max_depth, int) or max_depth < 0
+    ):
+        raise ValueError("max_depth must be a non-negative integer or None")
     if left is right and (
-        not isinstance(left, float) or not math.isnan(left)
+        (nan_equal and isinstance(left, float) and math.isnan(left))
+        or not isinstance(left, float)
+        or not math.isnan(left)
     ):
         return []
     differences: list[DeepDifference] = []
     #? Track id pairs of already-visited containers to stop traversal on
     #? shared or cyclic substructure without an unbounded recursion.
     visited: set[tuple[int, int]] = set()
-    pending: list[Iterator[tuple[t.Any, t.Any, str] | DeepDifference]] = [
-        iter(((left, right, path),))
+    pending: list[Iterator[tuple[t.Any, t.Any, str, int] | DeepDifference]] = [
+        iter(((left, right, path, 0),))
     ]
 
     def child_path(
@@ -279,6 +387,7 @@ def deep_diff(
         left_value: t.Any,
         right_value: t.Any,
         current: str,
+        depth: int,
     ) -> None:
         """Record one pair and schedule its children for depth-first traversal.
 
@@ -290,15 +399,22 @@ def deep_diff(
             Candidate value at the current path.
         current : str
             Path of the current values in the report.
+        depth : int
+            Current nesting depth.
 
         Returns
         -------
         None
         """
         if left_value is right_value and (
-            not isinstance(left_value, float) or not math.isnan(left_value)
+            (nan_equal and isinstance(left_value, float) and math.isnan(left_value))
+            or not isinstance(left_value, float)
+            or not math.isnan(left_value)
         ):
             return
+        if nan_equal and isinstance(left_value, float) and isinstance(right_value, float):
+            if math.isnan(left_value) and math.isnan(right_value):
+                return
         pair = (id(left_value), id(right_value))
         if pair in visited:
             return
@@ -306,13 +422,19 @@ def deep_diff(
         #? Mappings are compared by their sorted key union so the report order
         #? is deterministic regardless of insertion order.
         if isinstance(left_value, Mapping) and isinstance(right_value, Mapping):
+            if max_depth is not None and depth >= max_depth:
+                if left_value != right_value:
+                    differences.append(
+                        DeepDifference(current, "value", left_value, right_value)
+                    )
+                return
             visited.add(pair)
             keys = sorted(
                 set(left_value) | set(right_value),
                 key=repr,
             )
             def mapping_children(
-            ) -> Iterator[tuple[t.Any, t.Any, str] | DeepDifference]:
+            ) -> Iterator[tuple[t.Any, t.Any, str, int] | DeepDifference]:
                 for key in keys:
                     nested = child_path(current, key)
                     if key not in left_value:
@@ -324,13 +446,13 @@ def deep_diff(
                             nested, "missing_right", left_value[key], None
                         )
                     else:
-                        yield left_value[key], right_value[key], nested
+                        yield left_value[key], right_value[key], nested, depth + 1
 
             pending.append(mapping_children())
             return
 
-        #? Strings, bytes, and bytearrays are scalar leaves, not sequences.
-        scalar_sequence_types = (str, bytes, bytearray)
+        #? Strings, bytes, bytearrays, and memoryviews are scalar leaves, not sequences.
+        scalar_sequence_types = (str, bytes, bytearray, memoryview)
         left_sequence = isinstance(left_value, Sequence) and not isinstance(
             left_value, scalar_sequence_types
         )
@@ -348,6 +470,12 @@ def deep_diff(
                     )
                 )
                 return
+            if max_depth is not None and depth >= max_depth:
+                if left_value != right_value:
+                    differences.append(
+                        DeepDifference(current, "value", left_value, right_value)
+                    )
+                return
             visited.add(pair)
             left_length = len(left_value)
             right_length = len(right_value)
@@ -363,7 +491,7 @@ def deep_diff(
             #? Compare the shared prefix, then report the trailing tail of the
             #? longer sequence as missing on the shorter side.
             def sequence_children(
-            ) -> Iterator[tuple[t.Any, t.Any, str] | DeepDifference]:
+            ) -> Iterator[tuple[t.Any, t.Any, str, int] | DeepDifference]:
                 for index in range(max(left_length, right_length)):
                     nested = f"{current}[{index}]"
                     if index >= right_length:
@@ -375,7 +503,7 @@ def deep_diff(
                             nested, "missing_left", None, right_value[index]
                         )
                     else:
-                        yield left_value[index], right_value[index], nested
+                        yield left_value[index], right_value[index], nested, depth + 1
 
             pending.append(sequence_children())
             return
@@ -455,7 +583,10 @@ def freeze_structure(
     while pending:
         action, item, count = pending.pop()
         if action == "key":
-            results.append(copy.deepcopy(item))
+            if isinstance(item, (int, float, str, bytes, bool, type(None))):
+                results.append(item)
+            else:
+                results.append(copy.deepcopy(item))
             continue
         if action != "visit":
             children = results[-count:] if count else []
@@ -469,11 +600,14 @@ def freeze_structure(
             elif action == "sequence":
                 result = tuple(children)
             else:
-                result = frozenset(children)
+                try:
+                    result = frozenset(children)
+                except TypeError as exc:
+                    raise TypeError("frozen set elements must be hashable") from exc
             active.remove(id(item))
             results.append(result)
             continue
-        if isinstance(item, Mapping | list | tuple | set | frozenset):
+        if isinstance(item, (Mapping, list, tuple, set, frozenset, Set)):
             identifier = id(item)
             if identifier in active:
                 raise ValueError("cycle detected while freezing structure")
@@ -486,10 +620,12 @@ def freeze_structure(
                     pending.append(("key", key, 0))
             else:
                 values = list(item)
-                action = "sequence" if isinstance(item, list | tuple) else "set"
+                action = "sequence" if isinstance(item, (list, tuple)) else "set"
                 pending.append((action, item, len(values)))
                 for child in reversed(values):
                     pending.append(("visit", child, 0))
+        elif isinstance(item, (int, float, str, bytes, bool, type(None))):
+            results.append(item)
         else:
             results.append(copy.deepcopy(item))
     return results[0]

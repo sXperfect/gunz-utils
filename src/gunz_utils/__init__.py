@@ -22,12 +22,18 @@ from .concurrency import (
     process_map,
 )
 from .config import env_overrides, merge_configs
-from .context import correlation_id, ensure_correlation_id, operation_context
+from .context import (
+    correlation_id,
+    ensure_correlation_id,
+    operation_context,
+    reset_correlation_id,
+    set_correlation_id,
+)
 from .deprecation import GunzDeprecationWarning, deprecated
 from .diagnostics import exception_dict
-from .dict_utils import deep_get, deep_merge, deep_set
+from .dict_utils import deep_get, deep_merge, deep_pop, deep_set
 from .enums import BaseIntEnum, BaseStrEnum, OptionalBaseStrEnum
-from .env import env, env_bool
+from .env import env, env_bool, env_float, env_int, env_list
 from .faults import FailAfter, FaultSequence
 from .formatting import format_bytes, format_count, format_duration
 from .hashing import (
@@ -38,9 +44,9 @@ from .hashing import (
     file_hash,
     short_hash,
 )
-from .identifiers import deterministic_id, new_id, short_id
+from .identifiers import deterministic_id, is_valid_uuid, new_id, short_id
 from .io import atomic_write
-from .iteration import batched, chunked, first, flatten
+from .iteration import batched, chunked, first, flatten, windowed
 from .parsing import parse_bool, safe_bool, safe_float, safe_int
 from .rate_limit import AsyncRateLimiter
 from .redaction import SECRET_PATTERNS, redact, redact_dict
@@ -52,8 +58,15 @@ from .resilience import (
 )
 from .result import Result
 from .retry import async_retry, retry
-from .security import open_path_under_base, safe_path_join, sanitize_filename
+from .security import (
+    is_safe_relative_path,
+    open_path_under_base,
+    safe_path_join,
+    sanitize_filename,
+)
+from .sentinels import UNSET, UnsetType, default, is_unset
 from .serialization import canonical_json, json_dumps, json_loads, to_jsonable
+from .spec import coerce_spec_sequence, from_object_or_fields
 from .subprocess import (
     CommandError,
     CommandOutputLimitError,
@@ -139,13 +152,19 @@ __all__ = [
     "correlation_id",
     "ensure_correlation_id",
     "operation_context",
+    "reset_correlation_id",
+    "set_correlation_id",
     "merge_configs",
     "GunzDeprecationWarning",
     "deprecated",
     "exception_dict",
     "env",
     "env_bool",
+    "env_float",
+    "env_int",
+    "env_list",
     "deterministic_id",
+    "is_valid_uuid",
     "new_id",
     "short_id",
     "AsyncRateLimiter",
@@ -192,6 +211,7 @@ __all__ = [
     "DEFAULT_CHUNK_SIZE",
     "deep_get",
     "deep_merge",
+    "deep_pop",
     "deep_set",
     "file_hash",
     "first",
@@ -205,12 +225,19 @@ __all__ = [
     "safe_bool",
     "safe_float",
     "safe_int",
+    "is_safe_relative_path",
     "sanitize_filename",
     "open_path_under_base",
     "safe_path_join",
     "SECRET_PATTERNS",
     "redact",
     "redact_dict",
+    "UNSET",
+    "UnsetType",
+    "default",
+    "is_unset",
+    "from_object_or_fields",
+    "coerce_spec_sequence",
     "short_hash",
     "SUPPORTED_ALGOS",
     "Timer",
@@ -237,6 +264,7 @@ __all__ = [
     "blank_spans",
     "deduplicate_spans",
     "strip_problematic_chars",
+    "windowed",
     "word_pattern",
     "__version__",
 ]

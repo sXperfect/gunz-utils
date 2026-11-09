@@ -1,5 +1,5 @@
-# gunz-style: ignore-file[GS010,GS011]
 #!/usr/bin/env python3
+# gunz-style: ignore-file[GS010,GS011]
 """Deterministic local release and changelog tooling.
 
 This module is intentionally standard-library only. It is the canonical place

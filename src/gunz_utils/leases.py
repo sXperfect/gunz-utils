@@ -7,6 +7,8 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import math
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TypeVar
@@ -106,7 +108,8 @@ async def run_with_lease_heartbeat(
     operation: Callable[[], Awaitable[T]],
     renew: Callable[[], Awaitable[bool]],
     *,
-    heartbeat_interval: float,
+    heartbeat_interval: float | None = None,
+    timing: LeaseTiming | None = None,
     renew_immediately: bool = False,
 ) -> T:
     """Run async work while a renewable lease remains owned.
@@ -118,8 +121,11 @@ async def run_with_lease_heartbeat(
     renew : Callable[[], Awaitable[bool]]
         Renewal callback. Return True while the caller still owns the lease and
         False when ownership has been lost.
-    heartbeat_interval : float
-        Seconds between renewal attempts. Must be finite and positive.
+    heartbeat_interval : float | None, optional
+        Seconds between renewal attempts. Must be finite and positive. Required
+        unless timing is provided.
+    timing : LeaseTiming | None, optional
+        Validated lease timing configuration providing heartbeat_interval.
     renew_immediately : bool, optional
         Renew once before waiting for the first interval.
 
@@ -133,24 +139,23 @@ async def run_with_lease_heartbeat(
     LeaseLostError
         If a renewal reports that ownership was lost.
     ValueError
-        If heartbeat_interval is invalid.
+        If heartbeat_interval is invalid or missing.
+    TypeError
+        If operation, renew, or timing is invalid.
     Exception
         Any exception raised by the operation or renewal callback.
-
-    Notes
-    -----
-    When renewal fails before the operation completes, the operation task is
-    cancelled and awaited before the lease failure is re-raised. When the
-    operation completes, the heartbeat task is cancelled and awaited. This
-    prevents orphan heartbeat tasks and stale work from continuing after lease
-    ownership is lost.
     """
-    import math
-
     if not callable(operation):
         raise TypeError("operation must be callable")
     if not callable(renew):
         raise TypeError("renew must be callable")
+    if timing is not None:
+        if not isinstance(timing, LeaseTiming):
+            raise TypeError("timing must be a LeaseTiming instance or None")
+        if heartbeat_interval is None:
+            heartbeat_interval = timing.heartbeat_interval
+    if heartbeat_interval is None:
+        raise ValueError("heartbeat_interval or timing must be supplied")
     if not isinstance(renew_immediately, bool):
         raise ValueError("renew_immediately must be bool")
     if (
@@ -166,10 +171,14 @@ async def run_with_lease_heartbeat(
     operation_task: asyncio.Future[T] | None = None
     heartbeat_task: asyncio.Task[None] | None = None
     try:
-        #? ensure_future accepts any Awaitable promised by the public contract,
-        #? including an already-created Future. Task creation is inside the
-        #? cleanup scope so a later setup failure cannot orphan the operation.
-        operation_task = asyncio.ensure_future(operation())
+        op_awaitable = operation()
+        try:
+            operation_task = asyncio.ensure_future(op_awaitable)
+        except BaseException:
+            if inspect.iscoroutine(op_awaitable):
+                op_awaitable.close()
+            raise
+
         heartbeat_coroutine = _heartbeat_loop(
             renew,
             interval=float(heartbeat_interval),
@@ -219,10 +228,18 @@ async def run_with_lease_heartbeat(
             if not task.done():
                 task.cancel()
         if tasks:
-            await asyncio.gather(
+            drain = asyncio.gather(
                 *tasks,
                 return_exceptions=True,
             )
+            cancelled: asyncio.CancelledError | None = None
+            while not drain.done():
+                try:
+                    await asyncio.shield(drain)
+                except asyncio.CancelledError as exc:
+                    cancelled = exc
+            if cancelled is not None:
+                raise cancelled
 
 
 __all__ = [

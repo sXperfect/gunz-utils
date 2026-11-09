@@ -68,23 +68,25 @@ def test_pyproject_uses_preferred_maintainer_email() -> None:
 
 def test_legacy_maintainer_email_is_absent_from_repository_text() -> None:
     old_email = "adhisant@tnt.uni-hannover.de"
-    candidates = [
+    candidate_set: set[Path] = {
         PROJECT_ROOT / "AGENTS.md",
         PROJECT_ROOT / "CONTRIBUTING.md",
         PROJECT_ROOT / "LICENSE.md",
         PROJECT_ROOT / "README.md",
         PROJECT_ROOT / "CHANGELOG.md",
         PROJECT_ROOT / "pyproject.toml",
-    ]
+    }
     for directory, patterns in (
         (PROJECT_ROOT / "src", ("*.py",)),
         (PROJECT_ROOT / "docs", ("*.md", "*.rst", "*.py")),
     ):
         for pattern in patterns:
-            candidates.extend(directory.rglob(pattern))
+            for p in directory.rglob(pattern):
+                if "_build" not in p.parts:
+                    candidate_set.add(p)
 
     offenders = []
-    for path in candidates:
+    for path in sorted(candidate_set):
         if path.is_file() and old_email in path.read_text(encoding="utf-8"):
             offenders.append(str(path.relative_to(PROJECT_ROOT)))
     assert offenders == []

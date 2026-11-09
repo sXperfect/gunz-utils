@@ -44,6 +44,37 @@ def ensure_correlation_id() -> str:
     return value
 
 
+def set_correlation_id(value: str | None) -> Token[str | None]:
+    """Set the correlation identifier for the current execution context.
+
+    Parameters
+    ----------
+    value : str | None
+        Explicit correlation identifier or None to clear.
+
+    Returns
+    -------
+    Token[str | None]
+        Context variable reset token.
+    """
+    if value is not None and not isinstance(value, str):
+        raise TypeError("correlation id must be a string or None")
+    return _correlation_id.set(value)
+
+
+def reset_correlation_id(token: Token[str | None]) -> None:
+    """Reset the correlation identifier to its previous state using a token.
+
+    Parameters
+    ----------
+    token : Token[str | None]
+        Token returned by set_correlation_id.
+    """
+    if not isinstance(token, Token):
+        raise TypeError("token must be a contextvars.Token")
+    _correlation_id.reset(token)
+
+
 @contextmanager
 def operation_context(
     value: str | None = None,
@@ -60,7 +91,9 @@ def operation_context(
     Iterator[str]
         The result of the operation.
     """
-    correlation = value or str(uuid.uuid4())
+    if value is not None and not isinstance(value, str):
+        raise TypeError("correlation id must be a string or None")
+    correlation = value if (value is not None and value.strip()) else str(uuid.uuid4())
     token: Token[str | None] = _correlation_id.set(correlation)
     try:
         yield correlation
@@ -68,4 +101,10 @@ def operation_context(
         _correlation_id.reset(token)
 
 
-__all__ = ["correlation_id", "ensure_correlation_id", "operation_context"]
+__all__ = [
+    "correlation_id",
+    "ensure_correlation_id",
+    "operation_context",
+    "reset_correlation_id",
+    "set_correlation_id",
+]

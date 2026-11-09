@@ -60,6 +60,7 @@ def perf_stat(
         "cpu-migrations",
     ),
     cwd: str | None = None,
+    timeout: float | None = None,
 ) -> PerfStatResult:
     """Run a command under perf stat and parse machine-readable counters.
 
@@ -71,14 +72,25 @@ def perf_stat(
         events parameter.
     cwd : str | None
         cwd parameter.
+    timeout : float | None
+        timeout parameter.
 
     Returns
     -------
     PerfStatResult
         The result of the operation.
     """
+    if isinstance(args, (str, bytes, bytearray)):
+        raise TypeError("args must be a sequence of strings, not a bare string")
     if not args:
         raise ValueError("args must not be empty")
+    if timeout is not None and (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
+        or timeout <= 0
+    ):
+        raise ValueError("timeout must be a finite positive number or None")
     if any(not isinstance(event, str) or not event for event in events):
         raise ValueError("events must contain non-empty strings")
     if not perf_available():
@@ -95,7 +107,7 @@ def perf_stat(
         for event in events:
             command.extend(["-e", event])
         command.extend(["--", *args])
-        completed = subprocess.run(command, cwd=cwd, check=False)
+        completed = subprocess.run(command, cwd=cwd, check=False, timeout=timeout)
         output.seek(0)
         text = output.read().decode("utf-8", "replace")
 
@@ -126,6 +138,7 @@ def perf_record(
     frequency: int = 99,
     call_graph: str = "dwarf",
     cwd: str | None = None,
+    timeout: float | None = None,
 ) -> int:
     """Record perf samples suitable for later perf-script/flamegraph use.
 
@@ -141,18 +154,34 @@ def perf_record(
         call_graph parameter.
     cwd : str | None
         cwd parameter.
+    timeout : float | None
+        timeout parameter.
 
     Returns
     -------
     int
         The result of the operation.
     """
+    if isinstance(args, (str, bytes, bytearray)):
+        raise TypeError("args must be a sequence of strings, not a bare string")
     if not args:
         raise ValueError("args must not be empty")
+    output_str = str(output)
+    if not output_str:
+        raise ValueError("output must not be empty")
+    if output_str.startswith("-"):
+        raise ValueError("output path must not start with a dash")
     if isinstance(frequency, bool) or not isinstance(frequency, int) or frequency < 1:
         raise ValueError("frequency must be a positive integer")
     if not isinstance(call_graph, str) or not call_graph:
         raise ValueError("call_graph must be a non-empty string")
+    if timeout is not None and (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(float(timeout))
+        or timeout <= 0
+    ):
+        raise ValueError("timeout must be a finite positive number or None")
     if not perf_available():
         raise RuntimeError("Linux perf is not installed or not on PATH")
     completed = subprocess.run(
@@ -164,12 +193,13 @@ def perf_record(
             "--call-graph",
             call_graph,
             "-o",
-            str(output),
+            output_str,
             "--",
             *args,
         ],
         cwd=cwd,
         check=False,
+        timeout=timeout,
     )
     return completed.returncode
 

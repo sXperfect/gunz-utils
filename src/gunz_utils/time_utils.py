@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 
@@ -24,6 +25,8 @@ def utc_now() -> datetime:
 
 def monotonic_deadline(
     timeout: float,
+    *,
+    clock: Callable[[], float] | None = None,
 ) -> float:
     """Return a monotonic-clock deadline timeout seconds from now.
 
@@ -31,12 +34,16 @@ def monotonic_deadline(
     ----------
     timeout : float
         timeout parameter.
+    clock : Callable[[], float] or None, optional
+        Clock callable returning current time in seconds, by default time.monotonic.
 
     Returns
     -------
     float
         The result of the operation.
     """
+    if clock is not None and not callable(clock):
+        raise TypeError("clock must be callable")
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
@@ -44,11 +51,17 @@ def monotonic_deadline(
         or timeout < 0
     ):
         raise ValueError("timeout must be a finite non-negative number")
-    return time.monotonic() + float(timeout)
+    now = clock() if clock is not None else time.monotonic()
+    deadline = now + float(timeout)
+    if not math.isfinite(deadline):
+        raise OverflowError("monotonic deadline calculation overflowed")
+    return deadline
 
 
 def remaining(
     deadline: float,
+    *,
+    clock: Callable[[], float] | None = None,
 ) -> float:
     """Return non-negative seconds remaining before a monotonic deadline.
 
@@ -56,23 +69,30 @@ def remaining(
     ----------
     deadline : float
         deadline parameter.
+    clock : Callable[[], float] or None, optional
+        Clock callable returning current time in seconds, by default time.monotonic.
 
     Returns
     -------
     float
         The result of the operation.
     """
+    if clock is not None and not callable(clock):
+        raise TypeError("clock must be callable")
     if (
         isinstance(deadline, bool)
         or not isinstance(deadline, (int, float))
         or not math.isfinite(float(deadline))
     ):
         raise ValueError("deadline must be a finite number")
-    return max(0.0, float(deadline) - time.monotonic())
+    now = clock() if clock is not None else time.monotonic()
+    return max(0.0, float(deadline) - now)
 
 
 def expired(
     deadline: float,
+    *,
+    clock: Callable[[], float] | None = None,
 ) -> bool:
     """Return whether a monotonic deadline has elapsed.
 
@@ -80,13 +100,17 @@ def expired(
     ----------
     deadline : float
         deadline parameter.
+    clock : Callable[[], float] or None, optional
+        Clock callable returning current time in seconds, by default time.monotonic.
 
     Returns
     -------
     bool
         The result of the operation.
     """
-    return remaining(deadline) <= 0.0
+    if clock is not None and not callable(clock):
+        raise TypeError("clock must be callable")
+    return remaining(deadline, clock=clock) <= 0.0
 
 
 __all__ = ["expired", "monotonic_deadline", "remaining", "utc_now"]

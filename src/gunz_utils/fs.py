@@ -77,8 +77,10 @@ def lexical_contained_path(
     Path
         The result of the operation.
     """
+    if "\x00" in str(path) or "\x00" in str(root):
+        raise ValueError("paths must not contain NUL bytes")
     supplied = Path(path)
-    if supplied.is_absolute():
+    if supplied.is_absolute() or supplied.drive or supplied.root:
         raise ValueError("path must be relative")
     if any(part == ".." for part in supplied.parts):
         raise ValueError("path escapes configured root")
@@ -261,6 +263,11 @@ def advisory_file_lock(
         if exc.errno == errno.ELOOP:
             raise ValueError("lock path must not be a symlink") from exc
         raise
+    if os.name == "posix":
+        try:
+            os.fchmod(descriptor, mode)
+        except OSError:
+            pass
     try:
         desc_stat = os.fstat(descriptor)
         path_stat = target.lstat()
@@ -403,6 +410,40 @@ def _match_segments_anchored(
     return m in active
 
 
+def _match_path_parts(
+    path_parts: tuple[str, ...],
+    pattern: str,
+    anchored: bool = False,
+) -> bool:
+    if not pattern:
+        return False
+    pattern_parts = tuple(
+        part for part in pattern.replace("\\", "/").split("/") if part
+    )
+    if not pattern_parts:
+        return not path_parts
+    if (
+        pattern_parts[-1] != "**"
+        and "*" not in pattern_parts[-1]
+        and "?" not in pattern_parts[-1]
+    ):
+        if not path_parts or path_parts[-1] != pattern_parts[-1]:
+            return False
+    if anchored:
+        if (
+            pattern_parts[0] != "**"
+            and "*" not in pattern_parts[0]
+            and "?" not in pattern_parts[0]
+        ):
+            if not path_parts or path_parts[0] != pattern_parts[0]:
+                return False
+        return _match_segments_anchored(path_parts, pattern_parts)
+    for start in range(len(path_parts) + 1):
+        if _match_segments_anchored(path_parts[start:], pattern_parts):
+            return True
+    return False
+
+
 def match_path_glob(
     path: str | Path,
     pattern: str,
@@ -434,31 +475,7 @@ def match_path_glob(
     path_parts = tuple(
         part for part in normalized.parts if part and part != "/"
     )
-    pattern_parts = tuple(
-        part for part in pattern.replace("\\", "/").split("/") if part
-    )
-    if not pattern_parts:
-        return not path_parts
-    if (
-        pattern_parts[-1] != "**"
-        and "*" not in pattern_parts[-1]
-        and "?" not in pattern_parts[-1]
-    ):
-        if not path_parts or path_parts[-1] != pattern_parts[-1]:
-            return False
-    if anchored:
-        if (
-            pattern_parts[0] != "**"
-            and "*" not in pattern_parts[0]
-            and "?" not in pattern_parts[0]
-        ):
-            if not path_parts or path_parts[0] != pattern_parts[0]:
-                return False
-        return _match_segments_anchored(path_parts, pattern_parts)
-    for start in range(len(path_parts) + 1):
-        if _match_segments_anchored(path_parts[start:], pattern_parts):
-            return True
-    return False
+    return _match_path_parts(path_parts, pattern, anchored=anchored)
 
 
 def matches_any_glob(
@@ -483,8 +500,12 @@ def matches_any_glob(
     bool
         True if any pattern matches path.
     """
+    normalized = Path(path)
+    path_parts = tuple(
+        part for part in normalized.parts if part and part != "/"
+    )
     for pattern in patterns:
-        if pattern and match_path_glob(path, pattern, anchored=anchored):
+        if pattern and _match_path_parts(path_parts, pattern, anchored=anchored):
             return True
     return False
 
@@ -523,10 +544,10 @@ def _walk_files_iter(
             dir_names.clear()
 
         dir_names.sort()
-        for d in list(dir_names):
-            rel_dir = rel_current / d if current_depth > 0 else Path(d)
-            if exc_patterns and matches_any_glob(rel_dir, exc_patterns):
-                dir_names.remove(d)
+        dir_names[:] = [
+            d for d in dir_names
+            if not (exc_patterns and matches_any_glob(rel_current / d if current_depth > 0 else Path(d), exc_patterns))
+        ]
 
         file_names.sort()
         for f in file_names:
@@ -658,6 +679,7 @@ def tree_fingerprint(
         hasher.update(len(rel_bytes).to_bytes(8, "big", signed=False))
         hasher.update(rel_bytes)
         hasher.update(b"\x00")
+        hasher.update(stat.S_IMODE(st.st_mode).to_bytes(4, "big", signed=False))
         hasher.update(st.st_size.to_bytes(8, "big", signed=False))
         hasher.update(st.st_mtime_ns.to_bytes(8, "big", signed=True))
     return hasher.hexdigest()

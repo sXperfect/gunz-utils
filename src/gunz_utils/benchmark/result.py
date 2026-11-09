@@ -70,6 +70,9 @@ class BenchmarkResult:
     parameters: dict[str, Any] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "parameters", dict(self.parameters))
+
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible result mapping.
 

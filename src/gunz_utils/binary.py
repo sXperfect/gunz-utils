@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import importlib
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -31,6 +31,12 @@ try:
     _accel_decode_zigzags: (
         Callable[[Any, int, int], tuple[list[int], int]] | None
     ) = getattr(_accel, "fast_decode_zigzags", None)
+    _accel_encode_uvarints: Callable[[Any], bytes] | None = getattr(
+        _accel, "fast_encode_uvarints", None
+    )
+    _accel_encode_zigzags: Callable[[Any], bytes] | None = getattr(
+        _accel, "fast_encode_zigzags", None
+    )
 except (ImportError, AttributeError):  # pragma: no cover
     _accel_encode = None
     _accel_decode = None
@@ -38,6 +44,8 @@ except (ImportError, AttributeError):  # pragma: no cover
     _accel_decode_zigzag = None
     _accel_decode_uvarints = None
     _accel_decode_zigzags = None
+    _accel_encode_uvarints = None
+    _accel_encode_zigzags = None
 
 
 @dataclass(slots=True)
@@ -255,6 +263,68 @@ def _py_encode_zigzag(
     return _py_encode_uvarint(uval)
 
 
+def _py_encode_uvarints(
+    values: Iterable[int],
+) -> bytes:
+    """Encode an iterable of unsigned 64-bit integers into canonical varints in pure Python.
+
+    Parameters
+    ----------
+    values : Iterable[int]
+        Iterable of unsigned 64-bit integers.
+
+    Returns
+    -------
+    bytes
+        Concatenated encoded varint bytes.
+    """
+    output = bytearray()
+    for raw in values:
+        if isinstance(raw, bool) or not isinstance(raw, int):
+            raise TypeError("value must be an integer (not bool)")
+        if raw < 0 or raw > 2**64 - 1:
+            raise ValueError("unsigned varint requires a 64-bit unsigned integer")
+        val = raw
+        while True:
+            byte = val & 0x7F
+            val >>= 7
+            output.append(byte | (0x80 if val else 0))
+            if not val:
+                break
+    return bytes(output)
+
+
+def _py_encode_zigzags(
+    values: Iterable[int],
+) -> bytes:
+    """Encode an iterable of signed 64-bit integers into zigzag varints in pure Python.
+
+    Parameters
+    ----------
+    values : Iterable[int]
+        Iterable of signed 64-bit integers.
+
+    Returns
+    -------
+    bytes
+        Concatenated encoded zigzag varint bytes.
+    """
+    output = bytearray()
+    for raw in values:
+        if isinstance(raw, bool) or not isinstance(raw, int):
+            raise TypeError("value must be an integer (not bool)")
+        if raw < -(2**63) or raw > 2**63 - 1:
+            raise ValueError("signed zigzag varint requires a 64-bit signed integer")
+        uval = (raw << 1) ^ (raw >> 63)
+        while True:
+            byte = uval & 0x7F
+            uval >>= 7
+            output.append(byte | (0x80 if uval else 0))
+            if not uval:
+                break
+    return bytes(output)
+
+
 def encode_uvarint(
     value: int,
 ) -> bytes:
@@ -299,6 +369,46 @@ def encode_zigzag(
     return _py_encode_zigzag(value)
 
 
+def encode_uvarints(
+    values: Iterable[int],
+) -> bytes:
+    """Encode an iterable of unsigned 64-bit integers into concatenated canonical varints.
+
+    Parameters
+    ----------
+    values : Iterable[int]
+        Sequence or iterable of unsigned 64-bit integers.
+
+    Returns
+    -------
+    bytes
+        Concatenated varint bytes.
+    """
+    if _accel_encode_uvarints is not None and isinstance(values, (list, tuple)):
+        return _accel_encode_uvarints(values)
+    return _py_encode_uvarints(values)
+
+
+def encode_zigzags(
+    values: Iterable[int],
+) -> bytes:
+    """Encode an iterable of signed 64-bit integers into concatenated canonical zigzag varints.
+
+    Parameters
+    ----------
+    values : Iterable[int]
+        Sequence or iterable of signed 64-bit integers.
+
+    Returns
+    -------
+    bytes
+        Concatenated zigzag varint bytes.
+    """
+    if _accel_encode_zigzags is not None and isinstance(values, (list, tuple)):
+        return _accel_encode_zigzags(values)
+    return _py_encode_zigzags(values)
+
+
 def decode_uvarint(
     data: bytes | bytearray | memoryview,
     offset: int = 0,
@@ -317,6 +427,12 @@ def decode_uvarint(
     tuple[int, int]
         Tuple of (decoded_value, new_offset).
     """
+    if isinstance(offset, bool) or not isinstance(offset, int):
+        raise TypeError("offset must be an integer (not bool)")
+    if offset < 0 or offset > len(data):
+        raise ValueError("offset is out of bounds")
+    if _accel_decode is not None:
+        return _accel_decode(data, offset)
     reader = ByteReader(data)
     reader.offset = offset
     val = reader.read_uvarint()
@@ -341,6 +457,12 @@ def decode_zigzag(
     tuple[int, int]
         Tuple of (decoded_value, new_offset).
     """
+    if isinstance(offset, bool) or not isinstance(offset, int):
+        raise TypeError("offset must be an integer (not bool)")
+    if offset < 0 or offset > len(data):
+        raise ValueError("offset is out of bounds")
+    if _accel_decode_zigzag is not None:
+        return _accel_decode_zigzag(data, offset)
     reader = ByteReader(data)
     reader.offset = offset
     val = reader.read_zigzag()
@@ -352,5 +474,7 @@ __all__ = [
     "decode_uvarint",
     "decode_zigzag",
     "encode_uvarint",
+    "encode_uvarints",
     "encode_zigzag",
+    "encode_zigzags",
 ]

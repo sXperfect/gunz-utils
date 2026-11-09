@@ -57,6 +57,9 @@ def run_python_worker(
     """
     if not isinstance(module, str) or not module:
         raise ValueError("module must be a non-empty string")
+    for part in module.split("."):
+        if not part.isidentifier():
+            raise ValueError(f"module {module!r} is not a valid Python module name")
     if not isinstance(python, str) or not python:
         raise ValueError("python must be a non-empty string")
 

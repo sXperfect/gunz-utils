@@ -16,7 +16,7 @@ from _pickle import PicklingError
 from collections.abc import AsyncIterator, Callable, Coroutine, Iterable, Iterator
 from itertools import chain
 from multiprocessing.reduction import ForkingPickler
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar, overload
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -40,6 +40,33 @@ async def _cancel_and_drain(
         except asyncio.CancelledError as exc:
             cancelled = exc
     return cancelled
+
+
+@overload
+async def gather_limited(
+    awaitables: Iterable[Coroutine[Any, Any, T]],
+    *,
+    limit: int,
+    return_exceptions: Literal[False] = False,
+) -> list[T]: ...
+
+
+@overload
+async def gather_limited(
+    awaitables: Iterable[Coroutine[Any, Any, T]],
+    *,
+    limit: int,
+    return_exceptions: Literal[True],
+) -> list[T | BaseException]: ...
+
+
+@overload
+async def gather_limited(
+    awaitables: Iterable[Coroutine[Any, Any, T]],
+    *,
+    limit: int,
+    return_exceptions: bool = False,
+) -> list[T | BaseException]: ...
 
 
 async def gather_limited(
@@ -120,10 +147,43 @@ async def gather_limited(
         failure = exc
         raise
     finally:
+        for remaining_item in iterator:
+            if asyncio.iscoroutine(remaining_item):
+                remaining_item.close()
         cancelled = await _cancel_and_drain(pending)
         if failure is None and cancelled is not None:
             raise cancelled
     return [ordered[index] for index in range(next_index)]
+
+
+@overload
+async def map_concurrent(
+    func: Callable[[T], Coroutine[Any, Any, R]],
+    items: Iterable[T],
+    *,
+    limit: int,
+    return_exceptions: Literal[False] = False,
+) -> list[R]: ...
+
+
+@overload
+async def map_concurrent(
+    func: Callable[[T], Coroutine[Any, Any, R]],
+    items: Iterable[T],
+    *,
+    limit: int,
+    return_exceptions: Literal[True],
+) -> list[R | BaseException]: ...
+
+
+@overload
+async def map_concurrent(
+    func: Callable[[T], Coroutine[Any, Any, R]],
+    items: Iterable[T],
+    *,
+    limit: int,
+    return_exceptions: bool = False,
+) -> list[R | BaseException]: ...
 
 
 async def map_concurrent(
@@ -151,6 +211,8 @@ async def map_concurrent(
     list[R | BaseException]
         The result of the operation.
     """
+    if not callable(func):
+        raise TypeError("func must be callable")
     return await gather_limited(
         (func(item) for item in items),
         limit=limit,
@@ -158,7 +220,7 @@ async def map_concurrent(
     )
 
 
-async def map_unordered(
+def map_unordered(
     func: Callable[[T], Coroutine[Any, Any, R]],
     items: Iterable[T],
     *,
@@ -180,8 +242,19 @@ async def map_unordered(
     AsyncIterator[R]
         The result of the operation.
     """
+    if not callable(func):
+        raise TypeError("func must be callable")
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
         raise ValueError("limit must be a positive integer")
+    return _map_unordered_impl(func, items, limit=limit)
+
+
+async def _map_unordered_impl(
+    func: Callable[[T], Coroutine[Any, Any, R]],
+    items: Iterable[T],
+    *,
+    limit: int,
+) -> AsyncIterator[R]:
     iterator = iter(items)
     active: set[asyncio.Task[R]] = set()
 
@@ -284,6 +357,8 @@ def process_map(
     list[R]
         Ordered results matching the input items.
     """
+    if not callable(func):
+        raise TypeError("func must be callable")
     if workers is not None:
         if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
             raise ValueError("workers must be a positive integer or None")
@@ -373,6 +448,8 @@ def process_imap(
     R
         Mapped results.
     """
+    if not callable(func):
+        raise TypeError("func must be callable")
     if workers is not None:
         if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
             raise ValueError("workers must be a positive integer or None")
@@ -388,6 +465,25 @@ def process_imap(
     if not isinstance(fallback_serial, bool):
         raise ValueError("fallback_serial must be bool")
 
+    return _process_imap_impl(
+        func,
+        items,
+        workers=workers,
+        chunksize=chunksize,
+        threshold=threshold,
+        fallback_serial=fallback_serial,
+    )
+
+
+def _process_imap_impl(
+    func: Callable[[T], R],
+    items: Iterable[T],
+    *,
+    workers: int | None = None,
+    chunksize: int | None = None,
+    threshold: int = 8,
+    fallback_serial: bool = True,
+) -> Iterator[R]:
     iterator = iter(items)
     if workers == 1:
         for item in iterator:

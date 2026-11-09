@@ -121,12 +121,27 @@ def build_network_uri(
         or not 1 <= port <= 65535
     ):
         raise ValueError("port must be an integer in the range 1..65535")
-    if username is not None and not username:
-        raise ValueError("username must not be empty")
-    if password is not None and username is None:
-        raise ValueError("password requires username")
+    if username is not None:
+        if not isinstance(username, str):
+            raise TypeError("username must be a string")
+        if not username:
+            raise ValueError("username must not be empty")
+        if any(character in username for character in "\r\n\0"):
+            raise ValueError("username contains invalid control characters")
+    if password is not None:
+        if not isinstance(password, str):
+            raise TypeError("password must be a string")
+        if username is None:
+            raise ValueError("password requires username")
+        if any(character in password for character in "\r\n\0"):
+            raise ValueError("password contains invalid control characters")
     if not isinstance(path, str):
         raise TypeError("path must be a string")
+    if query is not None:
+        if isinstance(query, (str, bytes, bytearray)):
+            raise TypeError("query must be a Mapping or Sequence of pairs, not a string")
+        if not isinstance(query, (Mapping, Sequence)):
+            raise TypeError("query must be a Mapping or Sequence of pairs")
 
     userinfo = ""
     if username is not None:
@@ -176,7 +191,11 @@ def _is_non_public_address(
         The result of the operation.
     """
     normalized = address.split("%", 1)[0]
+    if normalized.startswith("[") and normalized.endswith("]"):
+        normalized = normalized[1:-1]
     ip = ipaddress.ip_address(normalized)
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
     return (
         ip.is_private
         or ip.is_loopback
@@ -219,6 +238,8 @@ def tcp_reachable(
         raise TypeError("allow_private must be bool")
 
     target_host = host.strip()
+    if target_host.startswith("[") and target_host.endswith("]"):
+        target_host = target_host[1:-1]
     if allow_private:
         try:
             with socket.create_connection(

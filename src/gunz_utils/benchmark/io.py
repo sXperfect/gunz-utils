@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,7 @@ from pathlib import Path
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
+from ..io import atomic_write
 from ..subprocess import (
     CommandError,
     CommandOutputLimitError,
@@ -47,6 +49,9 @@ def capture_git_info(
     GitInfo
         The result of the operation.
     """
+    if shutil.which("git") is None:
+        return GitInfo(commit=None, branch=None, dirty=None)
+
     def run(
         *args: str,
     ) -> str | None:
@@ -102,9 +107,10 @@ def save_result(
     path : str | Path
         path parameter.
     """
-    Path(path).write_text(
+    atomic_write(
+        path,
         json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+        mkdir=True,
     )
 
 
