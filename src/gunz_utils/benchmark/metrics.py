@@ -1,10 +1,12 @@
 """Derived performance metrics shared by all measurement backends."""
 
+from __future__ import annotations
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import itertools
 
-from __future__ import annotations
 
 import math
 from collections.abc import Sequence
@@ -82,7 +84,7 @@ def process_metrics(
     samples = profile.samples
     memory_time = math.fsum(
         previous.rss_bytes * max(0.0, current.elapsed - previous.elapsed)
-        for previous, current in zip(samples, samples[1:], strict=False)
+        for previous, current in itertools.pairwise(samples, strict=False)
     )
     return {
         "average_cpu_cores": profile.average_cpu_cores,

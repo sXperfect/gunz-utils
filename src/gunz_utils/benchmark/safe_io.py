@@ -106,7 +106,9 @@ def load_result_checked(
     if len(payload) > max_bytes:
         raise ValueError("benchmark result exceeds size limit")
 
-    def _reject_constant(constant: str) -> None:
+    def _reject_constant(
+        constant: str,
+    ) -> None:
         raise ValueError(f"non-standard JSON constant {constant!r} is not allowed")
 
     data: Any = json.loads(payload.decode("utf-8"), parse_constant=_reject_constant)

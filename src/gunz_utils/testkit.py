@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import logging
 import math
+import os
 import random
 import string
 from collections.abc import Callable, Iterable, Iterator
@@ -514,9 +516,76 @@ def check_property(
     return completed
 
 
+class TemporaryEnvironment:
+    """Context manager temporarily setting, modifying, or clearing environment variables."""
+
+    def __init__(self,
+        **kwargs: str | None,
+    ) -> None:
+        self.overrides = kwargs
+        self._old: dict[str, str | None] = {}
+
+    def __enter__(self) -> TemporaryEnvironment:
+        for k, v in self.overrides.items():
+            self._old[k] = os.environ.get(k)
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = str(v)
+        return self
+
+    def __exit__(self,
+        *args: object,
+    ) -> None:
+        for k, old_val in self._old.items():
+            if old_val is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = old_val
+
+
+class CapturingLogHandler(logging.Handler):
+    """Logging handler and context manager collecting formatted records in memory."""
+
+    def __init__(self,
+        logger: logging.Logger | str | None = None,
+    ) -> None:
+        super().__init__()
+        self.records: list[logging.LogRecord] = []
+        if isinstance(logger, str):
+            self.logger = logging.getLogger(logger)
+        elif isinstance(logger, logging.Logger):
+            self.logger = logger
+        else:
+            self.logger = logging.getLogger()
+
+    def emit(self,
+        record: logging.LogRecord,
+    ) -> None:
+        self.records.append(record)
+
+    @property
+    def messages(self) -> list[str]:
+        return [self.format(r) for r in self.records]
+
+    def clear(self) -> None:
+        self.records.clear()
+
+    def __enter__(self) -> CapturingLogHandler:
+        self.logger.addHandler(self)
+        return self
+
+    def __exit__(self,
+        *args: object,
+    ) -> None:
+        self.logger.removeHandler(self)
+
+
 __all__ = [
+    "CapturingLogHandler",
     "ManualClock",
     "PropertyFailure",
+    "TemporaryEnvironment",
     "check_property",
     "fuzz_bytes",
     "fuzz_floats",

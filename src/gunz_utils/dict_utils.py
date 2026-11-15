@@ -21,8 +21,19 @@ from typing import Any, Literal, cast
 # =============================================================================
 from ._version import __version__ as __version__
 from .sentinels import UNSET
+from .structures import DeepDifference, deep_diff
 
-__all__ = ["deep_get", "deep_set", "deep_merge", "deep_pop"]
+__all__ = [
+    "DeepDifference",
+    "compact_dict",
+    "deep_diff",
+    "deep_get",
+    "deep_merge",
+    "deep_pop",
+    "deep_set",
+    "flatten_dict",
+    "unflatten_dict",
+]
 
 #? Sentinel used to tag boolean values in keys so True/False do not collide
 #? with 1/0 during grouping and unique-hashing.
@@ -30,7 +41,7 @@ _BOOL_SENTINEL: Any = object()
 
 
 def _normalize_path(
-    path: str | Sequence[str],
+    path: str | Sequence[str | int],
     separator: str,
 ) -> tuple[str, ...]:
     """Convert a path (string or sequence) into a tuple of key segments.
@@ -41,7 +52,10 @@ def _normalize_path(
     if isinstance(path, str):
         parts = path.split(separator)
     else:
-        parts = list(path)
+        parts = [
+            str(p) if isinstance(p, int) and not isinstance(p, bool) else p  # type: ignore[misc]
+            for p in path
+        ]
         if separator != ".":
             #? When the user supplies a custom separator alongside a sequence
             #? path, the separator is meaningless; warn by raising rather
@@ -59,73 +73,42 @@ def _normalize_path(
 
 def deep_get(
     d: Mapping[str, Any],
-    path: str | Sequence[str],
+    path: str | Sequence[str | int],
     *,
     default: Any = UNSET,
     separator: str = ".",
 ) -> Any:
-    """Retrieve a value from a nested mapping using a dotted-path key.
+    """Retrieve a value from a nested mapping or sequence using a dotted-path key.
 
     Returns ``default`` when any key in the path is missing OR when traversal
-    encounters a non-Mapping intermediate. If ``default`` is not provided,
+    encounters a non-traversable intermediate. If ``default`` is not provided,
     :class:`KeyError` is raised with the full dotted path so callers can
     distinguish a missing key from a None-valued one.
-
-    Parameters
-    ----------
-    d : Mapping[str, Any]
-        Source mapping (not mutated).
-    path : str | Sequence[str]
-        Path to the value. A string like ``"a.b.c"`` is split on
-        ``separator``; alternatively a sequence like ``["a", "b", "c"]``.
-    default : Any, optional
-        Returned when the key is missing or traversal fails. If omitted
-        (default), missing keys raise ``KeyError``.
-    separator : str, optional
-        Separator used to split string paths. Default is ``"."``. Ignored
-        when ``path`` is a sequence (a non-``"."`` separator alongside a
-        sequence path raises ``ValueError``).
-
-    Returns
-    -------
-    Any
-        The value at ``path``, or ``default``.
-
-    Raises
-    ------
-    ValueError
-        If ``path`` is empty or contains empty segments, or if a custom
-        ``separator`` is supplied with a sequence ``path``.
-    KeyError
-        If ``path`` does not exist and ``default`` was not provided.
-
-    Examples
-    --------
-    >>> deep_get({"a": {"b": 1}}, "a.b")
-    1
-    >>> deep_get({"a": {"b": 1}}, ["a", "b"])
-    1
-    >>> deep_get({"a": {"b": 1}}, "a.c", default=None) is None
-    True
-    >>> deep_get({"a": 1}, "a.b")  # traversal through scalar returns default
     """
     parts = _normalize_path(path, separator)
     dotted = separator.join(parts)
     cursor: Any = d
     for key in parts:
-        if not isinstance(cursor, Mapping):
-            #? A list, int, or str in the middle of a path means the user
-            #? asked for something that doesn't structurally exist. Treat it
-            #? as "not found" rather than raising TypeError so callers can
-            #? probe config trees safely.
+        if isinstance(cursor, Mapping):
+            if key in cursor:
+                cursor = cursor[key]
+            elif key.isdigit() and int(key) in cursor:
+                cursor = cursor[int(key)]
+            else:
+                if default is UNSET:
+                    raise KeyError(dotted)
+                return default
+        elif isinstance(cursor, (list, tuple, Sequence)) and not isinstance(cursor, (str, bytes, bytearray)):
+            try:
+                idx = int(key)
+                cursor = cursor[idx]
+            except (ValueError, IndexError):
+                if default is UNSET:
+                    raise KeyError(dotted)
+                return default
+        else:
             if default is UNSET:
                 raise KeyError(dotted)
-            return default
-        try:
-            cursor = cursor[key]
-        except (KeyError, IndexError, TypeError):
-            if default is UNSET:
-                raise KeyError(dotted) from None
             return default
     return cursor
 
@@ -471,3 +454,119 @@ def deep_merge(
         return _isolate(b, depth + 1)
 
     return cast(dict[str, Any], _merge(base, override, 0))
+
+
+def flatten_dict(
+    d: Mapping[str, Any],
+    *,
+    separator: str = ".",
+    prefix: str = "",
+) -> dict[str, Any]:
+    """Flatten a nested mapping into a single-level dictionary with delimited keys.
+
+    Parameters
+    ----------
+    d : Mapping[str, Any]
+        Mapping to flatten.
+    separator : str, default="."
+        Delimiter string to join nested keys.
+    prefix : str, default=""
+        Optional prefix prepended to all output keys.
+
+    Returns
+    -------
+    dict[str, Any]
+        Flattened single-level dictionary.
+    """
+    if not isinstance(d, Mapping):
+        raise TypeError(f"expected Mapping, got {type(d).__name__}")
+    result: dict[str, Any] = {}
+    visited: set[int] = set()
+
+    def _flatten(
+        current: Mapping[str, Any],
+        current_prefix: str,
+    ) -> None:
+        ident = id(current)
+        if ident in visited:
+            raise ValueError("circular reference detected in mapping")
+        visited.add(ident)
+        for key, value in current.items():
+            key_str = str(key) if not isinstance(key, str) else key
+            new_key = f"{current_prefix}{separator}{key_str}" if current_prefix else key_str
+            if isinstance(value, Mapping) and value:
+                _flatten(value, new_key)
+            else:
+                result[new_key] = value
+        visited.remove(ident)
+
+    _flatten(d, prefix)
+    return result
+
+
+def unflatten_dict(
+    d: Mapping[str, Any],
+    *,
+    separator: str = ".",
+) -> dict[str, Any]:
+    """Reconstruct a nested mapping hierarchy from a flat mapping with delimited keys.
+
+    Parameters
+    ----------
+    d : Mapping[str, Any]
+        Flat dictionary to expand.
+    separator : str, default="."
+        Delimiter separating nested keys.
+
+    Returns
+    -------
+    dict[str, Any]
+        Expanded nested dictionary hierarchy.
+    """
+    if not isinstance(d, Mapping):
+        raise TypeError(f"expected Mapping, got {type(d).__name__}")
+    result: dict[str, Any] = {}
+    for key, value in d.items():
+        deep_set(result, key, value, separator=separator)
+    return result
+
+
+def compact_dict(
+    d: Mapping[str, Any],
+    *,
+    drop_none: bool = True,
+    drop_empty: bool = False,
+) -> dict[str, Any]:
+    """Recursively prune None and/or empty container values from a mapping.
+
+    Parameters
+    ----------
+    d : Mapping[str, Any]
+        Source mapping.
+    drop_none : bool, default=True
+        Whether to omit keys whose values are None.
+    drop_empty : bool, default=False
+        Whether to omit keys whose values are empty containers.
+
+    Returns
+    -------
+    dict[str, Any]
+        Pruned dictionary.
+    """
+    if not isinstance(d, Mapping):
+        raise TypeError(f"expected Mapping, got {type(d).__name__}")
+    result: dict[str, Any] = {}
+    for k, v in d.items():
+        if drop_none and v is None:
+            continue
+        if isinstance(v, Mapping):
+            nested = compact_dict(v, drop_none=drop_none, drop_empty=drop_empty)
+            if drop_empty and len(nested) == 0:
+                continue
+            result[k] = nested
+        elif drop_empty and hasattr(v, "__len__") and len(v) == 0 and not isinstance(v, (int, float, bool)):
+            continue
+        else:
+            result[k] = v
+    return result
+

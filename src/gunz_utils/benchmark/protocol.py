@@ -37,7 +37,9 @@ class WorkerRequest:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> WorkerRequest:
+    def from_dict(cls,
+        data: dict[str, Any],
+    ) -> WorkerRequest:
         """Create a WorkerRequest from a dictionary."""
         return cls(
             module=data["module"],
@@ -67,7 +69,9 @@ class WorkerResponse:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> WorkerResponse:
+    def from_dict(cls,
+        data: dict[str, Any],
+    ) -> WorkerResponse:
         """Create a WorkerResponse from a dictionary."""
         return cls(
             returncode=data["returncode"],

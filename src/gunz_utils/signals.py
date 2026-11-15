@@ -1,10 +1,12 @@
 """Reversible process and asyncio signal-handler utilities."""
 
+from __future__ import annotations
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import contextlib
 
-from __future__ import annotations
 
 import asyncio
 import inspect
@@ -18,7 +20,37 @@ from typing import Any, Literal
 SignalCallback = Callable[[int], None]
 
 
-@dataclass
+def _normalize_signums(
+    signums: Any,
+) -> tuple[int, ...]:
+    if isinstance(signums, (str, bytes, bytearray)):
+        raise TypeError("signums must be an iterable of signal integers, not string or bytes")
+    try:
+        iterator = iter(signums)
+    except TypeError as exc:
+        raise TypeError(f"signums must be an iterable, got {type(signums).__name__}") from exc
+
+    unique: list[int] = []
+    seen: set[int] = set()
+    for signum in iterator:
+        if (
+            isinstance(signum, bool)
+            or not isinstance(signum, int)
+            or signum <= 0
+        ):
+            raise ValueError(
+                "signums must contain positive integer signal numbers"
+            )
+        if signum not in seen:
+            seen.add(signum)
+            unique.append(signum)
+
+    if not unique:
+        raise ValueError("signums must not be empty")
+    return tuple(unique)
+
+
+@dataclass(slots=True)
 class SignalRegistration:
     """Installed process signal handler with idempotent restoration."""
 
@@ -26,6 +58,11 @@ class SignalRegistration:
     previous: Any
     handler: Callable[[int, FrameType | None], None]
     _restored: bool = False
+
+    @property
+    def restored(self) -> bool:
+        """Return True if the handler has been restored."""
+        return self._restored
 
     def restore(self) -> None:
         """Restore the handler that was active before registration.
@@ -54,7 +91,7 @@ class SignalRegistration:
         return False
 
 
-@dataclass
+@dataclass(slots=True)
 class AsyncSignalRegistration:
     """Asyncio loop signal handlers with idempotent restoration.
 
@@ -68,6 +105,11 @@ class AsyncSignalRegistration:
     previous: dict[int, Any]
     _restored: bool = False
 
+    @property
+    def restored(self) -> bool:
+        """Return True if handlers have been restored."""
+        return self._restored
+
     def restore(self) -> None:
         """Remove loop handlers and restore previous process handlers.
 
@@ -76,10 +118,8 @@ class AsyncSignalRegistration:
         if self._restored:
             return
         for signum in reversed(self.signums):
-            try:
+            with contextlib.suppress((NotImplementedError, RuntimeError)):
                 self.loop.remove_signal_handler(signum)
-            except (NotImplementedError, RuntimeError):
-                pass
             signal.signal(
                 signum,
                 self.previous[signum],
@@ -143,23 +183,7 @@ def install_async_signal_handlers(
     if not callable(callback):
         raise TypeError("callback must be callable")
 
-    unique: list[int] = []
-    seen: set[int] = set()
-    for signum in signums:
-        if (
-            isinstance(signum, bool)
-            or not isinstance(signum, int)
-            or signum <= 0
-        ):
-            raise ValueError(
-                "signums must contain positive integer signal numbers"
-            )
-        if signum not in seen:
-            seen.add(signum)
-            unique.append(signum)
-
-    if not unique:
-        raise ValueError("signums must not be empty")
+    unique = _normalize_signums(signums)
 
     event_loop = loop or asyncio.get_running_loop()
     previous: dict[int, Any] = {}
@@ -177,10 +201,8 @@ def install_async_signal_handlers(
     except BaseException:
         for signum in reversed(tuple(previous)):
             if signum in registered:
-                try:
+                with contextlib.suppress((NotImplementedError, RuntimeError)):
                     event_loop.remove_signal_handler(signum)
-                except (NotImplementedError, RuntimeError):
-                    pass
             signal.signal(
                 signum,
                 previous[signum],
@@ -286,7 +308,7 @@ class GracefulShutdown:
             or timeout <= 0
         ):
             raise ValueError("timeout must be a finite positive number")
-        self.signums = signums
+        self.signums = _normalize_signums(signums)
         self.timeout = float(timeout)
         self._loop = loop
         self._callbacks: list[Callable[[], Any]] = []
@@ -352,8 +374,47 @@ class GracefulShutdown:
         signum : int | None
             signum parameter.
         """
-        self._signal_received = signum
+        if signum is not None and (
+            isinstance(signum, bool)
+            or not isinstance(signum, int)
+            or signum <= 0
+        ):
+            raise ValueError("signum must be a positive integer or None")
+        if signum is not None or self._signal_received is None:
+            self._signal_received = signum
         self._get_event().set()
+
+    async def wait(self,
+        timeout: float | None = None,
+    ) -> bool:
+        """Wait until shutdown is triggered or timeout expires.
+
+        Parameters
+        ----------
+        timeout : float | None, optional
+            Timeout in seconds to wait. If None, awaits indefinitely.
+
+        Returns
+        -------
+        bool
+            True if shutdown was triggered, False if timeout expired.
+        """
+        if timeout is not None and (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(float(timeout))
+            or timeout < 0
+        ):
+            raise ValueError("timeout must be a finite non-negative number or None")
+        event = self._get_event()
+        if timeout is None:
+            await event.wait()
+            return True
+        try:
+            await asyncio.wait_for(event.wait(), timeout=float(timeout))
+            return True
+        except asyncio.TimeoutError:
+            return False
 
     async def wait_for_shutdown(self) -> int | None:
         """Wait until a shutdown signal is received or triggered.
@@ -416,10 +477,8 @@ class GracefulShutdown:
                 self.trigger_shutdown()
             cleanup_task = asyncio.create_task(self.run_cleanup())
             while not cleanup_task.done():
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await asyncio.shield(cleanup_task)
-                except asyncio.CancelledError:
-                    pass
         return False
 
 

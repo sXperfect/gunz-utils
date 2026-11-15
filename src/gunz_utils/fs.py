@@ -1,10 +1,12 @@
 """Production-safe filesystem helpers."""
 
+from __future__ import annotations
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import contextlib
 
-from __future__ import annotations
 
 import errno
 import fnmatch
@@ -264,10 +266,8 @@ def advisory_file_lock(
             raise ValueError("lock path must not be a symlink") from exc
         raise
     if os.name == "posix":
-        try:
+        with contextlib.suppress(OSError):
             os.fchmod(descriptor, mode)
-        except OSError:
-            pass
     try:
         desc_stat = os.fstat(descriptor)
         path_stat = target.lstat()
@@ -309,12 +309,10 @@ def advisory_file_lock(
                 yield target
             finally:
                 os.lseek(descriptor, 0, os.SEEK_SET)
-                try:
+                with contextlib.suppress(OSError):
                     windows_runtime.locking(
                         descriptor, windows_runtime.LK_UNLCK, 1
                     )
-                except OSError:
-                    pass
         else:
             try:
                 import fcntl
@@ -358,10 +356,8 @@ def advisory_file_lock(
             try:
                 yield target
             finally:
-                try:
+                with contextlib.suppress(OSError):
                     fcntl.flock(descriptor, fcntl.LOCK_UN)
-                except OSError:
-                    pass
     finally:
         os.close(descriptor)
 
@@ -500,6 +496,10 @@ def matches_any_glob(
     bool
         True if any pattern matches path.
     """
+    if isinstance(patterns, (str, bytes, bytearray)):
+        raise TypeError(
+            f"patterns must be an iterable of pattern strings, not {type(patterns).__name__}"
+        )
     normalized = Path(path)
     path_parts = tuple(
         part for part in normalized.parts if part and part != "/"
@@ -552,10 +552,20 @@ def _walk_files_iter(
         file_names.sort()
         for f in file_names:
             file_path = curr_path / f
-            if not follow_symlinks and file_path.is_symlink():
-                continue
-            if not file_path.is_file():
-                continue
+            if not follow_symlinks:
+                try:
+                    lst = os.lstat(file_path)
+                    if stat.S_ISLNK(lst.st_mode) or not stat.S_ISREG(lst.st_mode):
+                        continue
+                except OSError:
+                    continue
+            else:
+                try:
+                    st = os.stat(file_path)
+                    if not stat.S_ISREG(st.st_mode):
+                        continue
+                except OSError:
+                    continue
             rel_file = rel_current / f if current_depth > 0 else Path(f)
             if ext_set and not any(f.lower().endswith(ext) for ext in ext_set):
                 continue
@@ -604,6 +614,18 @@ def walk_files(
         raise TypeError("follow_symlinks must be bool")
     if max_depth is not None and (type(max_depth) is not int or max_depth < 0):
         raise ValueError("max_depth must be a non-negative integer or None")
+    if isinstance(include, (str, bytes, bytearray)):
+        raise TypeError(
+            f"include must be an iterable of patterns, not {type(include).__name__}"
+        )
+    if isinstance(exclude, (str, bytes, bytearray)):
+        raise TypeError(
+            f"exclude must be an iterable of patterns, not {type(exclude).__name__}"
+        )
+    if isinstance(extensions, (str, bytes, bytearray)):
+        raise TypeError(
+            f"extensions must be an iterable of extensions, not {type(extensions).__name__}"
+        )
 
     base = Path(root).resolve()
     if not base.is_dir():
@@ -655,6 +677,14 @@ def tree_fingerprint(
     str
         Hexadecimal digest string representing directory contents.
     """
+    if isinstance(exclude, (str, bytes, bytearray)):
+        raise TypeError(
+            f"exclude must be an iterable of patterns, not {type(exclude).__name__}"
+        )
+    if isinstance(extensions, (str, bytes, bytearray)):
+        raise TypeError(
+            f"extensions must be an iterable of extensions, not {type(extensions).__name__}"
+        )
     if algorithm not in SUPPORTED_ALGOS:
         allowed = sorted(SUPPORTED_ALGOS)
         raise ValueError(
@@ -685,14 +715,257 @@ def tree_fingerprint(
     return hasher.hexdigest()
 
 
+def ensure_dir(
+    path: str | Path,
+    *,
+    mode: int = 0o755,
+) -> Path:
+    """Create directory hierarchy safely, rejecting symlinks at the target path.
+
+    Parameters
+    ----------
+    path : str | Path
+        Directory path to ensure.
+    mode : int, default=0o755
+        Permissions mode for created directories.
+
+    Returns
+    -------
+    Path
+        Resolved created directory path.
+
+    Raises
+    ------
+    ValueError
+        If the target path is a symlink.
+    NotADirectoryError
+        If an existing path is not a directory.
+    """
+    target = Path(path)
+    if target.is_symlink():
+        raise ValueError(f"target path {target} is a symlink")
+    if target.exists() and not target.is_dir():
+        raise NotADirectoryError(f"target path exists and is not a directory: {target}")
+    target.mkdir(mode=mode, parents=True, exist_ok=True)
+    if target.is_symlink():
+        raise ValueError(f"target path {target} resolved to a symlink")
+    return target
+
+
+ensure_directory = ensure_dir
+
+
+def is_file_locked(
+    path: str | Path,
+) -> bool:
+    """Test whether a file currently has an active advisory lock."""
+    target = Path(path)
+    if not target.exists():
+        return False
+    try:
+        with advisory_file_lock(target, timeout=0.0):
+            return False
+    except (TimeoutError, OSError):
+        return True
+
+
+def safe_remove(
+    path: str | Path,
+) -> bool:
+    """Safely remove a file if it exists. Returns True if deleted, False if missing."""
+    target = Path(path)
+    try:
+        target.unlink()
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def safe_rmtree(
+    path: str | Path,
+    *,
+    missing_ok: bool = True,
+) -> bool:
+    """Safely remove a directory tree. Returns True if deleted, False if missing."""
+    target = Path(path)
+    if not target.exists():
+        if missing_ok:
+            return False
+        raise FileNotFoundError(f"directory not found: {target}")
+    if not target.is_dir():
+        raise NotADirectoryError(f"not a directory: {target}")
+    shutil.rmtree(target)
+    return True
+
+
+def file_size_bytes(
+    path: str | Path,
+) -> int:
+    """Return the size of a regular file in bytes."""
+    target = Path(path)
+    return target.stat().st_size
+
+
+def touch_file(
+    path: str | Path,
+    *,
+    mode: int = 0o644,
+) -> Path:
+    """Create an empty file if not present or update its timestamps."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if not target.exists():
+        target.touch(mode=mode, exist_ok=True)
+    else:
+        now = time.time()
+        os.utime(target, (now, now))
+    return target
+
+
+def copy_file_atomic(
+    source: str | Path,
+    destination: str | Path,
+) -> Path:
+    """Copy a file atomically via a temporary file in the destination directory."""
+    src = Path(source)
+    dst = Path(destination)
+    if not src.is_file():
+        raise FileNotFoundError(f"source file not found: {src}")
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    temp_dst = dst.parent / f".tmp_{dst.name}_{os.getpid()}_{time.time_ns()}"
+    try:
+        shutil.copy2(src, temp_dst)
+        os.replace(temp_dst, dst)
+    except Exception:
+        if temp_dst.exists():
+            temp_dst.unlink(missing_ok=True)
+        raise
+    return dst
+
+
+def get_disk_usage(
+    path: str | Path,
+) -> tuple[int, int, int]:
+    """Return (total, used, free) disk space in bytes for the path mount."""
+    usage = shutil.disk_usage(path)
+    return (usage.total, usage.used, usage.free)
+
+
+def walk_directory(
+    base_dir: str | Path,
+    pattern: str = "*",
+    *,
+    recursive: bool = True,
+    max_depth: int | None = None,
+) -> Iterator[Path]:
+    """Walk files and directories matching pattern with optional depth bounds."""
+    depth = max_depth if recursive else (1 if max_depth is None else min(max_depth, 1))
+    return walk_files(base_dir, include=(pattern,) if pattern != "*" else (), max_depth=depth)
+
+
+def find_files(
+    base_dir: str | Path,
+    *,
+    pattern: str = "*",
+    min_size: int | None = None,
+    max_size: int | None = None,
+    extensions: tuple[str, ...] | None = None,
+) -> Iterator[Path]:
+    """Find files satisfying pattern, extension, and byte size bounds."""
+    if min_size is not None and (isinstance(min_size, bool) or min_size < 0):
+        raise ValueError("min_size must be a non-negative integer")
+    if max_size is not None and (isinstance(max_size, bool) or max_size < 0):
+        raise ValueError("max_size must be a non-negative integer")
+    if min_size is not None and max_size is not None and min_size > max_size:
+        raise ValueError("min_size cannot exceed max_size")
+
+    ext_iter = extensions if extensions is not None else ()
+    for p in walk_files(base_dir, include=(pattern,) if pattern != "*" else (), extensions=ext_iter):
+        sz = p.stat().st_size
+        if min_size is not None and sz < min_size:
+            continue
+        if max_size is not None and sz > max_size:
+            continue
+        yield p
+
+
+class TemporaryDirectoryPool:
+    """Manages a pool of reusable temporary directories."""
+
+    def __init__(self,
+        prefix: str = "tmp_pool_",
+        max_dirs: int = 10,
+    ) -> None:
+        if isinstance(max_dirs, bool) or not isinstance(max_dirs, int) or max_dirs < 1:
+            raise ValueError("max_dirs must be an integer >= 1")
+        self.prefix = prefix
+        self.max_dirs = max_dirs
+        self._pool: list[Path] = []
+        self._all_created: list[Path] = []
+
+    @contextmanager
+    def acquire(self) -> Iterator[Path]:
+        """Acquire a temporary directory from the pool and return it on exit."""
+        if self._pool:
+            d = self._pool.pop()
+        else:
+            d = Path(tempfile.mkdtemp(prefix=self.prefix))
+            self._all_created.append(d)
+        d.mkdir(parents=True, exist_ok=True)
+        try:
+            yield d
+        finally:
+            for item in d.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item, ignore_errors=True)
+                else:
+                    item.unlink(missing_ok=True)
+            if len(self._pool) < self.max_dirs:
+                self._pool.append(d)
+            else:
+                shutil.rmtree(d, ignore_errors=True)
+                if d in self._all_created:
+                    self._all_created.remove(d)
+
+    def cleanup(self) -> None:
+        """Remove all created temporary directories in this pool."""
+        self._pool.clear()
+        for d in self._all_created:
+            if d.exists():
+                shutil.rmtree(d, ignore_errors=True)
+        self._all_created.clear()
+
+    def __enter__(self) -> TemporaryDirectoryPool:
+        return self
+
+    def __exit__(self,
+        exc_type: Any,
+        exc_val: Any,
+        exc_tb: Any,
+    ) -> None:
+        self.cleanup()
+
+
 __all__ = [
+    "TemporaryDirectoryPool",
     "advisory_file_lock",
     "atomic_write_bytes",
     "contained_path",
+    "copy_file_atomic",
+    "ensure_dir",
+    "ensure_directory",
+    "file_size_bytes",
+    "find_files",
+    "get_disk_usage",
+    "is_file_locked",
     "lexical_contained_path",
     "match_path_glob",
     "matches_any_glob",
+    "safe_remove",
+    "safe_rmtree",
+    "touch_file",
     "transactional_directory",
     "tree_fingerprint",
+    "walk_directory",
     "walk_files",
 ]

@@ -13,7 +13,14 @@ import os
 
 #? Import only the encoding failure type; no deserializer is used here.
 from _pickle import PicklingError
-from collections.abc import AsyncIterator, Callable, Coroutine, Iterable, Iterator
+from collections.abc import (
+    AsyncIterator,
+    Callable,
+    Coroutine,
+    Iterable,
+    Iterator,
+    Sequence,
+)
 from itertools import chain
 from multiprocessing.reduction import ForkingPickler
 from typing import Any, Literal, TypeVar, overload
@@ -40,6 +47,62 @@ async def _cancel_and_drain(
         except asyncio.CancelledError as exc:
             cancelled = exc
     return cancelled
+
+
+async def _finish_coroutines(
+    coroutines: Iterable[Coroutine[Any, Any, T]],
+    iterator: Iterator[Coroutine[Any, Any, T]],
+    tasks: Iterable[asyncio.Task[Any]],
+    failure: BaseException | None,
+) -> None:
+    """Close unused sequence coroutines and drain all tasks already owned.
+
+    Parameters
+    ----------
+    coroutines : Iterable[Coroutine[Any, Any, T]]
+        Original input, used to distinguish already-created sequences.
+    iterator : Iterator[Coroutine[Any, Any, T]]
+        Input iterator at its current position.
+    tasks : Iterable[asyncio.Task[Any]]
+        Owned tasks, including unobserved completed siblings.
+    failure : BaseException | None
+        Existing failure to preserve while performing cooperative cleanup.
+
+    Returns
+    -------
+    None
+        Completes cleanup or propagates cancellation/finalization failure.
+
+    Notes
+    -----
+    Never pull a lazy producer during cleanup. Its remaining work has not been
+    acquired. Finite sequences may already hold created coroutines, which must
+    be closed. Iterator finalization errors cannot bypass task draining or mask
+    an existing worker failure or cancellation.
+    """
+    cleanup_error: BaseException | None = None
+    try:
+        if isinstance(coroutines, Sequence):
+            for remaining in iterator:
+                if asyncio.iscoroutine(remaining):
+                    remaining.close()
+        close = getattr(iterator, "close", None)
+        if callable(close):
+            close()
+    except BaseException as exc:
+        cleanup_error = exc
+    cancelled = await _cancel_and_drain(tasks)
+    if cancelled is not None and (
+        failure is None or isinstance(failure, GeneratorExit)
+    ):
+        raise cancelled
+    if cleanup_error is not None:
+        if failure is None or not isinstance(cleanup_error, Exception):
+            raise cleanup_error
+        failure.add_note(
+            "Input iterator cleanup also raised "
+            f"{type(cleanup_error).__name__}"
+        )
 
 
 @overload
@@ -74,7 +137,7 @@ async def gather_limited(
     *,
     limit: int,
     return_exceptions: bool = False,
-) -> list[T | BaseException]:
+) -> list[T] | list[T | BaseException]:
     """Gather awaitables while bounding active task creation.
 
     Parameters
@@ -90,6 +153,12 @@ async def gather_limited(
     -------
     list[T | BaseException]
         The result of the operation.
+
+    Notes
+    -----
+    On failure, unused coroutine objects in a sequence are closed. Lazy inputs
+    are not exhausted; their iterator is closed when supported. Callers retain
+    ownership of coroutine objects not yet yielded by a lazy input.
     """
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
         raise ValueError("limit must be a positive integer")
@@ -116,7 +185,8 @@ async def gather_limited(
         try:
             task = asyncio.create_task(item)
         except BaseException:
-            item.close()
+            if asyncio.iscoroutine(item):
+                item.close()
             raise
         pending[task] = next_index
         next_index += 1
@@ -147,12 +217,7 @@ async def gather_limited(
         failure = exc
         raise
     finally:
-        for remaining_item in iterator:
-            if asyncio.iscoroutine(remaining_item):
-                remaining_item.close()
-        cancelled = await _cancel_and_drain(pending)
-        if failure is None and cancelled is not None:
-            raise cancelled
+        await _finish_coroutines(awaitables, iterator, pending, failure)
     return [ordered[index] for index in range(next_index)]
 
 
@@ -192,7 +257,7 @@ async def map_concurrent(
     *,
     limit: int,
     return_exceptions: bool = False,
-) -> list[R | BaseException]:
+) -> list[R] | list[R | BaseException]:
     """Apply an async function with bounded task creation and ordered results.
 
     Parameters
@@ -213,6 +278,8 @@ async def map_concurrent(
     """
     if not callable(func):
         raise TypeError("func must be callable")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ValueError("limit must be a positive integer")
     return await gather_limited(
         (func(item) for item in items),
         limit=limit,
@@ -274,7 +341,8 @@ async def _map_unordered_impl(
         try:
             task = asyncio.create_task(coroutine)
         except BaseException:
-            coroutine.close()
+            if asyncio.iscoroutine(coroutine):
+                coroutine.close()
             raise
         active.add(task)
         return True
@@ -532,10 +600,157 @@ def _process_imap_impl(
             yield from executor.map(func, batch, chunksize=batch_size)
 
 
+async def run_in_thread(
+    func: Callable[..., T],
+    *args: Any,
+    **kwargs: Any,
+) -> T:
+    """Run a synchronous blocking callable in the default thread pool."""
+    if not callable(func):
+        raise TypeError("func must be callable")
+    return await asyncio.to_thread(func, *args, **kwargs)
+
+
+async def as_completed_limited(
+    coros: Iterable[Coroutine[Any, Any, T]],
+    *,
+    limit: int,
+) -> AsyncIterator[T]:
+    """Yield results from coroutines as they finish with a concurrency ceiling.
+
+    Parameters
+    ----------
+    coros : Iterable[Coroutine[Any, Any, T]]
+        Coroutine sequence or lazy producer. Lazy inputs are pulled only when
+        another task can be scheduled.
+    limit : int
+        Positive maximum number of owned tasks.
+
+    Yields
+    ------
+    T
+        Completed results. Ordering among simultaneous completions is unspecified.
+
+    Notes
+    -----
+    Completed tasks remain owned until observed, including when another task
+    fails or the consumer closes the iterator. Unused coroutine objects held by
+    sequences are closed; lazy inputs follow the same ownership rules as
+    ``gather_limited``. Close the async iterator explicitly when stopping early.
+    """
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ValueError("limit must be a positive integer")
+    iterator = iter(coros)
+    pending: set[asyncio.Task[T]] = set()
+
+    def schedule_one() -> bool:
+        try:
+            item = next(iterator)
+        except StopIteration:
+            return False
+        try:
+            task = asyncio.create_task(item)
+        except BaseException:
+            if asyncio.iscoroutine(item):
+                item.close()
+            raise
+        pending.add(task)
+        return True
+
+    failure: BaseException | None = None
+    try:
+        for _ in range(limit):
+            if not schedule_one():
+                break
+        while pending:
+            done, _ = await asyncio.wait(
+                pending, return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in done:
+                pending.remove(task)
+                yield task.result()
+                schedule_one()
+    except BaseException as exc:
+        failure = exc
+        raise
+    finally:
+        await _finish_coroutines(coros, iterator, pending, failure)
+
+
+class AsyncWorkerPool:
+    """Bounded worker pool for asynchronous execution."""
+
+    def __init__(self,
+        limit: int = 10,
+    ) -> None:
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ValueError("limit must be a positive integer")
+        self._limit = limit
+        self._semaphore = asyncio.Semaphore(limit)
+        self._tasks: set[asyncio.Task[Any]] = set()
+        self._closed = False
+
+    @property
+    def limit(self) -> int:
+        """Maximum number of concurrent tasks."""
+        return self._limit
+
+    @property
+    def pending_count(self) -> int:
+        """Number of active or pending tasks."""
+        return len([t for t in self._tasks if not t.done()])
+
+    def submit(self,
+        coro_fn: Callable[..., Coroutine[Any, Any, T]],
+        *args: Any,
+        **kwargs: Any,
+    ) -> asyncio.Task[T]:
+        """Submit a coroutine function to run with concurrency control."""
+        if self._closed:
+            raise RuntimeError("AsyncWorkerPool is closed")
+        if not callable(coro_fn):
+            raise TypeError("coro_fn must be callable")
+
+        async def _runner() -> T:
+            async with self._semaphore:
+                return await coro_fn(*args, **kwargs)
+
+        task = asyncio.create_task(_runner())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
+
+    async def join(self) -> None:
+        """Wait for all pending tasks in the pool to finish."""
+        while self._tasks:
+            pending = [t for t in self._tasks if not t.done()]
+            if not pending:
+                break
+            await asyncio.gather(*pending, return_exceptions=True)
+
+    async def close(self) -> None:
+        """Close the pool and wait for all tasks to complete."""
+        self._closed = True
+        await self.join()
+
+    async def __aenter__(self) -> AsyncWorkerPool:
+        return self
+
+    async def __aexit__(self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        await self.close()
+
+
 __all__ = [
+    "AsyncWorkerPool",
+    "as_completed_limited",
     "gather_limited",
     "map_concurrent",
     "map_unordered",
-    "process_map",
     "process_imap",
+    "process_map",
+    "run_in_thread",
 ]

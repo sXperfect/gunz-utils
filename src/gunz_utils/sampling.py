@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import fnmatch
 import hashlib
-from collections.abc import Iterable
+import random
+from collections.abc import Iterable, Iterator
 from typing import TypeVar
 
 T = TypeVar("T")
@@ -135,4 +136,77 @@ def sample_named_items(
     return eligible if limit is None else eligible[:limit]
 
 
-__all__ = ["sample_named_items", "stable_priority"]
+def reservoir_sample(
+    iterable: Iterable[T],
+    k: int,
+    *,
+    rng: random.Random | None = None,
+) -> list[T]:
+    """Sample k items uniformly from an iterable of unknown length using Algorithm R."""
+    if isinstance(k, bool) or not isinstance(k, int) or k < 1:
+        raise ValueError("k must be a positive integer")
+    r = rng if rng is not None else random
+    iterator = iter(iterable)
+    reservoir: list[T] = []
+    for _ in range(k):
+        try:
+            reservoir.append(next(iterator))
+        except StopIteration:
+            return reservoir
+    for i, item in enumerate(iterator, start=k):
+        j = r.randint(0, i)
+        if j < k:
+            reservoir[j] = item
+    return reservoir
+
+
+def bernoulli_sample(
+    iterable: Iterable[T],
+    p: float,
+    *,
+    rng: random.Random | None = None,
+) -> Iterator[T]:
+    """Yield items independently with probability p."""
+    if (
+        isinstance(p, bool)
+        or not isinstance(p, (int, float))
+        or not (0.0 <= p <= 1.0)
+    ):
+        raise ValueError("p must be a float between 0.0 and 1.0 inclusive")
+    r = rng if rng is not None else random
+    for item in iterable:
+        if r.random() < p:
+            yield item
+
+
+def hash_sample_fraction(
+    key: str,
+    fraction: float,
+    *,
+    seed: int = 0,
+) -> bool:
+    """Deterministically decide if key falls into a sampled fraction based on BLAKE2b hash."""
+    if not isinstance(key, str):
+        raise TypeError(f"key must be str, got {type(key).__name__}")
+    if (
+        isinstance(fraction, bool)
+        or not isinstance(fraction, (int, float))
+        or not (0.0 <= fraction <= 1.0)
+    ):
+        raise ValueError("fraction must be a float between 0.0 and 1.0 inclusive")
+    if fraction == 0.0:
+        return False
+    if fraction == 1.0:
+        return True
+    p = stable_priority(key, seed=seed)
+    normalized = (p & 0xFFFFFFFFFFFFFFFF) / (2**64)
+    return normalized < fraction
+
+
+__all__ = [
+    "bernoulli_sample",
+    "hash_sample_fraction",
+    "reservoir_sample",
+    "sample_named_items",
+    "stable_priority",
+]

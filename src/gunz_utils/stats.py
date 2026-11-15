@@ -1096,7 +1096,9 @@ def ecdf(
     return points
 
 
-def _compute_mid_ranks(seq: list[float]) -> list[float]:
+def _compute_mid_ranks(
+    seq: list[float],
+) -> list[float]:
     """Assign average (mid-rank) ranks to a sequence of values."""
     indexed = sorted(enumerate(seq), key=lambda item: item[1])
     n = len(seq)
@@ -1289,6 +1291,103 @@ def ewma(
     return result
 
 
+def geometric_mean(
+    data: Iterable[float],
+) -> float:
+    """Calculate the geometric mean of non-negative values using log-space arithmetic."""
+    vals = _finite_values(data, name="data")
+    if not vals:
+        raise ValueError("data must not be empty")
+    if any(v < 0.0 for v in vals):
+        raise ValueError("geometric mean requires non-negative values")
+    if any(v == 0.0 for v in vals):
+        return 0.0
+    log_sum = sum(math.log(v) for v in vals)
+    return math.exp(log_sum / len(vals))
+
+
+def harmonic_mean(
+    data: Iterable[float],
+) -> float:
+    """Calculate the harmonic mean of strictly positive values."""
+    vals = _finite_values(data, name="data")
+    if not vals:
+        raise ValueError("data must not be empty")
+    if any(v <= 0.0 for v in vals):
+        raise ValueError("harmonic mean requires strictly positive values")
+    return len(vals) / sum(1.0 / v for v in vals)
+
+
+def z_scores(
+    data: Sequence[float],
+) -> list[float]:
+    """Calculate standard scores (z-scores) for a sequence of values."""
+    vals = _finite_values(data, name="data")
+    if not vals:
+        return []
+    if len(vals) == 1:
+        return [0.0]
+    mu = fmean(vals)
+    sigma = pstdev(vals)
+    if sigma == 0.0:
+        return [0.0] * len(vals)
+    return [(x - mu) / sigma for x in vals]
+
+
+def min_max_scale(
+    data: Sequence[float],
+    *,
+    feature_range: tuple[float, float] = (0.0, 1.0),
+) -> list[float]:
+    """Linearly scale data into feature_range (default [0, 1])."""
+    vals = _finite_values(data, name="data")
+    if not vals:
+        return []
+    low, high = feature_range
+    if high < low:
+        raise ValueError("feature_range high must be >= low")
+    min_val = min(vals)
+    max_val = max(vals)
+    if min_val == max_val:
+        mid = (low + high) / 2.0
+        return [mid] * len(vals)
+    rng = max_val - min_val
+    scale = (high - low) / rng
+    return [low + (x - min_val) * scale for x in vals]
+
+
+def skewness(
+    data: Sequence[float],
+) -> float:
+    """Calculate sample skewness (Fisher-Pearson coefficient)."""
+    vals = _finite_values(data, name="data")
+    n = len(vals)
+    if n < 3:
+        raise ValueError("skewness requires at least 3 values")
+    mu = fmean(vals)
+    m2 = sum((x - mu) ** 2 for x in vals) / n
+    m3 = sum((x - mu) ** 3 for x in vals) / n
+    if m2 == 0.0:
+        return 0.0
+    return m3 / (m2 ** 1.5)
+
+
+def kurtosis(
+    data: Sequence[float],
+) -> float:
+    """Calculate excess sample kurtosis (0 for normal distribution)."""
+    vals = _finite_values(data, name="data")
+    n = len(vals)
+    if n < 4:
+        raise ValueError("kurtosis requires at least 4 values")
+    mu = fmean(vals)
+    m2 = sum((x - mu) ** 2 for x in vals) / n
+    m4 = sum((x - mu) ** 4 for x in vals) / n
+    if m2 == 0.0:
+        return 0.0
+    return (m4 / (m2 ** 2)) - 3.0
+
+
 __all__ = [
     "BootstrapMeanCI",
     "ECDFPoint",
@@ -1301,14 +1400,20 @@ __all__ = [
     "cosine_similarity",
     "ecdf",
     "ewma",
+    "geometric_mean",
+    "harmonic_mean",
+    "kurtosis",
     "mad_outlier_indices",
     "median_absolute_deviation",
+    "min_max_scale",
     "normal_mean_summary",
     "paired_effect",
     "pareto_dominates",
     "pareto_frontier",
     "percentile",
+    "skewness",
     "spearman_rank_correlation",
     "summarize",
+    "z_scores",
 ]
 

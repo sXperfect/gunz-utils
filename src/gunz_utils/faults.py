@@ -75,6 +75,11 @@ class FailAfter:
                 )
             raise error
 
+    def reset(self) -> None:
+        """Reset the call counter to zero."""
+        self.calls = 0
+
+
 
 @dataclass
 class FaultSequence:
@@ -435,12 +440,94 @@ class AwaitBoundaryChaos:
         await asyncio.sleep(0)
 
 
+class LatencyInjector:
+    """Inject configurable latency into synchronous and asynchronous flows."""
+
+    def __init__(self,
+        min_delay: float,
+        max_delay: float | None = None,
+    ) -> None:
+        if (
+            isinstance(min_delay, bool)
+            or not isinstance(min_delay, (int, float))
+            or min_delay < 0
+            or not math.isfinite(float(min_delay))
+        ):
+            raise ValueError("min_delay must be a finite non-negative number")
+        if max_delay is not None:
+            if (
+                isinstance(max_delay, bool)
+                or not isinstance(max_delay, (int, float))
+                or max_delay < min_delay
+                or not math.isfinite(float(max_delay))
+            ):
+                raise ValueError("max_delay must be >= min_delay and finite")
+        self.min_delay = float(min_delay)
+        self.max_delay = float(max_delay) if max_delay is not None else float(min_delay)
+
+    def delay(self) -> float:
+        """Compute the injected delay duration."""
+        if self.min_delay == self.max_delay:
+            return self.min_delay
+        import random
+        return random.uniform(self.min_delay, self.max_delay)
+
+    def inject(self) -> float:
+        """Synchronously sleep for the computed delay and return it."""
+        d = self.delay()
+        import time
+        time.sleep(d)
+        return d
+
+    async def ainject(self) -> float:
+        """Asynchronously sleep for the computed delay and return it."""
+        d = self.delay()
+        await asyncio.sleep(d)
+        return d
+
+
+class CorruptingWriter:
+    """Wrap a binary writer and selectively corrupt written bytes for integrity testing."""
+
+    def __init__(self,
+        target: BinaryIO,
+        *,
+        corrupt_every_n_bytes: int = 100,
+    ) -> None:
+        if (
+            isinstance(corrupt_every_n_bytes, bool)
+            or not isinstance(corrupt_every_n_bytes, int)
+            or corrupt_every_n_bytes < 1
+        ):
+            raise ValueError("corrupt_every_n_bytes must be a positive integer")
+        self.target = target
+        self.corrupt_every_n_bytes = corrupt_every_n_bytes
+        self.total_written = 0
+
+    def write(self,
+        data: bytes | bytearray | memoryview,
+    ) -> int:
+        """Write bytes to the target, inverting bits every N bytes."""
+        buf = bytearray(data)
+        for i in range(len(buf)):
+            self.total_written += 1
+            if self.total_written % self.corrupt_every_n_bytes == 0:
+                buf[i] ^= 0xFF
+        return self.target.write(buf)
+
+    def flush(self) -> None:
+        """Flush the underlying target."""
+        self.target.flush()
+
+
 __all__ = [
     "AwaitBoundaryChaos",
+    "CorruptingWriter",
     "FailAfter",
     "FaultSequence",
     "FaultyStream",
     "InjectedFault",
+    "LatencyInjector",
     "NamedFaultInjector",
     "VirtualClock",
 ]

@@ -127,7 +127,9 @@ def env_int(
     if min is not None and max is not None and min > max:
         raise ValueError("min cannot be greater than max")
 
-    def parse(val: str) -> int:
+    def parse(
+        val: str,
+    ) -> int:
         parsed = safe_int(val, min=min, max=max)
         if parsed is None:
             raise ValueError(f"expected integer in bounds [{min}, {max}]")
@@ -166,7 +168,9 @@ def env_float(
     if min is not None and max is not None and min > max:
         raise ValueError("min cannot be greater than max")
 
-    def parse(val: str) -> float:
+    def parse(
+        val: str,
+    ) -> float:
         parsed = safe_float(
             val, min=min, max=max, allow_inf=allow_inf, allow_nan=allow_nan
         )
@@ -205,7 +209,9 @@ def env_list(
     if not isinstance(separator, str) or not separator:
         raise ValueError("separator must be a non-empty string")
 
-    def parse(val: str) -> list[str]:
+    def parse(
+        val: str,
+    ) -> list[str]:
         items = val.split(separator)
         if strip:
             items = [item.strip() for item in items]

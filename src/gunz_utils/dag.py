@@ -1,10 +1,12 @@
 """Dependency-ordered workflow DAG execution with fingerprint caching."""
 
+from __future__ import annotations
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import contextlib
 
-from __future__ import annotations
 
 import asyncio
 import inspect
@@ -13,6 +15,7 @@ import time
 from collections.abc import (
     Callable,
     Coroutine,
+    Iterable,
     Iterator,
     Mapping,
     MutableMapping,
@@ -20,12 +23,18 @@ from collections.abc import (
 )
 from contextlib import nullcontext
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 from .hashing import structured_hash
+
+T = TypeVar("T")
+
+
+class CycleError(ValueError):
+    """Raised when a directed graph cycle is detected."""
 
 
 class WorkflowExecutionError(RuntimeError):
@@ -74,16 +83,26 @@ class WorkflowStage:
 
     def __post_init__(self) -> None:
         """Validate stage identity, callable and dependency declaration."""
-        if not isinstance(self.name, str) or not self.name:
+        if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("stage name must be a non-empty string")
         if not callable(self.run):
             raise TypeError("stage run must be callable")
         if self.compensate is not None and not callable(self.compensate):
             raise TypeError("compensate must be callable or None")
 
-        dependencies = tuple(self.dependencies)
+        if isinstance(self.dependencies, (str, bytes, bytearray)):
+            raise TypeError(
+                f"stage dependencies must be a sequence of strings, not {type(self.dependencies).__name__}"
+            )
+        try:
+            dependencies = tuple(self.dependencies)
+        except TypeError as exc:
+            raise TypeError(
+                f"stage dependencies must be an iterable, got {type(self.dependencies).__name__}"
+            ) from exc
+
         if any(
-            not isinstance(item, str) or not item
+            not isinstance(item, str) or not item.strip()
             for item in dependencies
         ):
             raise ValueError(
@@ -147,15 +166,24 @@ class WorkflowDAG:
         rollback_timeout: float | None = None,
     ) -> None:
         self.rollback_timeout = _validate_rollback_timeout(rollback_timeout)
-        stage_list = list(stages)
+        try:
+            stage_list = list(stages)
+        except TypeError as exc:
+            raise TypeError("stages must be an iterable of WorkflowStage instances") from exc
+        for stage in stage_list:
+            if not isinstance(stage, WorkflowStage):
+                raise TypeError(
+                    f"stages must contain WorkflowStage instances, got {type(stage).__name__}"
+                )
         self.stages = {
             stage.name: stage
             for stage in stage_list
         }
         if len(self.stages) != len(stage_list):
             raise ValueError("stage names must be unique")
-        if any(not name for name in self.stages):
+        if any(not name.strip() for name in self.stages):
             raise ValueError("stage names must be non-empty")
+        self._fingerprint_memo: dict[str, str | None] = {}
         self._order = self._topological_order()
 
     def _topological_order(self) -> tuple[str, ...]:
@@ -226,6 +254,9 @@ class WorkflowDAG:
         if name not in self.stages:
             raise KeyError(name)
 
+        if name in self._fingerprint_memo:
+            return self._fingerprint_memo[name]
+
         memo: dict[str, str | None] = {}
         stack: list[tuple[str, Iterator[str]]] = [
             (name, iter(self.stages[name].dependencies))
@@ -234,6 +265,10 @@ class WorkflowDAG:
 
         while stack:
             stage_name, it = stack[-1]
+            if stage_name in self._fingerprint_memo:
+                memo[stage_name] = self._fingerprint_memo[stage_name]
+                stack.pop()
+                continue
             try:
                 dependency = next(it)
             except StopIteration:
@@ -241,6 +276,7 @@ class WorkflowDAG:
                 stage = self.stages[stage_name]
                 if stage.fingerprint is None:
                     memo[stage_name] = None
+                    self._fingerprint_memo[stage_name] = None
                     continue
 
                 dependencies: dict[str, str] = {}
@@ -254,8 +290,9 @@ class WorkflowDAG:
 
                 if any_none:
                     memo[stage_name] = None
+                    self._fingerprint_memo[stage_name] = None
                 else:
-                    memo[stage_name] = structured_hash(
+                    computed = structured_hash(
                         {
                             "name": stage.name,
                             "fingerprint": stage.fingerprint,
@@ -263,6 +300,12 @@ class WorkflowDAG:
                             "dependency_fingerprints": dependencies,
                         }
                     )
+                    memo[stage_name] = computed
+                    self._fingerprint_memo[stage_name] = computed
+                continue
+
+            if dependency in self._fingerprint_memo:
+                memo[dependency] = self._fingerprint_memo[dependency]
                 continue
 
             if dependency not in memo and dependency not in visited:
@@ -271,7 +314,107 @@ class WorkflowDAG:
                     (dependency, iter(self.stages[dependency].dependencies))
                 )
 
-        return memo[name]
+        res = memo[name]
+        self._fingerprint_memo[name] = res
+        return res
+
+    def parallel_layers(self) -> tuple[tuple[str, ...], ...]:
+        """Group independent stages into topological execution wavefronts.
+
+        Stages in the same layer have no dependencies on each other and can be
+        executed concurrently.
+
+        Returns
+        -------
+        tuple[tuple[str, ...], ...]
+            Wavefront layers of stage names.
+        """
+        layer_map: dict[str, int] = {}
+        for name in self._order:
+            deps = self.stages[name].dependencies
+            if not deps:
+                layer_map[name] = 0
+            else:
+                layer_map[name] = 1 + max(layer_map[dep] for dep in deps)
+
+        num_layers = max(layer_map.values()) + 1 if layer_map else 0
+        layers: list[list[str]] = [[] for _ in range(num_layers)]
+        for name in self._order:
+            layers[layer_map[name]].append(name)
+        return tuple(tuple(layer) for layer in layers)
+
+    def dependencies_of(self,
+        name: str,
+        *,
+        transitive: bool = False,
+    ) -> tuple[str, ...]:
+        """Return stage dependencies in topological execution order.
+
+        Parameters
+        ----------
+        name : str
+            Target stage name.
+        transitive : bool, default=False
+            If True, return all upstream dependencies recursively; otherwise only direct dependencies.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Dependency stage names in topological order.
+        """
+        if name not in self.stages:
+            raise KeyError(name)
+        if not isinstance(transitive, bool):
+            raise TypeError("transitive must be bool")
+        if not transitive:
+            return self.stages[name].dependencies
+
+        collected: set[str] = set()
+        stack = list(self.stages[name].dependencies)
+        while stack:
+            dep = stack.pop()
+            if dep not in collected:
+                collected.add(dep)
+                stack.extend(self.stages[dep].dependencies)
+        return tuple(n for n in self._order if n in collected)
+
+    def dependents_of(self,
+        name: str,
+        *,
+        transitive: bool = False,
+    ) -> tuple[str, ...]:
+        """Return stages depending on this stage in topological execution order.
+
+        Parameters
+        ----------
+        name : str
+            Target stage name.
+        transitive : bool, default=False
+            If True, return all downstream stages recursively; otherwise only direct dependents.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Dependent stage names in topological order.
+        """
+        if name not in self.stages:
+            raise KeyError(name)
+        if not isinstance(transitive, bool):
+            raise TypeError("transitive must be bool")
+        if not transitive:
+            return tuple(
+                s_name for s_name in self._order
+                if name in self.stages[s_name].dependencies
+            )
+
+        downstream: set[str] = set()
+        for s_name in self._order:
+            if s_name == name:
+                continue
+            deps = self.stages[s_name].dependencies
+            if name in deps or any(d in downstream for d in deps):
+                downstream.add(s_name)
+        return tuple(n for n in self._order if n in downstream)
 
     def _rollback_sync(self,
         completed_order: list[str],
@@ -436,10 +579,8 @@ class WorkflowDAG:
                 if effective_timeout is not None
                 else 0.05
             )
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await asyncio.wait([rollback_task], timeout=join_timeout)
-            except asyncio.CancelledError:
-                pass
             errors: list[tuple[str, BaseException]] = [
                 (
                     "rollback_timeout",
@@ -496,6 +637,8 @@ class WorkflowDAG:
         dict[str, Any]
             Stage outputs in completion/topological order.
         """
+        if cache is not None and not isinstance(cache, MutableMapping):
+            raise TypeError(f"cache must be a MutableMapping, got {type(cache).__name__}")
         store = cache if cache is not None else {}
         outputs: dict[str, Any] = {}
         executed_order: list[str] = []
@@ -555,10 +698,8 @@ class WorkflowDAG:
             if current_key is not None and current_key not in keys_to_clean:
                 keys_to_clean.append(current_key)
             for k in keys_to_clean:
-                try:
+                with contextlib.suppress(Exception):
                     del store[k]
-                except Exception:
-                    pass
             compensation_errors = self._rollback_sync(executed_order, outputs)
             raise WorkflowExecutionError(
                 f"workflow cache publication failed: {exc}",
@@ -592,6 +733,9 @@ class WorkflowDAG:
                 or concurrency_limit <= 0
             ):
                 raise ValueError("concurrency_limit must be a positive integer or None")
+
+        if cache is not None and not isinstance(cache, MutableMapping):
+            raise TypeError(f"cache must be a MutableMapping, got {type(cache).__name__}")
 
         sem = (
             asyncio.Semaphore(concurrency_limit)
@@ -787,10 +931,8 @@ class WorkflowDAG:
             if current_key is not None and current_key not in keys_to_clean:
                 keys_to_clean.append(current_key)
             for k in keys_to_clean:
-                try:
+                with contextlib.suppress(Exception):
                     del store[k]
-                except Exception:
-                    pass
             compensation_errors = await self._safe_rollback_async(
                 executed_order, outputs, timeout=effective_rollback_timeout
             )
@@ -804,4 +946,280 @@ class WorkflowDAG:
         return outputs
 
 
-__all__ = ["WorkflowDAG", "WorkflowExecutionError", "WorkflowStage"]
+def _normalize_graph(
+    graph: Mapping[T, Iterable[T]],
+) -> dict[T, set[T]]:
+    adj: dict[T, set[T]] = {k: set(v) for k, v in graph.items()}
+    #? Ensure all referenced target nodes exist in adj
+    for targets in list(adj.values()):
+        for node in targets:
+            if node not in adj:
+                adj[node] = set()
+    return adj
+
+
+def add_edge(
+    graph: dict[T, set[T]],
+    u: T,
+    v: T,
+) -> None:
+    """Add a directed edge u -> v to an adjacency dictionary."""
+    if u not in graph:
+        graph[u] = set()
+    if v not in graph:
+        graph[v] = set()
+    graph[u].add(v)
+
+
+def detect_cycles(
+    graph: Mapping[T, Iterable[T]],
+) -> list[list[T]]:
+    """Detect cycles in a directed graph using depth-first search.
+
+    Returns a list of cycles, each represented as a list of nodes.
+    """
+    adj = _normalize_graph(graph)
+    visited: dict[T, int] = {}  #? 0: visiting, 1: visited
+    stack: list[T] = []
+    cycles: list[list[T]] = []
+
+    def dfs(
+        node: T,
+    ) -> None:
+        visited[node] = 0
+        stack.append(node)
+        for nxt in adj.get(node, ()):
+            state = visited.get(nxt)
+            if state == 0:
+                #? Cycle found
+                idx = stack.index(nxt)
+                cycles.append(stack[idx:] + [nxt])
+            elif state is None:
+                dfs(nxt)
+        stack.pop()
+        visited[node] = 1
+
+    for n in adj:
+        if n not in visited:
+            dfs(n)
+    return cycles
+
+
+def is_dag(
+    graph: Mapping[T, Iterable[T]],
+) -> bool:
+    """Return True if graph is a directed acyclic graph (has no cycles)."""
+    return len(detect_cycles(graph)) == 0
+
+
+def topological_sort(
+    graph: Mapping[T, Iterable[T]],
+) -> list[T]:
+    """Return a topological sort of nodes in a directed acyclic graph.
+
+    Raises
+    ------
+    CycleError
+        If the graph contains at least one cycle.
+    """
+    adj = _normalize_graph(graph)
+    in_degree: dict[T, int] = {k: 0 for k in adj}
+    for targets in adj.values():
+        for t in targets:
+            in_degree[t] = in_degree.get(t, 0) + 1
+
+    ready = [k for k, deg in in_degree.items() if deg == 0]
+    result: list[T] = []
+
+    while ready:
+        node = ready.pop()
+        result.append(node)
+        for nxt in adj.get(node, ()):
+            in_degree[nxt] -= 1
+            if in_degree[nxt] == 0:
+                ready.append(nxt)
+
+    if len(result) != len(adj):
+        cycles = detect_cycles(graph)
+        raise CycleError(f"graph contains cycles: {cycles}")
+    return result
+
+
+def parallel_levels(
+    graph: Mapping[T, Iterable[T]],
+) -> list[set[T]]:
+    """Partition DAG nodes into execution levels that can run in parallel."""
+    adj = _normalize_graph(graph)
+    in_degree: dict[T, int] = {k: 0 for k in adj}
+    for targets in adj.values():
+        for t in targets:
+            in_degree[t] = in_degree.get(t, 0) + 1
+
+    current = {k for k, deg in in_degree.items() if deg == 0}
+    levels: list[set[T]] = []
+    processed = 0
+
+    while current:
+        levels.append(current)
+        processed += len(current)
+        next_level: set[T] = set()
+        for node in current:
+            for nxt in adj.get(node, ()):
+                in_degree[nxt] -= 1
+                if in_degree[nxt] == 0:
+                    next_level.add(nxt)
+        current = next_level
+
+    if processed != len(adj):
+        raise CycleError("cannot group cyclic graph into parallel levels")
+    return levels
+
+
+def descendants(
+    graph: Mapping[T, Iterable[T]],
+    node: T,
+) -> set[T]:
+    """Return all downstream nodes reachable from `node`."""
+    adj = _normalize_graph(graph)
+    visited: set[T] = set()
+    queue = list(adj.get(node, ()))
+    while queue:
+        curr = queue.pop()
+        if curr not in visited:
+            visited.add(curr)
+            queue.extend(adj.get(curr, ()))
+    return visited
+
+
+def ancestors(
+    graph: Mapping[T, Iterable[T]],
+    node: T,
+) -> set[T]:
+    """Return all upstream nodes that can reach `node`."""
+    adj = _normalize_graph(graph)
+    #? Reverse graph
+    rev: dict[T, set[T]] = {k: set() for k in adj}
+    for u, targets in adj.items():
+        for v in targets:
+            rev[v].add(u)
+
+    visited: set[T] = set()
+    queue = list(rev.get(node, ()))
+    while queue:
+        curr = queue.pop()
+        if curr not in visited:
+            visited.add(curr)
+            queue.extend(rev.get(curr, ()))
+    return visited
+
+
+def has_path(
+    graph: Mapping[T, Iterable[T]],
+    source: T,
+    target: T,
+) -> bool:
+    """Return True if a directed path exists from source to target."""
+    if source == target:
+        return True
+    return target in descendants(graph, source)
+
+
+def subgraph(
+    graph: Mapping[T, Iterable[T]],
+    nodes: Iterable[T],
+) -> dict[T, set[T]]:
+    """Return the induced subgraph containing only specified nodes."""
+    allowed = set(nodes)
+    adj = _normalize_graph(graph)
+    return {
+        u: {v for v in targets if v in allowed}
+        for u, targets in adj.items()
+        if u in allowed
+    }
+
+
+def transitive_reduction(
+    graph: Mapping[T, Iterable[T]],
+) -> dict[T, set[T]]:
+    """Compute the transitive reduction of a DAG."""
+    topo = topological_sort(graph)
+    adj = _normalize_graph(graph)
+    reduction: dict[T, set[T]] = {u: set(adj.get(u, ())) for u in topo}
+
+    for u in topo:
+        targets = list(reduction[u])
+        for v in targets:
+            for w in reduction[u]:
+                if w != v and has_path(reduction, w, v):
+                    reduction[u].discard(v)
+                    break
+    return reduction
+
+
+def critical_path(
+    graph: Mapping[T, Iterable[T]],
+    weights: Mapping[T, float],
+) -> tuple[list[T], float]:
+    """Compute the longest path through a DAG and its cumulative weight.
+
+    Parameters
+    ----------
+    graph : Mapping[T, Iterable[T]]
+        Directed acyclic graph.
+    weights : Mapping[T, float]
+        Cost or execution duration for each node.
+
+    Returns
+    -------
+    tuple[list[T], float]
+        (path_as_list_of_nodes, total_path_weight)
+    """
+    topo = topological_sort(graph)
+    if not topo:
+        return ([], 0.0)
+
+    dist: dict[T, float] = {u: float(weights.get(u, 0.0)) for u in topo}
+    prev: dict[T, T | None] = {u: None for u in topo}
+
+    adj = _normalize_graph(graph)
+
+    for u in topo:
+        u_dist = dist[u]
+        for v in adj.get(u, ()):
+            v_weight = float(weights.get(v, 0.0))
+            if u_dist + v_weight > dist[v]:
+                dist[v] = u_dist + v_weight
+                prev[v] = u
+
+    #? Find node with maximum distance
+    end_node = max(topo, key=lambda n: dist[n])
+    max_weight = dist[end_node]
+
+    #? Reconstruct path
+    path: list[T] = []
+    curr: T | None = end_node
+    while curr is not None:
+        path.append(curr)
+        curr = prev[curr]
+    path.reverse()
+
+    return path, max_weight
+
+
+__all__ = [
+    "CycleError",
+    "WorkflowDAG",
+    "WorkflowExecutionError",
+    "WorkflowStage",
+    "add_edge",
+    "ancestors",
+    "critical_path",
+    "descendants",
+    "detect_cycles",
+    "has_path",
+    "is_dag",
+    "parallel_levels",
+    "subgraph",
+    "topological_sort",
+    "transitive_reduction",
+]

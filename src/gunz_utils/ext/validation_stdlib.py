@@ -73,6 +73,11 @@ def _check_one(
             return True
         if annotation is int and isinstance(value, bool):
             return False
+        if annotation is float:
+            if isinstance(value, bool):
+                return False
+            if isinstance(value, (int, float)):
+                return True
         return isinstance(value, annotation)
 
     if origin is t.Annotated:
@@ -196,25 +201,10 @@ def type_checked(
             hints = getattr(f, "__annotations__", {}) or {}
         sig = inspect.signature(f)
 
-        @functools.wraps(f)
-        def wrapper(
-            *args: t.Any,
-            **kw: t.Any,
-        ) -> t.Any:
-            """wrapper() function.
-
-            Parameters
-            ----------
-            args : t.Any
-                args parameter.
-            kw : t.Any
-                kw parameter.
-
-            Returns
-            -------
-            t.Any
-                The result of the operation.
-            """
+        def _validate_call(
+            args: tuple[t.Any, ...],
+            kw: dict[str, t.Any],
+        ) -> None:
             try:
                 bound = sig.bind(*args, **kw)
             except TypeError as e:
@@ -262,6 +252,23 @@ def type_checked(
                     f"Validation error in '{f.__name__}':\n" + "\n".join(errors)
                 ) from None
 
+        if inspect.iscoroutinefunction(f):
+            @functools.wraps(f)
+            async def async_wrapper(
+                *args: t.Any,
+                **kw: t.Any,
+            ) -> t.Any:
+                _validate_call(args, kw)
+                return await f(*args, **kw)
+
+            return async_wrapper
+
+        @functools.wraps(f)
+        def wrapper(
+            *args: t.Any,
+            **kw: t.Any,
+        ) -> t.Any:
+            _validate_call(args, kw)
             return f(*args, **kw)
 
         return wrapper

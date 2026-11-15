@@ -17,13 +17,19 @@ from .result import BenchmarkResult
 from .runner import benchmark
 
 
-@dataclass
+@dataclass(slots=True)
 class BenchmarkCase:
     name: str
     func: Callable[..., Any]
     args: tuple[Any, ...] = ()
     kwargs: dict[str, Any] = field(default_factory=dict)
     parameters: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("name must be a non-empty string")
+        if not callable(self.func):
+            raise TypeError("func must be callable")
 
 
 class BenchmarkSuite:
@@ -32,6 +38,8 @@ class BenchmarkSuite:
     def __init__(self,
         name: str,
     ) -> None:
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("name must be a non-empty string")
         self.name = name
         self._cases: list[BenchmarkCase] = []
 
@@ -62,6 +70,10 @@ class BenchmarkSuite:
         BenchmarkSuite
             The result of the operation.
         """
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("name must be a non-empty string")
+        if not callable(func):
+            raise TypeError("func must be callable")
         self._cases.append(
             BenchmarkCase(
                 name=name,

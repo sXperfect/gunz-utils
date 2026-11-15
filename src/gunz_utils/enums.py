@@ -148,6 +148,8 @@ class BaseStrEnum(enum.StrEnum):
         if not isinstance(value_str, str):
             raise TypeError("value_str must be a string")
 
+        value_str = value_str.strip()
+
         #? Security check to prevent DoS via excessive string processing.
         #? Uses the class attribute so subclasses can override the limit.
         max_len = _max_input_length(cls)
@@ -200,9 +202,14 @@ class BaseStrEnum(enum.StrEnum):
         if normalized_value_input in fuzzy_map:
             return fuzzy_map[normalized_value_input]
 
-        valid_options = ", ".join(f"'{m.value}'" for m in cls)
+        member_strs = [f"'{m.value}'" for m in cls]
+        if len(member_strs) > 10:
+            valid_options = ", ".join(member_strs[:10]) + f", ... ({len(member_strs) - 10} more)"
+        else:
+            valid_options = ", ".join(member_strs)
+        disp_val = value_str[:50] + "..." if len(value_str) > 50 else value_str
         raise ValueError(
-            f"'{value_str}' is not a valid {cls.__name__}. "
+            f"'{disp_val}' is not a valid {cls.__name__}. "
             f"Please use one of: {valid_options}"
         )
 
@@ -406,6 +413,8 @@ class BaseIntEnum(enum.IntEnum):
         if not isinstance(value_str, str):
             raise TypeError("value_str must be a string")
 
+        value_str = value_str.strip()
+
         #? Security check to prevent DoS via excessive string processing.
         #? Uses the class attribute so subclasses can override the limit.
         max_len = _max_input_length(cls)
@@ -464,9 +473,14 @@ class BaseIntEnum(enum.IntEnum):
             #? reported uniformly with the valid integer choices below.
             pass
 
-        valid_options = ", ".join(f"'{m.value}'" for m in cls)
+        member_strs = [f"'{m.value}'" for m in cls]
+        if len(member_strs) > 10:
+            valid_options = ", ".join(member_strs[:10]) + f", ... ({len(member_strs) - 10} more)"
+        else:
+            valid_options = ", ".join(member_strs)
+        disp_val = value_str[:50] + "..." if len(value_str) > 50 else value_str
         raise ValueError(
-            f"'{value_str}' is not a valid {cls.__name__}. "
+            f"'{disp_val}' is not a valid {cls.__name__}. "
             f"Please use one of: {valid_options}"
         )
 

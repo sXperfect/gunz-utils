@@ -75,6 +75,10 @@ def benchmark_environment(
     Iterator[None]
         The result of the operation.
     """
+    if not isinstance(disable_gc, bool):
+        raise TypeError("disable_gc must be a bool")
+    if cpu_affinity is not None and not isinstance(cpu_affinity, (set, frozenset)):
+        raise TypeError("cpu_affinity must be a set or None")
     gc_enabled = gc.isenabled()
     previous_affinity = None
     try:
@@ -126,6 +130,8 @@ def calibrate_loops(
     int
         The result of the operation.
     """
+    if not callable(func):
+        raise TypeError("func must be callable")
     if (
         isinstance(target_time, bool)
         or not isinstance(target_time, (int, float))
@@ -259,6 +265,8 @@ def benchmark(
         or loops < 1
     ):
         raise ValueError("loops must be a positive integer or None")
+    if not callable(func):
+        raise TypeError("func must be callable")
     if (
         isinstance(target_time, bool)
         or not isinstance(target_time, (int, float))

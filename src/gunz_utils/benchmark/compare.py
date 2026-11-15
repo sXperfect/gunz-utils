@@ -150,4 +150,90 @@ def compare_results(
     )
 
 
-__all__ = ["BenchmarkComparison", "compare_results"]
+def detect_regression(
+    baseline: float,
+    current: float,
+    threshold_pct: float = 5.0,
+) -> bool:
+    """Return True if candidate duration is higher than baseline by > threshold_pct."""
+    if baseline <= 0:
+        return current > 0
+    pct_change = ((current - baseline) / baseline) * 100.0
+    return pct_change > threshold_pct
+
+
+def compare_benchmarks(
+    baseline: dict[str, Any] | BenchmarkResult,
+    current: dict[str, Any] | BenchmarkResult,
+    *,
+    threshold_pct: float = 5.0,
+) -> dict[str, Any]:
+    """Compare benchmark metrics and determine regression status."""
+    if isinstance(baseline, BenchmarkResult):
+        b_dict = {"mean": baseline.stats.mean, "median": baseline.stats.median, "p95": baseline.stats.p95}
+    else:
+        b_dict = dict(baseline)
+
+    if isinstance(current, BenchmarkResult):
+        c_dict = {"mean": current.stats.mean, "median": current.stats.median, "p95": current.stats.p95}
+    else:
+        c_dict = dict(current)
+
+    metrics_comparison: dict[str, Any] = {}
+    any_regressed = False
+
+    for key, b_val in b_dict.items():
+        if key in c_dict and isinstance(b_val, (int, float)) and isinstance(c_dict[key], (int, float)):
+            c_val = c_dict[key]
+            delta = c_val - b_val
+            pct = 0.0 if b_val == 0 else (delta / b_val) * 100.0
+            reg = detect_regression(float(b_val), float(c_val), threshold_pct=threshold_pct)
+            if reg:
+                any_regressed = True
+            metrics_comparison[key] = {
+                "baseline": b_val,
+                "current": c_val,
+                "delta": delta,
+                "percent_change": pct,
+                "regressed": reg,
+            }
+
+    return {
+        "metrics": metrics_comparison,
+        "regressed": any_regressed,
+        "threshold_pct": threshold_pct,
+    }
+
+
+def generate_markdown_comparison_table(
+    comparison_results: Sequence[dict[str, Any]],
+) -> str:
+    """Generate GitHub-Flavored Markdown table summarizing benchmark comparisons."""
+    headers = ["Benchmark", "Baseline", "Current", "Delta", "% Change", "Status"]
+    rows: list[str] = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join(["---"] * len(headers)) + " |",
+    ]
+    for comp in comparison_results:
+        name = str(comp.get("name", "benchmark"))
+        b_val = comp.get("baseline", 0.0)
+        c_val = comp.get("current", 0.0)
+        delta = comp.get("delta", c_val - b_val)
+        pct = comp.get("percent_change", 0.0)
+        reg = comp.get("regressed", False)
+        status = "**REGRESSED**" if reg else "PASSED"
+        pct_str = f"{pct:+.2f}%"
+        delta_str = f"{delta:+.4f}"
+        rows.append(
+            f"| {name} | {b_val:.4f} | {c_val:.4f} | {delta_str} | {pct_str} | {status} |"
+        )
+    return "\n".join(rows)
+
+
+__all__ = [
+    "BenchmarkComparison",
+    "compare_benchmarks",
+    "compare_results",
+    "detect_regression",
+    "generate_markdown_comparison_table",
+]

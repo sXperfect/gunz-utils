@@ -69,11 +69,12 @@ def save_process_csv(
         "voluntary_context_switches",
         "involuntary_context_switches",
     ]
-    with Path(path).open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
-        writer.writeheader()
-        for sample in profile.samples:
-            writer.writerow({field: getattr(sample, field) for field in fields})
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fields)
+    writer.writeheader()
+    for sample in profile.samples:
+        writer.writerow({field: getattr(sample, field) for field in fields})
+    atomic_write(path, buffer.getvalue(), encoding="utf-8")
 
 
 def _figure_data_uri(
@@ -139,4 +140,47 @@ def save_process_html(
     atomic_write(path, html_content, mode="w", encoding="utf-8")
 
 
-__all__ = ["save_process_csv", "save_process_html"]
+def export_benchmark_csv(results: list[dict[str, object]]) -> str:
+    """Format benchmark results as a CSV string."""
+    if not results:
+        return ""
+    keys: list[str] = list(results[0].keys())
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=keys)
+    writer.writeheader()
+    for r in results:
+        writer.writerow(r)
+    return buffer.getvalue()
+
+
+def export_benchmark_json(results: list[dict[str, object]], indent: int = 2) -> str:
+    """Format benchmark results as a formatted JSON string."""
+    import json
+    return json.dumps(results, indent=indent, default=str)
+
+
+def format_summary_matrix(results: list[dict[str, object]]) -> str:
+    """Format benchmark results as an ASCII matrix table."""
+    if not results:
+        return ""
+    headers = [str(k) for k in results[0].keys()]
+    rows = [[str(r.get(h, "")) for h in headers] for r in results]
+    col_widths = [max(len(h), max((len(row[i]) for row in rows), default=0)) for i, h in enumerate(headers)]
+
+    sep = "+-" + "-+-".join("-" * w for w in col_widths) + "-+"
+    header_line = "| " + " | ".join(f"{h:<{w}}" for h, w in zip(headers, col_widths)) + " |"
+    data_lines = [
+        "| " + " | ".join(f"{val:<{w}}" for val, w in zip(row, col_widths)) + " |"
+        for row in rows
+    ]
+
+    return "\n".join([sep, header_line, sep] + data_lines + [sep])
+
+
+__all__ = [
+    "export_benchmark_csv",
+    "export_benchmark_json",
+    "format_summary_matrix",
+    "save_process_csv",
+    "save_process_html",
+]

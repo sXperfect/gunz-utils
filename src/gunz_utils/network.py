@@ -12,7 +12,8 @@ import re
 import socket
 import time
 from collections.abc import Mapping, Sequence
-from urllib.parse import quote, urlencode, urlunsplit
+from dataclasses import dataclass
+from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 
 _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*$")
 
@@ -293,4 +294,95 @@ def tcp_reachable(
     return False
 
 
-__all__ = ["build_network_uri", "tcp_reachable"]
+@dataclass(frozen=True, slots=True)
+class ParsedURI:
+    """Parsed network URI components."""
+
+    scheme: str
+    host: str
+    port: int | None
+    path: str
+    query: str
+    fragment: str
+    username: str | None = None
+
+
+def parse_network_uri(
+    uri: str,
+) -> ParsedURI:
+    """Strictly parse a network URI into components, validating scheme and host."""
+    if not isinstance(uri, str) or not uri.strip():
+        raise ValueError("uri must be a non-empty string")
+    parts = urlsplit(uri.strip())
+    if not parts.scheme or not _SCHEME_RE.fullmatch(parts.scheme):
+        raise ValueError(f"invalid URI scheme: {parts.scheme!r}")
+    if not parts.hostname:
+        raise ValueError("URI must contain a valid host")
+    return ParsedURI(
+        scheme=parts.scheme,
+        host=parts.hostname,
+        port=parts.port,
+        path=parts.path,
+        query=parts.query,
+        fragment=parts.fragment,
+        username=parts.username,
+    )
+
+
+def is_public_ip(
+    address: str,
+) -> bool:
+    """Return True if an IP address is globally routable (not private, loopback, or reserved)."""
+    try:
+        return not _is_non_public_address(address)
+    except ValueError:
+        return False
+
+
+def is_loopback_host(
+    host: str,
+) -> bool:
+    """Return True if host resolves syntactically to a loopback address or localhost."""
+    if not isinstance(host, str):
+        return False
+    h = host.strip().lower()
+    if h.startswith("[") and h.endswith("]"):
+        h = h[1:-1]
+    if h in ("localhost", "localhost.localdomain"):
+        return True
+    try:
+        ip = ipaddress.ip_address(h.split("%", 1)[0])
+        return ip.is_loopback
+    except ValueError:
+        return False
+
+
+def sanitize_uri(
+    uri: str,
+    replacement: str = "***",
+) -> str:
+    """Redact embedded credentials from a URI string."""
+    if not isinstance(uri, str):
+        raise TypeError(f"expected str, got {type(uri).__name__}")
+    parts = urlsplit(uri)
+    if not parts.netloc or ("@" not in parts.netloc):
+        return uri
+    userinfo, host = parts.netloc.rsplit("@", 1)
+    if ":" in userinfo:
+        user, _ = userinfo.split(":", 1)
+        redacted_userinfo = f"{user}:{replacement}"
+    else:
+        redacted_userinfo = replacement
+    new_netloc = f"{redacted_userinfo}@{host}"
+    return urlunsplit((parts.scheme, new_netloc, parts.path, parts.query, parts.fragment))
+
+
+__all__ = [
+    "ParsedURI",
+    "build_network_uri",
+    "is_loopback_host",
+    "is_public_ip",
+    "parse_network_uri",
+    "sanitize_uri",
+    "tcp_reachable",
+]

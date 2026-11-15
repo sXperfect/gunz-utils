@@ -38,6 +38,16 @@ class RingBuffer(t.Generic[T]):
         """Return the maximum buffer capacity."""
         return self._capacity
 
+    @property
+    def is_full(self) -> bool:
+        """Return True if the buffer has reached capacity."""
+        return len(self._data) >= self._capacity
+
+    @property
+    def is_empty(self) -> bool:
+        """Return True if the buffer contains no elements."""
+        return len(self._data) == 0
+
     def append(self,
         value: T,
     ) -> None:
@@ -67,6 +77,22 @@ class RingBuffer(t.Generic[T]):
     def to_list(self) -> list[T]:
         """Return a copy of the buffer elements as a list from oldest to newest."""
         return list(self._data)
+
+    def peek(self) -> T:
+        """Return the oldest element without removing it. Alias for peek_oldest."""
+        return self.peek_oldest()
+
+    def popleft(self) -> T:
+        """Remove and return the oldest element from the buffer.
+
+        Raises
+        ------
+        IndexError
+            If the buffer is empty.
+        """
+        if not self._data:
+            raise IndexError("pop from empty RingBuffer")
+        return self._data.popleft()
 
     def peek_oldest(self) -> T:
         """Return the oldest element without removing it.
@@ -119,6 +145,194 @@ class RingBuffer(t.Generic[T]):
     def __repr__(self,
     ) -> str:
         return f"RingBuffer({list(self._data)!r}, capacity={self._capacity})"
+
+
+K = t.TypeVar("K")
+V = t.TypeVar("V")
+
+
+class PriorityQueue(t.Generic[T]):
+    """Bounded or unbounded priority queue backed by a binary min-heap."""
+
+    def __init__(self,
+        maxsize: int | None = None,
+    ) -> None:
+        if maxsize is not None:
+            if isinstance(maxsize, bool) or not isinstance(maxsize, int) or maxsize < 1:
+                raise ValueError("maxsize must be a positive integer or None")
+        self._maxsize = maxsize
+        self._heap: list[tuple[t.Any, int, T]] = []
+        self._counter = 0
+
+    @property
+    def maxsize(self) -> int | None:
+        """Return the maximum allowed capacity, or None if unbounded."""
+        return self._maxsize
+
+    @property
+    def is_empty(self) -> bool:
+        """Return True if the queue is empty."""
+        return len(self._heap) == 0
+
+    @property
+    def is_full(self) -> bool:
+        """Return True if the queue is at max capacity."""
+        if self._maxsize is None:
+            return False
+        return len(self._heap) >= self._maxsize
+
+    def push(self,
+        item: T,
+        priority: t.Any = None,
+    ) -> None:
+        """Push an item into the queue with optional explicit priority (lowest pops first).
+
+        Raises
+        ------
+        OverflowError
+            If maxsize is configured and the queue is full.
+        """
+        if self._maxsize is not None and len(self._heap) >= self._maxsize:
+            raise OverflowError("PriorityQueue is full")
+        p = item if priority is None else priority
+        heapq.heappush(self._heap, (p, self._counter, item))
+        self._counter += 1
+
+    def pop(self) -> T:
+        """Remove and return the lowest priority item.
+
+        Raises
+        ------
+        IndexError
+            If the queue is empty.
+        """
+        if not self._heap:
+            raise IndexError("pop from empty PriorityQueue")
+        _, _, item = heapq.heappop(self._heap)
+        return item
+
+    def peek(self) -> T:
+        """Return the lowest priority item without removing it.
+
+        Raises
+        ------
+        IndexError
+            If the queue is empty.
+        """
+        if not self._heap:
+            raise IndexError("peek from empty PriorityQueue")
+        return self._heap[0][2]
+
+    def clear(self) -> None:
+        """Remove all items from the queue."""
+        self._heap.clear()
+        self._counter = 0
+
+    def __len__(self) -> int:
+        return len(self._heap)
+
+    def __bool__(self) -> bool:
+        return bool(self._heap)
+
+    def __repr__(self) -> str:
+        return f"PriorityQueue(size={len(self._heap)}, maxsize={self._maxsize})"
+
+
+class BiMap(t.Generic[K, V], Mapping[K, V]):
+    """Bidirectional one-to-one mapping maintaining inverted key-value lookups."""
+
+    def __init__(self,
+        mapping_or_iterable: Mapping[K, V] | Iterable[tuple[K, V]] | None = None,
+        *,
+        _forward: dict[K, V] | None = None,
+        _backward: dict[V, K] | None = None,
+        _inverse: BiMap[V, K] | None = None,
+    ) -> None:
+        if _forward is not None and _backward is not None:
+            self._forward = _forward
+            self._backward = _backward
+            self._inverse = _inverse
+        else:
+            self._forward = {}
+            self._backward = {}
+            self._inverse = None
+            if mapping_or_iterable is not None:
+                if isinstance(mapping_or_iterable, Mapping):
+                    items = mapping_or_iterable.items()
+                else:
+                    items = mapping_or_iterable
+                for k, v in items:
+                    self[k] = v
+
+    @property
+    def inverse(self) -> BiMap[V, K]:
+        """Return the inverse view of this bidirectional map."""
+        if self._inverse is None:
+            self._inverse = BiMap(
+                _forward=self._backward,
+                _backward=self._forward,
+                _inverse=self,
+            )
+        return self._inverse
+
+    def __getitem__(self,
+        key: K,
+    ) -> V:
+        return self._forward[key]
+
+    def __setitem__(self,
+        key: K,
+        value: V,
+    ) -> None:
+        if value in self._backward and self._backward[value] != key:
+            raise ValueError(f"Value {value!r} is already mapped to key {self._backward[value]!r}")
+        if key in self._forward:
+            del self._backward[self._forward[key]]
+        self._forward[key] = value
+        self._backward[value] = key
+
+    def __delitem__(self,
+        key: K,
+    ) -> None:
+        val = self._forward.pop(key)
+        del self._backward[val]
+
+    def __contains__(self,
+        key: object,
+    ) -> bool:
+        return key in self._forward
+
+    def __len__(self) -> int:
+        return len(self._forward)
+
+    def __iter__(self) -> Iterator[K]:
+        return iter(self._forward)
+
+    def get(self,
+        key: K,
+        default: t.Any = None,
+    ) -> t.Any:
+        return self._forward.get(key, default)
+
+    def clear(self) -> None:
+        self._forward.clear()
+        self._backward.clear()
+
+    def copy(self) -> BiMap[K, V]:
+        return BiMap(self._forward.copy())
+
+    def __repr__(self) -> str:
+        return f"BiMap({self._forward!r})"
+
+    def __eq__(self,
+        other: object,
+    ) -> bool:
+        if isinstance(other, BiMap):
+            return self._forward == other._forward
+        if isinstance(other, Mapping):
+            return self._forward == other
+        return False
+
 
 
 def top_k(
@@ -205,7 +419,9 @@ def stable_unique(
 
 
 __all__ = [
+    "BiMap",
     "DeepDifference",
+    "PriorityQueue",
     "RingBuffer",
     "bottom_k",
     "deep_diff",

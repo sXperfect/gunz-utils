@@ -131,7 +131,9 @@ def redact(
 
 
 @functools.lru_cache(maxsize=32)
-def _get_patterns_regex(patterns: frozenset[str]) -> re.Pattern[str]:
+def _get_patterns_regex(
+    patterns: frozenset[str],
+) -> re.Pattern[str]:
     """Compile a combined regular expression for fast secret key matching."""
     escaped = [re.escape(p) for p in sorted(patterns) if p]
     if not escaped:
@@ -214,14 +216,20 @@ def redact_dict(
                 seen_ids.remove(id(value))
         return _walk_scalar(value, secret_context)
 
-    def _walk_scalar(value: object, secret_context: bool) -> object:
+    def _walk_scalar(
+        value: object,
+        secret_context: bool,
+    ) -> object:
         if secret_context:
             if isinstance(value, (str, bytes, bytearray, memoryview)):
                 return _MASK
             return value
         return value
 
-    def _walk_collection(value: object, secret_context: bool) -> object:
+    def _walk_collection(
+        value: object,
+        secret_context: bool,
+    ) -> object:
         if secret_context:
             if isinstance(value, Mapping):
                 return {key: _walk(item, True) for key, item in value.items()}

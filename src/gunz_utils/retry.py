@@ -103,6 +103,36 @@ def _validate(
         raise ValueError("timeout must be a finite non-negative number or None")
 
 
+class RetryExhaustedError(RuntimeError):
+    """Raised when an operation has exhausted all configured retry attempts."""
+
+    def __init__(self,
+        message: str,
+        *,
+        attempts: int,
+        total_delay: float,
+        last_exception: BaseException | None = None,
+    ) -> None:
+        if isinstance(attempts, bool) or not isinstance(attempts, int):
+            raise TypeError("attempts must be an integer")
+        if attempts < 1:
+            raise ValueError("attempts must be a positive integer")
+        if (
+            isinstance(total_delay, bool)
+            or not isinstance(total_delay, (int, float))
+            or not math.isfinite(float(total_delay))
+            or total_delay < 0
+        ):
+            raise ValueError("total_delay must be a finite non-negative number")
+        if last_exception is not None and not isinstance(last_exception, BaseException):
+            raise TypeError("last_exception must be an instance of BaseException or None")
+
+        super().__init__(message)
+        self.attempts = attempts
+        self.total_delay = float(total_delay)
+        self.last_exception = last_exception
+
+
 @dataclass(frozen=True, slots=True)
 class RetryPolicy(Generic[T]):
     """Policy for retrying on exceptions, results, or both."""
@@ -127,8 +157,28 @@ class RetryPolicy(Generic[T]):
             self.max_delay,
             self.timeout,
         )
-        if not self.exceptions:
+        if not isinstance(self.jitter, bool):
+            raise TypeError("jitter must be bool")
+        if isinstance(self.exceptions, (str, bytes, bytearray)):
+            raise TypeError("exceptions must be an iterable of exception classes, not a string")
+        try:
+            excs = tuple(self.exceptions)
+        except TypeError as exc:
+            raise TypeError(
+                f"exceptions must be an iterable of exception classes, got {type(self.exceptions).__name__}"
+            ) from exc
+        if not excs:
             raise ValueError("exceptions must not be empty")
+        for exc_cls in excs:
+            if not isinstance(exc_cls, type) or not issubclass(exc_cls, BaseException):
+                raise TypeError(f"expected BaseException subclass, got {exc_cls!r}")
+        object.__setattr__(self, "exceptions", excs)
+        if self.retry_if_exception is not None and not callable(self.retry_if_exception):
+            raise TypeError("retry_if_exception must be callable or None")
+        if self.retry_if_result is not None and not callable(self.retry_if_result):
+            raise TypeError("retry_if_result must be callable or None")
+        if self.delay_override is not None and not callable(self.delay_override):
+            raise TypeError("delay_override must be callable or None")
 
     def delay(self,
         attempt: int,
@@ -142,12 +192,10 @@ class RetryPolicy(Generic[T]):
         return an exact non-negative delay. Returning None falls back to the
         configured exponential backoff and jitter.
         """
-        if (
-            isinstance(attempt, bool)
-            or not isinstance(attempt, int)
-            or attempt < 1
-        ):
+        if isinstance(attempt, bool) or (isinstance(attempt, int) and attempt < 1):
             raise ValueError("attempt must be a positive integer")
+        if not isinstance(attempt, int):
+            raise TypeError("attempt must be an integer")
 
         if self.delay_override is not None:
             override = self.delay_override(
@@ -173,6 +221,8 @@ class RetryPolicy(Generic[T]):
             self.max_delay,
             self.jitter,
         )
+
+    delay_for_attempt = delay
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,6 +303,8 @@ def run_with_retry(
     for attempt in range(1, policy.attempts + 1):
         try:
             result = operation()
+        except (KeyboardInterrupt, SystemExit, GeneratorExit):
+            raise
         except policy.exceptions as exc:
             if attempt == policy.attempts:
                 raise
@@ -336,7 +388,7 @@ async def async_run_with_retry(
     for attempt in range(1, policy.attempts + 1):
         try:
             result = await operation()
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, KeyboardInterrupt, SystemExit, GeneratorExit):
             raise
         except policy.exceptions as exc:
             if attempt == policy.attempts:
@@ -433,8 +485,25 @@ def retry(
         The result of the operation.
     """
     _validate(attempts, base_delay, max_delay, timeout)
-    if not exceptions:
+    if not isinstance(jitter, bool):
+        raise TypeError("jitter must be bool")
+    if retry_if is not None and not callable(retry_if):
+        raise TypeError("retry_if must be callable or None")
+    if on_retry is not None and not callable(on_retry):
+        raise TypeError("on_retry must be callable or None")
+    if isinstance(exceptions, (str, bytes, bytearray)):
+        raise TypeError("exceptions must be an iterable of exception classes, not a string")
+    try:
+        excs = tuple(exceptions)
+    except TypeError as exc:
+        raise TypeError(
+            f"exceptions must be an iterable of exception classes, got {type(exceptions).__name__}"
+        ) from exc
+    if not excs:
         raise ValueError("exceptions must not be empty")
+    for exc_cls in excs:
+        if not isinstance(exc_cls, type) or not issubclass(exc_cls, BaseException):
+            raise TypeError(f"expected BaseException subclass, got {exc_cls!r}")
 
     def decorate(
         func: Callable[P, T],
@@ -451,6 +520,9 @@ def retry(
         Callable[P, T]
             The result of the operation.
         """
+        if not callable(func):
+            raise TypeError("func must be callable")
+
         @functools.wraps(func)
         def wrapped(
             *args: P.args,
@@ -474,7 +546,9 @@ def retry(
             for attempt in range(1, attempts + 1):
                 try:
                     return func(*args, **kwargs)
-                except exceptions as exc:
+                except (KeyboardInterrupt, SystemExit, GeneratorExit):
+                    raise
+                except excs as exc:
                     if attempt == attempts or (
                         retry_if is not None and not retry_if(exc)
                     ):
@@ -539,8 +613,25 @@ def async_retry(
         The result of the operation.
     """
     _validate(attempts, base_delay, max_delay, timeout)
-    if not exceptions:
+    if not isinstance(jitter, bool):
+        raise TypeError("jitter must be bool")
+    if retry_if is not None and not callable(retry_if):
+        raise TypeError("retry_if must be callable or None")
+    if on_retry is not None and not callable(on_retry):
+        raise TypeError("on_retry must be callable or None")
+    if isinstance(exceptions, (str, bytes, bytearray)):
+        raise TypeError("exceptions must be an iterable of exception classes, not a string")
+    try:
+        excs = tuple(exceptions)
+    except TypeError as exc:
+        raise TypeError(
+            f"exceptions must be an iterable of exception classes, got {type(exceptions).__name__}"
+        ) from exc
+    if not excs:
         raise ValueError("exceptions must not be empty")
+    for exc_cls in excs:
+        if not isinstance(exc_cls, type) or not issubclass(exc_cls, BaseException):
+            raise TypeError(f"expected BaseException subclass, got {exc_cls!r}")
 
     def decorate(
         func: Callable[P, Any],
@@ -557,6 +648,9 @@ def async_retry(
         Callable[P, Any]
             The result of the operation.
         """
+        if not callable(func):
+            raise TypeError("func must be callable")
+
         @functools.wraps(func)
         async def wrapped(
             *args: P.args,
@@ -580,9 +674,9 @@ def async_retry(
             for attempt in range(1, attempts + 1):
                 try:
                     return await func(*args, **kwargs)
-                except asyncio.CancelledError:
+                except (asyncio.CancelledError, KeyboardInterrupt, SystemExit, GeneratorExit):
                     raise
-                except exceptions as exc:
+                except excs as exc:
                     if attempt == attempts or (
                         retry_if is not None and not retry_if(exc)
                     ):
@@ -611,6 +705,7 @@ def async_retry(
 
 __all__ = [
     "RetryEvent",
+    "RetryExhaustedError",
     "RetryPolicy",
     "async_retry",
     "async_run_with_retry",

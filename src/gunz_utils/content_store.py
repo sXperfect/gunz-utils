@@ -1,10 +1,12 @@
 """Dependency-free content-addressed local file storage."""
 
+from __future__ import annotations
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import contextlib
 
-from __future__ import annotations
 
 import errno
 import hashlib
@@ -57,6 +59,14 @@ class StoredArtifact:
     digest: str
     path: Path
     size_bytes: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.digest, str) or not self.digest.strip():
+            raise ValueError("digest must be a non-empty string")
+        if not isinstance(self.path, Path):
+            object.__setattr__(self, "path", Path(self.path))
+        if isinstance(self.size_bytes, bool) or not isinstance(self.size_bytes, int) or self.size_bytes < 0:
+            raise ValueError("size_bytes must be a non-negative integer")
 
 
 @dataclass
@@ -224,10 +234,8 @@ class ContentAddressedStore:
         try:
             for component in target.parent.relative_to(self.root).parts:
                 if create:
-                    try:
+                    with contextlib.suppress(FileExistsError):
                         os.mkdir(component, dir_fd=descriptor)
-                    except FileExistsError:
-                        pass
                 try:
                     child = os.open(
                         component,
@@ -349,10 +357,8 @@ class ContentAddressedStore:
         parent_fd : int | None
             parent_fd parameter.
         """
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.unlink(path.name if parent_fd is not None else path, dir_fd=parent_fd)
-        except FileNotFoundError:
-            pass
 
     @staticmethod
     @contextmanager
@@ -941,6 +947,35 @@ class ContentAddressedStore:
         except (KeyError, ValueError, OSError):
             return False
         return True
+
+    def read_bytes(self,
+        digest: str,
+        *,
+        max_bytes: int | None = None,
+    ) -> bytes:
+        """Safely read and return stored artifact bytes by digest."""
+        path = self.get(digest, verify=True)
+        size = path.stat().st_size
+        if max_bytes is not None:
+            if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0:
+                raise ValueError("max_bytes must be a non-negative integer or None")
+            if size > max_bytes:
+                raise ValueError(f"artifact size {size} exceeds max_bytes {max_bytes}")
+        return path.read_bytes()
+
+    def delete(self,
+        digest: str,
+    ) -> bool:
+        """Safely remove a stored artifact by digest. Returns True if removed, False if absent."""
+        normalized = self._validate_digest(digest)
+        target = self.path_for(normalized)
+        if not target.exists():
+            return False
+        try:
+            target.unlink()
+            return True
+        except FileNotFoundError:
+            return False
 
 
 __all__ = ["ContentAddressedStore", "StoredArtifact"]

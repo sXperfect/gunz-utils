@@ -53,7 +53,9 @@ class BenchmarkHistory:
     def __iter__(self) -> Iterator[HistoryPoint]:
         return iter(self.points)
 
-    def __getitem__(self, index: int | slice) -> HistoryPoint | list[HistoryPoint]:
+    def __getitem__(self,
+        index: int | slice,
+    ) -> HistoryPoint | list[HistoryPoint]:
         return self.points[index]
 
     def add(self,

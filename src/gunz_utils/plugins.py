@@ -28,6 +28,14 @@ class PluginInfo:
     value: str
     group: str
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("name must be a non-empty string")
+        if not isinstance(self.value, str) or not self.value.strip():
+            raise ValueError("value must be a non-empty string")
+        if not isinstance(self.group, str) or not self.group.strip():
+            raise ValueError("group must be a non-empty string")
+
 
 @dataclass(frozen=True, slots=True)
 class PluginLoadResult:
@@ -134,25 +142,14 @@ class GunzFileFinder(importlib.abc.MetaPathFinder):
 
     def find_spec(self,
         fullname: str,
-        path: Sequence[str] | None,
+        path: Sequence[str] | None = None,
         target: ModuleType | None = None,
     ) -> importlib.machinery.ModuleSpec | None:
-        if not fullname.startswith(_FILE_MODULE_PREFIX):
-            return None
         registered_path = _REGISTERED_FILE_MODULES.get(fullname)
         if registered_path is None:
             return None
-        hex_encoded = fullname[len(_FILE_MODULE_PREFIX) :]
-        if not hex_encoded:
-            return None
-        try:
-            raw_path = bytes.fromhex(hex_encoded).decode("utf-8")
-        except (ValueError, UnicodeDecodeError):
-            return None
-        if "\x00" in raw_path:
-            return None
-        file_path = Path(raw_path)
-        if file_path != registered_path or not file_path.is_absolute():
+        file_path = registered_path
+        if not file_path.is_absolute():
             return None
         try:
             st = file_path.lstat()
@@ -223,7 +220,9 @@ def load_module_from_path(
     """
     if not isinstance(reload, bool):
         raise TypeError("reload must be bool")
-    if not isinstance(prefix, str) or not prefix.isidentifier():
+    if not isinstance(prefix, str):
+        raise TypeError("prefix must be a str")
+    if not prefix.isidentifier():
         raise ValueError("prefix must be a valid Python identifier")
 
     raw_path = Path(path)
@@ -262,6 +261,7 @@ def load_module_from_path(
     except BaseException:
         if old_mod is None:
             sys.modules.pop(module_name, None)
+            _REGISTERED_FILE_MODULES.pop(module_name, None)
         else:
             sys.modules[module_name] = old_mod
         raise

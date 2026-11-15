@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from enum import StrEnum
 import math
+import threading
 import time
 from typing import Any, TypeVar
 
@@ -39,6 +40,7 @@ class AsyncCircuitBreaker:
         failure_threshold: int = 5,
         recovery_timeout: float = 30.0,
         failure_predicate: Callable[[BaseException], bool] | None = None,
+        on_state_change: Callable[[CircuitState, CircuitState], None] | None = None,
     ) -> None:
         if (
             isinstance(failure_threshold, bool)
@@ -56,6 +58,7 @@ class AsyncCircuitBreaker:
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.failure_predicate = failure_predicate
+        self.on_state_change = on_state_change
         self._failures = 0
         self._opened_at: float | None = None
         self._half_open_in_flight = False
@@ -91,10 +94,13 @@ class AsyncCircuitBreaker:
     async def reset(self) -> None:
         """Reset the breaker to closed state, clearing failure counts."""
         async with self._lock:
+            old_state = self.state
             self._failures = 0
             self._opened_at = None
             self._half_open_in_flight = False
             self._generation += 1
+            if self.on_state_change and old_state != CircuitState.CLOSED:
+                self.on_state_change(old_state, CircuitState.CLOSED)
 
     async def __aenter__(self) -> AsyncCircuitBreaker:
         async with self._lock:
@@ -116,8 +122,7 @@ class AsyncCircuitBreaker:
         _breaker_context.set(new_ctx)
         return self
 
-    async def __aexit__(
-        self,
+    async def __aexit__(self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: Any,
@@ -148,6 +153,8 @@ class AsyncCircuitBreaker:
                             self._failures += 1
                             self._opened_at = time.monotonic()
                             self._generation += 1
+                            if self.on_state_change:
+                                self.on_state_change(CircuitState.HALF_OPEN, CircuitState.OPEN)
                         elif (
                             self._generation == admitted_generation
                             and self._opened_at is None
@@ -156,6 +163,8 @@ class AsyncCircuitBreaker:
                             if self._failures >= self.failure_threshold:
                                 self._opened_at = time.monotonic()
                                 self._generation += 1
+                                if self.on_state_change:
+                                    self.on_state_change(CircuitState.CLOSED, CircuitState.OPEN)
 
                 if predicate_exc is not None:
                     raise predicate_exc from exc_val
@@ -164,6 +173,8 @@ class AsyncCircuitBreaker:
                     if is_half_open_probe:
                         self._failures = 0
                         self._opened_at = None
+                        if self.on_state_change:
+                            self.on_state_change(CircuitState.HALF_OPEN, CircuitState.CLOSED)
                     elif (
                         self._generation == admitted_generation
                         and self._opened_at is None
@@ -243,7 +254,9 @@ class AsyncBulkhead:
         self._active += 1
         return self
 
-    async def __aexit__(self, *args: object) -> None:
+    async def __aexit__(self,
+        *args: object,
+    ) -> None:
         self._active -= 1
         self._semaphore.release()
 
@@ -289,9 +302,197 @@ class AsyncBulkhead:
             self._semaphore.release()
 
 
+class CircuitBreaker:
+    """Synchronous thread-safe circuit breaker."""
+
+    def __init__(self,
+        *,
+        failure_threshold: int = 5,
+        recovery_timeout: float = 30.0,
+        failure_predicate: Callable[[BaseException], bool] | None = None,
+        on_state_change: Callable[[CircuitState, CircuitState], None] | None = None,
+    ) -> None:
+        if (
+            isinstance(failure_threshold, bool)
+            or not isinstance(failure_threshold, int)
+            or failure_threshold < 1
+        ):
+            raise ValueError("failure_threshold must be a positive integer")
+        if (
+            isinstance(recovery_timeout, bool)
+            or not isinstance(recovery_timeout, (int, float))
+            or not math.isfinite(float(recovery_timeout))
+            or recovery_timeout < 0
+        ):
+            raise ValueError("recovery_timeout must be finite and non-negative")
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = float(recovery_timeout)
+        self.failure_predicate = failure_predicate
+        self.on_state_change = on_state_change
+        self._failures = 0
+        self._opened_at: float | None = None
+        self._half_open_in_flight = False
+        self._generation = 0
+        self._lock = threading.Lock()
+
+    @property
+    def failure_count(self) -> int:
+        return self._failures
+
+    @property
+    def state(self) -> CircuitState:
+        if self._opened_at is None:
+            return CircuitState.CLOSED
+        if time.monotonic() - self._opened_at >= self.recovery_timeout:
+            return CircuitState.HALF_OPEN
+        return CircuitState.OPEN
+
+    def reset(self) -> None:
+        with self._lock:
+            old_state = self.state
+            self._failures = 0
+            self._opened_at = None
+            self._half_open_in_flight = False
+            self._generation += 1
+            if self.on_state_change and old_state != CircuitState.CLOSED:
+                self.on_state_change(old_state, CircuitState.CLOSED)
+
+    def __enter__(self) -> CircuitBreaker:
+        with self._lock:
+            state = self.state
+            if state is CircuitState.OPEN:
+                raise CircuitOpenError("circuit is open")
+            if state is CircuitState.HALF_OPEN:
+                if self._half_open_in_flight:
+                    raise CircuitOpenError("half-open probe already in flight")
+                self._half_open_in_flight = True
+        return self
+
+    def __exit__(self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        with self._lock:
+            was_half_open = self._half_open_in_flight
+            try:
+                if exc_val is not None:
+                    if isinstance(exc_val, (KeyboardInterrupt, SystemExit)):
+                        return None
+                    is_failure = True
+                    if self.failure_predicate is not None:
+                        is_failure = bool(self.failure_predicate(exc_val))
+
+                    if is_failure:
+                        self._failures += 1
+                        if was_half_open:
+                            self._opened_at = time.monotonic()
+                            self._generation += 1
+                            if self.on_state_change:
+                                self.on_state_change(CircuitState.HALF_OPEN, CircuitState.OPEN)
+                        elif self._failures >= self.failure_threshold and self._opened_at is None:
+                            self._opened_at = time.monotonic()
+                            self._generation += 1
+                            if self.on_state_change:
+                                self.on_state_change(CircuitState.CLOSED, CircuitState.OPEN)
+                else:
+                    if was_half_open:
+                        self._failures = 0
+                        self._opened_at = None
+                        if self.on_state_change:
+                            self.on_state_change(CircuitState.HALF_OPEN, CircuitState.CLOSED)
+                    elif self._opened_at is None:
+                        self._failures = 0
+            finally:
+                if was_half_open:
+                    self._half_open_in_flight = False
+
+    def call(self,
+        func: Callable[..., T],
+        *args: Any,
+        **kwargs: Any,
+    ) -> T:
+        with self:
+            return func(*args, **kwargs)
+
+
+class Bulkhead:
+    """Synchronous thread-safe bulkhead concurrency limiter."""
+
+    def __init__(self,
+        limit: int,
+        max_queue: int = 0,
+    ) -> None:
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ValueError("limit must be a positive integer")
+        if isinstance(max_queue, bool) or not isinstance(max_queue, int) or max_queue < 0:
+            raise ValueError("max_queue must be a non-negative integer")
+        self.limit = limit
+        self.max_queue = max_queue
+        self._semaphore = threading.Semaphore(limit)
+        self._active = 0
+        self._lock = threading.Lock()
+
+    @property
+    def active_count(self) -> int:
+        with self._lock:
+            return self._active
+
+    @property
+    def available_slots(self) -> int:
+        return self.available
+
+    @property
+    def available(self) -> int:
+        with self._lock:
+            return self.limit - self._active
+
+    def __enter__(self) -> Bulkhead:
+        self._semaphore.acquire()
+        with self._lock:
+            self._active += 1
+        return self
+
+    def __exit__(self,
+        *args: object,
+    ) -> None:
+        with self._lock:
+            self._active -= 1
+        self._semaphore.release()
+
+    def run(self,
+        func: Callable[..., T],
+        *args: Any,
+        timeout: float | None = None,
+        **kwargs: Any,
+    ) -> T:
+        if timeout is not None and (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(float(timeout))
+            or timeout < 0
+        ):
+            raise ValueError("timeout must be a finite non-negative number or None")
+
+        acquired = self._semaphore.acquire(timeout=timeout if timeout is not None else -1)
+        if not acquired:
+            raise TimeoutError("bulkhead acquisition timed out")
+
+        with self._lock:
+            self._active += 1
+        try:
+            return func(*args, **kwargs)
+        finally:
+            with self._lock:
+                self._active -= 1
+            self._semaphore.release()
+
+
 __all__ = [
     "AsyncBulkhead",
     "AsyncCircuitBreaker",
+    "Bulkhead",
+    "CircuitBreaker",
     "CircuitOpenError",
     "CircuitState",
 ]

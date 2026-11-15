@@ -140,8 +140,10 @@ def to_jsonable(
                 separators=(",", ":"), default=repr,
             ),
         )
-    if isinstance(value, bytes):
-        raise TypeError("bytes are not implicitly JSON serializable")
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        if isinstance(value, bytes):
+            raise TypeError("bytes are not implicitly JSON serializable")
+        raise TypeError(f"{type(value).__name__} is not implicitly JSON serializable")
     if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
         raise ValueError("Out of range float values are not JSON compliant")
     return value
@@ -166,6 +168,8 @@ def json_dumps(
     str
         Stable UTF-8 JSON text.
     """
+    if not isinstance(pretty, bool):
+        raise TypeError("pretty must be bool")
     kwargs: dict[str, Any] = {
         "ensure_ascii": False,
         "sort_keys": True,
@@ -179,21 +183,75 @@ def json_dumps(
 
 
 def json_loads(
-    value: str | bytes | bytearray,
+    value: str | bytes | bytearray | memoryview,
+    *,
+    max_bytes: int = 10 * 1024 * 1024,
+    max_depth: int = 64,
 ) -> Any:
-    """Decode JSON text or bytes using the standard library decoder.
+    """Decode strict JSON text or bytes into Python objects.
+
+    Rejects non-finite numbers (NaN/Infinity), duplicate mapping keys, and
+    excessive nesting depth or payload size.
 
     Parameters
     ----------
-    value : str | bytes | bytearray
-        JSON-encoded text or bytes to decode.
+    value : str | bytes | bytearray | memoryview
+        JSON payload to decode.
+    max_bytes : int, default=10 MiB
+        Maximum allowed byte count.
+    max_depth : int, default=64
+        Maximum allowed container nesting depth.
 
     Returns
     -------
     Any
         The decoded Python object.
     """
-    return json.loads(value)
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0:
+        raise ValueError("max_bytes must be a positive integer")
+    if isinstance(max_depth, bool) or not isinstance(max_depth, int) or max_depth <= 0:
+        raise ValueError("max_depth must be a positive integer")
+
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        raw_bytes = bytes(memoryview(value).cast("B"))
+        if len(raw_bytes) > max_bytes:
+            raise ValueError(f"payload size {len(raw_bytes)} exceeds max_bytes {max_bytes}")
+        try:
+            text = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Invalid UTF-8 in JSON payload: {exc}") from exc
+    elif isinstance(value, str):
+        if len(value.encode("utf-8")) > max_bytes:
+            raise ValueError(f"payload size exceeds max_bytes {max_bytes}")
+        text = value
+    else:
+        raise TypeError(f"value must be bytes-like or str, got {type(value).__name__}")
+
+    try:
+        result = json.loads(text)
+    except (ValueError, RecursionError) as exc:
+        raise ValueError(f"Invalid JSON: {exc}") from exc
+
+    stack: list[tuple[Iterator[Any], int]] = []
+    if isinstance(result, dict):
+        stack.append((iter(result.values()), 1))
+    elif isinstance(result, list):
+        stack.append((iter(result), 1))
+
+    while stack:
+        iterator, depth = stack[-1]
+        try:
+            val = next(iterator)
+        except StopIteration:
+            stack.pop()
+            continue
+        if isinstance(val, (dict, list)):
+            if depth >= max_depth:
+                raise ValueError(f"JSON nesting depth exceeds max_depth ({max_depth})")
+            next_iter = iter(val.values()) if isinstance(val, dict) else iter(val)
+            stack.append((next_iter, depth + 1))
+
+    return result
 
 
 def canonical_json(
@@ -241,7 +299,7 @@ def _float_hook(
 
 
 def decode_json_object(
-    payload: bytes | str,
+    payload: bytes | bytearray | memoryview | str,
     *,
     label: str = "JSON",
     max_depth: int = 64,
@@ -250,7 +308,7 @@ def decode_json_object(
 
     Parameters
     ----------
-    payload : bytes | str
+    payload : bytes | bytearray | memoryview | str
         UTF-8 bytes or text representing a JSON object.
     label : str, default="JSON"
         Descriptor used in error messages.
@@ -264,16 +322,16 @@ def decode_json_object(
     """
     if isinstance(max_depth, bool) or not isinstance(max_depth, int) or max_depth < 1:
         raise ValueError("max_depth must be an integer >= 1")
-    if isinstance(payload, bytes):
+    if isinstance(payload, (bytes, bytearray, memoryview)):
         try:
-            text = payload.decode("utf-8")
+            text = bytes(memoryview(payload).cast("B")).decode("utf-8")
         except UnicodeDecodeError as exc:
             raise ValueError(f"Invalid UTF-8 in {label}: {exc}") from exc
     elif isinstance(payload, str):
         text = payload
     else:
         actual = type(payload).__name__
-        raise TypeError(f"{label} payload must be bytes or str, not {actual}")
+        raise TypeError(f"{label} payload must be bytes-like or str, not {actual}")
 
     try:
         result = json.loads(

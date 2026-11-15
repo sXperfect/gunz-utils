@@ -99,6 +99,8 @@ def register_artifact(
     PerformanceRun
         The result of the operation.
     """
+    if not isinstance(run, PerformanceRun):
+        raise TypeError("run must be an instance of PerformanceRun")
     item = Path(path)
     checksum, size_bytes = _hash_regular_file(item)
     artifact = PerformanceArtifact(
@@ -127,6 +129,8 @@ def verify_artifact(
     bool
         The result of the operation.
     """
+    if not isinstance(artifact, PerformanceArtifact):
+        raise TypeError("artifact must be an instance of PerformanceArtifact")
     if artifact.checksum_sha256 is None or artifact.size_bytes is None:
         return False
     try:

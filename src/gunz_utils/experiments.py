@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VariantResult:
     """Metrics or error produced by one independently initialized variant."""
 
@@ -23,13 +23,44 @@ class VariantResult:
     error: str | None = None
 
 
+class ExperimentMatrix(dict[str, Any]):
+    """Execution matrix produced by run_variant_matrix."""
+
+    @property
+    def baseline(self) -> str:
+        """Return the name of the baseline variant."""
+        return self["baseline"]
+
+    @property
+    def results(self) -> dict[str, VariantResult]:
+        """Return per-variant execution results."""
+        return self["results"]
+
+    @property
+    def comparisons(self) -> dict[str, dict[str, dict[str, Any]]]:
+        """Return baseline-relative metric comparisons."""
+        return self["comparisons"]
+
+    def succeeded_variants(self) -> tuple[str, ...]:
+        """Return names of variants that completed without error."""
+        return tuple(name for name, res in self.results.items() if res.error is None)
+
+    def failed_variants(self) -> tuple[str, ...]:
+        """Return names of variants that encountered errors."""
+        return tuple(name for name, res in self.results.items() if res.error is not None)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a plain dictionary copy of the matrix."""
+        return dict(self)
+
+
 def run_variant_matrix(
     setup: Callable[[], Any],
     run: Callable[[Any, dict[str, Any]], dict[str, Any]],
-    variants: dict[str, dict[str, Any]],
+    variants: Mapping[str, dict[str, Any]],
     *,
     baseline: str = "baseline",
-) -> dict[str, Any]:
+) -> ExperimentMatrix:
     """Run configuration variants from independently rebuilt state.
 
     Parameters
@@ -39,14 +70,14 @@ def run_variant_matrix(
     run : Callable[[Any, dict[str, Any]], dict[str, Any]]
         Variant function receiving the fresh state and an independent deep
         copy of the variant configuration. It must return a metric mapping.
-    variants : dict[str, dict[str, Any]]
+    variants : Mapping[str, dict[str, Any]]
         Named variant configurations.
     baseline : str, optional
         Variant used as the metric-comparison reference.
 
     Returns
     -------
-    dict[str, Any]
+    ExperimentMatrix
         Baseline name, per-variant results, and baseline-relative comparisons
         for variants that completed successfully.
 
@@ -54,6 +85,10 @@ def run_variant_matrix(
     ------
     KeyError
         If the named baseline is absent.
+    TypeError
+        If setup or run is not callable, or variants is not a Mapping.
+    ValueError
+        If variants mapping is empty.
 
     Notes
     -----
@@ -62,6 +97,14 @@ def run_variant_matrix(
     always called separately,
     preventing mutable state from leaking between variants.
     """
+    if not isinstance(variants, Mapping):
+        raise TypeError("variants must be a Mapping")
+    if not variants:
+        raise ValueError("variants mapping must not be empty")
+    if not callable(setup):
+        raise TypeError("setup must be callable")
+    if not callable(run):
+        raise TypeError("run must be callable")
     if baseline not in variants:
         raise KeyError(f"baseline variant {baseline!r} is missing")
 
@@ -97,11 +140,13 @@ def run_variant_matrix(
                 result.metrics,
             )
 
-    return {
-        "baseline": baseline,
-        "results": results,
-        "comparisons": comparisons,
-    }
+    return ExperimentMatrix(
+        {
+            "baseline": baseline,
+            "results": results,
+            "comparisons": comparisons,
+        }
+    )
 
 
 def compare_numeric_metrics(
@@ -192,7 +237,7 @@ def compare_numeric_metrics(
 
 
 def metric_improvement(
-    matrix: dict[str, Any],
+    matrix: Mapping[str, Any],
     *,
     variant: str,
     metric: str,
@@ -203,7 +248,7 @@ def metric_improvement(
 
     Parameters
     ----------
-    matrix : dict[str, Any]
+    matrix : Mapping[str, Any]
         Result returned by :func:`run_variant_matrix`.
     variant : str
         Candidate variant name.
@@ -222,14 +267,27 @@ def metric_improvement(
 
     Raises
     ------
+    TypeError
+        If matrix is not a Mapping, or variant/metric is not a string.
     ValueError
-        If the direction is invalid or the threshold is negative.
+        If the direction is invalid, the threshold is negative, or variant/metric is empty.
 
     Notes
     -----
     This reports operational evidence that an intervention changed one metric.
     It does not establish that the intervention is the unique cause.
     """
+    if not isinstance(matrix, Mapping):
+        raise TypeError("matrix must be a Mapping")
+    if not isinstance(variant, str):
+        raise TypeError("variant must be a string")
+    if not variant.strip():
+        raise ValueError("variant must be a non-empty string")
+    if not isinstance(metric, str):
+        raise TypeError("metric must be a string")
+    if not metric.strip():
+        raise ValueError("metric must be a non-empty string")
+
     if direction not in {"lower", "higher"}:
         raise ValueError("direction must be lower or higher")
     if isinstance(minimum_relative_improvement, bool) or not isinstance(
@@ -259,11 +317,18 @@ def metric_improvement(
     baseline = comparison["baseline"]
     candidate = comparison["candidate"]
     scale = max(abs(baseline), 1e-12)
-    relative_improvement = (
-        (baseline - candidate) / scale
-        if direction == "lower"
-        else (candidate - baseline) / scale
-    )
+    diff = (baseline - candidate) if direction == "lower" else (candidate - baseline)
+    try:
+        relative_improvement = diff / scale
+    except OverflowError:
+        relative_improvement = float("inf") if diff > 0 else float("-inf")
+
+    if not math.isfinite(relative_improvement):
+        return {
+            "supported": False,
+            "reason": "metric comparison is non-finite",
+        }
+
     return {
         "supported": (
             relative_improvement >= minimum_relative_improvement
@@ -273,16 +338,6 @@ def metric_improvement(
         "candidate": candidate,
         "direction": direction,
     }
-
-
-__all__ = [
-    "VariantResult",
-    "compare_numeric_metrics",
-    "metric_improvement",
-    "parameter_grid",
-    "run_variant_matrix",
-]
-
 
 
 def parameter_grid(
@@ -304,22 +359,33 @@ def parameter_grid(
     Raises
     ------
     TypeError
-        If factors is not a Mapping.
+        If factors is not a Mapping, or a factor's values is a string or not iterable.
     ValueError
         If a factor name is empty or any factor has no candidate values.
     """
     if not isinstance(factors, Mapping):
         raise TypeError("factors must be a Mapping")
     names = list(factors)
+    factor_values: dict[str, tuple[Any, ...]] = {}
     for name in names:
-        if not isinstance(name, str) or not name:
+        if not isinstance(name, str) or not name.strip():
             raise ValueError(
                 "factor names must be non-empty strings"
             )
-        if not factors[name]:
+        val = factors[name]
+        if isinstance(val, (str, bytes, bytearray)):
+            raise TypeError(
+                f"factor {name!r} values must be a sequence of values, not {type(val).__name__}"
+            )
+        try:
+            seq = tuple(val)
+        except TypeError as exc:
+            raise TypeError(f"factor {name!r} values must be iterable") from exc
+        if not seq:
             raise ValueError(
                 f"factor {name!r} must contain at least one value"
             )
+        factor_values[name] = seq
 
     return [
         dict(
@@ -330,6 +396,16 @@ def parameter_grid(
             )
         )
         for values in itertools.product(
-            *(factors[name] for name in names)
+            *(factor_values[name] for name in names)
         )
     ]
+
+
+__all__ = [
+    "ExperimentMatrix",
+    "VariantResult",
+    "compare_numeric_metrics",
+    "metric_improvement",
+    "parameter_grid",
+    "run_variant_matrix",
+]

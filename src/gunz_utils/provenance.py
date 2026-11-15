@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import json
 import os
 import platform
 import sys
@@ -45,6 +46,33 @@ class RuntimeProvenance:
             self,
             "environment",
             freeze_structure(dict(self.environment)),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize runtime provenance to a dictionary."""
+        return {
+            "captured_at": self.captured_at,
+            "python_version": self.python_version,
+            "python_implementation": self.python_implementation,
+            "platform": self.platform,
+            "machine": self.machine,
+            "executable": self.executable,
+            "environment": dict(self.environment),
+        }
+
+    @classmethod
+    def from_dict(cls,
+        data: Mapping[str, Any],
+    ) -> RuntimeProvenance:
+        """Deserialize runtime provenance from a dictionary."""
+        return cls(
+            captured_at=data["captured_at"],
+            python_version=data["python_version"],
+            python_implementation=data["python_implementation"],
+            platform=data["platform"],
+            machine=data["machine"],
+            executable=data["executable"],
+            environment=dict(data.get("environment", {})),
         )
 
 
@@ -241,6 +269,71 @@ class ExecutionManifest:
             "packages",
             freeze_structure(packages),
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize execution manifest to a dictionary."""
+        return {
+            "created_at": self.created_at,
+            "run_id": self.run_id,
+            "runtime": self.runtime.to_dict(),
+            "git": {
+                "commit": self.git.commit,
+                "branch": self.git.branch,
+                "dirty": self.git.dirty,
+            },
+            "parent_run_id": self.parent_run_id,
+            "attempt": self.attempt,
+            "seed": self.seed,
+            "config": dict(self.config),
+            "inputs": dict(self.inputs),
+            "packages": dict(self.packages),
+            "schema_version": self.schema_version,
+        }
+
+    @classmethod
+    def from_dict(cls,
+        data: Mapping[str, Any],
+    ) -> ExecutionManifest:
+        """Deserialize execution manifest from a dictionary."""
+        git_data = data["git"]
+        git_info = GitInfo(
+            commit=git_data.get("commit"),
+            branch=git_data.get("branch"),
+            dirty=git_data.get("dirty"),
+        )
+        runtime_data = data["runtime"]
+        runtime_info = (
+            runtime_data
+            if isinstance(runtime_data, RuntimeProvenance)
+            else RuntimeProvenance.from_dict(runtime_data)
+        )
+        return cls(
+            created_at=data["created_at"],
+            run_id=data["run_id"],
+            runtime=runtime_info,
+            git=git_info,
+            parent_run_id=data.get("parent_run_id"),
+            attempt=data.get("attempt", 1),
+            seed=data.get("seed"),
+            config=dict(data.get("config", {})),
+            inputs=dict(data.get("inputs", {})),
+            packages=dict(data.get("packages", {})),
+            schema_version=data.get("schema_version", 1),
+        )
+
+    def to_json(self,
+        indent: int | None = None,
+    ) -> str:
+        """Serialize execution manifest to a JSON string."""
+        return json.dumps(self.to_dict(), indent=indent, sort_keys=True)
+
+    @classmethod
+    def from_json(cls,
+        json_str: str,
+    ) -> ExecutionManifest:
+        """Deserialize execution manifest from a JSON string."""
+        return cls.from_dict(json.loads(json_str))
+
 
 
 def capture_execution_manifest(

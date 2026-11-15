@@ -19,6 +19,7 @@ __license__ = "Clear BSD"
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+from collections.abc import Callable
 from typing import TypeVar
 
 T = TypeVar("T")
@@ -32,6 +33,7 @@ class UnsetType:
     including ``None``, booleans, and other falsy values.
     """
 
+    __slots__ = ()
     _instance: "UnsetType | None" = None
 
     def __new__(
@@ -40,6 +42,14 @@ class UnsetType:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
+
+    def __copy__(self) -> "UnsetType":
+        return self
+
+    def __deepcopy__(self,
+        memo: object,
+    ) -> "UnsetType":
+        return self
 
     def __repr__(
         self,
@@ -101,4 +111,33 @@ def default(
     return fallback if value is UNSET else value
 
 
-__all__ = ["UNSET", "UnsetType", "default", "is_unset"]
+def default_factory(
+    value: T | UnsetType,
+    factory: Callable[[], T],
+) -> T:
+    """Return factory() when value is UNSET, else value.
+
+    Parameters
+    ----------
+    value : T or UnsetType
+        A value or the UNSET sentinel.
+    factory : Callable[[], T]
+        Callable returning a default value when value is UNSET.
+
+    Returns
+    -------
+    T
+        The computed or supplied value.
+    """
+    if not callable(factory):
+        raise TypeError("factory must be callable")
+    return factory() if value is UNSET else value
+
+
+__all__ = [
+    "UNSET",
+    "UnsetType",
+    "default",
+    "default_factory",
+    "is_unset",
+]

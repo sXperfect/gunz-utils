@@ -72,6 +72,7 @@ __license__ = "Clear BSD"
 import abc
 import asyncio
 import math
+import re
 from typing import Any, Protocol, runtime_checkable
 
 # =============================================================================
@@ -103,10 +104,19 @@ class UpstreamError(Exception):
         upstream: str,
         tool_name: str | None = None,
     ) -> None:
-        super().__init__(message)
-        self.upstream = upstream
+        if not isinstance(upstream, str) or not upstream.strip():
+            raise ValueError("upstream must be a non-empty string")
+        if not isinstance(message, str):
+            raise TypeError("message must be a str")
+        cleaned_msg = re.sub(
+            r"(?i)(token|bearer|secret|password|api[_-]?key)\s*[:=]\s*\S+",
+            r"\1=[REDACTED]",
+            message,
+        )
+        super().__init__(cleaned_msg)
+        self.upstream = upstream.strip()
         self.tool_name = tool_name
-        self.message = message
+        self.message = cleaned_msg
 
     def to_dict(self) -> dict[str, Any]:
         #? A stable, JSON-safe envelope lets brokers expose failures without
@@ -283,6 +293,16 @@ class BaseUpstream(abc.ABC):
         """
         return None
 
+    async def __aenter__(self) -> BaseUpstream:
+        return self
+
+    async def __aexit__(self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        await self.close()
+
 
 class PolicyUpstream:
     """Opt-in timeout, concurrency, and idempotent retry policy wrapper."""
@@ -340,6 +360,10 @@ class PolicyUpstream:
         """
         return dict(self._stats)
 
+    def reset_stats(self) -> None:
+        """Reset policy metrics counters to zero."""
+        self._stats = {"calls": 0, "retries": 0, "timeouts": 0, "failures": 0}
+
     async def call(self,
         tool_name: str,
         arguments: dict[str, Any],
@@ -377,6 +401,8 @@ class PolicyUpstream:
                         self._stats["failures"] += 1
                         raise
                     self._stats["retries"] += 1
+                except asyncio.CancelledError:
+                    raise
                 except BaseException:
                     self._stats["failures"] += 1
                     raise
@@ -398,6 +424,16 @@ class PolicyUpstream:
         No parameters and no return value.
         """
         await self._client.close()
+
+    async def __aenter__(self) -> PolicyUpstream:
+        return self
+
+    async def __aexit__(self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        await self.close()
 
 
 __all__ = [

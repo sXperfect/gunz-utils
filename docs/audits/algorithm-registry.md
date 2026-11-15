@@ -62,6 +62,17 @@ this scoped review re-audited the entire repository.
 
 ## Audited algorithm set
 
+### ALG-056 lazy async cleanup follow-up, 2026-11-15
+
+The [bounded async cleanup review](2026-11-15-async-cleanup.md) records a focused
+A3 follow-up on the current working tree. Lazy producers are no longer exhausted
+during failure cleanup; completed siblings remain owned until observed; invalid
+coroutine errors and repeated cancellation preserve their intended behavior.
+The dedicated regressions and related concurrency suites pass on Python 3.11 and
+3.12. Historical A4 rows below retain their original scope: repo-wide lint/type
+and documentation failures prevent an A4 claim for this working tree. No
+packaging, native Windows, or native macOS verification is claimed for this fix.
+
 ### Cross-process follow-up on 3f474ad
 
 [The process proof program](../tasks/done/2026-10-08-storage-process-proofs.md)

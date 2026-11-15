@@ -166,7 +166,12 @@ def resolve_project_root(
     """
     global _PROJECT_ANCHOR, _PROJECT_ROOT
 
+    if isinstance(subpaths, (str, bytes, bytearray)):
+        raise TypeError("subpaths must be a sequence of paths, not a string or bytes")
+
     start = pathlib.Path(anchor).resolve()
+    if start.is_file():
+        start = start.parent.resolve()
     if (
         _PROJECT_ROOT is not None
         and _PROJECT_ANCHOR is not None

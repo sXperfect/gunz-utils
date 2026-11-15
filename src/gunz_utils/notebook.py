@@ -18,6 +18,7 @@ __license__ = "Clear BSD"
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import pathlib
+import sys
 import typing as t
 
 # =============================================================================
@@ -33,7 +34,7 @@ try:
 except Exception:
     get_ipython = None
 
-__all__ = ["setup_notebook"]
+__all__ = ["is_colab", "is_notebook", "setup_notebook"]
 
 
 def setup_notebook(
@@ -98,3 +99,20 @@ def _enable_autoreload() -> None:
         ipython.run_line_magic("autoreload", "2")
     except Exception:
         return
+
+
+def is_notebook() -> bool:
+    """Return True if currently executing within an IPython or Jupyter notebook shell."""
+    if get_ipython is None:
+        return False
+    try:
+        shell = get_ipython().__class__.__name__
+        return "ZMQInteractiveShell" in shell or "ColabShell" in shell
+    except Exception:
+        return False
+
+
+def is_colab() -> bool:
+    """Return True if executing in a Google Colaboratory environment."""
+    return "google.colab" in sys.modules
+

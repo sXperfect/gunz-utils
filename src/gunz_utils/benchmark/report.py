@@ -28,6 +28,8 @@ def format_comparison(
     str
         The result of the operation.
     """
+    if not isinstance(comparison, BenchmarkComparison):
+        raise TypeError("comparison must be an instance of BenchmarkComparison")
     rows = [
         ("Median", comparison.median_change),
         ("P95", comparison.p95_change),
@@ -55,6 +57,8 @@ def format_process_profile(
     str
         The result of the operation.
     """
+    if not isinstance(profile, ProcessProfile):
+        raise TypeError("profile must be an instance of ProcessProfile")
     cpu = profile.cpu_user_seconds + profile.cpu_system_seconds
     cpu_util = 0.0 if profile.wall_seconds == 0 else cpu / profile.wall_seconds
     rows = [

@@ -1,10 +1,12 @@
 """Host environment and benchmark-noise metadata."""
 
+from __future__ import annotations
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import contextlib
 
-from __future__ import annotations
 
 import os
 from dataclasses import dataclass
@@ -41,10 +43,8 @@ def capture_noise_info() -> NoiseInfo:
     governors: set[str] = set()
     cpu_root = Path("/sys/devices/system/cpu")
     for path in cpu_root.glob("cpu[0-9]*/cpufreq/scaling_governor"):
-        try:
+        with contextlib.suppress((OSError, PermissionError)):
             governors.add(path.read_text().strip())
-        except (OSError, PermissionError):
-            pass
     memory_max = None
     try:
         raw = Path("/sys/fs/cgroup/memory.max").read_text().strip()

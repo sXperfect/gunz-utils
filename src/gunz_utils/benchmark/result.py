@@ -15,7 +15,7 @@ from typing import Any
 SCHEMA_VERSION = 1
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SystemInfo:
     """Machine/runtime metadata used to judge benchmark comparability."""
 
@@ -43,7 +43,7 @@ class SystemInfo:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BenchmarkStats:
     """Descriptive timing statistics in seconds."""
 
@@ -56,8 +56,24 @@ class BenchmarkStats:
     stddev: float
     ops_per_second: float
 
+    def __post_init__(self) -> None:
+        for f in (
+            "minimum",
+            "median",
+            "mean",
+            "p95",
+            "p99",
+            "maximum",
+            "stddev",
+            "ops_per_second",
+        ):
+            val = getattr(self, f)
+            if isinstance(val, bool) or not isinstance(val, (int, float)):
+                raise TypeError(f"{f} must be a number")
+            object.__setattr__(self, f, float(val))
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, slots=True)
 class BenchmarkResult:
     """Portable benchmark result with raw samples and metadata."""
 
@@ -71,6 +87,8 @@ class BenchmarkResult:
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("name must be a non-empty string")
         object.__setattr__(self, "parameters", dict(self.parameters))
 
     def to_dict(self) -> dict[str, Any]:

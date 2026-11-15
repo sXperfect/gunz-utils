@@ -1,10 +1,12 @@
 """Crash-safe file writing utilities for the Gunz ecosystem."""
 
+from __future__ import annotations
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import contextlib
 
-from __future__ import annotations
 
 import importlib
 import os
@@ -20,7 +22,7 @@ from typing import Any
 # LOCAL APPLICATION IMPORTS
 # =============================================================================
 from ._version import __version__ as __version__
-from .serialization import json_dumps
+from .serialization import decode_json_object, json_dumps
 
 try:
     _accel = importlib.import_module("._accel", package=__package__)
@@ -35,18 +37,21 @@ __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = [
     "FileSnapshot",
+    "atomic_json_read",
     "atomic_json_write",
     "atomic_write",
     "physical_lines",
     "read_file_snapshot",
     "read_regular_bytes",
     "read_source_file",
+    "safe_read_bytes",
+    "safe_read_text",
 ]
 
 
 def atomic_write(
     path: str | pathlib.Path,
-    content: str | bytes,
+    content: str | bytes | bytearray | memoryview,
     *,
     mode: str = "w",
     encoding: str | None = None,
@@ -66,6 +71,24 @@ def atomic_write(
     """
     if not isinstance(path, str | pathlib.Path):
         raise TypeError("path must be str or pathlib.Path")
+    if not isinstance(mkdir, bool):
+        raise TypeError("mkdir must be bool")
+    if not isinstance(durable, bool):
+        raise TypeError("durable must be bool")
+    if not isinstance(content, (str, bytes, bytearray, memoryview)):
+        raise TypeError(
+            f"content must be str or bytes-like, got {type(content).__name__}"
+        )
+
+    if mode not in ("w", "wb"):
+        raise ValueError("mode must be 'w' or 'wb'")
+    is_binary = mode == "wb"
+    if is_binary and isinstance(content, str):
+        raise ValueError("Binary mode requires bytes content")
+    if not is_binary and isinstance(content, (bytes, bytearray, memoryview)):
+        raise ValueError("Text mode requires str content")
+    if not is_binary and encoding is not None and not isinstance(encoding, str):
+        raise TypeError("encoding must be str or None")
 
     if permissions is not None:
         if (
@@ -82,6 +105,9 @@ def atomic_write(
             )
 
     target = pathlib.Path(path)
+    if target.is_dir():
+        raise IsADirectoryError(f"target path is an existing directory: {target}")
+
     if mkdir:
         #? Security (VULN-2026-002): when the target is owner-private,
         #? create missing parent directories with owner-private permissions too.
@@ -94,13 +120,11 @@ def atomic_write(
     elif not target.parent.exists():
         raise FileNotFoundError(f"Parent directory does not exist: {target.parent}")
 
-    if mode not in ("w", "wb"):
-        raise ValueError("mode must be 'w' or 'wb'")
-    is_binary = mode == "wb"
-    if is_binary and isinstance(content, str):
-        raise ValueError("Binary mode requires bytes content")
-    if not is_binary and isinstance(content, bytes):
-        raise ValueError("Text mode requires str content")
+    write_payload: bytes | str
+    if is_binary and isinstance(content, (bytearray, memoryview)):
+        write_payload = bytes(memoryview(content).cast("B"))
+    else:
+        write_payload = content
 
     fd, tmp_path = tempfile.mkstemp(
         dir=str(target.parent),
@@ -120,7 +144,7 @@ def atomic_write(
         #? Keep raw ownership even if wrapper construction closes an incomplete
         #? wrapper before raising (for example for an unknown text encoding).
         with file_handle as file:
-            file.write(content)
+            file.write(write_payload)
             if durable:
                 file.flush()
                 os.fsync(file.fileno())
@@ -132,10 +156,8 @@ def atomic_write(
             finally:
                 os.close(dir_fd)
     except BaseException:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp_path)
-        except OSError:
-            pass
         raise
     finally:
         os.close(fd)
@@ -176,6 +198,159 @@ def atomic_json_write(
         durable=durable,
         permissions=permissions,
     )
+
+
+def atomic_json_read(
+    path: str | pathlib.Path,
+    *,
+    max_bytes: int = 64 * 1024 * 1024,
+    max_depth: int = 64,
+) -> Any:
+    """Read and parse a JSON file safely.
+
+    Verifies regular file status, bounds file size, enforces UTF-8 decoding,
+    and forbids duplicate keys and non-finite numbers (NaN/Infinity).
+
+    Parameters
+    ----------
+    path : str | pathlib.Path
+        JSON file to read.
+    max_bytes : int, default=64 MiB
+        Maximum file size in bytes to prevent memory exhaustion.
+    max_depth : int, default=64
+        Maximum allowed JSON nesting depth.
+
+    Returns
+    -------
+    Any
+        Parsed JSON object.
+    """
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0:
+        raise ValueError("max_bytes must be a positive integer")
+    if isinstance(max_depth, bool) or not isinstance(max_depth, int) or max_depth <= 0:
+        raise ValueError("max_depth must be a positive integer")
+
+    target = pathlib.Path(path)
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NONBLOCK"):
+        flags |= os.O_NONBLOCK
+    fd = os.open(target, flags)
+    try:
+        st = os.fstat(fd)
+        if stat.S_ISDIR(st.st_mode):
+            raise IsADirectoryError(f"path {target} is a directory")
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError(f"path {target} must be a regular file")
+        if st.st_size > max_bytes:
+            raise ValueError(f"file size {st.st_size} exceeds max_bytes {max_bytes}")
+        with os.fdopen(fd, "rb") as f:
+            fd = -1
+            raw = f.read(max_bytes + 1)
+            if len(raw) > max_bytes:
+                raise ValueError(f"file size exceeds max_bytes {max_bytes}")
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+    return decode_json_object(raw, max_depth=max_depth)
+
+
+def safe_read_bytes(
+    path: str | pathlib.Path,
+    *,
+    allow_symlink: bool = True,
+    max_bytes: int | None = None,
+) -> bytes:
+    """Read a regular file into bytes with size bounds and symlink policy.
+
+    Parameters
+    ----------
+    path : str | pathlib.Path
+        Path of the file to read.
+    allow_symlink : bool, default=True
+        Whether to allow reading through symlinks. When False, symlinks are rejected.
+    max_bytes : int | None, default=None
+        Maximum bytes to read before raising ValueError.
+
+    Returns
+    -------
+    bytes
+        File contents.
+    """
+    if not isinstance(allow_symlink, bool):
+        raise TypeError("allow_symlink must be bool")
+    if max_bytes is not None and (type(max_bytes) is not int or max_bytes <= 0):
+        raise ValueError("max_bytes must be a positive integer or None")
+
+    target = pathlib.Path(path)
+    if not allow_symlink and target.is_symlink():
+        raise ValueError(f"path {target} is a symlink")
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NONBLOCK"):
+        flags |= os.O_NONBLOCK
+    if not allow_symlink and hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    try:
+        fd = os.open(target, flags)
+    except OSError as exc:
+        if not allow_symlink and target.is_symlink():
+            raise ValueError(f"path {target} is a symlink") from exc
+        raise
+
+    try:
+        st = os.fstat(fd)
+        if stat.S_ISDIR(st.st_mode):
+            raise IsADirectoryError(f"path {target} is a directory")
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError(f"path {target} must be a regular file")
+        if max_bytes is not None and st.st_size > max_bytes:
+            raise ValueError(f"file size {st.st_size} exceeds max_bytes {max_bytes}")
+        chunks: list[bytes] = []
+        remaining = max_bytes
+        while True:
+            read_size = min(remaining, 1 << 20) if remaining is not None else (1 << 20)
+            chunk = os.read(fd, read_size)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            if remaining is not None:
+                remaining -= len(chunk)
+                if remaining < 0:
+                    raise ValueError(f"file size exceeds max_bytes {max_bytes}")
+        return b"".join(chunks)
+    finally:
+        os.close(fd)
+
+
+def safe_read_text(
+    path: str | pathlib.Path,
+    *,
+    encoding: str = "utf-8",
+    allow_symlink: bool = True,
+    max_bytes: int | None = None,
+) -> str:
+    """Read a regular file into decoded text with size bounds and symlink policy.
+
+    Parameters
+    ----------
+    path : str | pathlib.Path
+        Path of the file to read.
+    encoding : str, default='utf-8'
+        Text encoding.
+    allow_symlink : bool, default=True
+        Whether to allow reading through symlinks.
+    max_bytes : int | None, default=None
+        Maximum bytes to read before raising ValueError.
+
+    Returns
+    -------
+    str
+        Decoded file content.
+    """
+    raw = safe_read_bytes(path, allow_symlink=allow_symlink, max_bytes=max_bytes)
+    return raw.decode(encoding)
 
 
 def read_regular_bytes(
@@ -293,6 +468,8 @@ def physical_lines(
     """
     if not isinstance(text, str):
         raise TypeError("text must be a string")
+    if not isinstance(keepends, bool):
+        raise TypeError("keepends must be bool")
     if _accel_physical_lines is not None:
         return _accel_physical_lines(text, keepends)
     lines: list[str] = []
@@ -390,10 +567,8 @@ class FileSnapshot:
                 finally:
                     os.close(dir_fd)
         except BaseException:
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_path)
-            except OSError:
-                pass
             raise
         finally:
             os.close(fd)

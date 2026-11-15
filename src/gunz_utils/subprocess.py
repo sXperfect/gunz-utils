@@ -9,11 +9,15 @@ __license__ = "Clear BSD"
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import contextlib
 import asyncio
 import math
 import os
+from pathlib import Path
 import selectors
+import shutil
 import signal
+import socket
 import subprocess
 import threading
 import time
@@ -31,6 +35,35 @@ class CommandResult:
     stdout: str
     stderr: str
     duration: float
+
+    @property
+    def ok(self) -> bool:
+        """Return True if the command exited with returncode 0."""
+        return self.returncode == 0
+
+    @property
+    def exit_code(self) -> int:
+        """Alias for returncode."""
+        return self.returncode
+
+
+def _validate_command_args(
+    args: Sequence[str],
+) -> list[str]:
+    if isinstance(args, (str, bytes, bytearray)):
+        raise TypeError("args must be a sequence of strings, not a string or bytes")
+    try:
+        arg_list = list(args)
+    except TypeError as exc:
+        raise TypeError(f"args must be an iterable of strings, got {type(args).__name__}") from exc
+    if not arg_list:
+        raise ValueError("args must not be empty")
+    for arg in arg_list:
+        if not isinstance(arg, str):
+            raise TypeError(f"command arguments must be str, got {type(arg).__name__}")
+        if "\x00" in arg:
+            raise ValueError("command arguments must not contain NUL bytes")
+    return arg_list
 
 
 class CommandError(RuntimeError):
@@ -152,10 +185,8 @@ def _kill_process(
         except (OSError, ProcessLookupError):
             pass
     if process.poll() is None:
-        try:
+        with contextlib.suppress(OSError):
             process.kill()
-        except OSError:
-            pass
 
 
 def _read_bounded_pipe(
@@ -326,10 +357,8 @@ def _run_command_bounded(
         _kill_process(process)
         stop.set()
         cleanup_deadline = time.monotonic() + 0.5
-        try:
+        with contextlib.suppress(subprocess.TimeoutExpired):
             process.wait(timeout=max(0.0, cleanup_deadline - time.monotonic()))
-        except subprocess.TimeoutExpired:
-            pass
         for thread in started_threads:
             thread.join(timeout=max(0.0, cleanup_deadline - time.monotonic()))
         #? Readers own their pipes once started. Never close a buffered stream
@@ -340,10 +369,8 @@ def _run_command_bounded(
             if cleanup_pipe is not None and (
                 index >= len(threads) or threads[index] not in started_threads
             ):
-                try:
+                with contextlib.suppress(OSError):
                     cleanup_pipe.close()
-                except OSError:
-                    pass
         if isinstance(exc, subprocess.TimeoutExpired) and state.exceeded:
             raise _output_limit_error(max_output_bytes) from None
         raise
@@ -392,14 +419,17 @@ def run_command(
     CommandResult
         The result of the operation.
     """
-    if not args:
-        raise ValueError("args must not be empty")
+    arg_list = _validate_command_args(args)
+    if not isinstance(check, bool):
+        raise TypeError("check must be a bool")
+    if env is not None and not isinstance(env, Mapping):
+        raise TypeError("env must be a Mapping or None")
     timeout = _validate_timeout_value(timeout, name="timeout")
     _validate_output_limit(max_output_bytes)
     started = time.perf_counter()
     if max_output_bytes is None:
         p = subprocess.Popen(
-            list(args),
+            arg_list,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -417,10 +447,8 @@ def run_command(
             raise
         except BaseException:
             _kill_process(p)
-            try:
+            with contextlib.suppress(subprocess.TimeoutExpired):
                 p.wait(timeout=0.5)
-            except subprocess.TimeoutExpired:
-                pass
             raise
     else:
         returncode, stdout_b, stderr_b = _run_command_bounded(
@@ -458,20 +486,16 @@ async def _stop_process(
         terminate_grace parameter.
     """
     if os.name == "posix":
-        try:
+        with contextlib.suppress((OSError, ProcessLookupError)):
             os.killpg(process.pid, signal.SIGTERM)
-        except (OSError, ProcessLookupError):
-            pass
     elif process.returncode is None:
         process.terminate()
     try:
         await asyncio.wait_for(process.wait(), timeout=terminate_grace)
     except TimeoutError:
         if os.name == "posix":
-            try:
+            with contextlib.suppress((OSError, ProcessLookupError)):
                 os.killpg(process.pid, signal.SIGKILL)
-            except (OSError, ProcessLookupError):
-                pass
         elif process.returncode is None:
             process.kill()
         await process.wait()
@@ -552,15 +576,11 @@ async def _read_bounded_async_pipe(
         state.exceeded = True
         failure.set()
         if os.name == "posix":
-            try:
+            with contextlib.suppress((OSError, ProcessLookupError)):
                 os.killpg(process.pid, signal.SIGKILL)
-            except (OSError, ProcessLookupError):
-                pass
         elif process.returncode is None:
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 process.kill()
-            except ProcessLookupError:
-                pass
         return
 
 
@@ -713,8 +733,11 @@ async def run_command_async(
     CommandResult
         The result of the operation.
     """
-    if not args:
-        raise ValueError("args must not be empty")
+    arg_list = _validate_command_args(args)
+    if not isinstance(check, bool):
+        raise TypeError("check must be a bool")
+    if env is not None and not isinstance(env, Mapping):
+        raise TypeError("env must be a Mapping or None")
     timeout = _validate_timeout_value(timeout, name="timeout")
     validated_grace = _validate_timeout_value(
         terminate_grace,
@@ -726,7 +749,7 @@ async def run_command_async(
     _validate_output_limit(max_output_bytes)
     started = time.perf_counter()
     process = await asyncio.create_subprocess_exec(
-        *args,
+        *arg_list,
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -763,10 +786,125 @@ async def run_command_async(
     return result
 
 
+def which(command: str) -> str | None:
+    """Locate the executable path for a command in the system PATH."""
+    return shutil.which(command)
+
+
+def is_executable(path: str | Path) -> bool:
+    """Check if the given path is a file with executable permissions."""
+    p = Path(path)
+    return p.is_file() and os.access(p, os.X_OK)
+
+
+def find_open_port(start_port: int = 8000, max_tries: int = 100) -> int:
+    """Find an available TCP port starting from start_port."""
+    for port in range(start_port, start_port + max_tries):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(("127.0.0.1", port))
+                return port
+            except OSError:
+                continue
+    raise OSError(f"no free port found in range {start_port}..{start_port + max_tries}")
+
+
+def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    """Check whether a TCP port is currently in use on the given host."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return False
+        except OSError:
+            return True
+
+
+def clean_subprocess_env(
+    extra_env: Mapping[str, str] | None = None,
+    remove_keys: Sequence[str] = (),
+) -> dict[str, str]:
+    """Return a clean copy of os.environ with specified modifications."""
+    env = dict(os.environ)
+    for k in remove_keys:
+        env.pop(k, None)
+    if extra_env:
+        env.update(extra_env)
+    return env
+
+
+def kill_process_tree(pid: int, timeout: float = 2.0) -> None:
+    """Recursively kill a process and its child processes."""
+    if os.name != "posix":
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+        return
+
+    # POSIX: Send signal to process group if possible
+    try:
+        pgid = os.getpgid(pid)
+        os.killpg(pgid, signal.SIGTERM)
+    except (OSError, ProcessLookupError):
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+
+
+def stream_command_output(
+    args: Sequence[str],
+    *,
+    cwd: str | Path | None = None,
+    env: Mapping[str, str] | None = None,
+) -> Iterator[tuple[float, str, str]]:
+    """Stream command output line by line with timestamps and stream tags ('stdout'/'stderr')."""
+    arg_list = _validate_command_args(args)
+    proc = subprocess.Popen(
+        arg_list,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=cwd,
+        env=None if env is None else {**os.environ, **env},
+        text=True,
+    )
+    if proc.stdout is None or proc.stderr is None:
+        return
+
+    sel = selectors.DefaultSelector()
+    sel.register(proc.stdout, selectors.EVENT_READ, data="stdout")
+    sel.register(proc.stderr, selectors.EVENT_READ, data="stderr")
+
+    active_streams = 2
+    while active_streams > 0:
+        events = sel.select(timeout=0.1)
+        for key, _ in events:
+            stream_name = key.data
+            stream_obj = key.fileobj
+            line = stream_obj.readline()  # type: ignore[union-attr]
+            if line:
+                yield (time.time(), stream_name, line)
+            else:
+                sel.unregister(stream_obj)  # type: ignore[arg-type]
+                active_streams -= 1
+        if proc.poll() is not None and not events:
+            break
+
+    proc.wait()
+
+
 __all__ = [
     "CommandError",
     "CommandOutputLimitError",
     "CommandResult",
+    "clean_subprocess_env",
+    "find_open_port",
+    "is_executable",
+    "is_port_in_use",
+    "kill_process_tree",
     "run_command",
     "run_command_async",
+    "stream_command_output",
+    "which",
 ]

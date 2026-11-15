@@ -18,7 +18,13 @@ from .backends import (
     default_sampler,
 )
 from .build import build_performance_run
-from .compare import BenchmarkComparison, compare_results
+from .compare import (
+    BenchmarkComparison,
+    compare_benchmarks,
+    compare_results,
+    detect_regression,
+    generate_markdown_comparison_table,
+)
 from .diagnostics import (
     StabilityReport,
     analyze_stability,
@@ -26,7 +32,13 @@ from .diagnostics import (
 )
 from .environment import NoiseInfo, capture_noise_info
 from .experiment import ExperimentResult, run_experiment
-from .export import save_process_csv, save_process_html
+from .export import (
+    export_benchmark_csv,
+    export_benchmark_json,
+    format_summary_matrix,
+    save_process_csv,
+    save_process_html,
+)
 from .gate import RegressionGate, evaluate_regression_gate
 from .history import BenchmarkHistory, HistoryPoint, Trend
 from .io import GitInfo, capture_git_info, load_result, save_result
@@ -75,8 +87,11 @@ __all__ = [
     "WorkerRequest", "WorkerResponse", "WorkerResult", "analyze_stability",
     "benchmark", "build_performance_run", "benchmark_environment", "calibrate_loops",
     "capture_git_info", "capture_noise_info", "comparability_warnings",
-    "compare_results", "default_sampler", "evaluate_metric",
-    "evaluate_regression_gate", "format_comparison", "format_process_profile",
+    "compare_benchmarks",
+    "compare_results", "default_sampler", "detect_regression", "evaluate_metric",
+    "evaluate_regression_gate", "export_benchmark_csv", "export_benchmark_json",
+    "format_comparison", "format_process_profile", "format_summary_matrix",
+    "generate_markdown_comparison_table",
     "load_result", "load_result_checked", "measure_runner_overhead",
     "migrate_performance_run",
     "perf_available", "perf_metrics", "perf_record", "perf_script",

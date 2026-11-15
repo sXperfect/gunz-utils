@@ -1,0 +1,1 @@
+Stop bounded async helpers from pulling unscheduled lazy work during failure cleanup. Observe completed sibling tasks when iteration fails or closes, drain cooperative cleanup across repeated cancellation, and preserve original worker and invalid-coroutine errors.

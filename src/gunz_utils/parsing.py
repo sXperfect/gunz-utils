@@ -10,6 +10,7 @@ safe defaults, plus a strict boolean parser for validation boundaries.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 import math
 from typing import Any
 
@@ -21,7 +22,15 @@ from ._version import __version__ as __version__
 __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
-__all__ = ["safe_int", "safe_float", "safe_bool", "parse_bool"]
+__all__ = [
+    "parse_bool",
+    "parse_int_exact",
+    "parse_key_value_pairs",
+    "safe_bool",
+    "safe_float",
+    "safe_int",
+    "safe_list",
+]
 
 _TRUE_STRINGS = frozenset({"1", "true", "t", "yes", "y", "on"})
 _FALSE_STRINGS = frozenset({"0", "false", "f", "no", "n", "off"})
@@ -216,3 +225,121 @@ def parse_bool(
         f"Cannot parse bool from type {type(value).__name__}; "
         f"expected one of {expected}"
     )
+
+
+def parse_key_value_pairs(
+    text: str,
+    *,
+    pair_delimiter: str = ",",
+    kv_delimiter: str = "=",
+) -> dict[str, str]:
+    """Parse delimited key-value strings into a dictionary.
+
+    Parameters
+    ----------
+    text : str
+        String of key-value pairs (e.g. 'a=1, b=2').
+    pair_delimiter : str, default=','
+        Delimiter separating key-value pairs.
+    kv_delimiter : str, default='='
+        Delimiter separating keys and values.
+
+    Returns
+    -------
+    dict[str, str]
+        Parsed key-value mapping.
+
+    Raises
+    ------
+    TypeError
+        If text is not a string.
+    ValueError
+        If any pair is malformed (missing kv_delimiter).
+    """
+    if not isinstance(text, str):
+        raise TypeError(f"expected str, got {type(text).__name__}")
+    if not pair_delimiter or not kv_delimiter:
+        raise ValueError("delimiters must not be empty")
+
+    result: dict[str, str] = {}
+    tokens = text.split(pair_delimiter)
+    for token in tokens:
+        stripped = token.strip()
+        if not stripped:
+            continue
+        if kv_delimiter not in stripped:
+            raise ValueError(f"malformed key-value pair missing {kv_delimiter!r}: {stripped!r}")
+        key, val = stripped.split(kv_delimiter, 1)
+        k = key.strip()
+        v = val.strip()
+        if len(v) >= 2 and ((v[0] == '"' and v[-1] == '"') or (v[0] == "'" and v[-1] == "'")):
+            v = v[1:-1]
+        result[k] = v
+    return result
+
+
+def safe_list(
+    value: Any,
+) -> list[Any]:
+    """Coerce single item, None, or iterable into a list without splitting strings.
+
+    Parameters
+    ----------
+    value : Any
+        Value to coerce into a list.
+
+    Returns
+    -------
+    list[Any]
+        Coerced list.
+    """
+    if value is None:
+        return []
+    if isinstance(value, (str, bytes, bytearray)):
+        return [value]
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return list(value)
+    if isinstance(value, Iterable) and not isinstance(value, (dict, type)):
+        return list(value)
+    return [value]
+
+
+def parse_int_exact(
+    value: Any,
+) -> int:
+    """Strictly parse an integer, rejecting booleans, floats, and non-integer representations.
+
+    Parameters
+    ----------
+    value : Any
+        Value to parse strictly as integer.
+
+    Returns
+    -------
+    int
+        Exact parsed integer.
+
+    Raises
+    ------
+    TypeError
+        If value is a bool, float, or unsupported type.
+    ValueError
+        If value string is not a valid exact integer.
+    """
+    if isinstance(value, bool):
+        raise TypeError("cannot parse exact int from bool")
+    if isinstance(value, float):
+        raise TypeError("cannot parse exact int from float")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, (str, bytes, bytearray)):
+        s = value.decode("utf-8") if isinstance(value, (bytes, bytearray)) else value
+        s = s.strip()
+        if not s:
+            raise ValueError("cannot parse exact int from empty string")
+        check_s = s[1:] if s[0] in "+-" else s
+        if not check_s.isdigit():
+            raise ValueError(f"invalid exact integer: {value!r}")
+        return int(s, 10)
+    raise TypeError(f"expected int or string, got {type(value).__name__}")
+

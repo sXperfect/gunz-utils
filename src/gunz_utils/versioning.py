@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+import re
 from types import MappingProxyType
 from typing import Any
 
@@ -156,8 +157,7 @@ class SchemaMigrator:
             )
         self._migrations[key] = migration
 
-    def can_migrate(
-        self,
+    def can_migrate(self,
         schema_or_envelope: str | VersionedEnvelope,
         from_version: int | None = None,
         *,
@@ -198,8 +198,7 @@ class SchemaMigrator:
             v += 1
         return True
 
-    def latest_version(
-        self,
+    def latest_version(self,
         schema: str,
     ) -> int | None:
         """Return the highest reachable version registered for a schema.
@@ -260,4 +259,114 @@ class SchemaMigrator:
         )
 
 
-__all__ = ["SchemaMigrationError", "SchemaMigrator", "VersionedEnvelope"]
+_SEMVER_RE = re.compile(
+    r"^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)"
+    r"(?:-(?P<prerelease>[0-9A-Za-z.-]+))?"
+    r"(?:\+(?P<build>[0-9A-Za-z.-]+))?$"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class SemanticVersion:
+    """SemVer 2.0.0 semantic version representation and comparison."""
+
+    major: int
+    minor: int
+    patch: int
+    prerelease: str | None = None
+    build: str | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("major", "minor", "patch"):
+            val = getattr(self, name)
+            if isinstance(val, bool) or not isinstance(val, int) or val < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+
+    @classmethod
+    def parse(cls,
+        version_str: str,
+    ) -> SemanticVersion:
+        """Parse a SemVer 2.0.0 formatted string into a SemanticVersion."""
+        if not isinstance(version_str, str):
+            raise TypeError("version_str must be a string")
+        match = _SEMVER_RE.match(version_str.strip())
+        if not match:
+            raise ValueError(f"invalid SemVer string: {version_str!r}")
+        gd = match.groupdict()
+        return cls(
+            major=int(gd["major"]),
+            minor=int(gd["minor"]),
+            patch=int(gd["patch"]),
+            prerelease=gd["prerelease"],
+            build=gd["build"],
+        )
+
+    def bump_major(self) -> SemanticVersion:
+        """Return a new SemanticVersion with incremented major version."""
+        return SemanticVersion(major=self.major + 1, minor=0, patch=0)
+
+    def bump_minor(self) -> SemanticVersion:
+        """Return a new SemanticVersion with incremented minor version."""
+        return SemanticVersion(major=self.major, minor=self.minor + 1, patch=0)
+
+    def bump_patch(self) -> SemanticVersion:
+        """Return a new SemanticVersion with incremented patch version."""
+        return SemanticVersion(major=self.major, minor=self.minor, patch=self.patch + 1)
+
+    def _key(self) -> tuple[int, int, int, int, str]:
+        has_pre = 0 if self.prerelease is not None else 1
+        pre = self.prerelease or ""
+        return (self.major, self.minor, self.patch, has_pre, pre)
+
+    def __lt__(self,
+        other: object,
+    ) -> bool:
+        if not isinstance(other, SemanticVersion):
+            return NotImplemented
+        return self._key() < other._key()
+
+    def __le__(self,
+        other: object,
+    ) -> bool:
+        if not isinstance(other, SemanticVersion):
+            return NotImplemented
+        return self._key() <= other._key()
+
+    def __gt__(self,
+        other: object,
+    ) -> bool:
+        if not isinstance(other, SemanticVersion):
+            return NotImplemented
+        return self._key() > other._key()
+
+    def __ge__(self,
+        other: object,
+    ) -> bool:
+        if not isinstance(other, SemanticVersion):
+            return NotImplemented
+        return self._key() >= other._key()
+
+    def __eq__(self,
+        other: object,
+    ) -> bool:
+        if not isinstance(other, SemanticVersion):
+            return False
+        return (self.major, self.minor, self.patch, self.prerelease) == (
+            other.major, other.minor, other.patch, other.prerelease
+        )
+
+    def __str__(self) -> str:
+        s = f"{self.major}.{self.minor}.{self.patch}"
+        if self.prerelease:
+            s = f"{s}-{self.prerelease}"
+        if self.build:
+            s = f"{s}+{self.build}"
+        return s
+
+
+__all__ = [
+    "SchemaMigrationError",
+    "SchemaMigrator",
+    "SemanticVersion",
+    "VersionedEnvelope",
+]

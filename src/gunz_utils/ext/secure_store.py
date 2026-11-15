@@ -54,11 +54,13 @@ Example (passphrase mode)::
     >>> store.set("google.api_key", "AIza...", acl=["mcp"])
 """
 
+from __future__ import annotations
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import contextlib
 
-from __future__ import annotations
 
 # =============================================================================
 # METADATA
@@ -165,10 +167,8 @@ def _close_quietly(
     fd : int
         fd parameter.
     """
-    try:
+    with contextlib.suppress(OSError):
         os.close(fd)
-    except OSError:
-        pass
 
 
 class _ReentrantFileLock:
@@ -432,10 +432,8 @@ class SecureStore:
 
         No parameters and no return value.
         """
-        try:
+        with contextlib.suppress(Exception):
             self._conn.close()
-        except Exception:
-            pass
         self._conn = self._open_connection()
 
     def _init_schema(self) -> None:
@@ -1482,10 +1480,8 @@ class SecureStore:
                     self._audit(caller, "set_many", None, True)
             except BaseException:
                 if not self._conn.in_transaction:
-                    try:
+                    with contextlib.suppress(sqlite3.Error):
                         self._audit(caller, "set_many", None, False)
-                    except sqlite3.Error:
-                        pass
                 raise
 
     def get_many(self,
@@ -1712,12 +1708,8 @@ class SecureStore:
         """
         try:
             if self._conn.in_transaction:
-                try:
+                with contextlib.suppress(BaseException):
                     self._conn.execute("ROLLBACK")
-                except BaseException:
-                    #? Closing the connection drops an uncommitted transaction.
-                    #? COMMIT may also have succeeded before its wrapper failed.
-                    pass
             self._reconnect_database()
             generation = self._read_generation()
             if generation == old_generation:

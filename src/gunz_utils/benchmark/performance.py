@@ -62,7 +62,9 @@ class PerformanceRun:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PerformanceRun:
+    def from_dict(cls,
+        data: dict[str, Any],
+    ) -> PerformanceRun:
         """Reconstruct a PerformanceRun from a serialized dictionary."""
         artifacts = tuple(
             PerformanceArtifact(**art) if isinstance(art, dict) else art

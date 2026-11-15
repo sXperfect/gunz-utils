@@ -1,23 +1,56 @@
 """Backend-neutral renewable lease heartbeat coordination."""
 
+from __future__ import annotations
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import contextlib
 
-from __future__ import annotations
 
 import asyncio
 import inspect
 import math
-from collections.abc import Awaitable, Callable
+import time
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
 
 class LeaseLostError(RuntimeError):
     """Raised when a lease renewal reports that ownership was lost."""
+
+
+@dataclass(frozen=True, slots=True)
+class LeaseToken:
+    """Immutable token identifying lease holder, expiry epoch, and fencing token."""
+
+    holder_id: str
+    expiry_epoch: float
+    fencing_token: int = 0
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.holder_id, str) or not self.holder_id.strip():
+            raise ValueError("holder_id must be a non-empty string")
+        if (
+            isinstance(self.expiry_epoch, bool)
+            or not isinstance(self.expiry_epoch, (int, float))
+            or not math.isfinite(float(self.expiry_epoch))
+        ):
+            raise ValueError("expiry_epoch must be a finite float")
+        if (
+            isinstance(self.fencing_token, bool)
+            or not isinstance(self.fencing_token, int)
+            or self.fencing_token < 0
+        ):
+            raise ValueError("fencing_token must be a non-negative integer")
+
+    @property
+    def is_expired(self) -> bool:
+        """Return True if current epoch time exceeds expiry."""
+        return time.time() >= self.expiry_epoch
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,8 +70,6 @@ class LeaseTiming:
 
     def __post_init__(self) -> None:
         """Validate positive finite timing and a safe renewal cadence."""
-        import math
-
         for name, value in (
             ("lease_seconds", self.lease_seconds),
             ("heartbeat_interval", self.heartbeat_interval),
@@ -57,6 +88,26 @@ class LeaseTiming:
             raise ValueError(
                 "heartbeat_interval must be shorter than lease_seconds"
             )
+
+    def to_dict(self) -> dict[str, float]:
+        """Serialize timing configuration to a dictionary."""
+        return {
+            "lease_seconds": self.lease_seconds,
+            "heartbeat_interval": self.heartbeat_interval,
+        }
+
+    @classmethod
+    def from_dict(cls,
+        data: Mapping[str, Any],
+    ) -> LeaseTiming:
+        """Deserialize timing configuration from a dictionary."""
+        if not isinstance(data, Mapping):
+            raise TypeError(f"expected Mapping, got {type(data).__name__}")
+        return cls(
+            lease_seconds=data["lease_seconds"],
+            heartbeat_interval=data["heartbeat_interval"],
+        )
+
 
 
 async def _renew_once(
@@ -242,8 +293,61 @@ async def run_with_lease_heartbeat(
                 raise cancelled
 
 
+class LeaseHeartbeat:
+    """Async context manager coordinating periodic background lease heartbeats."""
+
+    def __init__(self,
+        renew: Callable[[], Awaitable[bool]],
+        *,
+        interval: float | None = None,
+        timing: LeaseTiming | None = None,
+        renew_immediately: bool = True,
+    ) -> None:
+        if not callable(renew):
+            raise TypeError("renew must be callable")
+        if timing is not None:
+            if not isinstance(timing, LeaseTiming):
+                raise TypeError("timing must be a LeaseTiming instance or None")
+            if interval is None:
+                interval = timing.heartbeat_interval
+        if interval is None:
+            raise ValueError("interval or timing must be supplied")
+        if (
+            isinstance(interval, bool)
+            or not isinstance(interval, (int, float))
+            or not math.isfinite(float(interval))
+            or interval <= 0
+        ):
+            raise ValueError("interval must be a finite positive number")
+        self.renew = renew
+        self.interval = float(interval)
+        self.renew_immediately = renew_immediately
+        self._task: asyncio.Task[None] | None = None
+
+    async def __aenter__(self) -> LeaseHeartbeat:
+        coro = _heartbeat_loop(
+            self.renew,
+            interval=self.interval,
+            renew_immediately=self.renew_immediately,
+        )
+        self._task = asyncio.create_task(coro)
+        return self
+
+    async def __aexit__(self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        if self._task is not None:
+            self._task.cancel()
+            with contextlib.suppress((asyncio.CancelledError, LeaseLostError)):
+                await self._task
+
+
 __all__ = [
+    "LeaseHeartbeat",
     "LeaseLostError",
     "LeaseTiming",
+    "LeaseToken",
     "run_with_lease_heartbeat",
 ]

@@ -15,9 +15,12 @@ __license__ = "Clear BSD"
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import functools
+import hmac
+import math
 import os
 import re
 import stat
+from collections import Counter
 from pathlib import Path
 from typing import IO, Any
 
@@ -29,10 +32,15 @@ _MAX_FILENAME_INPUT_LENGTH = 4096  #? Security: limit input size to prevent DoS
 
 __all__ = [
     "NameAccessPolicy",
+    "constant_time_equals",
+    "is_dos_device_name",
     "is_safe_relative_path",
     "open_path_under_base",
     "safe_path_join",
     "sanitize_filename",
+    "sanitize_path_segment",
+    "validate_token_entropy",
+    "verify_no_symlink_escape",
 ]
 
 
@@ -489,3 +497,78 @@ def is_safe_relative_path(
             return False
         depth += 1
     return depth > 0
+
+
+def sanitize_path_segment(
+    name: str,
+    replacement: str = "_",
+) -> str:
+    """Sanitize a single path segment, stripping separators, null bytes, and traversal tokens."""
+    if not isinstance(name, str):
+        raise TypeError(f"expected str, got {type(name).__name__}")
+    if "\0" in name:
+        raise ValueError("null byte in path segment")
+    s = name.replace("/", replacement).replace("\\", replacement)
+    s = s.replace("..", replacement)
+    s = s.strip()
+    #? Collapse multiple replacements
+    while replacement + replacement in s:
+        s = s.replace(replacement + replacement, replacement)
+    if s in ("", ".", ".."):
+        return replacement
+    return s
+
+
+def validate_token_entropy(
+    token: str,
+    min_entropy_bits: float = 64.0,
+) -> bool:
+    """Estimate Shannon entropy of a token string and check against a bit threshold."""
+    if not isinstance(token, str):
+        raise TypeError(f"expected str, got {type(token).__name__}")
+    if not token:
+        return False
+    counts = Counter(token)
+    length = len(token)
+    entropy_per_char = -sum(
+        (count / length) * math.log2(count / length)
+        for count in counts.values()
+    )
+    total_entropy = entropy_per_char * length
+    return total_entropy >= min_entropy_bits
+
+
+def constant_time_equals(
+    a: str | bytes,
+    b: str | bytes,
+) -> bool:
+    """Constant-time comparison wrapper preventing timing side-channel attacks."""
+    a_bytes = a.encode("utf-8") if isinstance(a, str) else a
+    b_bytes = b.encode("utf-8") if isinstance(b, str) else b
+    if not isinstance(a_bytes, (bytes, bytearray)) or not isinstance(b_bytes, (bytes, bytearray)):
+        raise TypeError("inputs must be str or bytes")
+    return hmac.compare_digest(a_bytes, b_bytes)
+
+
+def is_dos_device_name(
+    name: str,
+) -> bool:
+    """Return True if the name corresponds to a reserved DOS / Windows device name."""
+    if not isinstance(name, str):
+        return False
+    stem = name.split(".")[0].strip().upper()
+    return stem in _WINDOWS_RESERVED
+
+
+def verify_no_symlink_escape(
+    path: Path | str,
+    base_dir: Path | str,
+) -> bool:
+    """Return True if path resolves strictly within base_dir without escaping through symlinks."""
+    try:
+        resolved_path = Path(path).resolve()
+        resolved_base = Path(base_dir).resolve()
+        return resolved_path.is_relative_to(resolved_base)
+    except (ValueError, RuntimeError):
+        return False
+

@@ -7,9 +7,11 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 import pathlib
 import stat
+from collections.abc import Iterable
 from typing import BinaryIO, cast
 
 # =============================================================================
@@ -23,15 +25,27 @@ __author__ = "Yeremia Gunawan Adhisantoso"
 __email__ = "yeremiag@gmail.com"
 __license__ = "Clear BSD"
 __all__ = [
+    "DEFAULT_ALGO",
+    "DEFAULT_CHUNK_SIZE",
+    "MerkleTree",
+    "RollingHash",
+    "SUPPORTED_ALGOS",
+    "compute_file_checksum",
     "content_hash",
     "directory_hash",
     "directory_manifest",
     "file_hash",
+    "fnv1a_32",
+    "fnv1a_64",
+    "hmac_digest",
+    "hmac_sha256",
+    "murmurhash3_32",
+    "rabin_karp_hash",
+    "sha256_digest",
     "short_hash",
     "structured_hash",
-    "DEFAULT_ALGO",
-    "DEFAULT_CHUNK_SIZE",
-    "SUPPORTED_ALGOS",
+    "verify_file_checksum",
+    "verify_hmac",
 ]
 
 DEFAULT_ALGO: str = "sha256"
@@ -51,7 +65,7 @@ _MAX_SHORT_CHARS: int = 128
 
 
 def content_hash(
-    data: bytes | str,
+    data: bytes | bytearray | memoryview | str,
     *,
     algo: str = DEFAULT_ALGO,
 ) -> str:
@@ -63,8 +77,8 @@ def content_hash(
 
     Parameters
     ----------
-    data : bytes | str
-        Bytes to hash, or a string (UTF-8 encoded before hashing).
+    data : bytes | bytearray | memoryview | str
+        Bytes or bytes-like object to hash, or a string (UTF-8 encoded).
     algo : str, optional
         Hash algorithm name. Must appear in :data:`SUPPORTED_ALGOS`.
         Default is ``"sha256"``.
@@ -77,25 +91,24 @@ def content_hash(
     Raises
     ------
     TypeError
-        If ``data`` is not ``bytes`` or ``str``.
+        If ``data`` is not bytes-like or ``str``.
     ValueError
         If ``algo`` is not in :data:`SUPPORTED_ALGOS`.
-
-    Examples
-    --------
-    >>> content_hash(b"hello")
-    '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
-    >>> content_hash("hello") == content_hash(b"hello")
-    True
     """
-    if type(data) not in (bytes, str):
-        raise TypeError(f"data must be bytes or str, got {type(data).__name__}")
+    if not isinstance(data, (bytes, bytearray, memoryview, str)):
+        raise TypeError(f"data must be bytes-like or str, got {type(data).__name__}")
     if algo not in SUPPORTED_ALGOS:
         raise ValueError(
             f"unsupported algo {algo!r}; expected one of {sorted(SUPPORTED_ALGOS)}"
         )
-    # ? str -> bytes via UTF-8 encoding (single canonical form for hashing).
-    payload = data.encode("utf-8") if isinstance(data, str) else data
+    if isinstance(data, str):
+        payload: bytes | memoryview = data.encode("utf-8")
+    elif isinstance(data, memoryview):
+        payload = data.cast("B")
+    elif isinstance(data, bytearray):
+        payload = memoryview(data)
+    else:
+        payload = data
     return hashlib.new(algo, payload).hexdigest()
 
 
@@ -173,16 +186,32 @@ def file_hash(
         or chunk_size <= 0
     ):
         raise ValueError(f"chunk_size must be positive, got {chunk_size}")
-    with open(path, "rb") as handle:
-        return _hash_binary_handle(
-            handle,
-            algo=algo,
-            chunk_size=chunk_size,
-        )
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NONBLOCK"):
+        flags |= os.O_NONBLOCK
+    fd = os.open(path, flags)
+    try:
+        mode = os.fstat(fd).st_mode
+        if stat.S_ISDIR(mode):
+            raise IsADirectoryError(f"path {path!r} is a directory")
+        if not stat.S_ISREG(mode):
+            raise ValueError(
+                f"path {path!r} must be a regular file, not a FIFO, pipe, or device"
+            )
+        with os.fdopen(fd, "rb") as handle:
+            fd = -1
+            return _hash_binary_handle(
+                handle,
+                algo=algo,
+                chunk_size=chunk_size,
+            )
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
 
 def short_hash(
-    data: bytes | str,
+    data: bytes | bytearray | memoryview | str,
     *,
     chars: int = 8,
     algo: str = DEFAULT_ALGO,
@@ -195,7 +224,7 @@ def short_hash(
 
     Parameters
     ----------
-    data : bytes | str
+    data : bytes | bytearray | memoryview | str
         Bytes or string to hash (forwarded to :func:`content_hash`).
     chars : int, optional
         Length of the returned prefix. Must be in
@@ -213,7 +242,7 @@ def short_hash(
     ValueError
         If ``chars`` is out of range or ``algo`` is unsupported.
     TypeError
-        If ``data`` is not ``bytes`` or ``str``.
+        If ``data`` is not bytes-like or ``str``.
 
     Examples
     --------
@@ -234,6 +263,98 @@ def short_hash(
         )
     return content_hash(data, algo=algo)[:chars]
 
+
+def hmac_digest(
+    key: bytes | bytearray | memoryview | str,
+    data: bytes | bytearray | memoryview | str,
+    *,
+    algo: str = DEFAULT_ALGO,
+) -> str:
+    """Compute a keyed HMAC hexadecimal digest.
+
+    Parameters
+    ----------
+    key : bytes | bytearray | memoryview | str
+        Secret key for HMAC generation.
+    data : bytes | bytearray | memoryview | str
+        Payload to authenticate.
+    algo : str, optional
+        Digest algorithm from SUPPORTED_ALGOS. Default is 'sha256'.
+
+    Returns
+    -------
+    str
+        Lowercase hexadecimal HMAC digest.
+    """
+    if algo not in SUPPORTED_ALGOS:
+        raise ValueError(
+            f"unsupported algo {algo!r}; expected one of {sorted(SUPPORTED_ALGOS)}"
+        )
+    if isinstance(key, str):
+        key_bytes = key.encode("utf-8")
+    elif isinstance(key, (bytes, bytearray, memoryview)):
+        key_bytes = bytes(memoryview(key).cast("B"))
+    else:
+        raise TypeError(f"key must be bytes-like or str, got {type(key).__name__}")
+
+    if isinstance(data, str):
+        data_bytes = data.encode("utf-8")
+    elif isinstance(data, (bytes, bytearray, memoryview)):
+        data_bytes = bytes(memoryview(data).cast("B"))
+    else:
+        raise TypeError(f"data must be bytes-like or str, got {type(data).__name__}")
+
+    return hmac.new(key_bytes, data_bytes, digestmod=algo).hexdigest()
+
+
+def verify_hmac(
+    key: bytes | bytearray | memoryview | str,
+    data: bytes | bytearray | memoryview | str,
+    expected_digest: str,
+    *,
+    algo: str = DEFAULT_ALGO,
+) -> bool:
+    """Verify an HMAC digest in constant time.
+
+    Parameters
+    ----------
+    key : bytes | bytearray | memoryview | str
+        Secret key.
+    data : bytes | bytearray | memoryview | str
+        Payload.
+    expected_digest : str
+        Hexadecimal HMAC digest to compare against.
+    algo : str, optional
+        Digest algorithm. Default is 'sha256'.
+
+    Returns
+    -------
+    bool
+        True if the digest matches; False otherwise.
+    """
+    if not isinstance(expected_digest, str):
+        raise TypeError("expected_digest must be a string")
+    try:
+        actual = hmac_digest(key, data, algo=algo)
+    except (TypeError, ValueError):
+        return False
+    return hmac.compare_digest(actual.casefold(), expected_digest.strip().casefold())
+
+
+def _normalize_structured(
+    obj: Any,
+) -> Any:
+    if isinstance(obj, (bytes, bytearray, memoryview)):
+        return {"__bytes__": bytes(memoryview(obj).cast("B")).hex()}
+    if isinstance(obj, dict):
+        return {k: _normalize_structured(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_normalize_structured(v) for v in obj]
+    if isinstance(obj, tuple):
+        return tuple(_normalize_structured(v) for v in obj)
+    if isinstance(obj, (set, frozenset)):
+        return set(_normalize_structured(v) for v in obj)
+    return obj
 
 
 def structured_hash(
@@ -261,7 +382,7 @@ def structured_hash(
     digest because serialization is canonicalized first.
     """
     return content_hash(
-        canonical_json(value),
+        canonical_json(_normalize_structured(value)),
         algo=algo,
     )
 
@@ -375,3 +496,270 @@ def directory_hash(
         ),
         algo=algo,
     )
+
+
+def murmurhash3_32(
+    data: bytes | str,
+    seed: int = 0,
+) -> int:
+    """Compute 32-bit MurmurHash3 digest."""
+    if isinstance(data, str):
+        buf = data.encode("utf-8")
+    elif isinstance(data, (bytes, bytearray, memoryview)):
+        buf = bytes(data)
+    else:
+        raise TypeError(f"data must be bytes or str, got {type(data).__name__}")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError("seed must be an integer")
+
+    length = len(buf)
+    nblocks = length // 4
+    h1 = seed & 0xFFFFFFFF
+    c1 = 0xCC9E2D51
+    c2 = 0x1B873593
+
+    for i in range(nblocks):
+        idx = i * 4
+        k1 = buf[idx] | (buf[idx + 1] << 8) | (buf[idx + 2] << 16) | (buf[idx + 3] << 24)
+        k1 = (k1 * c1) & 0xFFFFFFFF
+        k1 = ((k1 << 15) | (k1 >> 17)) & 0xFFFFFFFF
+        k1 = (k1 * c2) & 0xFFFFFFFF
+
+        h1 ^= k1
+        h1 = ((h1 << 13) | (h1 >> 19)) & 0xFFFFFFFF
+        h1 = (h1 * 5 + 0xE6546B64) & 0xFFFFFFFF
+
+    tail_idx = nblocks * 4
+    rem = length & 3
+    k1 = 0
+    if rem == 3:
+        k1 ^= buf[tail_idx + 2] << 16
+    if rem >= 2:
+        k1 ^= buf[tail_idx + 1] << 8
+    if rem >= 1:
+        k1 ^= buf[tail_idx]
+        k1 = (k1 * c1) & 0xFFFFFFFF
+        k1 = ((k1 << 15) | (k1 >> 17)) & 0xFFFFFFFF
+        k1 = (k1 * c2) & 0xFFFFFFFF
+        h1 ^= k1
+
+    h1 ^= length
+    h1 ^= (h1 >> 16)
+    h1 = (h1 * 0x85EBCA6B) & 0xFFFFFFFF
+    h1 ^= (h1 >> 13)
+    h1 = (h1 * 0xC2B2AE35) & 0xFFFFFFFF
+    h1 ^= (h1 >> 16)
+    return h1
+
+
+def fnv1a_32(
+    data: bytes | str,
+) -> int:
+    """Compute 32-bit Fowler-Noll-Vo FNV-1a hash."""
+    buf = data.encode("utf-8") if isinstance(data, str) else bytes(data)
+    h = 0x811C9DC5
+    for b in buf:
+        h = (h ^ b) & 0xFFFFFFFF
+        h = (h * 0x01000193) & 0xFFFFFFFF
+    return h
+
+
+def fnv1a_64(
+    data: bytes | str,
+) -> int:
+    """Compute 64-bit Fowler-Noll-Vo FNV-1a hash."""
+    buf = data.encode("utf-8") if isinstance(data, str) else bytes(data)
+    h = 0xCBF29CE484222325
+    for b in buf:
+        h = (h ^ b) & 0xFFFFFFFFFFFFFFFF
+        h = (h * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    return h
+
+
+def rabin_karp_hash(
+    data: bytes | str,
+    *,
+    base: int = 256,
+    prime: int = 1_000_000_007,
+) -> int:
+    """Calculate polynomial hash of a sequence for Rabin-Karp matching."""
+    buf = data.encode("utf-8") if isinstance(data, str) else bytes(data)
+    h = 0
+    for b in buf:
+        h = (h * base + b) % prime
+    return h
+
+
+class RollingHash:
+    """Rabin-Karp sliding window polynomial rolling hash."""
+
+    def __init__(self,
+        window_size: int,
+        *,
+        base: int = 256,
+        prime: int = 1_000_000_007,
+    ) -> None:
+        if isinstance(window_size, bool) or not isinstance(window_size, int) or window_size < 1:
+            raise ValueError("window_size must be a positive integer")
+        self.window_size = window_size
+        self.base = base
+        self.prime = prime
+        self.high_multiplier = pow(base, window_size - 1, prime)
+        self.hash_value = 0
+
+    def feed(self,
+        data: bytes | str,
+    ) -> int:
+        """Seed the rolling hash with an initial window sequence."""
+        buf = data.encode("utf-8") if isinstance(data, str) else bytes(data)
+        h = 0
+        for b in buf:
+            h = (h * self.base + b) % self.prime
+        self.hash_value = h
+        return h
+
+    def slide(self,
+        out_byte: int,
+        in_byte: int,
+    ) -> int:
+        """Slide window forward by removing out_byte and adding in_byte."""
+        h = (self.hash_value - out_byte * self.high_multiplier) % self.prime
+        h = (h * self.base + in_byte) % self.prime
+        self.hash_value = h
+        return h
+
+    @property
+    def digest(self) -> int:
+        """Return the current rolling hash integer."""
+        return self.hash_value
+
+
+def sha256_digest(
+    data: bytes | str,
+    *,
+    as_hex: bool = True,
+) -> str | bytes:
+    """Calculate SHA-256 digest directly from string or bytes."""
+    buf = data.encode("utf-8") if isinstance(data, str) else bytes(data)
+    d = hashlib.sha256(buf)
+    return d.hexdigest() if as_hex else d.digest()
+
+
+def hmac_sha256(
+    key: bytes | str,
+    data: bytes | str,
+    *,
+    as_hex: bool = True,
+) -> str | bytes:
+    """Calculate HMAC-SHA256 digest from key and payload."""
+    k = key.encode("utf-8") if isinstance(key, str) else bytes(key)
+    buf = data.encode("utf-8") if isinstance(data, str) else bytes(data)
+    mac = hmac.new(k, buf, hashlib.sha256)
+    return mac.hexdigest() if as_hex else mac.digest()
+
+
+def compute_file_checksum(
+    path: str | pathlib.Path,
+    *,
+    algorithm: str = "sha256",
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> str:
+    """Compute hex digest for a file path using a streaming buffer."""
+    return file_hash(path, algo=algorithm, chunk_size=chunk_size)
+
+
+def verify_file_checksum(
+    path: str | pathlib.Path,
+    expected_digest: str,
+    *,
+    algorithm: str = "sha256",
+) -> bool:
+    """Verify that file digest matches expected digest in constant time."""
+    actual = compute_file_checksum(path, algorithm=algorithm)
+    return hmac.compare_digest(actual.lower(), expected_digest.strip().lower())
+
+
+class MerkleTree:
+    """Binary Merkle tree implementation with root hash and audit proof generation."""
+
+    def __init__(self,
+        leaves: Iterable[bytes | str],
+        *,
+        hash_algo: str = "sha256",
+    ) -> None:
+        if hash_algo not in SUPPORTED_ALGOS:
+            raise ValueError(f"unsupported hash algorithm {hash_algo!r}")
+        self.hash_algo = hash_algo
+        leaf_list: list[str] = []
+        for leaf in leaves:
+            buf = leaf.encode("utf-8") if isinstance(leaf, str) else bytes(leaf)
+            leaf_list.append(hashlib.new(hash_algo, buf).hexdigest())
+        if not leaf_list:
+            raise ValueError("MerkleTree requires at least one leaf")
+        self.leaves = leaf_list
+        self.levels: list[list[str]] = [self.leaves]
+        self._build_tree()
+
+    def _hash_pair(self,
+        left: str,
+        right: str,
+    ) -> str:
+        combined = (left + right).encode("ascii")
+        return hashlib.new(self.hash_algo, combined).hexdigest()
+
+    def _build_tree(self) -> None:
+        current = self.leaves
+        while len(current) > 1:
+            next_level: list[str] = []
+            for i in range(0, len(current), 2):
+                left = current[i]
+                right = current[i + 1] if i + 1 < len(current) else left
+                next_level.append(self._hash_pair(left, right))
+            self.levels.append(next_level)
+            current = next_level
+
+    @property
+    def root(self) -> str:
+        """Return the Merkle root hex digest."""
+        return self.levels[-1][0]
+
+    def get_proof(self,
+        leaf_index: int,
+    ) -> list[tuple[str, str]]:
+        """Return audit proof: list of ('left'|'right', sibling_hash)."""
+        if (
+            isinstance(leaf_index, bool)
+            or not isinstance(leaf_index, int)
+            or not (0 <= leaf_index < len(self.leaves))
+        ):
+            raise IndexError("leaf_index out of bounds")
+        proof: list[tuple[str, str]] = []
+        idx = leaf_index
+        for level in self.levels[:-1]:
+            is_right_sibling = (idx % 2 == 0)
+            if is_right_sibling:
+                sibling_idx = idx + 1 if idx + 1 < len(level) else idx
+                direction = "right"
+            else:
+                sibling_idx = idx - 1
+                direction = "left"
+            proof.append((direction, level[sibling_idx]))
+            idx //= 2
+        return proof
+
+    @classmethod
+    def verify_proof(cls,
+        leaf: bytes | str,
+        proof: list[tuple[str, str]],
+        root: str,
+        *,
+        hash_algo: str = "sha256",
+    ) -> bool:
+        """Verify an audit proof against a known Merkle root."""
+        buf = leaf.encode("utf-8") if isinstance(leaf, str) else bytes(leaf)
+        curr = hashlib.new(hash_algo, buf).hexdigest()
+        for direction, sibling in proof:
+            combined = (sibling + curr) if direction == "left" else (curr + sibling)
+            curr = hashlib.new(hash_algo, combined.encode("ascii")).hexdigest()
+        return hmac.compare_digest(curr, root)
+
