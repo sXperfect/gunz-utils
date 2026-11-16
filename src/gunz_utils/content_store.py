@@ -6,8 +6,6 @@ from __future__ import annotations
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import contextlib
-
-
 import errno
 import hashlib
 import io
@@ -65,7 +63,11 @@ class StoredArtifact:
             raise ValueError("digest must be a non-empty string")
         if not isinstance(self.path, Path):
             object.__setattr__(self, "path", Path(self.path))
-        if isinstance(self.size_bytes, bool) or not isinstance(self.size_bytes, int) or self.size_bytes < 0:
+        if isinstance(
+    self.size_bytes,
+    bool) or not isinstance(
+        self.size_bytes,
+         int) or self.size_bytes < 0:
             raise ValueError("size_bytes must be a non-negative integer")
 
 
@@ -957,7 +959,11 @@ class ContentAddressedStore:
         path = self.get(digest, verify=True)
         size = path.stat().st_size
         if max_bytes is not None:
-            if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0:
+            if isinstance(
+    max_bytes,
+    bool) or not isinstance(
+        max_bytes,
+         int) or max_bytes < 0:
                 raise ValueError("max_bytes must be a non-negative integer or None")
             if size > max_bytes:
                 raise ValueError(f"artifact size {size} exceeds max_bytes {max_bytes}")
@@ -966,7 +972,9 @@ class ContentAddressedStore:
     def delete(self,
         digest: str,
     ) -> bool:
-        """Safely remove a stored artifact by digest. Returns True if removed, False if absent."""
+        """Safely remove a stored artifact by digest. Returns True if removed, False if
+        absent.
+        """
         normalized = self._validate_digest(digest)
         target = self.path_for(normalized)
         if not target.exists():

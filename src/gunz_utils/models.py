@@ -28,7 +28,8 @@ try:
     from pydantic import BaseModel, ConfigDict
 except ImportError as exc:
     raise ImportError(
-        "pydantic is required for gunz_utils.models; install with 'pip install gunz-utils[pydantic]'"
+        "pydantic is required for gunz_utils.models; "
+            "install with 'pip install gunz-utils[pydantic]'"
     ) from exc
 
 # =============================================================================

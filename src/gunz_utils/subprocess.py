@@ -9,11 +9,10 @@ __license__ = "Clear BSD"
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
-import contextlib
 import asyncio
+import contextlib
 import math
 import os
-from pathlib import Path
 import selectors
 import shutil
 import signal
@@ -21,8 +20,9 @@ import socket
 import subprocess
 import threading
 import time
-from collections.abc import Coroutine, Mapping, Sequence
+from collections.abc import Coroutine, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import BinaryIO
 
 
@@ -55,7 +55,8 @@ def _validate_command_args(
     try:
         arg_list = list(args)
     except TypeError as exc:
-        raise TypeError(f"args must be an iterable of strings, got {type(args).__name__}") from exc
+        raise TypeError(
+            f"args must be an iterable of strings, got {type(args).__name__}") from exc
     if not arg_list:
         raise ValueError("args must not be empty")
     for arg in arg_list:
@@ -486,7 +487,7 @@ async def _stop_process(
         terminate_grace parameter.
     """
     if os.name == "posix":
-        with contextlib.suppress((OSError, ProcessLookupError)):
+        with contextlib.suppress(OSError, ProcessLookupError):
             os.killpg(process.pid, signal.SIGTERM)
     elif process.returncode is None:
         process.terminate()
@@ -494,7 +495,7 @@ async def _stop_process(
         await asyncio.wait_for(process.wait(), timeout=terminate_grace)
     except TimeoutError:
         if os.name == "posix":
-            with contextlib.suppress((OSError, ProcessLookupError)):
+            with contextlib.suppress(OSError, ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
         elif process.returncode is None:
             process.kill()
@@ -576,7 +577,7 @@ async def _read_bounded_async_pipe(
         state.exceeded = True
         failure.set()
         if os.name == "posix":
-            with contextlib.suppress((OSError, ProcessLookupError)):
+            with contextlib.suppress(OSError, ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
         elif process.returncode is None:
             with contextlib.suppress(ProcessLookupError):
@@ -786,18 +787,25 @@ async def run_command_async(
     return result
 
 
-def which(command: str) -> str | None:
+def which(
+    command: str,
+) -> str | None:
     """Locate the executable path for a command in the system PATH."""
     return shutil.which(command)
 
 
-def is_executable(path: str | Path) -> bool:
+def is_executable(
+    path: str | Path,
+) -> bool:
     """Check if the given path is a file with executable permissions."""
     p = Path(path)
     return p.is_file() and os.access(p, os.X_OK)
 
 
-def find_open_port(start_port: int = 8000, max_tries: int = 100) -> int:
+def find_open_port(
+    start_port: int = 8000,
+    max_tries: int = 100,
+) -> int:
     """Find an available TCP port starting from start_port."""
     for port in range(start_port, start_port + max_tries):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -810,7 +818,10 @@ def find_open_port(start_port: int = 8000, max_tries: int = 100) -> int:
     raise OSError(f"no free port found in range {start_port}..{start_port + max_tries}")
 
 
-def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+def is_port_in_use(
+    port: int,
+    host: str = "127.0.0.1",
+) -> bool:
     """Check whether a TCP port is currently in use on the given host."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
@@ -833,7 +844,10 @@ def clean_subprocess_env(
     return env
 
 
-def kill_process_tree(pid: int, timeout: float = 2.0) -> None:
+def kill_process_tree(
+    pid: int,
+    timeout: float = 2.0,
+) -> None:
     """Recursively kill a process and its child processes."""
     if os.name != "posix":
         try:
@@ -842,7 +856,7 @@ def kill_process_tree(pid: int, timeout: float = 2.0) -> None:
             pass
         return
 
-    # POSIX: Send signal to process group if possible
+    #? POSIX: Send signal to process group if possible
     try:
         pgid = os.getpgid(pid)
         os.killpg(pgid, signal.SIGTERM)
@@ -859,7 +873,9 @@ def stream_command_output(
     cwd: str | Path | None = None,
     env: Mapping[str, str] | None = None,
 ) -> Iterator[tuple[float, str, str]]:
-    """Stream command output line by line with timestamps and stream tags ('stdout'/'stderr')."""
+    """Stream command output line by line with timestamps and stream tags
+    ('stdout'/'stderr').
+    """
     arg_list = _validate_command_args(args)
     proc = subprocess.Popen(
         arg_list,
@@ -886,7 +902,7 @@ def stream_command_output(
             if line:
                 yield (time.time(), stream_name, line)
             else:
-                sel.unregister(stream_obj)  # type: ignore[arg-type]
+                sel.unregister(stream_obj)
                 active_streams -= 1
         if proc.poll() is not None and not events:
             break

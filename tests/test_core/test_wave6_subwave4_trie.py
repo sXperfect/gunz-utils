@@ -1,5 +1,9 @@
 """Tests for Wave 6 Sub-Wave 4: Trie & Prefix Matching Data Structures."""
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+
 from gunz_utils.trie import Trie, longest_common_prefix
 
 
@@ -23,7 +27,7 @@ def test_trie_insert_search_delete():
     assert trie.starts_with("ban")
     assert not trie.starts_with("cat")
 
-    # Delete
+    #? Delete
     assert trie.delete("app")
     assert "app" not in trie
     assert "apple" in trie

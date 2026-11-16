@@ -1150,7 +1150,6 @@ static PyObject *py_merge_running_stats(PyObject *self, PyObject *args) {
         PyErr_SetString(PyExc_OverflowError, "running statistics overflowed finite float range");
         return NULL;
     }
-    double combined_total = total_a + total_b;
     double combined_min = (min_a < min_b) ? min_a : min_b;
     double combined_max = (max_a > max_b) ? max_a : max_b;
     return Py_BuildValue("Lddddd", combined_count, combined_mean, combined_m2, combined_min, combined_max, combined_total);
@@ -1384,7 +1383,11 @@ static struct PyModuleDef accelmodule = {
     "_accel",
     "Compiled C acceleration primitives for gunz-utils.",
     -1,
-    AccelMethods
+    AccelMethods,
+    NULL,
+    NULL,
+    NULL,
+    NULL
 };
 
 PyMODINIT_FUNC PyInit__accel(void) {

@@ -1,11 +1,17 @@
 """Tests for Wave 4 Sub-Wave 1: timing, stopwatches, and deadlines (#1–#13)."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
-import asyncio
-from datetime import UTC, datetime, timezone
 import unittest
+from datetime import UTC, datetime
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.time_utils import (
     clamp_datetime,
     from_iso_utc,
@@ -16,17 +22,21 @@ from gunz_utils.time_utils import (
     to_unix_millis,
     to_unix_seconds,
 )
-from gunz_utils.timing import LapRecord, Stopwatch, Timer, async_timer, timer
+from gunz_utils.timing import LapRecord, Stopwatch, Timer, async_timer
 
 
 class MockClock:
-    def __init__(self, start: float = 1000.0) -> None:
+    def __init__(self,
+        start: float = 1000.0,
+    ) -> None:
         self.time = start
 
     def __call__(self) -> float:
         return self.time
 
-    def advance(self, delta: float) -> None:
+    def advance(self,
+        delta: float,
+    ) -> None:
         self.time += delta
 
 
@@ -75,7 +85,7 @@ class TestWave4SubWave1Timing(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(t.is_running)
         self.assertAlmostEqual(t.elapsed, 1.0)
 
-        # Elapsed should not advance while paused
+        #? Elapsed should not advance while paused
         clock.advance(5.0)
         self.assertAlmostEqual(t.elapsed, 1.0)
 
@@ -113,7 +123,7 @@ class TestWave4SubWave1Timing(unittest.IsolatedAsyncioTestCase):
         interval1 = sw.stop()
         self.assertAlmostEqual(interval1, 2.0)
 
-        clock.advance(10.0)  # dead time between intervals
+        clock.advance(10.0)  #? dead time between intervals
 
         sw.start()
         clock.advance(4.0)
@@ -124,7 +134,7 @@ class TestWave4SubWave1Timing(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(sw.total_elapsed, 6.0)
         self.assertAlmostEqual(sw.mean_elapsed, 3.0)
 
-        # Context manager
+        #? Context manager
         with sw:
             clock.advance(3.0)
         self.assertEqual(sw.count, 3)

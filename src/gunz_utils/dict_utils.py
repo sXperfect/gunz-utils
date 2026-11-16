@@ -53,7 +53,9 @@ def _normalize_path(
         parts = path.split(separator)
     else:
         parts = [
-            str(p) if isinstance(p, int) and not isinstance(p, bool) else p  # type: ignore[misc]
+            str(p) if isinstance(
+    p, int) and not isinstance(
+        p, bool) else p  # type: ignore[misc]
             for p in path
         ]
         if separator != ".":
@@ -98,13 +100,15 @@ def deep_get(
                 if default is UNSET:
                     raise KeyError(dotted)
                 return default
-        elif isinstance(cursor, (list, tuple, Sequence)) and not isinstance(cursor, (str, bytes, bytearray)):
+        elif isinstance(cursor, (list, tuple, Sequence)) and not isinstance(
+            cursor, (str, bytes, bytearray)
+        ):
             try:
                 idx = int(key)
                 cursor = cursor[idx]
-            except (ValueError, IndexError):
+            except (ValueError, IndexError) as error:
                 if default is UNSET:
-                    raise KeyError(dotted)
+                    raise KeyError(dotted) from error
                 return default
         else:
             if default is UNSET:
@@ -493,7 +497,9 @@ def flatten_dict(
         visited.add(ident)
         for key, value in current.items():
             key_str = str(key) if not isinstance(key, str) else key
-            new_key = f"{current_prefix}{separator}{key_str}" if current_prefix else key_str
+            new_key = (
+                f"{current_prefix}{separator}{key_str}" if current_prefix else key_str
+            )
             if isinstance(value, Mapping) and value:
                 _flatten(value, new_key)
             else:
@@ -564,7 +570,10 @@ def compact_dict(
             if drop_empty and len(nested) == 0:
                 continue
             result[k] = nested
-        elif drop_empty and hasattr(v, "__len__") and len(v) == 0 and not isinstance(v, (int, float, bool)):
+        elif (
+            drop_empty and hasattr(v, "__len__") and len(v) == 0
+            and not isinstance(v, (int, float, bool))
+        ):
             continue
         else:
             result[k] = v

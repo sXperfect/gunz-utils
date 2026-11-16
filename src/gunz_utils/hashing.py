@@ -12,7 +12,7 @@ import os
 import pathlib
 import stat
 from collections.abc import Iterable
-from typing import BinaryIO, cast
+from typing import Any, BinaryIO, cast
 
 # =============================================================================
 # LOCAL APPLICATION IMPORTS
@@ -520,7 +520,8 @@ def murmurhash3_32(
 
     for i in range(nblocks):
         idx = i * 4
-        k1 = buf[idx] | (buf[idx + 1] << 8) | (buf[idx + 2] << 16) | (buf[idx + 3] << 24)
+        k1 = buf[idx] | (buf[idx + 1] << 8) | (buf[idx + 2]
+                         << 16) | (buf[idx + 3] << 24)
         k1 = (k1 * c1) & 0xFFFFFFFF
         k1 = ((k1 << 15) | (k1 >> 17)) & 0xFFFFFFFF
         k1 = (k1 * c2) & 0xFFFFFFFF
@@ -599,7 +600,11 @@ class RollingHash:
         base: int = 256,
         prime: int = 1_000_000_007,
     ) -> None:
-        if isinstance(window_size, bool) or not isinstance(window_size, int) or window_size < 1:
+        if isinstance(
+    window_size,
+    bool) or not isinstance(
+        window_size,
+         int) or window_size < 1:
             raise ValueError("window_size must be a positive integer")
         self.window_size = window_size
         self.base = base

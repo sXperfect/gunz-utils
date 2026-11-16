@@ -1,11 +1,18 @@
 """Tests for Wave 1 additions: Cache & Workflow DAG (#1 - #14)."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
 import unittest
+from datetime import UTC, datetime, timedelta
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.cache import (
     CacheInfo,
     RecencyTTLPolicy,
@@ -45,7 +52,9 @@ class TestWave1Cache(unittest.IsolatedAsyncioTestCase):
         calls = 0
 
         @ttl_cache(ttl=10.0, clock=fake_clock)
-        def compute(x: int) -> int:
+        def compute(
+            x: int,
+        ) -> int:
             nonlocal calls
             calls += 1
             return x * 2
@@ -53,12 +62,12 @@ class TestWave1Cache(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(compute(5), 10)
         self.assertEqual(calls, 1)
 
-        # Hit within TTL
+        #? Hit within TTL
         current_time = 105.0
         self.assertEqual(compute(5), 10)
         self.assertEqual(calls, 1)
 
-        # Expired after TTL
+        #? Expired after TTL
         current_time = 111.0
         self.assertEqual(compute(5), 10)
         self.assertEqual(calls, 2)
@@ -75,7 +84,9 @@ class TestWave1Cache(unittest.IsolatedAsyncioTestCase):
         calls = 0
 
         @async_ttl_cache(ttl=10.0, clock=fake_clock)
-        async def fetch(x: int) -> int:
+        async def fetch(
+            x: int,
+        ) -> int:
             nonlocal calls
             calls += 1
             return x + 100
@@ -95,7 +106,10 @@ class TestWave1Cache(unittest.IsolatedAsyncioTestCase):
         calls = 0
 
         @ttl_cache(ttl=60.0)
-        def get_val(a: int, b: str = "x") -> str:
+        def get_val(
+            a: int,
+            b: str = "x",
+        ) -> str:
             nonlocal calls
             calls += 1
             return f"{a}:{b}"
@@ -103,14 +117,14 @@ class TestWave1Cache(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(get_val(1, b="y"), "1:y")
         self.assertEqual(calls, 1)
 
-        # Invalidate non-existent key returns False
+        #? Invalidate non-existent key returns False
         self.assertFalse(get_val.cache_invalidate(2, b="y"))
 
-        # Invalidate existing key returns True
+        #? Invalidate existing key returns True
         self.assertTrue(get_val.cache_invalidate(1, b="y"))
         self.assertFalse(get_val.cache_invalidate(1, b="y"))
 
-        # Next call computes afresh
+        #? Next call computes afresh
         self.assertEqual(get_val(1, b="y"), "1:y")
         self.assertEqual(calls, 2)
 
@@ -118,7 +132,9 @@ class TestWave1Cache(unittest.IsolatedAsyncioTestCase):
         calls = 0
 
         @async_ttl_cache(ttl=60.0)
-        async def get_val_async(k: int) -> int:
+        async def get_val_async(
+            k: int,
+        ) -> int:
             nonlocal calls
             calls += 1
             return k * 10
@@ -174,13 +190,17 @@ class TestWave1Cache(unittest.IsolatedAsyncioTestCase):
         recent_time = now - timedelta(minutes=10)
         old_time = now - timedelta(hours=5)
 
-        # Item 6: strict empty bool validation
+        #? Item 6: strict empty bool validation
         with self.assertRaises(TypeError):
-            policy.ttl_for(recent_time, empty="invalid", now=now)  # type: ignore[arg-type]
+            policy.ttl_for(
+    recent_time,
+    empty="invalid",
+     now=now)  # type: ignore[arg-type]
         with self.assertRaises(TypeError):
-            policy.ttl_seconds_for(recent_time, empty=1, now=now)  # type: ignore[arg-type]
+            policy.ttl_seconds_for(
+    recent_time, empty=1, now=now)  # type: ignore[arg-type]
 
-        # Item 7: ttl_seconds_for
+        #? Item 7: ttl_seconds_for
         sec_recent = policy.ttl_seconds_for(recent_time, empty=False, now=now)
         self.assertEqual(sec_recent, 300.0)
 
@@ -194,10 +214,16 @@ class TestWave1Cache(unittest.IsolatedAsyncioTestCase):
 class TestWave1DAG(unittest.IsolatedAsyncioTestCase):
     def test_item8_bare_string_dependencies_rejection(self) -> None:
         with self.assertRaises(TypeError):
-            WorkflowStage(name="s1", run=lambda _: 1, dependencies="stage_a")  # type: ignore[arg-type]
+            WorkflowStage(
+    name="s1",
+    run=lambda _: 1,
+     dependencies="stage_a")  # type: ignore[arg-type]
 
         with self.assertRaises(TypeError):
-            WorkflowStage(name="s2", run=lambda _: 1, dependencies=b"stage_b")  # type: ignore[arg-type]
+            WorkflowStage(
+    name="s2",
+    run=lambda _: 1,
+     dependencies=b"stage_b")  # type: ignore[arg-type]
 
     def test_item9_whitespace_stage_name_rejection(self) -> None:
         with self.assertRaises(ValueError):
@@ -212,7 +238,13 @@ class TestWave1DAG(unittest.IsolatedAsyncioTestCase):
 
     def test_item11_fingerprint_memoization(self) -> None:
         s1 = WorkflowStage(name="a", run=lambda _: 1, fingerprint="fp_a")
-        s2 = WorkflowStage(name="b", run=lambda d: d["a"] + 1, dependencies=("a",), fingerprint="fp_b")
+        s2 = WorkflowStage(
+    name="b",
+    run=lambda d: d["a"] + 1,
+    dependencies=(
+        "a",
+        ),
+         fingerprint="fp_b")
         dag = WorkflowDAG([s1, s2])
 
         fp1 = dag.effective_fingerprint("b")
@@ -220,16 +252,29 @@ class TestWave1DAG(unittest.IsolatedAsyncioTestCase):
         self.assertIn("b", dag._fingerprint_memo)
         self.assertEqual(dag._fingerprint_memo["b"], fp1)
 
-        # Repeated call returns identical memoized result
+        #? Repeated call returns identical memoized result
         self.assertEqual(dag.effective_fingerprint("b"), fp1)
 
     def test_item12_parallel_layers(self) -> None:
-        # A, B (independent, layer 0) -> C (depends on A), D (depends on A, B) (layer 1) -> E (depends on C, D) (layer 2)
+        #? A, B (independent, layer 0) -> C (depends on A), D (depends on A, B) (layer
+        #? 1) -> E (depends on C, D) (layer 2)
         s_a = WorkflowStage(name="a", run=lambda _: 1)
         s_b = WorkflowStage(name="b", run=lambda _: 2)
         s_c = WorkflowStage(name="c", run=lambda d: d["a"] + 1, dependencies=("a",))
-        s_d = WorkflowStage(name="d", run=lambda d: d["a"] + d["b"], dependencies=("a", "b"))
-        s_e = WorkflowStage(name="e", run=lambda d: d["c"] + d["d"], dependencies=("c", "d"))
+        s_d = WorkflowStage(
+    name="d",
+    run=lambda d: d["a"] +
+    d["b"],
+    dependencies=(
+        "a",
+         "b"))
+        s_e = WorkflowStage(
+    name="e",
+    run=lambda d: d["c"] +
+    d["d"],
+    dependencies=(
+        "c",
+         "d"))
 
         dag = WorkflowDAG([s_a, s_b, s_c, s_d, s_e])
         layers = dag.parallel_layers()
@@ -243,12 +288,12 @@ class TestWave1DAG(unittest.IsolatedAsyncioTestCase):
 
         dag = WorkflowDAG([s_a, s_b, s_c, s_d])
 
-        # dependencies_of
+        #? dependencies_of
         self.assertEqual(dag.dependencies_of("c", transitive=False), ("b",))
         self.assertEqual(dag.dependencies_of("c", transitive=True), ("a", "b"))
         self.assertEqual(dag.dependencies_of("a", transitive=True), ())
 
-        # dependents_of
+        #? dependents_of
         self.assertEqual(set(dag.dependents_of("a", transitive=False)), {"b", "d"})
         self.assertEqual(set(dag.dependents_of("a", transitive=True)), {"b", "c", "d"})
         self.assertEqual(dag.dependents_of("c", transitive=True), ())

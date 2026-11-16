@@ -7,11 +7,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
 import math
 import sys
 import threading
 import time
+from collections.abc import Callable
+from typing import Any
 
 
 class RateLimitExceeded(RuntimeError):
@@ -113,8 +114,9 @@ class AsyncRateLimiter:
         if timeout is not None:
             try:
                 deadline = self._clock() + timeout
-            except OverflowError:
-                raise OverflowError("timeout deadline calculation overflowed")
+            except OverflowError as error:
+                raise OverflowError(
+                    "timeout deadline calculation overflowed") from error
             if not math.isfinite(deadline):
                 raise OverflowError("timeout deadline calculation overflowed")
         else:
@@ -238,7 +240,8 @@ class RateLimiter:
     ) -> None:
         if clock is not None and not callable(clock):
             raise TypeError("clock must be callable")
-        self._clock: Callable[[], float] = clock if clock is not None else time.monotonic
+        self._clock: Callable[[],
+     float] = clock if clock is not None else time.monotonic
         self.rate = AsyncRateLimiter._finite_positive(rate, name="rate")
         raw_capacity = max(1.0, self.rate) if capacity is None else capacity
         self.capacity = AsyncRateLimiter._finite_positive(raw_capacity, name="capacity")
@@ -386,7 +389,8 @@ class LeakyBucket:
     ) -> bool:
         """Wait until water level drops enough to add amount, or until timeout."""
         if amount <= 0 or amount > self.capacity:
-            raise ValueError(f"amount must be positive and <= capacity ({self.capacity})")
+            raise ValueError(
+                f"amount must be positive and <= capacity ({self.capacity})")
         start = self._clock()
         while True:
             if self.try_acquire(amount):
@@ -417,7 +421,11 @@ class SlidingWindowLog:
         *,
         clock: Callable[[], float] | None = None,
     ) -> None:
-        if isinstance(max_requests, bool) or not isinstance(max_requests, int) or max_requests < 1:
+        if isinstance(
+    max_requests,
+    bool) or not isinstance(
+        max_requests,
+         int) or max_requests < 1:
             raise ValueError("max_requests must be a positive integer")
         if (
             isinstance(window_seconds, bool)
@@ -554,7 +562,10 @@ def async_rate_limited(
             *args: Any,
             **kwargs: Any,
         ) -> Any:
-            if hasattr(limiter, "acquire") and asyncio.iscoroutinefunction(limiter.acquire):
+            if hasattr(
+    limiter,
+    "acquire") and asyncio.iscoroutinefunction(
+        limiter.acquire):
                 await limiter.acquire()
             elif hasattr(limiter, "try_acquire"):
                 if not limiter.try_acquire():

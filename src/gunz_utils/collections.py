@@ -132,7 +132,12 @@ def flatten(
     """Yield items from nested iterables up to the specified depth (default 1)."""
     if isinstance(iterable, (str, bytes, bytearray)):
         raise TypeError("iterable must not be a string or bytes")
-    if depth is not None and (isinstance(depth, bool) or not isinstance(depth, int) or depth < 1):
+    if depth is not None and (
+    isinstance(
+        depth,
+        bool) or not isinstance(
+            depth,
+             int) or depth < 1):
         raise ValueError("depth must be a positive integer or None")
 
     for item in iterable:

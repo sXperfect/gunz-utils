@@ -1,7 +1,14 @@
 """Tests for Wave 5 Sub-Wave 6: Directed Acyclic Graphs (DAG) & Critical Path."""
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.dag import (
     CycleError,
     add_edge,
@@ -19,13 +26,13 @@ from gunz_utils.dag import (
 
 
 def test_topological_sort_and_is_dag():
-    # Linear graph: A -> B -> C
+    #? Linear graph: A -> B -> C
     graph = {"A": ["B"], "B": ["C"], "C": []}
     assert is_dag(graph)
     assert topological_sort(graph) == ["A", "B", "C"]
     assert detect_cycles(graph) == []
 
-    # Cyclic graph: A -> B -> A
+    #? Cyclic graph: A -> B -> A
     cyclic = {"A": ["B"], "B": ["A"]}
     assert not is_dag(cyclic)
     assert len(detect_cycles(cyclic)) > 0
@@ -34,7 +41,7 @@ def test_topological_sort_and_is_dag():
 
 
 def test_parallel_levels():
-    # A -> C, B -> C, C -> D
+    #? A -> C, B -> C, C -> D
     graph = {"A": ["C"], "B": ["C"], "C": ["D"], "D": []}
     levels = parallel_levels(graph)
     assert len(levels) == 3
@@ -62,7 +69,7 @@ def test_has_path_and_subgraph():
 
 
 def test_transitive_reduction():
-    # Graph with shortcut: A -> B -> C and A -> C
+    #? Graph with shortcut: A -> B -> C and A -> C
     graph = {"A": ["B", "C"], "B": ["C"], "C": []}
     red = transitive_reduction(graph)
     assert red["A"] == {"B"}
@@ -83,8 +90,8 @@ def test_critical_path():
         "C": 1.0,
         "D": 3.0,
     }
-    # Path A -> B -> D: 2 + 5 + 3 = 10
-    # Path A -> C -> D: 2 + 1 + 3 = 6
+    #? Path A -> B -> D: 2 + 5 + 3 = 10
+    #? Path A -> C -> D: 2 + 1 + 3 = 6
     path, max_weight = critical_path(graph, weights)
     assert path == ["A", "B", "D"]
     assert max_weight == 10.0

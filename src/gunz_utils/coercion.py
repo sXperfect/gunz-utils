@@ -1,5 +1,9 @@
 """Dynamic type coercion, schema normalization, and detailed conversion diagnostics."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import math
@@ -14,8 +18,7 @@ T = TypeVar("T")
 class CoercionError(ValueError):
     """Raised when value cannot be coerced into the target type."""
 
-    def __init__(
-        self,
+    def __init__(self,
         message: str,
         *,
         value: Any = None,
@@ -28,13 +31,18 @@ class CoercionError(ValueError):
         self.field_path = field_path
 
 
-def format_coercion_error(exc: CoercionError, path: str = "") -> str:
+def format_coercion_error(
+    exc: CoercionError,
+    path: str = "",
+) -> str:
     """Format a CoercionError with hierarchical path details."""
     effective_path = path or exc.field_path or "<root>"
     return f"coercion error at '{effective_path}': {exc}"
 
 
-def coerce_bool(value: Any) -> bool:
+def coerce_bool(
+    value: Any,
+) -> bool:
     """Coerce boolean values from strings, integers, or booleans."""
     if isinstance(value, bool):
         return value
@@ -46,18 +54,29 @@ def coerce_bool(value: Any) -> bool:
             return True
         if v in ("false", "0", "no", "n", "f", "off"):
             return False
-    raise CoercionError(f"cannot coerce {value!r} to bool", value=value, target_type=bool)
+    raise CoercionError(
+    f"cannot coerce {value!r} to bool",
+    value=value,
+     target_type=bool)
 
 
-def coerce_int(value: Any) -> int:
+def coerce_int(
+    value: Any,
+) -> int:
     """Coerce integer values rejecting booleans and non-finite floats."""
     if isinstance(value, bool):
-        raise CoercionError("boolean is not accepted as int", value=value, target_type=int)
+        raise CoercionError(
+    "boolean is not accepted as int",
+    value=value,
+     target_type=int)
     if isinstance(value, int):
         return value
     if isinstance(value, float):
         if not math.isfinite(value):
-            raise CoercionError(f"cannot coerce non-finite float {value} to int", value=value, target_type=int)
+            raise CoercionError(
+    f"cannot coerce non-finite float {value} to int",
+    value=value,
+     target_type=int)
         return int(value)
     if isinstance(value, str):
         try:
@@ -67,19 +86,33 @@ def coerce_int(value: Any) -> int:
     raise CoercionError(f"cannot coerce {value!r} to int", value=value, target_type=int)
 
 
-def coerce_float(value: Any, *, allow_nan: bool = False, allow_inf: bool = False) -> float:
+def coerce_float(
+    value: Any,
+    *,
+    allow_nan: bool = False,
+    allow_inf: bool = False,
+) -> float:
     """Coerce floating-point values rejecting booleans."""
     if isinstance(value, bool):
-        raise CoercionError("boolean is not accepted as float", value=value, target_type=float)
+        raise CoercionError(
+    "boolean is not accepted as float",
+    value=value,
+     target_type=float)
     if isinstance(value, (int, float)):
         val = float(value)
     elif isinstance(value, str):
         try:
             val = float(value.strip())
         except ValueError:
-            raise CoercionError(f"cannot coerce {value!r} to float", value=value, target_type=float) from None
+            raise CoercionError(
+    f"cannot coerce {value!r} to float",
+    value=value,
+     target_type=float) from None
     else:
-        raise CoercionError(f"cannot coerce {value!r} to float", value=value, target_type=float)
+        raise CoercionError(
+    f"cannot coerce {value!r} to float",
+    value=value,
+     target_type=float)
 
     if math.isnan(val) and not allow_nan:
         raise CoercionError("NaN is not allowed", value=value, target_type=float)
@@ -88,7 +121,9 @@ def coerce_float(value: Any, *, allow_nan: bool = False, allow_inf: bool = False
     return val
 
 
-def coerce_datetime(value: Any) -> datetime:
+def coerce_datetime(
+    value: Any,
+) -> datetime:
     """Coerce ISO formatted strings, integers (unix epoch), or datetimes."""
     if isinstance(value, datetime):
         return value
@@ -99,14 +134,22 @@ def coerce_datetime(value: Any) -> datetime:
             return datetime.fromisoformat(value)
         except ValueError:
             pass
-    raise CoercionError(f"cannot coerce {value!r} to datetime", value=value, target_type=datetime)
+    raise CoercionError(
+    f"cannot coerce {value!r} to datetime",
+    value=value,
+     target_type=datetime)
 
 
-def coerce_path(value: Any) -> Path:
+def coerce_path(
+    value: Any,
+) -> Path:
     """Coerce strings or paths to a Path instance."""
     if isinstance(value, (str, Path)):
         return Path(value)
-    raise CoercionError(f"cannot coerce {value!r} to Path", value=value, target_type=Path)
+    raise CoercionError(
+    f"cannot coerce {value!r} to Path",
+    value=value,
+     target_type=Path)
 
 
 class CoercionRegistry:
@@ -122,11 +165,17 @@ class CoercionRegistry:
             Path: coerce_path,
         }
 
-    def register(self, target_type: type, coercer: Callable[[Any], Any]) -> None:
+    def register(self,
+        target_type: type,
+        coercer: Callable[[Any], Any],
+    ) -> None:
         """Register a custom coercer for a type."""
         self._coercers[target_type] = coercer
 
-    def coerce(self, value: Any, target_type: type) -> Any:
+    def coerce(self,
+        value: Any,
+        target_type: type,
+    ) -> Any:
         """Coerce value to target_type using registered coercers."""
         if value is None:
             return None
@@ -148,12 +197,18 @@ class CoercionRegistry:
 _DEFAULT_REGISTRY = CoercionRegistry()
 
 
-def coerce_type(value: Any, target_type: type) -> Any:
+def coerce_type(
+    value: Any,
+    target_type: type,
+) -> Any:
     """Coerce a value to target_type using the default registry."""
     return _DEFAULT_REGISTRY.coerce(value, target_type)
 
 
-def coerce_sequence(target_elem_type: type, items: Iterable[Any]) -> list[Any]:
+def coerce_sequence(
+    target_elem_type: type,
+    items: Iterable[Any],
+) -> list[Any]:
     """Coerce all elements of an iterable to target_elem_type."""
     return [_DEFAULT_REGISTRY.coerce(item, target_elem_type) for item in items]
 
@@ -179,7 +234,7 @@ def coerce_mapping(
         if extra_keys:
             raise CoercionError(f"unexpected extra keys in data: {sorted(extra_keys)}")
 
-    # Copy non-schema keys if not strict
+    #? Copy non-schema keys if not strict
     if not strict:
         for k, v in data.items():
             if k not in result:

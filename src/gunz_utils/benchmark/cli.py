@@ -17,7 +17,6 @@ from .compare import compare_results
 from .io import load_result
 from .process import profile_command
 
-
 __all__ = ["main"]
 
 

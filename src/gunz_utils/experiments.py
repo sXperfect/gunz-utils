@@ -11,7 +11,7 @@ import itertools
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,17 +29,17 @@ class ExperimentMatrix(dict[str, Any]):
     @property
     def baseline(self) -> str:
         """Return the name of the baseline variant."""
-        return self["baseline"]
+        return cast(str, self["baseline"])
 
     @property
     def results(self) -> dict[str, VariantResult]:
         """Return per-variant execution results."""
-        return self["results"]
+        return cast(dict[str, VariantResult], self["results"])
 
     @property
     def comparisons(self) -> dict[str, dict[str, dict[str, Any]]]:
         """Return baseline-relative metric comparisons."""
-        return self["comparisons"]
+        return cast(dict[str, dict[str, dict[str, Any]]], self["comparisons"])
 
     def succeeded_variants(self) -> tuple[str, ...]:
         """Return names of variants that completed without error."""
@@ -47,7 +47,8 @@ class ExperimentMatrix(dict[str, Any]):
 
     def failed_variants(self) -> tuple[str, ...]:
         """Return names of variants that encountered errors."""
-        return tuple(name for name, res in self.results.items() if res.error is not None)
+        return tuple(name for name, res in self.results.items()
+                     if res.error is not None)
 
     def to_dict(self) -> dict[str, Any]:
         """Return a plain dictionary copy of the matrix."""
@@ -270,7 +271,8 @@ def metric_improvement(
     TypeError
         If matrix is not a Mapping, or variant/metric is not a string.
     ValueError
-        If the direction is invalid, the threshold is negative, or variant/metric is empty.
+        If the direction is invalid, the threshold is negative, or variant/metric is
+        empty.
 
     Notes
     -----
@@ -375,7 +377,8 @@ def parameter_grid(
         val = factors[name]
         if isinstance(val, (str, bytes, bytearray)):
             raise TypeError(
-                f"factor {name!r} values must be a sequence of values, not {type(val).__name__}"
+                f"factor {name!r} values must be a sequence "
+                    f"of values, not {type(val).__name__}"
             )
         try:
             seq = tuple(val)

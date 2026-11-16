@@ -6,8 +6,6 @@ from __future__ import annotations
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import contextlib
-
-
 import importlib
 import os
 import pathlib

@@ -1,10 +1,14 @@
-"""Tests for Wave 7 Sub-Wave 1: Probabilistic Data Structures & Cardinality Estimation."""
+"""Tests for Wave 7 Sub-Wave 1: Probabilistic Data Structures & Cardinality Estimation.
+"""
 
-import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 
 from gunz_utils.probabilistic import (
-    CountMinSketch,
     CountingBloomFilter,
+    CountMinSketch,
     HyperLogLog,
     MinHash,
 )
@@ -16,7 +20,7 @@ def test_hyperloglog_cardinality_and_merge():
         hll1.add(f"item_{i}")
 
     est1 = hll1.cardinality()
-    # Within 10% of true cardinality 1000
+    #? Within 10% of true cardinality 1000
     assert 900 <= est1 <= 1100
 
     hll2 = HyperLogLog(p=10)
@@ -25,7 +29,7 @@ def test_hyperloglog_cardinality_and_merge():
 
     merged = hll1.merge(hll2)
     est_merged = merged.cardinality()
-    # Within 10% of true cardinality 2000
+    #? Within 10% of true cardinality 2000
     assert 1800 <= est_merged <= 2200
 
 
@@ -47,7 +51,7 @@ def test_counting_bloom_filter_add_and_remove():
     assert "missing_key" not in cbf
     assert len(cbf) == 1
 
-    # Remove
+    #? Remove
     assert cbf.remove("test_key")
     assert "test_key" not in cbf
     assert len(cbf) == 0
@@ -55,8 +59,8 @@ def test_counting_bloom_filter_add_and_remove():
 
 def test_minhash_similarity():
     s1 = {"apple", "banana", "cherry", "date", "fig"}
-    s2 = {"apple", "banana", "cherry", "date", "grape"}  # 4/6 = 0.666 Jaccard
-    s3 = {"kiwi", "lemon", "mango", "orange", "peach"}  # 0 Jaccard
+    s2 = {"apple", "banana", "cherry", "date", "grape"}  #? 4/6 = 0.666 Jaccard
+    s3 = {"kiwi", "lemon", "mango", "orange", "peach"}  #? 0 Jaccard
 
     m1 = MinHash(num_perm=128, seed=42)
     m2 = MinHash(num_perm=128, seed=42)

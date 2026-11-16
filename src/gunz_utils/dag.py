@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import contextlib
-
-
-import asyncio
 import inspect
 import math
 import time
@@ -92,13 +91,15 @@ class WorkflowStage:
 
         if isinstance(self.dependencies, (str, bytes, bytearray)):
             raise TypeError(
-                f"stage dependencies must be a sequence of strings, not {type(self.dependencies).__name__}"
+                f"stage dependencies must be a sequence of "
+                    f"strings, not {type(self.dependencies).__name__}"
             )
         try:
             dependencies = tuple(self.dependencies)
         except TypeError as exc:
             raise TypeError(
-                f"stage dependencies must be an iterable, got {type(self.dependencies).__name__}"
+                f"stage dependencies must be an iterable, "
+                    f"got {type(self.dependencies).__name__}"
             ) from exc
 
         if any(
@@ -169,11 +170,13 @@ class WorkflowDAG:
         try:
             stage_list = list(stages)
         except TypeError as exc:
-            raise TypeError("stages must be an iterable of WorkflowStage instances") from exc
+            raise TypeError(
+                "stages must be an iterable of WorkflowStage instances") from exc
         for stage in stage_list:
             if not isinstance(stage, WorkflowStage):
                 raise TypeError(
-                    f"stages must contain WorkflowStage instances, got {type(stage).__name__}"
+                    f"stages must contain WorkflowStage "
+                        f"instances, got {type(stage).__name__}"
                 )
         self.stages = {
             stage.name: stage
@@ -355,7 +358,8 @@ class WorkflowDAG:
         name : str
             Target stage name.
         transitive : bool, default=False
-            If True, return all upstream dependencies recursively; otherwise only direct dependencies.
+            If True, return all upstream dependencies recursively; otherwise only direct
+            dependencies.
 
         Returns
         -------
@@ -390,7 +394,8 @@ class WorkflowDAG:
         name : str
             Target stage name.
         transitive : bool, default=False
-            If True, return all downstream stages recursively; otherwise only direct dependents.
+            If True, return all downstream stages recursively; otherwise only direct
+            dependents.
 
         Returns
         -------
@@ -638,7 +643,8 @@ class WorkflowDAG:
             Stage outputs in completion/topological order.
         """
         if cache is not None and not isinstance(cache, MutableMapping):
-            raise TypeError(f"cache must be a MutableMapping, got {type(cache).__name__}")
+            raise TypeError(
+                f"cache must be a MutableMapping, got {type(cache).__name__}")
         store = cache if cache is not None else {}
         outputs: dict[str, Any] = {}
         executed_order: list[str] = []
@@ -667,9 +673,8 @@ class WorkflowDAG:
                     if asyncio.iscoroutine(output):
                         output.close()
                     raise TypeError(
-                        f"stage {name!r} returned an awaitable in synchronous execute(); "
-                        "use async_execute() instead"
-                    )
+    f"stage {name!r} returned an awaitable in synchronous execute(); "
+    "use async_execute() instead" )
             except BaseException as exc:
                 compensation_errors = self._rollback_sync(executed_order, outputs)
                 raise WorkflowExecutionError(
@@ -735,7 +740,8 @@ class WorkflowDAG:
                 raise ValueError("concurrency_limit must be a positive integer or None")
 
         if cache is not None and not isinstance(cache, MutableMapping):
-            raise TypeError(f"cache must be a MutableMapping, got {type(cache).__name__}")
+            raise TypeError(
+                f"cache must be a MutableMapping, got {type(cache).__name__}")
 
         sem = (
             asyncio.Semaphore(concurrency_limit)

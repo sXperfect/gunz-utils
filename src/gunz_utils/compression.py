@@ -40,7 +40,8 @@ def detect_compression_format(
         return CompressionFormat.BZIP2
     if len(header_bytes) >= 6 and header_bytes[:6] == b"\xfd7zXZ\x00":
         return CompressionFormat.XZ
-    if len(header_bytes) >= 2 and header_bytes[0] == 0x78 and header_bytes[1] in (0x01, 0x5E, 0x9C, 0xDA):
+    if len(header_bytes) >= 2 and header_bytes[0] == 0x78 and header_bytes[1] in (
+        0x01, 0x5E, 0x9C, 0xDA):
         return CompressionFormat.ZLIB
     return CompressionFormat.RAW
 
@@ -58,7 +59,9 @@ def decompress_gzip(
     max_bytes: int | None = None,
 ) -> bytes:
     """Decompress gzip bytes with optional size bound."""
-    return decompress_bounded(data, max_output_bytes=max_bytes or (100 * len(data) + 1024 * 1024))
+    return decompress_bounded(
+    data, max_output_bytes=max_bytes or (
+        100 * len(data) + 1024 * 1024))
 
 
 def compress_zlib(
@@ -74,7 +77,9 @@ def decompress_zlib(
     max_bytes: int | None = None,
 ) -> bytes:
     """Decompress zlib bytes with optional size bound."""
-    return decompress_bounded(data, max_output_bytes=max_bytes or (100 * len(data) + 1024 * 1024))
+    return decompress_bounded(
+    data, max_output_bytes=max_bytes or (
+        100 * len(data) + 1024 * 1024))
 
 
 def decompress_bounded(
@@ -85,7 +90,8 @@ def decompress_bounded(
     fmt = detect_compression_format(data)
     if fmt == CompressionFormat.RAW:
         if len(data) > max_output_bytes:
-            raise DecompressionLimitExceeded("uncompressed payload exceeds maximum bound")
+            raise DecompressionLimitExceeded(
+                "uncompressed payload exceeds maximum bound")
         return data
 
     out = bytearray()
@@ -187,9 +193,10 @@ def decompress_stream(
     header = in_stream.read(16)
     if not header:
         return 0
-    fmt = detect_compression_format(header)
     combined = io.BytesIO(header + in_stream.read())
-    decompressed = decompress_bounded(combined.getvalue(), max_output_bytes=max_bytes or 100_000_000)
+    decompressed = decompress_bounded(
+    combined.getvalue(),
+     max_output_bytes=max_bytes or 100_000_000)
     out_stream.write(decompressed)
     return len(decompressed)
 

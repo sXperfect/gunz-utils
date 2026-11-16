@@ -204,7 +204,8 @@ class BaseStrEnum(enum.StrEnum):
 
         member_strs = [f"'{m.value}'" for m in cls]
         if len(member_strs) > 10:
-            valid_options = ", ".join(member_strs[:10]) + f", ... ({len(member_strs) - 10} more)"
+            valid_options = ", ".join(
+                member_strs[:10]) + f", ... ({len(member_strs) - 10} more)"
         else:
             valid_options = ", ".join(member_strs)
         disp_val = value_str[:50] + "..." if len(value_str) > 50 else value_str
@@ -475,7 +476,8 @@ class BaseIntEnum(enum.IntEnum):
 
         member_strs = [f"'{m.value}'" for m in cls]
         if len(member_strs) > 10:
-            valid_options = ", ".join(member_strs[:10]) + f", ... ({len(member_strs) - 10} more)"
+            valid_options = ", ".join(
+                member_strs[:10]) + f", ... ({len(member_strs) - 10} more)"
         else:
             valid_options = ", ".join(member_strs)
         disp_val = value_str[:50] + "..." if len(value_str) > 50 else value_str

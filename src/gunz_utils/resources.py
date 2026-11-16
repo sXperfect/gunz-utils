@@ -13,7 +13,9 @@ from typing import Any
 
 
 class ResourceGroup:
-    """Synchronous resource group managing multiple nested context managers and callbacks."""
+    """Synchronous resource group managing multiple nested context managers and
+    callbacks.
+    """
 
     def __init__(self) -> None:
         self._stack = ExitStack()
@@ -75,7 +77,9 @@ class ResourceGroup:
 
 
 class AsyncResourceGroup:
-    """Asynchronous resource group managing nested async context managers and cleanup callbacks."""
+    """Asynchronous resource group managing nested async context managers and cleanup
+    callbacks.
+    """
 
     def __init__(self) -> None:
         self._stack = AsyncExitStack()

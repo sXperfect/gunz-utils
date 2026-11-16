@@ -20,7 +20,7 @@ __license__ = "Clear BSD"
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 from collections.abc import Callable
-from typing import TypeVar
+from typing import TypeVar, cast
 
 T = TypeVar("T")
 
@@ -34,21 +34,21 @@ class UnsetType:
     """
 
     __slots__ = ()
-    _instance: "UnsetType | None" = None
+    _instance: UnsetType | None = None
 
     def __new__(
         cls,
-    ) -> "UnsetType":
+    ) -> UnsetType:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __copy__(self) -> "UnsetType":
+    def __copy__(self) -> UnsetType:
         return self
 
     def __deepcopy__(self,
         memo: object,
-    ) -> "UnsetType":
+    ) -> UnsetType:
         return self
 
     def __repr__(
@@ -108,7 +108,7 @@ def default(
     T
         ``fallback`` if ``value`` is ``UNSET``, otherwise ``value``.
     """
-    return fallback if value is UNSET else value
+    return fallback if value is UNSET else cast(T, value)
 
 
 def default_factory(
@@ -131,7 +131,7 @@ def default_factory(
     """
     if not callable(factory):
         raise TypeError("factory must be callable")
-    return factory() if value is UNSET else value
+    return factory() if value is UNSET else cast(T, value)
 
 
 __all__ = [

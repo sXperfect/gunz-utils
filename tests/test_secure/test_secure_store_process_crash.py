@@ -104,7 +104,8 @@ class _CommitCheckpoint:
     ) -> sqlite3.Cursor:
         if sql == "COMMIT" and self.boundary == "transaction":
             _checkpoint(self.control, self.boundary, self.store)
-        cursor = self.connection.execute(sql, parameters)
+        #? Forward the tested store's statement and parameters without interpolation.
+        cursor = self.connection.execute(sql, parameters)  # gunz-style: ignore[GS250]
         if sql == "COMMIT" and self.boundary == "committed":
             _checkpoint(self.control, self.boundary, self.store)
         return cursor

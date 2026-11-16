@@ -85,19 +85,47 @@ async def gather_with_concurrency(
     max_concurrency: int,
     *awaitables: Awaitable[T],
 ) -> list[T]:
-    """Execute awaitables with bounded parallelism using an asyncio Semaphore."""
-    if isinstance(max_concurrency, bool) or not isinstance(max_concurrency, int) or max_concurrency < 1:
-        raise ValueError("max_concurrency must be an integer >= 1")
+    """Execute awaitables with bounded parallelism and drain owned tasks.
 
-    sem = asyncio.Semaphore(max_concurrency)
+    Submitted coroutine objects are closed if they never start. Worker failure
+    and caller cancellation wait for sibling cleanup before returning.
+    """
+    tasks: list[asyncio.Task[T]] = []
+    try:
+        if (
+            isinstance(max_concurrency, bool)
+            or not isinstance(max_concurrency, int)
+            or max_concurrency < 1
+        ):
+            raise ValueError("max_concurrency must be an integer >= 1")
+        sem = asyncio.Semaphore(max_concurrency)
 
-    async def _sem_task(
-        coro: Awaitable[T],
-    ) -> T:
-        async with sem:
-            return await coro
+        async def _sem_task(
+            awaitable: Awaitable[T],
+        ) -> T:
+            async with sem:
+                return await awaitable
 
-    return await asyncio.gather(*(_sem_task(a) for a in awaitables))
+        for awaitable in awaitables:
+            coroutine = _sem_task(awaitable)
+            try:
+                task = asyncio.create_task(coroutine)
+            except BaseException:
+                coroutine.close()
+                raise
+            tasks.append(task)
+        #? The finally block cancels and drains every task owned by this call.
+        return await asyncio.gather(*tasks)  # gunz-style: ignore[GS233]
+    finally:
+        try:
+            await cancel_and_wait(*tasks)
+        finally:
+            for awaitable in awaitables:
+                if (
+                    inspect.iscoroutine(awaitable)
+                    and inspect.getcoroutinestate(awaitable) == inspect.CORO_CREATED
+                ):
+                    awaitable.close()
 
 
 @asynccontextmanager
@@ -105,7 +133,9 @@ async def async_timeout(
     seconds: float,
 ) -> AsyncIterator[None]:
     """Async context manager applying a deadline using asyncio.timeout."""
-    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds < 0:
+    if isinstance(
+    seconds, bool) or not isinstance(
+        seconds, (int, float)) or seconds < 0:
         raise ValueError("seconds must be a non-negative number")
     async with asyncio.timeout(float(seconds)):
         yield
@@ -151,15 +181,15 @@ def async_throttle(
     seconds: float,
 ) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
     """Async decorator restricting call rate to at most once per `seconds`."""
-    if seconds < 0:
-        raise ValueError("seconds must be non-negative")
+    if not math.isfinite(seconds) or seconds < 0:
+        raise ValueError("seconds must be finite and non-negative")
 
     def decorator(
         func: Callable[..., Awaitable[T]],
     ) -> Callable[..., Awaitable[T]]:
-        last_called = 0.0
+        last_called: float | None = None
         lock = asyncio.Lock()
-        last_result: Any = None
+        last_result: T
 
         @functools.wraps(func)
         async def wrapper(
@@ -169,9 +199,9 @@ def async_throttle(
             nonlocal last_called, last_result
             async with lock:
                 now = time.monotonic()
-                if now - last_called >= seconds:
-                    last_called = now
+                if last_called is None or now - last_called >= seconds:
                     last_result = await func(*args, **kwargs)
+                    last_called = now
                 return last_result
         return wrapper
     return decorator
@@ -180,7 +210,9 @@ def async_throttle(
 def async_debounce(
     seconds: float,
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
-    """Async decorator delaying coroutine execution until `seconds` elapsed since last call."""
+    """Async decorator delaying coroutine execution until `seconds` elapsed since last
+    call.
+    """
     if seconds < 0:
         raise ValueError("seconds must be non-negative")
 

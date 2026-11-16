@@ -6,9 +6,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-import re
 from types import MappingProxyType
 from typing import Any
 
@@ -185,10 +185,12 @@ class SchemaMigrator:
         elif isinstance(schema_or_envelope, str):
             schema = schema_or_envelope
             if from_version is None:
-                raise ValueError("from_version must be provided when schema is a string")
+                raise ValueError(
+                    "from_version must be provided when schema is a string")
             from_v = from_version
         else:
-            raise TypeError("first argument must be a schema string or VersionedEnvelope")
+            raise TypeError(
+                "first argument must be a schema string or VersionedEnvelope")
         if target_version < from_v:
             return False
         v = from_v

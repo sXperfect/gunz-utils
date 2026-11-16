@@ -235,7 +235,10 @@ def test_posix_build_preparation_keeps_compiler_flags_and_output_contract(
         scoped.setattr(module.subprocess, "run", compiler)
         assert module.build(tmp_path / "output") == 0
     assert calls[0][0] == ("clang" if platform == "darwin" else "gcc")
-    assert calls[0][1:4] == ["-O3", "-shared", "-fPIC"]
+    assert calls[0][1:7] == [
+        "-std=c11", "-O3", "-Wall", "-Wextra", "-Wno-unused-parameter", "-shared"
+    ]
+    assert "-fPIC" in calls[0]
     assert "-o" in calls[0] and "/link" not in calls[0]
     assert (calls[0][-2:] == ["-undefined", "dynamic_lookup"]) == (platform == "darwin")
 

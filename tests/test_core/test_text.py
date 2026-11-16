@@ -1,10 +1,17 @@
 """Contract and behavior tests for gunz_utils.text."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import re
 import unittest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.text import blank_spans, deduplicate_spans, word_pattern
 
 
@@ -19,18 +26,18 @@ class TestTextModule(unittest.TestCase):
         self.assertFalse(pat.search("prefactor"))
 
     def test_word_pattern_inflections(self) -> None:
-        # -y to -ies
+        #? -y to -ies
         pat_dep = word_pattern("dependency")
         self.assertTrue(pat_dep.search("zero dependency"))
         self.assertTrue(pat_dep.search("many dependencies"))
 
-        # -e to -ing
+        #? -e to -ing
         pat_create = word_pattern("create")
         self.assertTrue(pat_create.search("we create code"))
         self.assertTrue(pat_create.search("creating tests"))
         self.assertTrue(pat_create.search("created cleanly"))
 
-        # multi-word
+        #? multi-word
         pat_multi = word_pattern("sanity check")
         self.assertTrue(pat_multi.search("run a sanity check"))
         self.assertTrue(pat_multi.search("run sanity-check"))
@@ -45,7 +52,7 @@ class TestTextModule(unittest.TestCase):
         self.assertEqual(len(blanked), len(text))
 
     def test_deduplicate_spans_prefers_longest(self) -> None:
-        # Span B (5, 30) is longer than span A (5, 10) and span C (15, 25)
+        #? Span B (5, 30) is longer than span A (5, 10) and span C (15, 25)
         candidates = [
             (5, 10, "short"),
             (5, 30, "long"),

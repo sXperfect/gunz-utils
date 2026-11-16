@@ -153,6 +153,10 @@ def test_safe_result_loader_rejects_oversized_and_non_finite_samples(
     data = _result().to_dict()
     data["samples"] = [math.nan, 2.0]
     path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="non-standard JSON constant"):
+        load_result_checked(path)
+
+    path.write_text(json.dumps(data).replace("NaN", "1e999"), encoding="utf-8")
     with pytest.raises(ValueError, match="sample"):
         load_result_checked(path)
 

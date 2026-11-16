@@ -61,7 +61,9 @@ class TestAsyncCleanup(unittest.IsolatedAsyncioTestCase):
         async def fail() -> int:
             raise WorkerFailure("worker")
 
-        def factory(value: int) -> Coroutine[Any, Any, int]:
+        def factory(
+            value: int,
+        ) -> Coroutine[Any, Any, int]:
             called.append(value)
             return fail()
 
@@ -134,10 +136,15 @@ class TestAsyncCleanup(unittest.IsolatedAsyncioTestCase):
         errors: list[dict[str, Any]] = []
         original_wait = asyncio.wait
 
-        async def wait_all(tasks: Any, **kwargs: Any) -> Any:
+        async def wait_all(
+            tasks: Any,
+            **kwargs: Any,
+        ) -> Any:
             return await original_wait(tasks, return_when=asyncio.ALL_COMPLETED)
 
-        async def fail(value: int) -> int:
+        async def fail(
+            value: int,
+        ) -> int:
             raise WorkerFailure(str(value))
 
         loop.set_exception_handler(lambda _loop, context: errors.append(context))

@@ -101,7 +101,11 @@ class Timer:
 
     def pause(self) -> None:
         """Pause the timer, halting elapsed accumulation until resumed."""
-        if self._start_time is not None and self._end_time is None and self._pause_start is None:
+        if (
+            self._start_time is not None
+            and self._end_time is None
+            and self._pause_start is None
+        ):
             self._pause_start = self._now()
 
     def resume(self) -> None:

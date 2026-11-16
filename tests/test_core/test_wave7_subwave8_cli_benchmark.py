@@ -1,5 +1,9 @@
 """Tests for Wave 7 Sub-Wave 8: Lightweight CLI Utilities & Benchmark Summaries."""
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+
 from gunz_utils.benchmark import (
     export_benchmark_csv,
     export_benchmark_json,
@@ -14,19 +18,19 @@ def test_simple_arg_parser_flags_and_options():
     parser.add_option("port", short="p", type=int, default=8000, help="Listen port")
     parser.add_argument("filename", help="Input file")
 
-    # Long flag and option
+    #? Long flag and option
     res = parser.parse_args(["--verbose", "--port", "9090", "input.txt"])
     assert res["verbose"] is True
     assert res["port"] == 9090
     assert res["filename"] == "input.txt"
 
-    # Short flag and option with =
+    #? Short flag and option with =
     res2 = parser.parse_args(["-v", "--port=3000", "output.txt"])
     assert res2["verbose"] is True
     assert res2["port"] == 3000
     assert res2["filename"] == "output.txt"
 
-    # Default values
+    #? Default values
     res3 = parser.parse_args(["just_file.txt"])
     assert res3["verbose"] is False
     assert res3["port"] == 8000

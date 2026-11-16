@@ -6,8 +6,6 @@ from __future__ import annotations
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import contextlib
-
-
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,7 +41,7 @@ def capture_noise_info() -> NoiseInfo:
     governors: set[str] = set()
     cpu_root = Path("/sys/devices/system/cpu")
     for path in cpu_root.glob("cpu[0-9]*/cpufreq/scaling_governor"):
-        with contextlib.suppress((OSError, PermissionError)):
+        with contextlib.suppress(OSError, PermissionError):
             governors.add(path.read_text().strip())
     memory_max = None
     try:

@@ -17,7 +17,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Hashable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Generic, ParamSpec, TypeVar
+from typing import Any, Generic, ParamSpec, TypeVar, cast
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -704,7 +704,7 @@ class FIFOCache(Generic[T]):
         res = self.get(key, default=_KW_SENTINEL)
         if res is _KW_SENTINEL:
             raise KeyError(key)
-        return res
+        return cast(T, res)
 
     def __setitem__(self,
         key: Any,
@@ -782,7 +782,8 @@ class LFUCache(Generic[T]):
                 self._touch(key)
                 return
             if len(self._key_val) >= self.capacity:
-                #? Evict least frequently used key (earliest inserted in min_freq bucket)
+                #? Evict least frequently used key (earliest inserted in min_freq
+                #? bucket)
                 evict_bucket = self._freq_keys[self._min_freq]
                 evict_key, _ = evict_bucket.popitem(last=False)
                 if not evict_bucket:
@@ -804,7 +805,7 @@ class LFUCache(Generic[T]):
         res = self.get(key, default=_KW_SENTINEL)
         if res is _KW_SENTINEL:
             raise KeyError(key)
-        return res
+        return cast(T, res)
 
     def __setitem__(self,
         key: Any,
@@ -899,7 +900,7 @@ class TTLCache(Generic[T]):
         res = self.get(key, default=_KW_SENTINEL)
         if res is _KW_SENTINEL:
             raise KeyError(key)
-        return res
+        return cast(T, res)
 
     def __setitem__(self,
         key: Any,

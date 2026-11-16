@@ -6,8 +6,6 @@ from __future__ import annotations
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import itertools
-
-
 import math
 from collections.abc import Sequence
 
@@ -84,7 +82,7 @@ def process_metrics(
     samples = profile.samples
     memory_time = math.fsum(
         previous.rss_bytes * max(0.0, current.elapsed - previous.elapsed)
-        for previous, current in itertools.pairwise(samples, strict=False)
+        for previous, current in itertools.pairwise(samples)
     )
     return {
         "average_cpu_cores": profile.average_cpu_cores,

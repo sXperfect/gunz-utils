@@ -1,33 +1,36 @@
 """Tests for Wave 4 Sub-Wave 3: Mappings, Config & Parsing (#27–#39)."""
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.dict_utils import (
     DeepDifference,
     compact_dict,
     deep_diff,
     deep_get,
     deep_merge,
-    deep_pop,
-    deep_set,
     flatten_dict,
     unflatten_dict,
 )
 from gunz_utils.parsing import (
-    parse_bool,
     parse_int_exact,
     parse_key_value_pairs,
-    safe_bool,
-    safe_float,
-    safe_int,
     safe_list,
 )
 from gunz_utils.typed_config import (
     ConfigValue,
     LayeredConfig,
-    convert,
 )
-
 
 # =============================================================================
 # #27–#32: dict_utils enhancements
@@ -66,15 +69,15 @@ def test_flatten_and_unflatten_dict():
         "enabled": True,
     }
 
-    # Reconstruct
+    #? Reconstruct
     rebuilt = unflatten_dict(flat)
     assert rebuilt == nested
 
-    # Custom separator and prefix
+    #? Custom separator and prefix
     flat_custom = flatten_dict(nested, separator="/", prefix="app")
     assert flat_custom["app/database/host"] == "localhost"
 
-    # Cycle detection
+    #? Cycle detection
     circular: dict = {}
     circular["self"] = circular
     with pytest.raises(ValueError, match="circular reference"):
@@ -94,7 +97,7 @@ def test_compact_dict():
         "h": "",
     }
 
-    # Default: drop_none=True, drop_empty=False
+    #? Default: drop_none=True, drop_empty=False
     c1 = compact_dict(data)
     assert c1 == {
         "a": 1,
@@ -103,7 +106,7 @@ def test_compact_dict():
         "h": "",
     }
 
-    # drop_empty=True, drop_none=True
+    #? drop_empty=True, drop_none=True
     c2 = compact_dict(data, drop_none=True, drop_empty=True)
     assert c2 == {
         "a": 1,
@@ -120,16 +123,16 @@ def test_deep_get_sequence_indexing():
         "tags": ["web", "production"],
     }
 
-    # String dotted paths with integer segments
+    #? String dotted paths with integer segments
     assert deep_get(tree, "servers.0.host") == "primary.local"
     assert deep_get(tree, "servers.1.port") == 8080
     assert deep_get(tree, "tags.0") == "web"
     assert deep_get(tree, "tags.1") == "production"
 
-    # Sequence path with ints
+    #? Sequence path with ints
     assert deep_get(tree, ["servers", 1, "host"]) == "secondary.local"
 
-    # Out of bounds returns default or raises KeyError
+    #? Out of bounds returns default or raises KeyError
     assert deep_get(tree, "servers.5.host", default="fallback") == "fallback"
     with pytest.raises(KeyError):
         deep_get(tree, "servers.5.host")
@@ -141,7 +144,7 @@ def test_deep_merge_cycle_and_depth_limits():
     merged = deep_merge(d1, d2)
     assert merged == {"a": 1, "b": 2}
 
-    # Depth limit exceeded
+    #? Depth limit exceeded
     deep_tree = {"l1": {"l2": {"l3": {"l4": 1}}}}
     with pytest.raises(ValueError, match="maximum mapping merge depth exceeded"):
         deep_merge(deep_tree, {"l1": {"l2": {"l3": {"l4": 2}}}}, max_depth=2)
@@ -165,17 +168,17 @@ def test_layered_config_precedence():
     ])
 
     assert config.layers == ["defaults", "file", "env", "cli"]
-    assert config["host"] == "0.0.0.0"       # CLI override
-    assert config["port"] == 9000            # File override
-    assert config["debug"] is True           # Env override
-    assert config["db.name"] == "prod"       # File nested
+    assert config["host"] == "0.0.0.0"       #? CLI override
+    assert config["port"] == 9000            #? File override
+    assert config["debug"] is True           #? Env override
+    assert config["db.name"] == "prod"       #? File nested
     assert "db.name" in config
     assert "missing" not in config
 
-    # get with default
+    #? get with default
     assert config.get("missing", "default_val") == "default_val"
 
-    # to_dict
+    #? to_dict
     full = config.to_dict()
     assert full["host"] == "0.0.0.0"
     assert full["port"] == 9000
@@ -204,7 +207,7 @@ def test_layered_config_provenance():
 def test_config_value_hashable_with_unhashables():
     cv1 = ConfigValue(value=[1, 2, 3], source="cli")
     cv2 = ConfigValue(value={"a": 1}, source="cli")
-    # Should not raise TypeError when hashed
+    #? Should not raise TypeError when hashed
     assert isinstance(hash(cv1), int)
     assert isinstance(hash(cv2), int)
 
@@ -214,7 +217,8 @@ def test_config_value_hashable_with_unhashables():
 # =============================================================================
 
 def test_parse_key_value_pairs():
-    parsed = parse_key_value_pairs("host=localhost, port = 8080 , name='test app', desc=\"my server\"")
+    parsed = parse_key_value_pairs(
+        "host=localhost, port = 8080 , name='test app', desc=\"my server\"")
     assert parsed == {
         "host": "localhost",
         "port": "8080",

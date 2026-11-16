@@ -35,7 +35,8 @@ class EventBus:
         topic: str,
         handler: Callable[..., Any],
     ) -> Callable[[], None]:
-        """Register a callback for the specified topic. Returns an unsubscribe callable."""
+        """Register a callback for the specified topic. Returns an unsubscribe callable.
+        """
         if not isinstance(topic, str) or not topic:
             raise ValueError("topic must be a non-empty string")
         if not callable(handler):
@@ -92,7 +93,8 @@ class EventBus:
             onces = set(self._once_subscribers.get(topic, ()))
             #? Clean up once handlers
             if onces:
-                self._subscribers[topic] = [h for h in self._subscribers[topic] if h not in onces]
+                self._subscribers[topic] = [
+    h for h in self._subscribers[topic] if h not in onces]
                 self._once_subscribers[topic].clear()
 
         results: list[Any] = []
@@ -117,7 +119,8 @@ class EventBus:
             handlers = list(self._subscribers.get(topic, ()))
             onces = set(self._once_subscribers.get(topic, ()))
             if onces:
-                self._subscribers[topic] = [h for h in self._subscribers[topic] if h not in onces]
+                self._subscribers[topic] = [
+    h for h in self._subscribers[topic] if h not in onces]
                 self._once_subscribers[topic].clear()
 
         results: list[Any] = []
@@ -142,7 +145,9 @@ def debounce(
     seconds: float,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Delay execution until `seconds` elapsed since last call."""
-    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds < 0:
+    if isinstance(
+    seconds, bool) or not isinstance(
+        seconds, (int, float)) or seconds < 0:
         raise ValueError("seconds must be a non-negative number")
 
     def decorator(
@@ -181,7 +186,9 @@ def throttle(
     seconds: float,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Limit execution frequency to at most once per `seconds`."""
-    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds < 0:
+    if isinstance(
+    seconds, bool) or not isinstance(
+        seconds, (int, float)) or seconds < 0:
         raise ValueError("seconds must be a non-negative number")
 
     def decorator(

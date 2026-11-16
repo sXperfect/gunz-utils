@@ -1,7 +1,14 @@
 """Tests for Wave 6 Sub-Wave 2: Declarative Finite State Machine."""
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.state_machine import (
     InvalidTransitionError,
     StateMachine,
@@ -15,7 +22,8 @@ def test_state_machine_basic_flow():
     fsm.add_state("draft", on_exit=lambda: events_log.append("exit_draft"))
     fsm.add_state("published", on_enter=lambda: events_log.append("enter_published"))
 
-    fsm.add_transition("publish", source="draft", target="published", action=lambda: events_log.append("publishing"))
+    fsm.add_transition("publish", source="draft", target="published",
+                       action=lambda: events_log.append("publishing"))
 
     assert fsm.current_state == "draft"
     assert fsm.can_trigger("publish")
@@ -51,7 +59,13 @@ def test_state_machine_guard():
 
 def test_state_machine_multiple_sources_and_reset():
     fsm = StateMachine("active")
-    fsm.add_transition("terminate", source=["active", "paused", "errored"], target="stopped")
+    fsm.add_transition(
+    "terminate",
+    source=[
+        "active",
+        "paused",
+        "errored"],
+         target="stopped")
 
     assert fsm.current_state == "active"
     fsm.trigger("terminate")

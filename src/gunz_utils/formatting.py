@@ -599,7 +599,8 @@ def format_table(
         align_list = list(alignments)
         if len(align_list) != num_cols:
             raise ValueError(
-                f"alignments length ({len(align_list)}) must match column count ({num_cols})"
+                f"alignments length ({len(align_list)}) "
+                    f"must match column count ({num_cols})"
             )
         for a in align_list:
             if a not in {"left", "right", "center"}:
@@ -616,7 +617,8 @@ def format_table(
         row_cells = [str(c) for c in row]
         if len(row_cells) != num_cols:
             raise ValueError(
-                f"row length ({len(row_cells)}) does not match column count ({num_cols})"
+                f"row length ({len(row_cells)}) does "
+                    f"not match column count ({num_cols})"
             )
         formatted_rows.append(row_cells)
 
@@ -900,7 +902,11 @@ def format_hex_dump(
     """
     if not isinstance(data, (bytes, bytearray, memoryview)):
         raise TypeError("data must be bytes-like")
-    if isinstance(bytes_per_line, bool) or not isinstance(bytes_per_line, int) or bytes_per_line < 1:
+    if isinstance(
+    bytes_per_line,
+    bool) or not isinstance(
+        bytes_per_line,
+         int) or bytes_per_line < 1:
         raise ValueError("bytes_per_line must be a positive integer")
 
     raw = bytes(data)

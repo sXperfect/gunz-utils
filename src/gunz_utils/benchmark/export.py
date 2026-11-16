@@ -140,7 +140,9 @@ def save_process_html(
     atomic_write(path, html_content, mode="w", encoding="utf-8")
 
 
-def export_benchmark_csv(results: list[dict[str, object]]) -> str:
+def export_benchmark_csv(
+    results: list[dict[str, object]],
+) -> str:
     """Format benchmark results as a CSV string."""
     if not results:
         return ""
@@ -153,24 +155,34 @@ def export_benchmark_csv(results: list[dict[str, object]]) -> str:
     return buffer.getvalue()
 
 
-def export_benchmark_json(results: list[dict[str, object]], indent: int = 2) -> str:
+def export_benchmark_json(
+    results: list[dict[str, object]],
+    indent: int = 2,
+) -> str:
     """Format benchmark results as a formatted JSON string."""
     import json
     return json.dumps(results, indent=indent, default=str)
 
 
-def format_summary_matrix(results: list[dict[str, object]]) -> str:
+def format_summary_matrix(
+    results: list[dict[str, object]],
+) -> str:
     """Format benchmark results as an ASCII matrix table."""
     if not results:
         return ""
     headers = [str(k) for k in results[0].keys()]
     rows = [[str(r.get(h, "")) for h in headers] for r in results]
-    col_widths = [max(len(h), max((len(row[i]) for row in rows), default=0)) for i, h in enumerate(headers)]
+    col_widths = [max(len(h), max((len(row[i]) for row in rows), default=0))
+                      for i, h in enumerate(headers)]
 
     sep = "+-" + "-+-".join("-" * w for w in col_widths) + "-+"
-    header_line = "| " + " | ".join(f"{h:<{w}}" for h, w in zip(headers, col_widths)) + " |"
+    header_line = "| " + " | ".join(
+        f"{h:<{w}}" for h, w in zip(headers, col_widths, strict=True)
+    ) + " |"
     data_lines = [
-        "| " + " | ".join(f"{val:<{w}}" for val, w in zip(row, col_widths)) + " |"
+        "| " + " | ".join(
+            f"{val:<{w}}" for val, w in zip(row, col_widths, strict=True)
+        ) + " |"
         for row in rows
     ]
 

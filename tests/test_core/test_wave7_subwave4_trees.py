@@ -1,5 +1,9 @@
 """Tests for Wave 7 Sub-Wave 4: Tree Structures & Hierarchy Algorithms."""
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+
 from gunz_utils.trees import (
     TreeNode,
     lowest_common_ancestor,
@@ -16,7 +20,7 @@ from gunz_utils.trees import (
 def test_tree_construction_and_properties():
     root = TreeNode("root")
     c1 = root.add_child("c1")
-    c2 = root.add_child("c2")
+    root.add_child("c2")
     c1_1 = c1.add_child("c1_1")
 
     assert root.is_root
@@ -36,7 +40,7 @@ def test_tree_construction_and_properties():
 def test_tree_traversals():
     root = TreeNode(1)
     c1 = root.add_child(2)
-    c2 = root.add_child(3)
+    root.add_child(3)
     c1.add_child(4)
     c1.add_child(5)
 

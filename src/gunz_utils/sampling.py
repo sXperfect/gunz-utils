@@ -185,7 +185,9 @@ def hash_sample_fraction(
     *,
     seed: int = 0,
 ) -> bool:
-    """Deterministically decide if key falls into a sampled fraction based on BLAKE2b hash."""
+    """Deterministically decide if key falls into a sampled fraction based on BLAKE2b
+    hash.
+    """
     if not isinstance(key, str):
         raise TypeError(f"key must be str, got {type(key).__name__}")
     if (

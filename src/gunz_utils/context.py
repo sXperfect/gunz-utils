@@ -10,6 +10,7 @@ import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
+from types import MappingProxyType
 from typing import Any
 
 _correlation_id: ContextVar[str | None] = ContextVar(
@@ -17,9 +18,9 @@ _correlation_id: ContextVar[str | None] = ContextVar(
     default=None,
 )
 
-_execution_context: ContextVar[dict[str, Any]] = ContextVar(
+_execution_context: ContextVar[Mapping[str, Any]] = ContextVar(
     "gunz_utils_execution_context",
-    default={},
+    default=MappingProxyType({}),
 )
 
 
@@ -71,7 +72,9 @@ class ExecutionContext:
         correlation: str | None = None,
     ) -> None:
         self._data = dict(data) if data is not None else dict(_execution_context.get())
-        self._correlation_id = correlation if correlation is not None else correlation_id()
+        self._correlation_id = (
+            correlation if correlation is not None else correlation_id()
+        )
 
     @property
     def correlation_id(self) -> str | None:
@@ -100,7 +103,8 @@ class ExecutionContext:
         return key in self._data
 
     def __repr__(self) -> str:
-        return f"ExecutionContext(correlation_id={self._correlation_id!r}, data={self._data!r})"
+        return (f"ExecutionContext(correlation_id={self._correlation_id!r}, "
+            f"data={self._data!r})")
 
 
 

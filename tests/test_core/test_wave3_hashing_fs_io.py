@@ -1,13 +1,21 @@
-"""Tests for Wave 3 additions: Cryptographic Hashing, Filesystem & Atomic I/O (#28 - #42)."""
+"""Tests for Wave 3 additions: Cryptographic Hashing, Filesystem & Atomic I/O (#28 -
+#42).
+"""
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 
 from __future__ import annotations
 
 import os
-import stat
 import tempfile
 import unittest
 from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.fs import (
     ensure_dir,
     matches_any_glob,
@@ -63,12 +71,12 @@ class TestWave3Hashing(unittest.TestCase):
         self.assertIsInstance(digest, str)
         self.assertEqual(len(digest), 64)
 
-        # verify_hmac
+        #? verify_hmac
         self.assertTrue(verify_hmac(key, msg, digest, algo="sha256"))
         self.assertFalse(verify_hmac(key, b"tampered", digest, algo="sha256"))
         self.assertFalse(verify_hmac(b"wrong-key", msg, digest, algo="sha256"))
 
-        # String key/message support
+        #? String key/message support
         digest_str = hmac_digest("secret-key", "authenticated-message")
         self.assertEqual(digest_str, digest)
 
@@ -107,7 +115,7 @@ class TestWave3Filesystem(unittest.TestCase):
             sub.mkdir()
             (sub / "c.py").write_text("print(2)")
 
-            # Bare strings must be rejected
+            #? Bare strings must be rejected
             with self.assertRaises(TypeError):
                 list(walk_files(root, include="*.py"))  # type: ignore[arg-type]
             with self.assertRaises(TypeError):
@@ -117,7 +125,7 @@ class TestWave3Filesystem(unittest.TestCase):
             with self.assertRaises(TypeError):
                 tree_fingerprint(root, exclude="sub")  # type: ignore[arg-type]
 
-            # Valid walks
+            #? Valid walks
             files = list(walk_files(root, extensions=[".py"]))
             self.assertEqual(len(files), 2)
             fp = tree_fingerprint(root, extensions=[".py"])
@@ -132,17 +140,17 @@ class TestWave3Filesystem(unittest.TestCase):
             self.assertTrue(res.is_dir())
             self.assertEqual(res, target)
 
-            # Idempotent
+            #? Idempotent
             res2 = ensure_dir(target)
             self.assertEqual(res2, target)
 
-            # Rejects existing file
+            #? Rejects existing file
             file_path = root / "a_file.txt"
             file_path.write_text("hello")
             with self.assertRaises(NotADirectoryError):
                 ensure_dir(file_path)
 
-            # Rejects symlink
+            #? Rejects symlink
             sym = root / "sym_dir"
             sym.symlink_to(target)
             with self.assertRaises(ValueError):
@@ -155,7 +163,7 @@ class TestWave3IO(unittest.TestCase):
             root = Path(tmp_dir)
             target = root / "out.txt"
 
-            # Pre-tempfile validation: invalid types do not create temp files
+            #? Pre-tempfile validation: invalid types do not create temp files
             with self.assertRaises(TypeError):
                 atomic_write(target, 12345)  # type: ignore[arg-type]
             with self.assertRaises(TypeError):
@@ -166,13 +174,13 @@ class TestWave3IO(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertEqual(list(root.iterdir()), [])
 
-            # Target is directory
+            #? Target is directory
             dir_path = root / "existing_dir"
             dir_path.mkdir()
             with self.assertRaises(IsADirectoryError):
                 atomic_write(dir_path, "content")
 
-            # Supports bytearray and memoryview in binary mode
+            #? Supports bytearray and memoryview in binary mode
             bin_target = root / "bin.dat"
             atomic_write(bin_target, bytearray(b"binary data"), mode="wb")
             self.assertEqual(bin_target.read_bytes(), b"binary data")
@@ -189,19 +197,25 @@ class TestWave3IO(unittest.TestCase):
             data = atomic_json_read(json_file)
             self.assertEqual(data, {"key": "value", "items": [1, 2, 3]})
 
-            # max_bytes enforcement
+            #? max_bytes enforcement
             with self.assertRaises(ValueError):
                 atomic_json_read(json_file, max_bytes=5)
 
-            # Non-regular file rejection
+            #? Non-regular file rejection
             with self.assertRaises(IsADirectoryError):
                 atomic_json_read(root)
 
     def test_item39_physical_lines_keepends_validation(self) -> None:
         with self.assertRaises(TypeError):
             physical_lines("hello\nworld", keepends=1)  # type: ignore[arg-type]
-        self.assertEqual(physical_lines("hello\nworld", keepends=False), ["hello", "world"])
-        self.assertEqual(physical_lines("hello\nworld", keepends=True), ["hello\n", "world"])
+        self.assertEqual(
+    physical_lines(
+        "hello\nworld", keepends=False), [
+            "hello", "world"])
+        self.assertEqual(
+    physical_lines(
+        "hello\nworld", keepends=True), [
+            "hello\n", "world"])
 
     def test_item40_safe_read_bytes_and_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -212,17 +226,17 @@ class TestWave3IO(unittest.TestCase):
             sym = root / "sym.txt"
             sym.symlink_to(f)
 
-            # Read via symlink allowed when True
+            #? Read via symlink allowed when True
             self.assertEqual(safe_read_text(sym, allow_symlink=True), "safe content")
             self.assertEqual(safe_read_bytes(sym, allow_symlink=True), b"safe content")
 
-            # Symlink rejected when False
+            #? Symlink rejected when False
             with self.assertRaises(ValueError):
                 safe_read_text(sym, allow_symlink=False)
             with self.assertRaises(ValueError):
                 safe_read_bytes(sym, allow_symlink=False)
 
-            # max_bytes check
+            #? max_bytes check
             with self.assertRaises(ValueError):
                 safe_read_bytes(f, max_bytes=4)
 

@@ -100,9 +100,17 @@ def verify(
             if result.returncode:
                 return result.returncode
             if importlib.util.find_spec("pytest") is not None:
-                test_cmd = [sys.executable, "-m", "pytest", "-o", f"pythonpath={source}", *TESTS]
+                test_cmd = [
+    sys.executable,
+    "-m",
+    "pytest",
+    "-o",
+    f"pythonpath={source}",
+     *TESTS]
             else:
-                test_cmd = [sys.executable, str(ROOT / "scripts" / "run_tests.py"), *TESTS]
+                test_cmd = [
+    sys.executable, str(
+        ROOT / "scripts" / "run_tests.py"), *TESTS]
             result = subprocess.run(
                 test_cmd,
                 cwd=ROOT,

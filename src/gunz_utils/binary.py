@@ -266,7 +266,8 @@ def _py_encode_zigzag(
 def _py_encode_uvarints(
     values: Iterable[int],
 ) -> bytes:
-    """Encode an iterable of unsigned 64-bit integers into canonical varints in pure Python.
+    """Encode an iterable of unsigned 64-bit integers into canonical varints in pure
+    Python.
 
     Parameters
     ----------
@@ -372,7 +373,8 @@ def encode_zigzag(
 def encode_uvarints(
     values: Iterable[int],
 ) -> bytes:
-    """Encode an iterable of unsigned 64-bit integers into concatenated canonical varints.
+    """Encode an iterable of unsigned 64-bit integers into concatenated canonical
+    varints.
 
     Parameters
     ----------
@@ -392,7 +394,8 @@ def encode_uvarints(
 def encode_zigzags(
     values: Iterable[int],
 ) -> bytes:
-    """Encode an iterable of signed 64-bit integers into concatenated canonical zigzag varints.
+    """Encode an iterable of signed 64-bit integers into concatenated canonical zigzag
+    varints.
 
     Parameters
     ----------

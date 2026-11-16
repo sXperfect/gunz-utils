@@ -1,12 +1,19 @@
-"""Tests for Wave 7 Sub-Wave 3: Lexical Tokenization, Text Scanning & Pattern Matching."""
+"""Tests for Wave 7 Sub-Wave 3: Lexical Tokenization, Text Scanning & Pattern Matching.
+"""
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 
 import pytest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.tokenizer import (
     RegexTokenizer,
     StringScanner,
     TokenizerError,
-    glob_to_regex,
     match_glob,
 )
 

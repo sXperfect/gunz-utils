@@ -1,4 +1,6 @@
-"""Hierarchical data diffing, patch application, and inversion for nested mappings and lists."""
+"""Hierarchical data diffing, patch application, and inversion for nested mappings and
+lists.
+"""
 
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
@@ -58,7 +60,9 @@ def set_path(
     path: tuple[str | int, ...],
     value: Any,
 ) -> None:
-    """Set a value in a nested structure along path, creating intermediate dicts as needed."""
+    """Set a value in a nested structure along path, creating intermediate dicts as
+    needed.
+    """
     if not path:
         raise ValueError("path must not be empty")
     curr = data
@@ -91,7 +95,8 @@ def deep_diff(
     b: Any,
     prefix: tuple[str | int, ...] = (),
 ) -> list[DiffEntry]:
-    """Compute recursive diff entries between any two JSON-compatible data structures."""
+    """Compute recursive diff entries between any two JSON-compatible data structures.
+    """
     if a == b:
         return []
 
@@ -174,7 +179,12 @@ def invert_diff(
         elif d.op == DiffOp.REMOVED:
             inverted.append(DiffEntry(d.path, DiffOp.ADDED, None, d.old_value))
         elif d.op == DiffOp.MODIFIED:
-            inverted.append(DiffEntry(d.path, DiffOp.MODIFIED, d.new_value, d.old_value))
+            inverted.append(
+    DiffEntry(
+        d.path,
+        DiffOp.MODIFIED,
+        d.new_value,
+         d.old_value))
         else:
             inverted.append(d)
     return inverted
@@ -194,7 +204,7 @@ def patch_dict(
         elif d.op == DiffOp.REMOVED:
             if not d.path:
                 continue
-            parent = res
+            parent: Any = res
             for step in d.path[:-1]:
                 if isinstance(parent, dict) and step in parent:
                     parent = parent[step]

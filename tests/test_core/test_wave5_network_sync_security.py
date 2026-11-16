@@ -1,18 +1,25 @@
-"""Tests for Wave 5: Network, sync, diagnostics, notebook/project, security, redaction, content_store, and provenance."""
+"""Tests for Wave 5: Network, sync, diagnostics, notebook/project, security, redaction,
+content_store, and provenance.
+"""
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 
 from __future__ import annotations
 
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.content_store import ContentAddressedStore
 from gunz_utils.diagnostics import exception_dict
-from gunz_utils.network import _is_non_public_address, build_network_uri, tcp_reachable
-from gunz_utils.notebook import setup_notebook
-from gunz_utils.project import resolve_project_root
+from gunz_utils.network import _is_non_public_address, build_network_uri
 from gunz_utils.provenance import ExecutionManifest, GitInfo, RuntimeProvenance
-from gunz_utils.redaction import SECRET_PATTERNS, redact
+from gunz_utils.redaction import SECRET_PATTERNS
 from gunz_utils.security import is_safe_relative_path
 from gunz_utils.sync import _unsafe_rsync_extra_argument, rsync_mirror
 
@@ -24,11 +31,23 @@ class TestNetworkWave5(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_network_uri("http", "example.com", username="admin", password="pw\n")
         with self.assertRaises(TypeError):
-            build_network_uri("http", "example.com", username=123)  # type: ignore[arg-type]
+            build_network_uri(
+    "http",
+    "example.com",
+     username=123)  # type: ignore[arg-type]
         with self.assertRaises(TypeError):
-            build_network_uri("http", "example.com", query="bare_query_string")  # type: ignore[arg-type]
+            build_network_uri(
+    "http",
+    "example.com",
+     query="bare_query_string")  # type: ignore[arg-type]
 
-        uri = build_network_uri("https", "example.com", username="user", password="secret", query={"q": "test"})
+        uri = build_network_uri(
+    "https",
+    "example.com",
+    username="user",
+    password="secret",
+    query={
+        "q": "test"})
         self.assertEqual(uri, "https://user:secret@example.com?q=test")
 
     def test_ipv4_mapped_ipv6_detection(self) -> None:
@@ -56,7 +75,9 @@ class TestDiagnosticsWave5(unittest.TestCase):
             exception_dict("not_an_exc")  # type: ignore[arg-type]
 
         exc = ValueError("some error")
-        data = exception_dict(exc, include_message=True, context={"api_key": "my-secret-key"})
+        data = exception_dict(
+    exc, include_message=True, context={
+        "api_key": "my-secret-key"})
         self.assertNotIn("my-secret-key", str(data))
         self.assertEqual(data["message"], "some error")
         self.assertEqual(data["context"]["api_key"], "****")

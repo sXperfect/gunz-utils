@@ -80,7 +80,8 @@ class SummaryStats:
 
     @property
     def iqr(self) -> float | None:
-        """Interquartile range (p75 - p25), or None if 0.25 and 0.75 quantiles are absent.
+        """Interquartile range (p75 - p25), or None if 0.25 and 0.75 quantiles are
+        absent.
 
         Returns
         -------
@@ -1253,7 +1254,8 @@ def ewma(
     values : Sequence[float] | Iterable[float]
         Sequence or iterable of numeric observations.
     alpha : float
-        Smoothing factor in (0.0, 1.0]. Higher alpha discounts older observations faster.
+        Smoothing factor in (0.0, 1.0]. Higher alpha discounts older observations
+        faster.
 
     Returns
     -------
@@ -1294,7 +1296,8 @@ def ewma(
 def geometric_mean(
     data: Iterable[float],
 ) -> float:
-    """Calculate the geometric mean of non-negative values using log-space arithmetic."""
+    """Calculate the geometric mean of non-negative values using log-space arithmetic.
+    """
     vals = _finite_values(data, name="data")
     if not vals:
         raise ValueError("data must not be empty")
@@ -1369,7 +1372,7 @@ def skewness(
     m3 = sum((x - mu) ** 3 for x in vals) / n
     if m2 == 0.0:
         return 0.0
-    return m3 / (m2 ** 1.5)
+    return float(m3 / (m2 ** 1.5))
 
 
 def kurtosis(

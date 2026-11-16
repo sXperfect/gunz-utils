@@ -1,14 +1,19 @@
-"""Tests for Wave 2: Async, leases, pipeline, rate limit, context, resilience, and concurrency."""
+"""Tests for Wave 2: Async, leases, pipeline, rate limit, context, resilience, and
+concurrency.
+"""
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 
 from __future__ import annotations
 
 import asyncio
-import math
-import sys
-import time
-from typing import Any
 import unittest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.async_utils import cancel_and_wait, with_timeout
 from gunz_utils.concurrency import (
     map_concurrent,
@@ -18,7 +23,6 @@ from gunz_utils.concurrency import (
 )
 from gunz_utils.context import (
     correlation_id,
-    ensure_correlation_id,
     operation_context,
     reset_correlation_id,
     set_correlation_id,
@@ -49,7 +53,7 @@ class TestAsyncUtilsWave2(unittest.IsolatedAsyncioTestCase):
         c = coro()
         with self.assertRaises(ValueError):
             await with_timeout(c, timeout=-1.0)
-        # Verify the coroutine was closed (c.cr_frame is None when closed)
+        #? Verify the coroutine was closed (c.cr_frame is None when closed)
         self.assertIsNone(c.cr_frame)
 
     async def test_cancel_and_wait_validation(self) -> None:
@@ -83,9 +87,12 @@ class TestLeasesWave2(unittest.IsolatedAsyncioTestCase):
 class TestPipelineWave2(unittest.IsolatedAsyncioTestCase):
     async def test_worker_map_validation(self) -> None:
         with self.assertRaises(TypeError):
-            await anext(worker_map("not_callable", [1, 2], workers=2))  # type: ignore[arg-type]
+            # type: ignore[arg-type]
+            await anext(worker_map("not_callable", [1, 2], workers=2))
 
-        async def dummy(x: int) -> int:
+        async def dummy(
+            x: int,
+        ) -> int:
             return x
 
         with self.assertRaises(ValueError):
@@ -100,7 +107,9 @@ class TestPipelineWave2(unittest.IsolatedAsyncioTestCase):
                 await asyncio.sleep(0.001)
                 yield i
 
-        async def double(x: int) -> int:
+        async def double(
+            x: int,
+        ) -> int:
             return x * 2
 
         results: list[int] = []
@@ -119,11 +128,11 @@ class TestRateLimiterWave2(unittest.IsolatedAsyncioTestCase):
         limiter = AsyncRateLimiter(rate=10.0, capacity=10.0, clock=mock_clock)
         self.assertEqual(limiter.available_tokens, 10.0)
 
-        # Time going backwards should clamp elapsed to 0
+        #? Time going backwards should clamp elapsed to 0
         current_time = 50.0
         self.assertEqual(limiter.available_tokens, 10.0)
 
-        # Invalid clock
+        #? Invalid clock
         with self.assertRaises(TypeError):
             AsyncRateLimiter(rate=1.0, clock="not_callable")  # type: ignore[arg-type]
 
@@ -204,7 +213,8 @@ class TestConcurrencyWave2(unittest.IsolatedAsyncioTestCase):
 
     async def test_map_concurrent_eager_validation(self) -> None:
         with self.assertRaises(TypeError):
-            await map_concurrent("not_a_func", [1, 2], limit=2)  # type: ignore[arg-type]
+            # type: ignore[arg-type]
+            await map_concurrent("not_a_func", [1, 2], limit=2)
 
 
 if __name__ == "__main__":

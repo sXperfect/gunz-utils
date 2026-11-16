@@ -1,7 +1,13 @@
 """Tests for Wave 5 Sub-Wave 2: Formatting & Visualization (#14–#26)."""
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
-import pytest
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.formatting import (
     format_duration,
     format_hex_dump,
@@ -27,11 +33,11 @@ def test_format_duration_and_parse_duration():
 
 
 def test_format_number():
-    # Comma separation
+    #? Comma separation
     assert format_number(1234567) == "1,234,567"
     assert format_number(1234.567, precision=2) == "1,234.57"
 
-    # Compact SI
+    #? Compact SI
     assert format_number(1500, compact=True) == "1.50k"
     assert format_number(2500000, compact=True) == "2.50M"
     assert format_number(3200000000, compact=True) == "3.20B"
@@ -51,7 +57,7 @@ def test_format_table():
     assert "| Name" in table
     assert "| Alice" in table
     assert "| Bob" in table
-    assert ":--:" in table  # Markdown center indicator
+    assert ":--:" in table  #? Markdown center indicator
 
 
 def test_format_key_value():
@@ -59,7 +65,7 @@ def test_format_key_value():
     formatted = format_key_value(data)
     lines = formatted.split("\n")
     assert len(lines) == 3
-    # Check alignment
+    #? Check alignment
     assert "Status       : OK" in lines[0]
     assert "Response Time: 12ms" in lines[1]
 
@@ -85,17 +91,17 @@ def test_format_hex_dump():
 def test_strip_ansi_codes_and_visible_width():
     colored = "\x1b[31mRed Alert\x1b[0m"
     assert strip_ansi_codes(colored) == "Red Alert"
-    assert visible_width(colored) == 9  # len("Red Alert")
+    assert visible_width(colored) == 9  #? len("Red Alert")
 
 
 def test_pad_string():
-    colored = "\x1b[32mSuccess\x1b[0m"  # Visible len 7
-    # Left align
+    colored = "\x1b[32mSuccess\x1b[0m"  #? Visible len 7
+    #? Left align
     padded_left = pad_string(colored, 10, align="left")
     assert visible_width(padded_left) == 10
     assert padded_left.endswith("   ")
 
-    # Right align
+    #? Right align
     padded_right = pad_string(colored, 10, align="right")
     assert visible_width(padded_right) == 10
     assert padded_right.startswith("   ")

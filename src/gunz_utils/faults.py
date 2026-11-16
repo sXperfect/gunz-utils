@@ -487,7 +487,8 @@ class LatencyInjector:
 
 
 class CorruptingWriter:
-    """Wrap a binary writer and selectively corrupt written bytes for integrity testing."""
+    """Wrap a binary writer and selectively corrupt written bytes for integrity testing.
+    """
 
     def __init__(self,
         target: BinaryIO,

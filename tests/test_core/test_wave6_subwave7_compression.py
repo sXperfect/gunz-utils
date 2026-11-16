@@ -1,7 +1,14 @@
 """Tests for Wave 6 Sub-Wave 7: Compression Magic Bytes & Bounded Decompression."""
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.compression import (
     CompressionFormat,
     DecompressionLimitExceeded,
@@ -10,7 +17,6 @@ from gunz_utils.compression import (
     compression_ratio,
     decompress_bounded,
     decompress_gzip,
-    decompress_zlib,
     detect_compression_format,
     estimate_entropy,
 )
@@ -33,14 +39,14 @@ def test_bounded_decompression_and_roundtrip():
     decomp = decompress_gzip(gz)
     assert decomp == data
 
-    # Exceed limit
+    #? Exceed limit
     with pytest.raises(DecompressionLimitExceeded):
         decompress_bounded(gz, max_output_bytes=50)
 
 
 def test_compression_ratio_and_entropy():
     data = b"AAAAAAAAAA"
-    # Low entropy for repetitive bytes
+    #? Low entropy for repetitive bytes
     ent = estimate_entropy(data)
     assert ent == 0.0
 

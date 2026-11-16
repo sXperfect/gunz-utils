@@ -1,5 +1,9 @@
 """Tests for Wave 6 Sub-Wave 3: Hierarchical Data Diffs, Patching & Inversion."""
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+
 from gunz_utils.diff import (
     DiffOp,
     deep_diff,
@@ -16,18 +20,26 @@ from gunz_utils.diff import (
 
 def test_deep_diff_dicts():
     a = {"name": "Alice", "meta": {"role": "dev", "age": 30}, "tags": ["a", "b"]}
-    b = {"name": "Alice", "meta": {"role": "admin", "age": 30}, "tags": ["a", "c"], "city": "NYC"}
+    b = {
+    "name": "Alice",
+    "meta": {
+        "role": "admin",
+        "age": 30},
+        "tags": [
+            "a",
+            "c"],
+             "city": "NYC"}
 
     diffs = diff_dicts(a, b)
     assert has_changes(diffs)
 
-    # Check additions
+    #? Check additions
     adds = filter_diffs(diffs, {DiffOp.ADDED})
     assert len(adds) == 1
     assert adds[0].path == ("city",)
     assert adds[0].new_value == "NYC"
 
-    # Check modifications
+    #? Check modifications
     mods = filter_diffs(diffs, {DiffOp.MODIFIED})
     mod_paths = [m.path for m in mods]
     assert ("meta", "role") in mod_paths
@@ -42,7 +54,7 @@ def test_patch_and_invert():
     patched = patch_dict(orig, diffs)
     assert patched == target
 
-    # Invert diffs and patch back
+    #? Invert diffs and patch back
     inv = invert_diff(diffs)
     reverted = patch_dict(patched, inv)
     assert reverted == orig

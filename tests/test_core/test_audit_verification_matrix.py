@@ -120,10 +120,17 @@ def test_native_activation_cannot_report_fallback_as_native(
     package = tmp_path / "gunz_utils"
     package.mkdir()
     (package / "__init__.py").write_text("")
-    (package / "binary.py").write_text("_accel_encode = None\n_accel_decode = None\n")
+    (package / "binary.py").write_text(
+        "_accel_encode = _accel_decode = None\n"
+        "_accel_encode_zigzag = _accel_decode_zigzag = None\n"
+        "_accel_encode_uvarints = _accel_decode_uvarints = None\n"
+        "_accel_encode_zigzags = _accel_decode_zigzags = None\n"
+    )
+    (package / "io.py").write_text("_accel_physical_lines = None\n")
     (package / "serialization.py").write_text("_accel_is_json_clean = None\n")
     (package / "stats.py").write_text(
-        "_accel_fast_summary = None\n_accel_update_running_stats = None\n"
+        "_accel_fast_summary = _accel_update_running_stats = None\n"
+        "_accel_merge_running_stats = _accel_fast_pareto_2d = None\n"
     )
     env = dict(os.environ, PYTHONPATH=str(tmp_path))
     result = subprocess.run(

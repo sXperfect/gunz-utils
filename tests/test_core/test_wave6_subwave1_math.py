@@ -1,8 +1,14 @@
 """Tests for Wave 6 Sub-Wave 1: Numerical Primitives, Vector Math & Combinatorics."""
 
-import math
-import pytest
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 
+import math
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.math_utils import (
     clamp,
     cosine_similarity,

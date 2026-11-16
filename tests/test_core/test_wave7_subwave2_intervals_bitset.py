@@ -1,5 +1,9 @@
 """Tests for Wave 7 Sub-Wave 2: Range Queries, Interval Trees & Bitsets."""
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+
 from gunz_utils.bitset import BitSet
 from gunz_utils.intervals import Interval, IntervalTree
 
@@ -21,12 +25,12 @@ def test_interval_overlaps_and_tree():
 
     assert len(tree) == 3
 
-    # Overlaps with [18, 22)
+    #? Overlaps with [18, 22)
     overlaps = tree.find_overlapping((18.0, 22.0))
     datas = [x.data for x in overlaps]
     assert datas == ["A", "B"]
 
-    # Point query at 35.0
+    #? Point query at 35.0
     containing = tree.find_containing(35.0)
     assert len(containing) == 1
     assert containing[0].data == "C"
@@ -39,7 +43,7 @@ def test_bitset_operations():
 
     bs.set(5, True)
     bs.set(10, True)
-    bs.set(65, True)  # in 2nd 64-bit limb
+    bs.set(65, True)  #? in 2nd 64-bit limb
 
     assert bs.get(5)
     assert bs.get(10)
@@ -70,7 +74,7 @@ def test_bitset_algebra_and_serialization():
     bxor = b1 ^ b2
     assert bxor.popcount() == 2
 
-    # Serialization roundtrip
+    #? Serialization roundtrip
     raw = b1.to_bytes()
     restored = BitSet.from_bytes(raw, size=10)
     assert restored.popcount() == 2

@@ -154,11 +154,13 @@ def sanitize_filename(
     #? control characters to limit cache churn and string-allocation abuse.
     if len(replacement) > 16:
         raise ValueError("Replacement string is too long (max 16 chars)")
-    if any(ord(c) < 0x20 or ord(c) == 0x7F or 0x80 <= ord(c) <= 0x9F for c in replacement):
+    if any(ord(c) < 0x20 or ord(c) == 0x7F or 0x80 <=
+           ord(c) <= 0x9F for c in replacement):
         raise ValueError("Replacement string contains control characters")
 
     #? 2. Get base name to avoid directories/path traversal via slashes
-    # ? Normalize backslashes before getting basename to handle Windows separators uniformly
+    #? Normalize backslashes before getting basename to handle Windows separators
+    #? uniformly
     filename = os.path.basename(filename.replace("\\", "/"))
 
     #? 3. Replace dangerous characters
@@ -301,7 +303,11 @@ def open_path_under_base(
     #? them so O_NOFOLLOW can reject both intermediate and final components.
     relative = os.path.join(*paths) if paths else "."
     parts = Path(relative).parts
-    if not parts or parts == (".",) or any(part in ("..", ".") for part in parts) or any(not part for part in parts):
+    if not parts or parts == (
+    ".",) or any(
+        part in (
+            "..", ".") for part in parts) or any(
+                not part for part in parts):
         raise ValueError("path must identify a regular file under base directory")
 
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -503,7 +509,9 @@ def sanitize_path_segment(
     name: str,
     replacement: str = "_",
 ) -> str:
-    """Sanitize a single path segment, stripping separators, null bytes, and traversal tokens."""
+    """Sanitize a single path segment, stripping separators, null bytes, and traversal
+    tokens.
+    """
     if not isinstance(name, str):
         raise TypeError(f"expected str, got {type(name).__name__}")
     if "\0" in name:
@@ -545,7 +553,9 @@ def constant_time_equals(
     """Constant-time comparison wrapper preventing timing side-channel attacks."""
     a_bytes = a.encode("utf-8") if isinstance(a, str) else a
     b_bytes = b.encode("utf-8") if isinstance(b, str) else b
-    if not isinstance(a_bytes, (bytes, bytearray)) or not isinstance(b_bytes, (bytes, bytearray)):
+    if not isinstance(
+    a_bytes, (bytes, bytearray)) or not isinstance(
+        b_bytes, (bytes, bytearray)):
         raise TypeError("inputs must be str or bytes")
     return hmac.compare_digest(a_bytes, b_bytes)
 
@@ -564,7 +574,9 @@ def verify_no_symlink_escape(
     path: Path | str,
     base_dir: Path | str,
 ) -> bool:
-    """Return True if path resolves strictly within base_dir without escaping through symlinks."""
+    """Return True if path resolves strictly within base_dir without escaping through
+    symlinks.
+    """
     try:
         resolved_path = Path(path).resolve()
         resolved_base = Path(base_dir).resolve()

@@ -1,13 +1,23 @@
 """Tests for Wave 4 enhancements: plugins, serialization, and retry (#43–#56)."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import asyncio
 import tempfile
 import unittest
 from pathlib import Path
 
-from gunz_utils.plugins import GunzFileFinder, PluginInfo, PluginLoadResult, discover_plugins, load_module_from_path
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+from gunz_utils.plugins import (
+    GunzFileFinder,
+    PluginInfo,
+    load_module_from_path,
+)
 from gunz_utils.retry import (
-    RetryEvent,
     RetryExhaustedError,
     RetryPolicy,
     async_retry,
@@ -16,7 +26,6 @@ from gunz_utils.retry import (
     run_with_retry,
 )
 from gunz_utils.serialization import (
-    canonical_json,
     decode_json_object,
     json_dumps,
     json_loads,
@@ -27,16 +36,18 @@ from gunz_utils.serialization import (
 class TestWave4Plugins(unittest.TestCase):
     def test_item43_gunz_file_finder_prefix_independence(self) -> None:
         finder = GunzFileFinder()
-        # Non-registered module returns None
+        #? Non-registered module returns None
         self.assertIsNone(finder.find_spec("unregistered_mod_xyz_123"))
 
     def test_item44_load_module_from_path_cleanup_on_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bad_file = Path(tmpdir) / "broken_plugin.py"
-            bad_file.write_text("raise RuntimeError('broken on load')", encoding="utf-8")
+            bad_file.write_text(
+    "raise RuntimeError('broken on load')",
+     encoding="utf-8")
             with self.assertRaises(RuntimeError):
                 load_module_from_path(bad_file, prefix="test_broken_mod_item44")
-            # Should have cleaned up registration
+            #? Should have cleaned up registration
             finder = GunzFileFinder()
             self.assertIsNone(finder.find_spec("test_broken_mod_item44.broken_plugin"))
 
@@ -83,14 +94,20 @@ class TestWave4Serialization(unittest.TestCase):
 
     def test_item49_decode_json_object_bytes_like(self) -> None:
         data = b'{"hello": "world", "num": 42}'
-        self.assertEqual(decode_json_object(bytearray(data)), {"hello": "world", "num": 42})
-        self.assertEqual(decode_json_object(memoryview(data)), {"hello": "world", "num": 42})
+        self.assertEqual(
+    decode_json_object(
+        bytearray(data)), {
+            "hello": "world", "num": 42})
+        self.assertEqual(
+    decode_json_object(
+        memoryview(data)), {
+            "hello": "world", "num": 42})
 
     def test_item50_json_loads_bytes_like_and_bounds(self) -> None:
         data = b'{"key": [1, 2, 3]}'
         self.assertEqual(json_loads(bytearray(data)), {"key": [1, 2, 3]})
         self.assertEqual(json_loads(memoryview(data)), {"key": [1, 2, 3]})
-        # max_bytes bound
+        #? max_bytes bound
         with self.assertRaises(ValueError):
             json_loads(data, max_bytes=5)
 
@@ -101,7 +118,7 @@ class TestWave4Retry(unittest.TestCase):
             RetryPolicy(exceptions="ValueError")  # type: ignore[arg-type]
         with self.assertRaises(TypeError):
             RetryPolicy(jitter="yes")  # type: ignore[arg-type]
-        # Valid tuple normalization
+        #? Valid tuple normalization
         policy = RetryPolicy(exceptions=[ValueError, KeyError])
         self.assertIsInstance(policy.exceptions, tuple)
         self.assertEqual(policy.exceptions, (ValueError, KeyError))
@@ -136,13 +153,29 @@ class TestWave4Retry(unittest.TestCase):
 
     def test_item55_retry_exhausted_error_validation_and_export(self) -> None:
         with self.assertRaises(TypeError):
-            RetryExhaustedError("msg", attempts=True, total_delay=1.0, last_exception=ValueError())  # type: ignore[arg-type]
+            RetryExhaustedError(
+    "msg",
+    attempts=True,
+    total_delay=1.0,
+     last_exception=ValueError())  # type: ignore[arg-type]
         with self.assertRaises(ValueError):
-            RetryExhaustedError("msg", attempts=0, total_delay=1.0, last_exception=ValueError())
+            RetryExhaustedError(
+    "msg",
+    attempts=0,
+    total_delay=1.0,
+     last_exception=ValueError())
         with self.assertRaises(ValueError):
-            RetryExhaustedError("msg", attempts=1, total_delay=-0.5, last_exception=ValueError())
+            RetryExhaustedError(
+    "msg",
+    attempts=1,
+    total_delay=-0.5,
+     last_exception=ValueError())
 
-        err = RetryExhaustedError("attempts exhausted", attempts=3, total_delay=1.5, last_exception=ValueError("boom"))
+        err = RetryExhaustedError(
+    "attempts exhausted",
+    attempts=3,
+    total_delay=1.5,
+     last_exception=ValueError("boom"))
         self.assertIsInstance(err, RuntimeError)
         self.assertEqual(err.attempts, 3)
         self.assertEqual(err.total_delay, 1.5)

@@ -17,7 +17,9 @@ class TestBaseStrEnum(unittest.TestCase):
         class Color(BaseStrEnum):
             #? _ignore_ = ["ALIASES"] # No longer needed with __ALIASES__
             #? An enum maps its aliases as class-level data by design.
-            __ALIASES__ = {"dark": "dark_blue", "crimson": "red"}  # noqa: GS124
+            __ALIASES__ = {  # gunz-style: ignore[GS124]
+                "dark": "dark_blue", "crimson": "red"
+            }
             RED = "red"
             BLUE = "blue"
             DARK_BLUE = "dark_blue"
@@ -136,7 +138,9 @@ class TestBaseIntEnum(unittest.TestCase):
         class ErrorCode(BaseIntEnum):
             #? _ignore_ = ["ALIASES"]
             #? An enum maps its aliases as class-level data by design.
-            __ALIASES__ = {"missing": 404, "ok": 200, "NOT-HERE": 404}  # noqa: GS124
+            __ALIASES__ = {  # gunz-style: ignore[GS124]
+                "missing": 404, "ok": 200, "NOT-HERE": 404
+            }
             OK = 200
             NOT_FOUND = 404
             ONE = 1

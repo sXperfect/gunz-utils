@@ -1,4 +1,5 @@
-"""Prefix tree (Trie) for fast prefix searching, autocompletion, and key-value indexing."""
+"""Prefix tree (Trie) for fast prefix searching, autocompletion, and key-value indexing.
+"""
 
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
@@ -37,7 +38,8 @@ class Trie(Generic[T]):
         key: str,
     ) -> bool:
         """Return True if key exists in trie."""
-        return self.search(key) is not None or (self._find_node(key) is not None and self._find_node(key).is_terminal)  # type: ignore[union-attr]
+        return self.search(key) is not None or (self._find_node(
+            key) is not None and self._find_node(key).is_terminal)  # type: ignore[union-attr]
 
     def clear(self) -> None:
         """Reset the trie to empty."""
@@ -91,7 +93,12 @@ class Trie(Generic[T]):
         limit: int | None = None,
     ) -> list[str]:
         """Find all keys starting with prefix, optionally limited."""
-        if limit is not None and (isinstance(limit, bool) or not isinstance(limit, int) or limit < 0):
+        if limit is not None and (
+    isinstance(
+        limit,
+        bool) or not isinstance(
+            limit,
+             int) or limit < 0):
             raise ValueError("limit must be a non-negative integer or None")
         start_node = self._find_node(prefix)
         if start_node is None:

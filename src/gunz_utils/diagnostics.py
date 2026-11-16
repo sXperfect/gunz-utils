@@ -56,7 +56,9 @@ def exception_dict(
 def format_exception_summary(
     exc: BaseException,
 ) -> str:
-    """Format a compact one-line summary of an exception including type, message, and origin."""
+    """Format a compact one-line summary of an exception including type, message, and
+    origin.
+    """
     if not isinstance(exc, BaseException):
         raise TypeError(f"expected BaseException, got {type(exc).__name__}")
     tb = exc.__traceback__
@@ -96,7 +98,9 @@ def sanitize_traceback(
 def get_exception_chain(
     exc: BaseException,
 ) -> list[BaseException]:
-    """Traverse the cause and context chain of an exception safely, preventing infinite loops."""
+    """Traverse the cause and context chain of an exception safely, preventing infinite
+    loops.
+    """
     if not isinstance(exc, BaseException):
         raise TypeError(f"expected BaseException, got {type(exc).__name__}")
     chain: list[BaseException] = []

@@ -10,8 +10,8 @@ safe defaults, plus a strict boolean parser for validation boundaries.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 import math
+from collections.abc import Iterable
 from typing import Any
 
 # =============================================================================
@@ -39,7 +39,8 @@ _FALSE_STRINGS = frozenset({"0", "false", "f", "no", "n", "off"})
 def _stripped(
     value: Any,
 ) -> Any:
-    """Strip surrounding whitespace from strings, bytes, or bytearrays while preserving other types.
+    """Strip surrounding whitespace from strings, bytes, or bytearrays while preserving
+    other types.
 
     Parameters
     ----------
@@ -84,7 +85,10 @@ def safe_int(
     int or None
         Parsed integer, or ``default`` on failure.
     """
-    if isinstance(base, bool) or not isinstance(base, int) or not (base == 0 or 2 <= base <= 36):
+    if isinstance(
+    base, bool) or not isinstance(
+        base, int) or not (
+            base == 0 or 2 <= base <= 36):
         return default
     if min is not None and max is not None and min > max:
         return default
@@ -268,11 +272,13 @@ def parse_key_value_pairs(
         if not stripped:
             continue
         if kv_delimiter not in stripped:
-            raise ValueError(f"malformed key-value pair missing {kv_delimiter!r}: {stripped!r}")
+            raise ValueError(
+                f"malformed key-value pair missing {kv_delimiter!r}: {stripped!r}")
         key, val = stripped.split(kv_delimiter, 1)
         k = key.strip()
         v = val.strip()
-        if len(v) >= 2 and ((v[0] == '"' and v[-1] == '"') or (v[0] == "'" and v[-1] == "'")):
+        if len(v) >= 2 and ((v[0] == '"' and v[-1] == '"')
+               or (v[0] == "'" and v[-1] == "'")):
             v = v[1:-1]
         result[k] = v
     return result
@@ -307,7 +313,8 @@ def safe_list(
 def parse_int_exact(
     value: Any,
 ) -> int:
-    """Strictly parse an integer, rejecting booleans, floats, and non-integer representations.
+    """Strictly parse an integer, rejecting booleans, floats, and non-integer
+    representations.
 
     Parameters
     ----------

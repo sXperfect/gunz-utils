@@ -517,7 +517,9 @@ def check_property(
 
 
 class TemporaryEnvironment:
-    """Context manager temporarily setting, modifying, or clearing environment variables."""
+    """Context manager temporarily setting, modifying, or clearing environment
+    variables.
+    """
 
     def __init__(self,
         **kwargs: str | None,

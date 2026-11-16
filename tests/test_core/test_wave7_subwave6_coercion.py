@@ -1,8 +1,19 @@
 """Tests for Wave 7 Sub-Wave 6: Dynamic Schema Coercion & Type Normalization."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from pathlib import Path
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import pytest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.coercion import (
     CoercionError,
     coerce_bool,
@@ -11,7 +22,6 @@ from gunz_utils.coercion import (
     coerce_mapping,
     coerce_path,
     coerce_sequence,
-    coerce_type,
     format_coercion_error,
 )
 
@@ -27,11 +37,11 @@ def test_coerce_primitives():
     assert coerce_int("42") == 42
     assert coerce_int(42.0) == 42
     with pytest.raises(CoercionError):
-        coerce_int(True)  # rejects bool as int
+        coerce_int(True)  #? rejects bool as int
 
     assert coerce_float("3.14") == 3.14
     with pytest.raises(CoercionError):
-        coerce_float("nan")  # rejects nan by default
+        coerce_float("nan")  #? rejects nan by default
 
     assert coerce_path("/tmp/test") == Path("/tmp/test")
 

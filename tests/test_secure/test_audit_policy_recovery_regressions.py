@@ -156,9 +156,11 @@ class _RotationFailureConnection:
             raise sqlite3.OperationalError("secondary rollback failure")
         if sql == "COMMIT":
             if self.durable_commit:
-                self.conn.execute(sql)
+                #? Forward a fixed transaction statement from the code under test.
+                self.conn.execute(sql)  # gunz-style: ignore[GS250]
             raise sqlite3.OperationalError("original commit failure")
-        return self.conn.execute(sql, *args)
+        #? Fault-injection proxy preserves the caller's SQL and bound parameters.
+        return self.conn.execute(sql, *args)  # gunz-style: ignore[GS250]
 
     def executemany(self,
         sql: str,
@@ -166,7 +168,7 @@ class _RotationFailureConnection:
     ) -> Any:
         if self.fail_body:
             raise sqlite3.OperationalError("original body failure")
-        return self.conn.executemany(sql, values)
+        return self.conn.executemany(sql, values)  # gunz-style: ignore[GS250]
 
 
 @pytest.mark.parametrize(

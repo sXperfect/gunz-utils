@@ -35,7 +35,9 @@ class ConfigValue(Generic[T]):
 
 
 class LayeredConfig:
-    """Multi-layer hierarchical configuration combining defaults, config files, and overrides."""
+    """Multi-layer hierarchical configuration combining defaults, config files, and
+    overrides.
+    """
 
     def __init__(self,
         layers: Sequence[tuple[str, Mapping[str, Any]]] | None = None,
@@ -53,7 +55,8 @@ class LayeredConfig:
         if not isinstance(name, str) or not name.strip():
             raise ValueError("layer name must be a non-empty string")
         if not isinstance(mapping, Mapping):
-            raise TypeError(f"layer mapping must be a Mapping, got {type(mapping).__name__}")
+            raise TypeError(
+                f"layer mapping must be a Mapping, got {type(mapping).__name__}")
         self._layers.append((name, dict(mapping)))
 
     @property
@@ -65,7 +68,9 @@ class LayeredConfig:
         path: str | Sequence[str | int],
         default: Any = None,
     ) -> Any:
-        """Retrieve a value by dotted-path from the highest-precedence layer that defines it."""
+        """Retrieve a value by dotted-path from the highest-precedence layer that
+        defines it.
+        """
         try:
             return self[path]
         except KeyError:
@@ -79,7 +84,11 @@ class LayeredConfig:
                 return deep_get(mapping, path)
             except KeyError:
                 continue
-        raise KeyError(path if isinstance(path, str) else ".".join(str(p) for p in path))
+        raise KeyError(
+    path if isinstance(
+        path,
+        str) else ".".join(
+            str(p) for p in path))
 
     def __contains__(self,
         path: str | Sequence[str | int],
@@ -95,7 +104,9 @@ class LayeredConfig:
     def get_provenance(self,
         path: str | Sequence[str | int],
     ) -> ConfigValue[Any] | None:
-        """Return a ConfigValue containing the value and source layer name that supplied it."""
+        """Return a ConfigValue containing the value and source layer name that supplied
+        it.
+        """
         for name, mapping in reversed(self._layers):
             try:
                 val = deep_get(mapping, path)
@@ -105,7 +116,8 @@ class LayeredConfig:
         return None
 
     def to_dict(self) -> dict[str, Any]:
-        """Merge all layers from lowest to highest precedence into a single dictionary."""
+        """Merge all layers from lowest to highest precedence into a single dictionary.
+        """
         result: dict[str, Any] = {}
         for _, mapping in self._layers:
             result = deep_merge(result, mapping)

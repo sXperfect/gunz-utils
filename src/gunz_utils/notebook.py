@@ -102,7 +102,8 @@ def _enable_autoreload() -> None:
 
 
 def is_notebook() -> bool:
-    """Return True if currently executing within an IPython or Jupyter notebook shell."""
+    """Return True if currently executing within an IPython or Jupyter notebook shell.
+    """
     if get_ipython is None:
         return False
     try:

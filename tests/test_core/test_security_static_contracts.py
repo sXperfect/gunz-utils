@@ -25,8 +25,10 @@ _BANNED_CALLS = {
 }
 
 
-@functools.lru_cache(maxsize=None)
-def _parsed_file(path: Path) -> tuple[str, ast.AST]:
+@functools.cache
+def _parsed_file(
+    path: Path,
+) -> tuple[str, ast.AST]:
     text = path.read_text(encoding="utf-8")
     return text, ast.parse(text, filename=str(path))
 

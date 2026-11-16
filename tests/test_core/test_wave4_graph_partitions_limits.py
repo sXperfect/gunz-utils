@@ -1,23 +1,27 @@
 """Tests for Wave 4: Provenance Graph, Partitions, Sampling, Limits, and Resources."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
-import asyncio
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
-from gunz_utils.faults import FailAfter, FaultSequence
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.instrumentation import Counter, Timer
 from gunz_utils.limits import BudgetExceededError, Limits, ResourceBudget
 from gunz_utils.partitions import (
     PartitionManifest,
-    assert_disjoint_partitions,
     partition_overlaps,
 )
 from gunz_utils.provenance_graph import ProvenanceGraph, ProvenanceNode
 from gunz_utils.resources import AsyncResourceGroup, ResourceGroup
-from gunz_utils.sampling import sample_named_items, stable_priority
+from gunz_utils.sampling import sample_named_items
 
 
 class TestProvenanceGraphWave4(unittest.TestCase):
@@ -26,7 +30,10 @@ class TestProvenanceGraphWave4(unittest.TestCase):
             yield "p1"
             yield "p2"
 
-        node = ProvenanceNode(identifier="child", kind="artifact", inputs=gen())  # type: ignore[arg-type]
+        node = ProvenanceNode(
+    identifier="child",
+    kind="artifact",
+     inputs=gen())  # type: ignore[arg-type]
         self.assertEqual(node.inputs, ("p1", "p2"))
 
     def test_add_validation_and_descendants_topo_order(self) -> None:
@@ -74,8 +81,10 @@ class TestPartitionsWave4(unittest.TestCase):
             self.assertEqual(loaded.fingerprint, manifest.fingerprint)
             self.assertEqual(loaded.partitions["train"], ("img1", "img2"))
 
-            # Corrupt the fingerprint
-            corrupted = file_path.read_text().replace(manifest.fingerprint, "corrupted_fp")
+            #? Corrupt the fingerprint
+            corrupted = file_path.read_text().replace(
+                manifest.fingerprint, "corrupted_fp"
+            )
             file_path.write_text(corrupted)
             with self.assertRaises(ValueError) as ctx:
                 PartitionManifest.load(file_path)
@@ -90,9 +99,11 @@ class TestSamplingWave4(unittest.TestCase):
     def test_sample_named_items_patterns_and_zero_limit(self) -> None:
         items = [("apple", 1), ("banana", 2), ("apricot", 3)]
         with self.assertRaises(TypeError):
-            sample_named_items(items, limit=2, include_patterns="app*")  # type: ignore[arg-type]
+            # type: ignore[arg-type]
+            sample_named_items(items, limit=2, include_patterns="app*")
         with self.assertRaises(TypeError):
-            sample_named_items(items, limit=2, exclude_patterns="app*")  # type: ignore[arg-type]
+            # type: ignore[arg-type]
+            sample_named_items(items, limit=2, exclude_patterns="app*")
 
         self.assertEqual(sample_named_items(items, limit=0), [])
         sampled = sample_named_items(items, limit=2, include_patterns=("ap*",))

@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import contextlib
-
-
-import asyncio
 import inspect
 import math
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, TypeVar
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+from .async_utils import cancel_and_wait
 
 T = TypeVar("T")
 
@@ -339,9 +343,9 @@ class LeaseHeartbeat:
         exc_tb: Any,
     ) -> None:
         if self._task is not None:
-            self._task.cancel()
-            with contextlib.suppress((asyncio.CancelledError, LeaseLostError)):
-                await self._task
+            await cancel_and_wait(self._task)
+            with contextlib.suppress(asyncio.CancelledError, LeaseLostError):
+                self._task.result()
 
 
 __all__ = [

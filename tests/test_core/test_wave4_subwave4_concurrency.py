@@ -1,9 +1,21 @@
 """Tests for Wave 4 Sub-Wave 4: Concurrency & Context (#40–#52)."""
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
 import time
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.concurrency import (
     AsyncWorkerPool,
     as_completed_limited,
@@ -14,12 +26,10 @@ from gunz_utils.concurrency import (
 from gunz_utils.context import (
     ExecutionContext,
     bind_context,
-    correlation_id,
     get_context,
     operation_context,
     validate_correlation_id,
 )
-
 
 # =============================================================================
 # #40–#47: Concurrency & Worker Pools
@@ -45,7 +55,9 @@ def test_async_worker_pool_lifecycle():
         active = 0
         peak_active = 0
 
-        async def worker(val: int):
+        async def worker(
+            val: int,
+        ):
             nonlocal active, peak_active
             active += 1
             if active > peak_active:
@@ -74,7 +86,9 @@ def test_async_worker_pool_context_manager():
     async def scenario():
         results = []
 
-        async def job(v: int):
+        async def job(
+            v: int,
+        ):
             await asyncio.sleep(0.01)
             results.append(v)
 
@@ -82,7 +96,7 @@ def test_async_worker_pool_context_manager():
             for i in range(3):
                 pool.submit(job, i)
 
-        # Context manager automatically joined on exit
+        #? Context manager automatically joined on exit
         assert sorted(results) == [0, 1, 2]
 
     asyncio.run(scenario())
@@ -90,7 +104,10 @@ def test_async_worker_pool_context_manager():
 
 def test_run_in_thread():
     async def scenario():
-        def blocking_calc(x: int, y: int) -> int:
+        def blocking_calc(
+            x: int,
+            y: int,
+        ) -> int:
             time.sleep(0.01)
             return x + y
 
@@ -102,17 +119,20 @@ def test_run_in_thread():
 
 def test_as_completed_limited():
     async def scenario():
-        async def work(val: int, delay: float):
+        async def work(
+            val: int,
+            delay: float,
+        ):
             await asyncio.sleep(delay)
             return val
 
-        # 3 tasks with different delays
+        #? 3 tasks with different delays
         coros = [work(1, 0.04), work(2, 0.01), work(3, 0.02)]
         results = []
         async for r in as_completed_limited(coros, limit=2):
             results.append(r)
 
-        # 2 completes first (0.01), then 3 (0.02), then 1 (0.04)
+        #? 2 completes first (0.01), then 3 (0.02), then 1 (0.04)
         assert results == [2, 3, 1]
 
     asyncio.run(scenario())
@@ -132,15 +152,15 @@ def test_bind_context_and_get_context():
         assert get_context("tenant") == "alpha"
         assert get_context()["request_id"] == "req-123"
 
-        # Nested scope override
+        #? Nested scope override
         with bind_context(tenant="beta"):
             assert get_context("tenant") == "beta"
             assert get_context("request_id") == "req-123"
 
-        # Restored after nested exit
+        #? Restored after nested exit
         assert get_context("tenant") == "alpha"
 
-    # Restored after outer exit
+    #? Restored after outer exit
     assert get_context("request_id") is None
 
 
@@ -154,7 +174,9 @@ def test_execution_context_container():
             assert ctx["user"] == "alice"
             assert "user" in ctx
             assert "missing" not in ctx
-            assert repr(ctx) == "ExecutionContext(correlation_id='cid-456', data={'user': 'alice'})"
+            assert repr(
+                ctx) == ("ExecutionContext(correlation_id='cid-456', "
+                    "data={'user': 'alice'})")
 
 
 def test_validate_correlation_id():

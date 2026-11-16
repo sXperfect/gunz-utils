@@ -185,7 +185,8 @@ class PriorityQueue(t.Generic[T]):
         item: T,
         priority: t.Any = None,
     ) -> None:
-        """Push an item into the queue with optional explicit priority (lowest pops first).
+        """Push an item into the queue with optional explicit priority (lowest pops
+        first).
 
         Raises
         ------
@@ -258,7 +259,7 @@ class BiMap(t.Generic[K, V], Mapping[K, V]):
             self._inverse = None
             if mapping_or_iterable is not None:
                 if isinstance(mapping_or_iterable, Mapping):
-                    items = mapping_or_iterable.items()
+                    items: Iterable[tuple[K, V]] = mapping_or_iterable.items()
                 else:
                     items = mapping_or_iterable
                 for k, v in items:
@@ -285,7 +286,8 @@ class BiMap(t.Generic[K, V], Mapping[K, V]):
         value: V,
     ) -> None:
         if value in self._backward and self._backward[value] != key:
-            raise ValueError(f"Value {value!r} is already mapped to key {self._backward[value]!r}")
+            raise ValueError(
+                f"Value {value!r} is already mapped to key {self._backward[value]!r}")
         if key in self._forward:
             del self._backward[self._forward[key]]
         self._forward[key] = value
@@ -339,7 +341,7 @@ def top_k(
     items: Iterable[T],
     k: int,
     *,
-    key: Callable[[T], Any] | None = None,
+    key: Callable[[T], t.Any] | None = None,
 ) -> list[T]:
     """Return the largest k values without sorting the complete input.
 
@@ -370,7 +372,7 @@ def bottom_k(
     items: Iterable[T],
     k: int,
     *,
-    key: Callable[[T], Any] | None = None,
+    key: Callable[[T], t.Any] | None = None,
 ) -> list[T]:
     """Return the smallest k values without sorting the complete input.
 
@@ -500,7 +502,7 @@ def retain_priority_and_recent(
 class DeepDifference:
     """One structural or scalar mismatch between nested Python values.
 
-    Attributes
+    Parameters
     ----------
     path : str
         Stable dotted/indexed path to the mismatch.
@@ -628,7 +630,11 @@ def deep_diff(
             or not math.isnan(left_value)
         ):
             return
-        if nan_equal and isinstance(left_value, float) and isinstance(right_value, float):
+        if nan_equal and isinstance(
+    left_value,
+    float) and isinstance(
+        right_value,
+         float):
             if math.isnan(left_value) and math.isnan(right_value):
                 return
         pair = (id(left_value), id(right_value))

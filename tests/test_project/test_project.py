@@ -26,12 +26,14 @@ from gunz_utils.ext import project_gitpython as project_module
 
 class TestProject(unittest.TestCase):
     def setUp(self):
+        self.original_path = sys.path.copy()
         self.original_root = project_module._PROJECT_ROOT
         self.original_anchor = project_module._PROJECT_ANCHOR
         project_module._PROJECT_ROOT = None
         project_module._PROJECT_ANCHOR = None
 
     def tearDown(self):
+        sys.path[:] = self.original_path
         project_module._PROJECT_ROOT = self.original_root
         project_module._PROJECT_ANCHOR = self.original_anchor
 
@@ -58,6 +60,8 @@ class TestProject(unittest.TestCase):
 
     def test_resolve_project_root_injects_src(self):
         project_module._PROJECT_ROOT = None
+        root = resolve_project_root(inject_to_sys_path=False)
+        sys.path[:] = [p for p in sys.path if p not in {str(root), str(root / "src")}]
         root = resolve_project_root(inject_to_sys_path=True, src=True)
         self.assertIn(str(root), sys.path)
         self.assertIn(str(root / "src"), sys.path)
@@ -65,11 +69,11 @@ class TestProject(unittest.TestCase):
 
     def test_resolve_project_root_src_default_off(self):
         project_module._PROJECT_ROOT = None
-        original_path = sys.path.copy()
+        root = resolve_project_root(inject_to_sys_path=False)
+        sys.path[:] = [p for p in sys.path if p not in {str(root), str(root / "src")}]
         root = resolve_project_root(inject_to_sys_path=True)
         self.assertIn(str(root), sys.path)
         self.assertNotIn(str(root / "src"), sys.path)
-        sys.path[:] = original_path
 
     def test_resolve_project_root_injects_subpaths(self):
         project_module._PROJECT_ROOT = None

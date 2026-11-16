@@ -1,13 +1,24 @@
 """Tests for Wave 4 Sub-Wave 7: Sampling, Faults & Diagnostics (#78–#89)."""
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
 import io
 import random
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.diagnostics import (
     capture_system_diagnostics,
-    exception_dict,
     format_exception_summary,
     get_exception_chain,
     sanitize_traceback,
@@ -24,7 +35,6 @@ from gunz_utils.sampling import (
     reservoir_sample,
 )
 
-
 # =============================================================================
 # #78–#81: Sampling helpers
 # =============================================================================
@@ -36,7 +46,7 @@ def test_reservoir_sample():
     assert len(sample) == 5
     assert all(x in range(100) for x in sample)
 
-    # Stream smaller than k returns full stream
+    #? Stream smaller than k returns full stream
     assert reservoir_sample([1, 2, 3], 10) == [1, 2, 3]
 
     with pytest.raises(ValueError, match="positive integer"):
@@ -49,13 +59,13 @@ def test_bernoulli_sample():
     items = list(range(100))
     rng = random.Random(42)
 
-    # p = 0.0 yields nothing
+    #? p = 0.0 yields nothing
     assert list(bernoulli_sample(items, 0.0, rng=rng)) == []
 
-    # p = 1.0 yields everything
+    #? p = 1.0 yields everything
     assert list(bernoulli_sample(items, 1.0, rng=rng)) == items
 
-    # p = 0.5 yields roughly half
+    #? p = 0.5 yields roughly half
     sampled = list(bernoulli_sample(items, 0.5, rng=rng))
     assert 20 < len(sampled) < 80
 
@@ -67,7 +77,7 @@ def test_hash_sample_fraction():
     assert hash_sample_fraction("item1", 0.0) is False
     assert hash_sample_fraction("item1", 1.0) is True
 
-    # Same item with same fraction and seed is deterministic
+    #? Same item with same fraction and seed is deterministic
     res1 = hash_sample_fraction("user-12345", 0.5, seed=10)
     res2 = hash_sample_fraction("user-12345", 0.5, seed=10)
     assert res1 == res2
@@ -93,32 +103,32 @@ def test_corrupting_writer():
     target = io.BytesIO()
     writer = CorruptingWriter(target, corrupt_every_n_bytes=4)
 
-    # Write 8 bytes
+    #? Write 8 bytes
     data = b"12345678"
     written = writer.write(data)
     assert written == 8
 
     res = target.getvalue()
     assert len(res) == 8
-    # Bytes 0..2 unchanged: '1', '2', '3'
+    #? Bytes 0..2 unchanged: '1', '2', '3'
     assert res[:3] == b"123"
-    # Byte 3 corrupted
+    #? Byte 3 corrupted
     assert res[3] != ord("4")
-    # Bytes 4..6 unchanged: '5', '6', '7'
+    #? Bytes 4..6 unchanged: '5', '6', '7'
     assert res[4:7] == b"567"
-    # Byte 7 corrupted
+    #? Byte 7 corrupted
     assert res[7] != ord("8")
 
 
 def test_fail_after_reset():
     fault = FailAfter(successes=1, exception_factory=lambda: InjectedFault("boom"))
-    fault()  # call 1: ok
+    fault()  #? call 1: ok
     with pytest.raises(InjectedFault):
-        fault()  # call 2: raises
+        fault()  #? call 2: raises
 
     fault.reset()
     assert fault.calls == 0
-    fault()  # call 1 again after reset: ok
+    fault()  #? call 1 again after reset: ok
 
 
 # =============================================================================
@@ -144,7 +154,8 @@ def test_capture_system_diagnostics():
 
 
 def test_sanitize_traceback():
-    raw_tb = "Traceback (most recent call last):\n  File 'app.py', line 10\n    api_key = 'sk_live_secret12345'\nValueError: bad"
+    raw_tb = ("Traceback (most recent call last):\n  File 'app.py', line "
+        "10\n    api_key = 'sk_live_secret12345'\nValueError: bad")
     clean = sanitize_traceback(raw_tb)
     assert "Traceback" in clean
     assert "api_key" in clean
@@ -156,9 +167,9 @@ def test_get_exception_chain_cycle_safe():
     e1 = ValueError("e1")
     e2 = RuntimeError("e2")
     e1.__cause__ = e2
-    # Create cycle
+    #? Create cycle
     e2.__cause__ = e1
 
     chain = get_exception_chain(e1)
-    # Must terminate without infinite loop
+    #? Must terminate without infinite loop
     assert chain == [e1, e2]

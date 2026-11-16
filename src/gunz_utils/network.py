@@ -140,7 +140,8 @@ def build_network_uri(
         raise TypeError("path must be a string")
     if query is not None:
         if isinstance(query, (str, bytes, bytearray)):
-            raise TypeError("query must be a Mapping or Sequence of pairs, not a string")
+            raise TypeError(
+                "query must be a Mapping or Sequence of pairs, not a string")
         if not isinstance(query, (Mapping, Sequence)):
             raise TypeError("query must be a Mapping or Sequence of pairs")
 
@@ -332,7 +333,9 @@ def parse_network_uri(
 def is_public_ip(
     address: str,
 ) -> bool:
-    """Return True if an IP address is globally routable (not private, loopback, or reserved)."""
+    """Return True if an IP address is globally routable (not private, loopback, or
+    reserved).
+    """
     try:
         return not _is_non_public_address(address)
     except ValueError:
@@ -374,7 +377,12 @@ def sanitize_uri(
     else:
         redacted_userinfo = replacement
     new_netloc = f"{redacted_userinfo}@{host}"
-    return urlunsplit((parts.scheme, new_netloc, parts.path, parts.query, parts.fragment))
+    return urlunsplit(
+    (parts.scheme,
+    new_netloc,
+    parts.path,
+    parts.query,
+     parts.fragment))
 
 
 __all__ = [

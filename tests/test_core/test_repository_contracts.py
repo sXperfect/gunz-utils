@@ -30,7 +30,7 @@ README = PROJECT_ROOT / "README.md"
 INSTALLATION = PROJECT_ROOT / "docs" / "source" / "installation.md"
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _declares_public_all(
     path: Path,
 ) -> bool:

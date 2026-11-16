@@ -175,7 +175,8 @@ def load_result_checked(
         <= normalized_stats["median"]
         <= normalized_stats["maximum"]
     ):
-        raise ValueError("stats minimum, median, and maximum ordering invariant violated")
+        raise ValueError(
+            "stats minimum, median, and maximum ordering invariant violated")
     if not (
         normalized_stats["minimum"]
         <= normalized_stats["p95"]

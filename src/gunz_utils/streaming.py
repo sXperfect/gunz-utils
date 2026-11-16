@@ -60,7 +60,9 @@ def _iter_jsonl_gen(
             line = handle.readline(max_line_length + 1)
             if not line:
                 break
-            if len(line) > max_line_length or (not line.endswith("\n") and bool(handle.readline(1))):
+            if len(line) > max_line_length or (
+    not line.endswith("\n") and bool(
+        handle.readline(1))):
                 raise ValueError(
                     f"JSON Lines record exceeds maximum line length ({max_line_length})"
                 )
@@ -639,7 +641,11 @@ class AsyncStreamBuffer:
     def __init__(self,
         max_bytes: int = 0,
     ) -> None:
-        if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0:
+        if isinstance(
+    max_bytes,
+    bool) or not isinstance(
+        max_bytes,
+         int) or max_bytes < 0:
             raise ValueError("max_bytes must be a non-negative integer")
         self.max_bytes = max_bytes
         self._buffer = bytearray()
@@ -731,7 +737,8 @@ class AsyncDelimitedReader:
                 return res
 
             if max_bytes is not None and len(self._buffer) >= max_bytes:
-                raise ValueError(f"delimiter not found within max_bytes limit ({max_bytes})")
+                raise ValueError(
+                    f"delimiter not found within max_bytes limit ({max_bytes})")
 
             chunk = await self.stream.read(4096)
             if not chunk:

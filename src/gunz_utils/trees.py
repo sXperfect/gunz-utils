@@ -1,5 +1,9 @@
 """Generic n-ary tree structures, lowest common ancestors, and hierarchy algorithms."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 from collections import deque
@@ -21,7 +25,9 @@ class TreeNode(Generic[T]):
     def __hash__(self) -> int:
         return id(self)
 
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self,
+        other: object,
+    ) -> bool:
         return self is other
 
     @property
@@ -44,7 +50,9 @@ class TreeNode(Generic[T]):
             curr = curr.parent
         return d
 
-    def add_child(self, child: TreeNode[T] | T) -> TreeNode[T]:
+    def add_child(self,
+        child: TreeNode[T] | T,
+    ) -> TreeNode[T]:
         """Add child to this node and set child's parent pointer."""
         if not isinstance(child, TreeNode):
             node = TreeNode(value=child, parent=self)
@@ -54,7 +62,9 @@ class TreeNode(Generic[T]):
         self.children.append(node)
         return node
 
-    def remove_child(self, child: TreeNode[T]) -> bool:
+    def remove_child(self,
+        child: TreeNode[T],
+    ) -> bool:
         """Remove child from this node. Returns True if removed."""
         if child in self.children:
             self.children.remove(child)
@@ -63,21 +73,27 @@ class TreeNode(Generic[T]):
         return False
 
 
-def tree_preorder(root: TreeNode[T]) -> Iterator[TreeNode[T]]:
+def tree_preorder(
+    root: TreeNode[T],
+) -> Iterator[TreeNode[T]]:
     """Yield tree nodes in preorder (parent before children)."""
     yield root
     for child in root.children:
         yield from tree_preorder(child)
 
 
-def tree_postorder(root: TreeNode[T]) -> Iterator[TreeNode[T]]:
+def tree_postorder(
+    root: TreeNode[T],
+) -> Iterator[TreeNode[T]]:
     """Yield tree nodes in postorder (children before parent)."""
     for child in root.children:
         yield from tree_postorder(child)
     yield root
 
 
-def tree_level_order(root: TreeNode[T]) -> Iterator[TreeNode[T]]:
+def tree_level_order(
+    root: TreeNode[T],
+) -> Iterator[TreeNode[T]]:
     """Yield tree nodes in breadth-first level order."""
     queue = deque([root])
     while queue:
@@ -86,14 +102,18 @@ def tree_level_order(root: TreeNode[T]) -> Iterator[TreeNode[T]]:
         queue.extend(curr.children)
 
 
-def tree_height(node: TreeNode[T]) -> int:
+def tree_height(
+    node: TreeNode[T],
+) -> int:
     """Return maximum height of subtree (0 for a leaf)."""
     if node.is_leaf:
         return 0
     return 1 + max(tree_height(child) for child in node.children)
 
 
-def tree_size(node: TreeNode[T]) -> int:
+def tree_size(
+    node: TreeNode[T],
+) -> int:
     """Return the total number of nodes in the subtree rooted at node."""
     return 1 + sum(tree_size(child) for child in node.children)
 
@@ -118,7 +138,9 @@ def lowest_common_ancestor(
     return None
 
 
-def tree_to_dict(root: TreeNode[T]) -> dict[str, Any]:
+def tree_to_dict(
+    root: TreeNode[T],
+) -> dict[str, Any]:
     """Serialize tree structure into a nested dictionary."""
     return {
         "value": root.value,
@@ -126,7 +148,9 @@ def tree_to_dict(root: TreeNode[T]) -> dict[str, Any]:
     }
 
 
-def tree_from_dict(d: dict[str, Any]) -> TreeNode[Any]:
+def tree_from_dict(
+    d: dict[str, Any],
+) -> TreeNode[Any]:
     """Deserialize a nested dictionary into a TreeNode hierarchy."""
     node = TreeNode(value=d.get("value"))
     for child_dict in d.get("children", []):

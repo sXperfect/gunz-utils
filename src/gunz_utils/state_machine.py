@@ -1,4 +1,6 @@
-"""Declarative finite state machine with guards, lifecycle hooks, and transition history."""
+"""Declarative finite state machine with guards, lifecycle hooks, and transition
+history.
+"""
 
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
@@ -94,7 +96,7 @@ class StateMachine:
         if not isinstance(trigger, str) or not trigger:
             raise ValueError("trigger must be a non-empty string")
         if isinstance(source, str):
-            sources = (source,)
+            sources: tuple[str, ...] = (source,)
         else:
             sources = tuple(source)
             if not sources:

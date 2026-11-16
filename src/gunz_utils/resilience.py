@@ -7,12 +7,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
-from contextvars import ContextVar
-from enum import StrEnum
 import math
 import threading
 import time
+from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
+from enum import StrEnum
 from typing import Any, TypeVar
 
 T = TypeVar("T")
@@ -154,7 +154,8 @@ class AsyncCircuitBreaker:
                             self._opened_at = time.monotonic()
                             self._generation += 1
                             if self.on_state_change:
-                                self.on_state_change(CircuitState.HALF_OPEN, CircuitState.OPEN)
+                                self.on_state_change(
+    CircuitState.HALF_OPEN, CircuitState.OPEN)
                         elif (
                             self._generation == admitted_generation
                             and self._opened_at is None
@@ -164,7 +165,8 @@ class AsyncCircuitBreaker:
                                 self._opened_at = time.monotonic()
                                 self._generation += 1
                                 if self.on_state_change:
-                                    self.on_state_change(CircuitState.CLOSED, CircuitState.OPEN)
+                                    self.on_state_change(
+    CircuitState.CLOSED, CircuitState.OPEN)
 
                 if predicate_exc is not None:
                     raise predicate_exc from exc_val
@@ -174,7 +176,8 @@ class AsyncCircuitBreaker:
                         self._failures = 0
                         self._opened_at = None
                         if self.on_state_change:
-                            self.on_state_change(CircuitState.HALF_OPEN, CircuitState.CLOSED)
+                            self.on_state_change(
+    CircuitState.HALF_OPEN, CircuitState.CLOSED)
                     elif (
                         self._generation == admitted_generation
                         and self._opened_at is None
@@ -389,18 +392,24 @@ class CircuitBreaker:
                             self._opened_at = time.monotonic()
                             self._generation += 1
                             if self.on_state_change:
-                                self.on_state_change(CircuitState.HALF_OPEN, CircuitState.OPEN)
-                        elif self._failures >= self.failure_threshold and self._opened_at is None:
+                                self.on_state_change(
+    CircuitState.HALF_OPEN, CircuitState.OPEN)
+                        elif (
+                            self._failures >= self.failure_threshold
+                            and self._opened_at is None
+                        ):
                             self._opened_at = time.monotonic()
                             self._generation += 1
                             if self.on_state_change:
-                                self.on_state_change(CircuitState.CLOSED, CircuitState.OPEN)
+                                self.on_state_change(
+    CircuitState.CLOSED, CircuitState.OPEN)
                 else:
                     if was_half_open:
                         self._failures = 0
                         self._opened_at = None
                         if self.on_state_change:
-                            self.on_state_change(CircuitState.HALF_OPEN, CircuitState.CLOSED)
+                            self.on_state_change(
+    CircuitState.HALF_OPEN, CircuitState.CLOSED)
                     elif self._opened_at is None:
                         self._failures = 0
             finally:
@@ -425,7 +434,11 @@ class Bulkhead:
     ) -> None:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
             raise ValueError("limit must be a positive integer")
-        if isinstance(max_queue, bool) or not isinstance(max_queue, int) or max_queue < 0:
+        if isinstance(
+    max_queue,
+    bool) or not isinstance(
+        max_queue,
+         int) or max_queue < 0:
             raise ValueError("max_queue must be a non-negative integer")
         self.limit = limit
         self.max_queue = max_queue
@@ -474,7 +487,8 @@ class Bulkhead:
         ):
             raise ValueError("timeout must be a finite non-negative number or None")
 
-        acquired = self._semaphore.acquire(timeout=timeout if timeout is not None else -1)
+        acquired = self._semaphore.acquire(
+    timeout=timeout if timeout is not None else -1)
         if not acquired:
             raise TimeoutError("bulkhead acquisition timed out")
 

@@ -1,5 +1,9 @@
 """Tests for Wave 6: text processing, upstreams, and subprocess (#71–#83)."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import asyncio
@@ -7,34 +11,42 @@ import re
 import sys
 import unittest
 
-from gunz_utils.subprocess import CommandError, CommandResult, run_command, run_command_async
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+from gunz_utils.subprocess import (
+    run_command,
+    run_command_async,
+)
 from gunz_utils.text import (
     blank_spans,
     deduplicate_spans,
     slugify,
-    strip_problematic_chars,
     truncate_text,
     word_pattern,
 )
 from gunz_utils.upstream_protocol import (
-    BaseUpstream,
     PolicyUpstream,
-    UpstreamClient,
     UpstreamError,
-    UpstreamTimeoutError,
     UpstreamUnavailableError,
 )
 
 
 class MockUpstreamClient:
-    def __init__(self, name: str = "mock_service") -> None:
+    def __init__(self,
+        name: str = "mock_service",
+    ) -> None:
         self.name = name
         self.closed = False
         self.healthy = True
 
-    async def call(self, tool_name: str, arguments: dict) -> dict:
+    async def call(self,
+        tool_name: str,
+        arguments: dict,
+    ) -> dict:
         if tool_name == "fail":
-            raise UpstreamUnavailableError("unavailable", upstream=self.name, tool_name=tool_name)
+            raise UpstreamUnavailableError(
+    "unavailable", upstream=self.name, tool_name=tool_name)
         if tool_name == "hang":
             await asyncio.sleep(10.0)
         return {"result": f"ok-{tool_name}"}
@@ -57,7 +69,7 @@ class TestWave6Text(unittest.TestCase):
         with self.assertRaises(TypeError):
             word_pattern("term", flags=True)  # type: ignore[arg-type]
 
-        # Multi-word whitespace normalization
+        #? Multi-word whitespace normalization
         p = word_pattern("sanity   check")
         self.assertIsNotNone(p.search("sanity check"))
         self.assertIsNotNone(p.search("sanity-check"))
@@ -86,7 +98,7 @@ class TestWave6Text(unittest.TestCase):
         self.assertEqual(res[0][2], "long")
 
     def test_item74_truncate_text_and_slugify(self) -> None:
-        # truncate_text
+        #? truncate_text
         with self.assertRaises(TypeError):
             truncate_text(123, 10)  # type: ignore[arg-type]
         with self.assertRaises(ValueError):
@@ -95,11 +107,13 @@ class TestWave6Text(unittest.TestCase):
         self.assertEqual(truncate_text("hello world", 8), "hello...")
         self.assertEqual(truncate_text("hello world", 2), "..")
 
-        # slugify
+        #? slugify
         with self.assertRaises(TypeError):
             slugify(123)  # type: ignore[arg-type]
         self.assertEqual(slugify("Hello, World! 123"), "hello-world-123")
-        self.assertEqual(slugify("  Multiple   Spaces  _ Here "), "multiple-spaces-_-here")
+        self.assertEqual(
+    slugify("  Multiple   Spaces  _ Here "),
+     "multiple-spaces-_-here")
 
 
 class TestWave6Upstream(unittest.IsolatedAsyncioTestCase):
@@ -109,7 +123,9 @@ class TestWave6Upstream(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             UpstreamError("msg", upstream="   ")
 
-        err = UpstreamError("failed with token=secret12345 in header", upstream="auth_srv")
+        err = UpstreamError(
+    "failed with token=secret12345 in header",
+     upstream="auth_srv")
         self.assertNotIn("secret12345", str(err))
         self.assertIn("[REDACTED]", str(err))
 

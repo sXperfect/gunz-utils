@@ -215,7 +215,8 @@ def json_loads(
     if isinstance(value, (bytes, bytearray, memoryview)):
         raw_bytes = bytes(memoryview(value).cast("B"))
         if len(raw_bytes) > max_bytes:
-            raise ValueError(f"payload size {len(raw_bytes)} exceeds max_bytes {max_bytes}")
+            raise ValueError(
+                f"payload size {len(raw_bytes)} exceeds max_bytes {max_bytes}")
         try:
             text = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as exc:

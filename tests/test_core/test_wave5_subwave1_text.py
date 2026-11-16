@@ -1,7 +1,18 @@
 """Tests for Wave 5 Sub-Wave 1: Text Analysis, String Metrics & Wrapping (#1–#13)."""
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.text import (
     camel_to_snake,
     damerau_levenshtein_distance,
@@ -26,7 +37,7 @@ def test_levenshtein_distance():
     assert levenshtein_distance("", "hello") == 5
     assert levenshtein_distance("hello", "") == 5
 
-    # max_distance early exit
+    #? max_distance early exit
     assert levenshtein_distance("kitten", "sitting", max_distance=1) == 2
     assert levenshtein_distance("kitten", "sitting", max_distance=5) == 3
 
@@ -37,7 +48,7 @@ def test_levenshtein_distance():
 
 
 def test_damerau_levenshtein_distance():
-    # Adjacent transposition is distance 1 in Damerau, but 2 in Levenshtein
+    #? Adjacent transposition is distance 1 in Damerau, but 2 in Levenshtein
     assert damerau_levenshtein_distance("ab", "ba") == 1
     assert levenshtein_distance("ab", "ba") == 2
 
@@ -50,11 +61,11 @@ def test_jaro_winkler_similarity():
     assert jaro_winkler_similarity("same", "same") == 1.0
     assert jaro_winkler_similarity("", "test") == 0.0
 
-    # High similarity with common prefix
+    #? High similarity with common prefix
     sim = jaro_winkler_similarity("martha", "marhta")
     assert 0.9 < sim < 1.0
 
-    # Completely different
+    #? Completely different
     assert jaro_winkler_similarity("abc", "xyz") == 0.0
 
     with pytest.raises(ValueError, match="prefix_weight"):
@@ -84,7 +95,7 @@ def test_truncate_and_word_boundary():
     assert truncate(text, 16) == "The quick bro..."
     assert truncate_text(text, 16) == "The quick bro..."
 
-    # Word boundary
+    #? Word boundary
     assert truncate(text, 16, word_boundary=True) == "The quick..."
     assert truncate(text, 100) == text
     assert truncate(text, 3) == "..."

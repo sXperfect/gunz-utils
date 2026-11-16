@@ -145,7 +145,8 @@ def deduplicate_spans(
     ordered = []
     for item in candidates:
         if len(item) != 3:
-            raise ValueError("each candidate span must be a 3-tuple (start, end, payload)")
+            raise ValueError(
+                "each candidate span must be a 3-tuple (start, end, payload)")
         start, end, payload = item
         if isinstance(start, bool) or not isinstance(start, int) or start < 0:
             raise ValueError("span start must be a non-negative integer")
@@ -197,7 +198,11 @@ def truncate(
     """
     if not isinstance(text, str):
         raise TypeError("text must be a str")
-    if isinstance(max_length, bool) or not isinstance(max_length, int) or max_length < 0:
+    if isinstance(
+    max_length,
+    bool) or not isinstance(
+        max_length,
+         int) or max_length < 0:
         raise ValueError("max_length must be a non-negative integer")
     if not isinstance(suffix, str):
         raise TypeError("suffix must be a str")
@@ -223,7 +228,8 @@ def truncate_text(
     *,
     suffix: str = "...",
 ) -> str:
-    """Truncate text to max_length, appending suffix if truncated. Alias for truncate."""
+    """Truncate text to max_length, appending suffix if truncated. Alias for truncate.
+    """
     return truncate(text, max_length, suffix=suffix, word_boundary=False)
 
 
@@ -279,7 +285,11 @@ def levenshtein_distance(
     if not isinstance(a, str) or not isinstance(b, str):
         raise TypeError("inputs must be strings")
     if max_distance is not None:
-        if isinstance(max_distance, bool) or not isinstance(max_distance, int) or max_distance < 0:
+        if isinstance(
+    max_distance,
+    bool) or not isinstance(
+        max_distance,
+         int) or max_distance < 0:
             raise ValueError("max_distance must be a non-negative integer or None")
 
     if a == b:
@@ -348,7 +358,7 @@ def damerau_levenshtein_distance(
         db = 0
         for j in range(1, len_b + 1):
             k = da.get(b[j - 1], 0)
-            l = db
+            previous_match = db
             cost = 0 if a[i - 1] == b[j - 1] else 1
             if cost == 0:
                 db = j
@@ -357,7 +367,7 @@ def damerau_levenshtein_distance(
                 d[i][j + 1] + 1,
                 d[i + 1][j] + 1,
                 d[i][j] + cost,
-                d[k][l] + (i - k - 1) + 1 + (j - l - 1),
+                d[k][previous_match] + (i - k - 1) + 1 + (j - previous_match - 1),
             )
         da[a[i - 1]] = i
 
@@ -439,7 +449,9 @@ def hamming_distance(
     a: str | bytes,
     b: str | bytes,
 ) -> int:
-    """Calculate the Hamming distance between two equal-length strings or byte sequences."""
+    """Calculate the Hamming distance between two equal-length strings or byte
+    sequences.
+    """
     if not isinstance(a, (str, bytes)) or not isinstance(b, (str, bytes)):
         raise TypeError("inputs must be both strings or both bytes")
     if type(a) is not type(b):

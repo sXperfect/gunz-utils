@@ -62,6 +62,18 @@ this scoped review re-audited the entire repository.
 
 ## Audited algorithm set
 
+### ALG-056 and numerical utility follow-up, 2026-11-15
+
+The follow-up in [verification fixes](2026-11-15-verification-fixes.md) covers
+owned-task cleanup in `async_utils.gather_with_concurrency`, throttle startup and
+failure behavior, process metric integration and scaled vector calculations.
+Focused tests cover parameter boundaries, worker/caller failure, cleanup, order
+and scale invariance against independent expected results. Scheduler storage
+remains O(n), active work is bounded by the configured limit, and vector
+reductions remain O(n). Evidence is A3: both Python versions, native/fallback
+tests, docs and packaging checks pass, but strict style still fails on advisory
+warnings. No A4 promotion is claimed.
+
 ### ALG-056 lazy async cleanup follow-up, 2026-11-15
 
 The [bounded async cleanup review](2026-11-15-async-cleanup.md) records a focused

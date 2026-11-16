@@ -1,16 +1,24 @@
-"""Memory-efficient chunk pools, sliding byte buffers, and non-contiguous byte streams."""
+"""Memory-efficient chunk pools, sliding byte buffers, and non-contiguous byte streams.
+"""
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 
 class MemoryChunkPool:
     """Pre-allocated pool of reusable bytearrays to minimize GC overhead."""
 
-    def __init__(self, chunk_size: int = 65536, max_chunks: int = 16) -> None:
+    def __init__(self,
+        chunk_size: int = 65536,
+        max_chunks: int = 16,
+    ) -> None:
         if chunk_size < 1 or max_chunks < 1:
             raise ValueError("chunk_size and max_chunks must be positive integers")
         self.chunk_size = chunk_size
@@ -25,10 +33,12 @@ class MemoryChunkPool:
                 return self._pool.pop()
         return bytearray(self.chunk_size)
 
-    def release(self, chunk: bytearray) -> None:
+    def release(self,
+        chunk: bytearray,
+    ) -> None:
         """Return a chunk to the pool."""
         if len(chunk) != self.chunk_size:
-            return  # wrong size, discard
+            return  #? wrong size, discard
         with self._lock:
             if len(self._pool) < self.max_chunks:
                 self._pool.append(chunk)
@@ -46,7 +56,9 @@ class MemoryChunkPool:
 class SlidingByteBuffer:
     """Sliding-window byte buffer for stream parsing and pattern lookahead."""
 
-    def __init__(self, capacity: int = 65536) -> None:
+    def __init__(self,
+        capacity: int = 65536,
+    ) -> None:
         if capacity < 1:
             raise ValueError("capacity must be a positive integer")
         self.capacity = capacity
@@ -57,7 +69,9 @@ class SlidingByteBuffer:
         with self._lock:
             return len(self._buffer)
 
-    def write(self, data: bytes | bytearray | memoryview) -> int:
+    def write(self,
+        data: bytes | bytearray | memoryview,
+    ) -> int:
         """Append bytes to buffer. Raises BufferError if capacity exceeded."""
         view = memoryview(data).cast("B")
         with self._lock:
@@ -66,7 +80,9 @@ class SlidingByteBuffer:
             self._buffer.extend(view)
         return len(view)
 
-    def read(self, n: int = -1) -> bytes:
+    def read(self,
+        n: int = -1,
+    ) -> bytes:
         """Consume and return up to n bytes from front of buffer."""
         with self._lock:
             if not self._buffer:
@@ -79,7 +95,9 @@ class SlidingByteBuffer:
             del self._buffer[:n]
             return res
 
-    def peek(self, n: int = -1) -> bytes:
+    def peek(self,
+        n: int = -1,
+    ) -> bytes:
         """Preview up to n bytes from front of buffer without consuming."""
         with self._lock:
             if not self._buffer:
@@ -88,16 +106,22 @@ class SlidingByteBuffer:
                 return bytes(self._buffer)
             return bytes(self._buffer[:n])
 
-    def find(self, sub: bytes) -> int:
+    def find(self,
+        sub: bytes,
+    ) -> int:
         """Return index of byte substring in buffer, or -1 if not found."""
         with self._lock:
             return self._buffer.find(sub)
 
 
 class ChunkedMemoryStream:
-    """Non-contiguous memory stream built on chunks avoiding massive continuous reallocations."""
+    """Non-contiguous memory stream built on chunks avoiding massive continuous
+    reallocations.
+    """
 
-    def __init__(self, chunk_size: int = 65536) -> None:
+    def __init__(self,
+        chunk_size: int = 65536,
+    ) -> None:
         if chunk_size < 1:
             raise ValueError("chunk_size must be a positive integer")
         self.chunk_size = chunk_size
@@ -105,7 +129,9 @@ class ChunkedMemoryStream:
         self._write_pos: int = 0
         self._read_pos: int = 0
 
-    def write(self, data: bytes | bytearray | memoryview) -> int:
+    def write(self,
+        data: bytes | bytearray | memoryview,
+    ) -> int:
         """Append data to the stream."""
         view = memoryview(data).cast("B")
         offset = 0
@@ -123,12 +149,15 @@ class ChunkedMemoryStream:
 
         return total
 
-    def read(self, n: int = -1) -> bytes:
+    def read(self,
+        n: int = -1,
+    ) -> bytes:
         """Read up to n bytes from the stream."""
         if n == 0 or self._read_pos >= self._write_pos:
             return b""
 
-        to_read = self._write_pos - self._read_pos if n < 0 else min(n, self._write_pos - self._read_pos)
+        to_read = self._write_pos - \
+            self._read_pos if n < 0 else min(n, self._write_pos - self._read_pos)
         out = bytearray(to_read)
         out_offset = 0
 
@@ -138,7 +167,8 @@ class ChunkedMemoryStream:
             chunk = self._chunks[chunk_idx]
             avail = len(chunk) - in_chunk_offset
             take = min(avail, to_read - out_offset)
-            out[out_offset : out_offset + take] = chunk[in_chunk_offset : in_chunk_offset + take]
+            out[out_offset : out_offset + \
+                take] = chunk[in_chunk_offset : in_chunk_offset + take]
             self._read_pos += take
             out_offset += take
 
@@ -152,7 +182,9 @@ class ChunkedMemoryStream:
         """Return current read position."""
         return self._read_pos
 
-    def seek(self, pos: int) -> int:
+    def seek(self,
+        pos: int,
+    ) -> int:
         """Set current read position."""
         if not (0 <= pos <= self._write_pos):
             raise ValueError(f"seek position {pos} out of range (0..{self._write_pos})")

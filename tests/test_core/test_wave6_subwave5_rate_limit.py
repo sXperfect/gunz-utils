@@ -1,7 +1,14 @@
 """Tests for Wave 6 Sub-Wave 5: Advanced Rate Limiting Algorithms."""
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+
 import pytest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.rate_limit import (
     BurstTokenBucket,
     LeakyBucket,
@@ -17,7 +24,7 @@ def test_leaky_bucket_acquire():
     assert bucket.acquire(1.0)
     assert not bucket.try_acquire(1.0)
 
-    # Reset
+    #? Reset
     bucket.reset()
     assert bucket.try_acquire(1.0)
 
@@ -31,7 +38,7 @@ def test_sliding_window_log():
     assert not sw.allow("user1")
     assert sw.remaining("user1") == 0
 
-    # Independent key
+    #? Independent key
     assert sw.allow("user2")
 
     sw.reset("user1")

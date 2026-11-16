@@ -21,7 +21,7 @@ def dot_product(
     """Compute the scalar dot product of two numerical vectors."""
     if len(u) != len(v):
         raise ValueError(f"vectors must have the same length: {len(u)} != {len(v)}")
-    return sum(a * b for a, b in zip(u, v))
+    return math.fsum(a * b for a, b in zip(u, v, strict=True))
 
 
 def vector_norm(
@@ -29,27 +29,32 @@ def vector_norm(
     p: float = 2.0,
 ) -> float:
     """Compute the Lp norm of a vector (default L2 Euclidean norm)."""
+    if math.isnan(p) or p <= 0:
+        raise ValueError("p norm must be positive or infinity")
     if not v:
         return 0.0
     if p == 2.0:
-        return math.sqrt(sum(x * x for x in v))
+        return math.hypot(*v)
     if p == 1.0:
-        return sum(abs(x) for x in v)
+        return math.fsum(abs(x) for x in v)
     if math.isinf(p) and p > 0:
         return max(abs(x) for x in v)
-    if p <= 0:
-        raise ValueError("p norm must be positive or infinity")
-    return sum(abs(x) ** p for x in v) ** (1.0 / p)
+    scale = max(abs(x) for x in v)
+    if scale == 0.0 or not math.isfinite(scale):
+        return scale
+    return float(scale * math.fsum((abs(x) / scale) ** p for x in v) ** (1.0 / p))
 
 
 def vector_normalize(
     v: Sequence[float],
 ) -> list[float]:
     """Normalize a vector to unit length (Euclidean L2 norm)."""
-    norm = vector_norm(v, p=2.0)
-    if norm == 0.0:
-        raise ValueError("cannot normalize a zero vector")
-    return [x / norm for x in v]
+    scale = max((abs(x) for x in v), default=0.0)
+    if scale == 0.0 or any(not math.isfinite(x) for x in v):
+        raise ValueError("cannot normalize a zero or non-finite vector")
+    scaled = [x / scale for x in v]
+    norm = math.hypot(*scaled)
+    return [x / norm for x in scaled]
 
 
 def cosine_similarity(
@@ -59,11 +64,13 @@ def cosine_similarity(
     """Compute the cosine similarity between two vectors in [-1.0, 1.0]."""
     if len(u) != len(v):
         raise ValueError(f"vectors must have the same length: {len(u)} != {len(v)}")
-    norm_u = vector_norm(u, 2.0)
-    norm_v = vector_norm(v, 2.0)
-    if norm_u == 0.0 or norm_v == 0.0:
+    if not any(u) or not any(v):
         return 0.0
-    sim = dot_product(u, v) / (norm_u * norm_v)
+    unit_u = vector_normalize(u)
+    unit_v = vector_normalize(v)
+    sim = math.fsum(
+        a * b for a, b in zip(unit_u, unit_v, strict=True)
+    )
     return max(-1.0, min(1.0, sim))
 
 
@@ -200,7 +207,10 @@ def powerset(
 ) -> Iterator[tuple[T, ...]]:
     """Generate all subsets of an iterable from length 0 to N."""
     s = list(iterable)
-    return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s) + 1))
+    return itertools.chain.from_iterable(
+    itertools.combinations(
+        s, r) for r in range(
+            len(s) + 1))
 
 
 __all__ = [

@@ -1,5 +1,9 @@
 """Lexical tokenization, cursor-based string scanning, and glob-to-regex compilation."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import re
@@ -10,7 +14,12 @@ from dataclasses import dataclass
 class TokenizerError(ValueError):
     """Raised when tokenization encounters an illegal character."""
 
-    def __init__(self, message: str, line: int, column: int, pos: int) -> None:
+    def __init__(self,
+        message: str,
+        line: int,
+        column: int,
+        pos: int,
+    ) -> None:
         super().__init__(f"{message} at line {line}, column {column} (pos {pos})")
         self.line = line
         self.column = column
@@ -34,14 +43,20 @@ class RegexTokenizer:
     def __init__(self) -> None:
         self.rules: list[tuple[str, re.Pattern[str]]] = []
 
-    def add_rule(self, token_type: str, pattern: str) -> RegexTokenizer:
+    def add_rule(self,
+        token_type: str,
+        pattern: str,
+    ) -> RegexTokenizer:
         """Register a token type with a regex pattern."""
         if not token_type or not isinstance(token_type, str):
             raise ValueError("token_type must be a non-empty string")
         self.rules.append((token_type, re.compile(pattern)))
         return self
 
-    def tokenize(self, text: str, skip_whitespace: bool = False) -> Iterator[Token]:
+    def tokenize(self,
+        text: str,
+        skip_whitespace: bool = False,
+    ) -> Iterator[Token]:
         """Yield tokens from input text."""
         pos = 0
         line = 1
@@ -72,7 +87,7 @@ class RegexTokenizer:
                         column=column,
                         span=(start_pos, end_pos),
                     )
-                    # Advance lines and columns
+                    #? Advance lines and columns
                     newline_count = val.count("\n")
                     if newline_count > 0:
                         line += newline_count
@@ -92,7 +107,9 @@ class RegexTokenizer:
 class StringScanner:
     """Cursor-based string scanner with lookahead and regex matching."""
 
-    def __init__(self, text: str) -> None:
+    def __init__(self,
+        text: str,
+    ) -> None:
         self.text = text
         self.pos = 0
 
@@ -100,11 +117,15 @@ class StringScanner:
         """Return True if cursor has reached end of string."""
         return self.pos >= len(self.text)
 
-    def peek(self, n: int = 1) -> str:
+    def peek(self,
+        n: int = 1,
+    ) -> str:
         """Preview next n characters without advancing cursor."""
         return self.text[self.pos : self.pos + n]
 
-    def scan(self, pattern: str | re.Pattern[str]) -> str | None:
+    def scan(self,
+        pattern: str | re.Pattern[str],
+    ) -> str | None:
         """Attempt to match regex at current position; advances cursor on match."""
         regex = re.compile(pattern) if isinstance(pattern, str) else pattern
         match = regex.match(self.text, self.pos)
@@ -122,14 +143,18 @@ class StringScanner:
             count += 1
         return count
 
-    def reset(self, pos: int = 0) -> None:
+    def reset(self,
+        pos: int = 0,
+    ) -> None:
         """Reset cursor to given position."""
         if not (0 <= pos <= len(self.text)):
             raise IndexError("position out of bounds")
         self.pos = pos
 
 
-def glob_to_regex(pattern: str) -> str:
+def glob_to_regex(
+    pattern: str,
+) -> str:
     """Convert Unix glob pattern to equivalent compiled regular expression string."""
     i = 0
     n = len(pattern)
@@ -139,7 +164,7 @@ def glob_to_regex(pattern: str) -> str:
         c = pattern[i]
         if c == "*":
             if i + 1 < n and pattern[i + 1] == "*":
-                # '**' matches across path segments
+                #? '**' matches across path segments
                 i += 2
                 if i < n and pattern[i] == "/":
                     i += 1
@@ -147,7 +172,7 @@ def glob_to_regex(pattern: str) -> str:
                 else:
                     res.append(".*")
             else:
-                # '*' matches within path segment
+                #? '*' matches within path segment
                 res.append("[^/]*")
                 i += 1
         elif c == "?":
@@ -178,7 +203,10 @@ def glob_to_regex(pattern: str) -> str:
     return "".join(res)
 
 
-def match_glob(text: str, pattern: str) -> bool:
+def match_glob(
+    text: str,
+    pattern: str,
+) -> bool:
     """Return True if text matches glob pattern."""
     regex = glob_to_regex(pattern)
     return bool(re.match(regex, text))

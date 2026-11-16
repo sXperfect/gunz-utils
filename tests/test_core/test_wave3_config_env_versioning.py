@@ -1,22 +1,29 @@
-"""Tests for Wave 3: Config, env, parsing, typed_config, deprecation, result, versioning, identifiers, models."""
+"""Tests for Wave 3: Config, env, parsing, typed_config, deprecation, result,
+versioning, identifiers, models.
+"""
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 
 from __future__ import annotations
 
 import asyncio
-from types import MappingProxyType
 import unittest
 import warnings
+from types import MappingProxyType
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.config import env_overrides, merge_configs
 from gunz_utils.deprecation import GunzDeprecationWarning, deprecated
 from gunz_utils.env import env, env_float, env_int, env_list
 from gunz_utils.identifiers import is_valid_uuid, short_id
 from gunz_utils.parsing import parse_bool, safe_float, safe_int
 from gunz_utils.result import Result
-from gunz_utils.sentinels import UNSET
 from gunz_utils.typed_config import ConfigValue, convert
 from gunz_utils.versioning import (
-    SchemaMigrationError,
     SchemaMigrator,
     VersionedEnvelope,
 )
@@ -32,7 +39,7 @@ class TestConfigWave3(unittest.TestCase):
         with self.assertRaises(TypeError):
             env_overrides("not_a_mapping", prefix="APP")  # type: ignore[arg-type]
 
-        # Case-insensitive collision
+        #? Case-insensitive collision
         environ = {
             "APP_DATABASE_URL": "postgres://localhost",
             "app_database_url": "mysql://localhost",
@@ -91,7 +98,8 @@ class TestEnvWave3(unittest.TestCase):
         os.environ.update({"TAGS": "  web , api, backend  "})
         try:
             self.assertEqual(env_list("TAGS"), ["web", "api", "backend"])
-            self.assertEqual(env_list("TAGS", strip=False), ["  web ", " api", " backend  "])
+            self.assertEqual(env_list("TAGS", strip=False), [
+                             "  web ", " api", " backend  "])
             self.assertEqual(env_list("MISSING_TAGS", default=["default"]), ["default"])
         finally:
             os.environ.clear()
@@ -106,7 +114,7 @@ class TestParsingWave3(unittest.TestCase):
 
     def test_safe_float_bounds_and_zero(self) -> None:
         self.assertIsNone(safe_float("1.0", min=5.0, max=2.0))
-        # -0.0 normalization
+        #? -0.0 normalization
         val = safe_float("-0.0")
         self.assertEqual(val, 0.0)
         self.assertFalse(str(val).startswith("-"))
@@ -140,7 +148,9 @@ class TestDeprecationWave3(unittest.IsolatedAsyncioTestCase):
             deprecated("old")("not_callable")  # type: ignore[arg-type]
 
         @deprecated("use new_func instead")
-        def old_func(x: int) -> int:
+        def old_func(
+            x: int,
+        ) -> int:
             return x + 1
 
         self.assertEqual(old_func.__deprecated__, "use new_func instead")
@@ -153,7 +163,9 @@ class TestDeprecationWave3(unittest.IsolatedAsyncioTestCase):
 
     async def test_deprecated_async_function(self) -> None:
         @deprecated("async func is old")
-        async def old_async(x: int) -> int:
+        async def old_async(
+            x: int,
+        ) -> int:
             await asyncio.sleep(0.001)
             return x * 2
 
@@ -192,19 +204,26 @@ class TestResultWave3(unittest.TestCase):
         self.assertEqual(err.unwrap_or_else(lambda e: len(e)), 9)
 
     def test_result_and_then(self) -> None:
-        def double_if_even(x: int) -> Result[int, str]:
+        def double_if_even(
+            x: int,
+        ) -> Result[int, str]:
             if x % 2 == 0:
                 return Result.ok(x * 2)
             return Result.err("odd number")
 
         self.assertEqual(Result.ok(4).and_then(double_if_even).unwrap(), 8)
-        self.assertEqual(Result.ok(3).and_then(double_if_even).unwrap_err(), "odd number")
-        self.assertEqual(Result.err("initial").and_then(double_if_even).unwrap_err(), "initial")
+        self.assertEqual(Result.ok(3).and_then(
+            double_if_even).unwrap_err(), "odd number")
+        self.assertEqual(Result.err("initial").and_then(
+            double_if_even).unwrap_err(), "initial")
 
 
 class TestVersioningWave3(unittest.TestCase):
     def test_versioned_envelope_metadata_mapping_proxy(self) -> None:
-        env = VersionedEnvelope(schema="user", version=1, payload={"name": "Alice"}, metadata={"tag": "v1"})
+        env = VersionedEnvelope(
+    schema="user", version=1, payload={
+        "name": "Alice"}, metadata={
+            "tag": "v1"})
         self.assertIsInstance(env.metadata, MappingProxyType)
         with self.assertRaises(TypeError):
             env.metadata["tag"] = "v2"  # type: ignore[index]
@@ -219,14 +238,18 @@ class TestVersioningWave3(unittest.TestCase):
         self.assertEqual(migrator.latest_version("user"), 3)
         self.assertIsNone(migrator.latest_version("unknown"))
 
-        envelope = VersionedEnvelope(schema="user", version=1, payload={"name": "Alice"})
+        envelope = VersionedEnvelope(
+    schema="user", version=1, payload={
+        "name": "Alice"})
         migrated = migrator.migrate(envelope, target_version=3)
         self.assertEqual(migrated.version, 3)
 
     def test_schema_migrator_exception_propagation(self) -> None:
         migrator = SchemaMigrator()
 
-        def broken_migration(payload):
+        def broken_migration(
+            payload,
+        ):
             raise KeyError("missing required key")
 
         migrator.register("doc", 1, broken_migration)

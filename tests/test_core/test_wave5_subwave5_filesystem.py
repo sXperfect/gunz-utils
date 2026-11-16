@@ -1,9 +1,17 @@
-"""Tests for Wave 5 Sub-Wave 5: Filesystem Operations, Advisory Locking & Temp Resources."""
+"""Tests for Wave 5 Sub-Wave 5: Filesystem Operations, Advisory Locking & Temp
+Resources.
+"""
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 
 import tempfile
 from pathlib import Path
-import pytest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.filesystem import (
     TemporaryDirectoryPool,
     advisory_file_lock,
@@ -32,7 +40,7 @@ def test_ensure_directory_and_touch_file():
         assert f.is_file()
         assert file_size_bytes(f) == 0
 
-        # update touch
+        #? update touch
         touch_file(f)
         assert f.is_file()
 
@@ -108,9 +116,9 @@ def test_temporary_directory_pool():
     with pool.acquire() as d1:
         assert d1.is_dir()
         (d1 / "test.txt").write_text("temp data")
-    # returned to pool
+    #? returned to pool
     with pool.acquire() as d2:
         assert d2.is_dir()
-        # verify cleaned
+        #? verify cleaned
         assert not (d2 / "test.txt").exists()
     pool.cleanup()

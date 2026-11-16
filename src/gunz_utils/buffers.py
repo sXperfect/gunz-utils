@@ -35,7 +35,8 @@ def as_readonly_view(
     try:
         view = memoryview(data)
     except TypeError as exc:
-        raise TypeError(f"expected a bytes-like object, got {type(data).__name__}") from exc
+        raise TypeError(
+            f"expected a bytes-like object, got {type(data).__name__}") from exc
     try:
         byte_view = view.cast("B")
     except (BufferError, TypeError, ValueError):

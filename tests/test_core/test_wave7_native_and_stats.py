@@ -1,14 +1,18 @@
 """Tests for Wave 7: Native acceleration, stats primitives, and varint encoding."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
-import math
 from unittest import TestCase
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.binary import (
     ByteReader,
-    decode_uvarint,
-    decode_zigzag,
     encode_uvarint,
     encode_uvarints,
     encode_zigzag,
@@ -86,7 +90,10 @@ class Wave7StatsPrimitivesTest(TestCase):
     def test_summary_stats_iqr(self) -> None:
         stats = summarize([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         self.assertIsNotNone(stats.iqr)
-        self.assertAlmostEqual(stats.iqr, stats.percentiles[0.75] - stats.percentiles[0.25])
+        self.assertAlmostEqual(
+    stats.iqr,
+    stats.percentiles[0.75] -
+     stats.percentiles[0.25])
 
         empty_pct_stats = SummaryStats(
             count=1,
@@ -109,7 +116,8 @@ class Wave7StatsPrimitivesTest(TestCase):
             ParetoObjective("latency", lower_is_better=True),
         ]
         with self.assertRaises(TypeError):
-            pareto_frontier([(True, 1.0), (False, 2.0)], objectives=objectives, key=lambda p: p)
+            pareto_frontier([(True, 1.0), (False, 2.0)],
+                            objectives=objectives, key=lambda p: p)
 
     def test_spearman_rank_correlation(self) -> None:
         x = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -119,17 +127,17 @@ class Wave7StatsPrimitivesTest(TestCase):
         y_inv = [50.0, 40.0, 30.0, 20.0, 10.0]
         self.assertAlmostEqual(spearman_rank_correlation(x, y_inv), -1.0)
 
-        # Ties
+        #? Ties
         x_ties = [1.0, 2.0, 2.0, 4.0, 5.0]
         y_ties = [5.0, 6.0, 7.0, 8.0, 9.0]
         corr = spearman_rank_correlation(x_ties, y_ties)
         self.assertTrue(0.9 < corr <= 1.0)
 
-        # Constant sequence error
+        #? Constant sequence error
         with self.assertRaises(ValueError):
             spearman_rank_correlation([1.0, 1.0, 1.0], [2.0, 3.0, 4.0])
 
-        # Validation
+        #? Validation
         with self.assertRaises(ValueError):
             spearman_rank_correlation([1.0], [2.0])
         with self.assertRaises(ValueError):
@@ -154,17 +162,17 @@ class Wave7StatsPrimitivesTest(TestCase):
         f = [-1.0, 0.0]
         self.assertAlmostEqual(cosine_similarity(e, f), -1.0)
 
-        # Zero norm
+        #? Zero norm
         with self.assertRaises(ValueError):
             cosine_similarity([0.0, 0.0], [1.0, 2.0])
 
-        # Empty / unequal length
+        #? Empty / unequal length
         with self.assertRaises(ValueError):
             cosine_similarity([], [])
         with self.assertRaises(ValueError):
             cosine_similarity([1.0], [1.0, 2.0])
 
-        # Types and non-finite
+        #? Types and non-finite
         with self.assertRaises(TypeError):
             cosine_similarity([1.0, True], [2.0, 3.0])
         with self.assertRaises(ValueError):
@@ -176,16 +184,16 @@ class Wave7StatsPrimitivesTest(TestCase):
 
         series = [10.0, 20.0, 30.0]
         alpha = 0.5
-        # S0 = 10.0
-        # S1 = 0.5 * 20.0 + 0.5 * 10.0 = 15.0
-        # S2 = 0.5 * 30.0 + 0.5 * 15.0 = 22.5
+        #? S0 = 10.0
+        #? S1 = 0.5 * 20.0 + 0.5 * 10.0 = 15.0
+        #? S2 = 0.5 * 30.0 + 0.5 * 15.0 = 22.5
         smoothed = ewma(series, alpha=alpha)
         self.assertEqual(len(smoothed), 3)
         self.assertAlmostEqual(smoothed[0], 10.0)
         self.assertAlmostEqual(smoothed[1], 15.0)
         self.assertAlmostEqual(smoothed[2], 22.5)
 
-        # Alpha bounds
+        #? Alpha bounds
         with self.assertRaises(ValueError):
             ewma([1.0, 2.0], alpha=0.0)
         with self.assertRaises(ValueError):

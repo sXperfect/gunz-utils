@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import contextlib
-
-
-import asyncio
 import inspect
 import math
 import signal
@@ -24,11 +23,13 @@ def _normalize_signums(
     signums: Any,
 ) -> tuple[int, ...]:
     if isinstance(signums, (str, bytes, bytearray)):
-        raise TypeError("signums must be an iterable of signal integers, not string or bytes")
+        raise TypeError(
+            "signums must be an iterable of signal integers, not string or bytes")
     try:
         iterator = iter(signums)
     except TypeError as exc:
-        raise TypeError(f"signums must be an iterable, got {type(signums).__name__}") from exc
+        raise TypeError(
+            f"signums must be an iterable, got {type(signums).__name__}") from exc
 
     unique: list[int] = []
     seen: set[int] = set()
@@ -118,7 +119,7 @@ class AsyncSignalRegistration:
         if self._restored:
             return
         for signum in reversed(self.signums):
-            with contextlib.suppress((NotImplementedError, RuntimeError)):
+            with contextlib.suppress(NotImplementedError, RuntimeError):
                 self.loop.remove_signal_handler(signum)
             signal.signal(
                 signum,
@@ -201,7 +202,7 @@ def install_async_signal_handlers(
     except BaseException:
         for signum in reversed(tuple(previous)):
             if signum in registered:
-                with contextlib.suppress((NotImplementedError, RuntimeError)):
+                with contextlib.suppress(NotImplementedError, RuntimeError):
                     event_loop.remove_signal_handler(signum)
             signal.signal(
                 signum,
@@ -413,7 +414,7 @@ class GracefulShutdown:
         try:
             await asyncio.wait_for(event.wait(), timeout=float(timeout))
             return True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return False
 
     async def wait_for_shutdown(self) -> int | None:
@@ -438,7 +439,7 @@ class GracefulShutdown:
         list[tuple[Callable[[], Any], Exception]]
             The result of the operation.
         """
-        errors: list[tuple[Callable[[], Any], Exception]] = []
+        errors: list[tuple[Callable[[], Any], BaseException]] = []
         for cb in reversed(self._callbacks):
             try:
                 res = cb()

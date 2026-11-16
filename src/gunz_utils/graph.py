@@ -1,4 +1,5 @@
-"""General graph algorithms: Dijkstra, Tarjan's SCC, Kruskal's MST, and graph analysis."""
+"""General graph algorithms: Dijkstra, Tarjan's SCC, Kruskal's MST, and graph analysis.
+"""
 
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
@@ -104,7 +105,9 @@ def dijkstra(
 def strongly_connected_components(
     graph: Mapping[T, Iterable[T]],
 ) -> list[set[T]]:
-    """Compute strongly connected components in a directed graph using Tarjan's algorithm."""
+    """Compute strongly connected components in a directed graph using Tarjan's
+    algorithm.
+    """
     index = 0
     indices: dict[T, int] = {}
     lowlinks: dict[T, int] = {}
@@ -280,7 +283,7 @@ def has_cycle_undirected(
     for start in graph:
         if start in visited:
             continue
-        queue = deque([(start, None)])
+        queue: deque[tuple[T, T | None]] = deque([(start, None)])
         visited.add(start)
         while queue:
             u, parent = queue.popleft()
@@ -296,7 +299,8 @@ def has_cycle_undirected(
 def eulerian_path(
     graph: Mapping[T, Sequence[T]],
 ) -> list[T] | None:
-    """Find an Eulerian path visiting every edge exactly once (Hierholzer's algorithm)."""
+    """Find an Eulerian path visiting every edge exactly once (Hierholzer's algorithm).
+    """
     adj: dict[T, list[T]] = {k: list(v) for k, v in graph.items()}
     in_deg: dict[T, int] = {k: 0 for k in adj}
     out_deg: dict[T, int] = {k: len(v) for k, v in adj.items()}

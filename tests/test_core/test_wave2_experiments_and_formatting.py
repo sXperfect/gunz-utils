@@ -1,13 +1,19 @@
 """Tests for Wave 2 additions: Experiments & Formatting (#15 - #27)."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import io
-import math
 import os
 import unittest
 from unittest.mock import patch
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.experiments import (
     ExperimentMatrix,
     VariantResult,
@@ -37,33 +43,38 @@ class TestWave2Experiments(unittest.TestCase):
 
     def test_item16_run_variant_matrix_pre_loop_validation(self) -> None:
         with self.assertRaises(TypeError):
-            run_variant_matrix("not_callable", lambda s, c: {}, {"baseline": {}})  # type: ignore[arg-type]
+            run_variant_matrix(
+    "not_callable", lambda s, c: {}, {
+        "baseline": {}})  # type: ignore[arg-type]
 
         with self.assertRaises(TypeError):
-            run_variant_matrix(lambda: None, "not_callable", {"baseline": {}})  # type: ignore[arg-type]
+            run_variant_matrix(
+    lambda: None, "not_callable", {
+        "baseline": {}})  # type: ignore[arg-type]
 
         with self.assertRaises(TypeError):
-            run_variant_matrix(lambda: None, lambda s, c: {}, ["not_a_mapping"])  # type: ignore[arg-type]
+            run_variant_matrix(lambda: None, lambda s, c: {}, [
+                               "not_a_mapping"])  # type: ignore[arg-type]
 
         with self.assertRaises(ValueError):
             run_variant_matrix(lambda: None, lambda s, c: {}, {})
 
     def test_item17_parameter_grid_bare_string_and_generators(self) -> None:
-        # Bare string factor values must be rejected
+        #? Bare string factor values must be rejected
         with self.assertRaises(TypeError):
             parameter_grid({"mode": "fast"})  # type: ignore[dict-item]
 
         with self.assertRaises(TypeError):
             parameter_grid({"mode": b"fast"})  # type: ignore[dict-item]
 
-        # Generator factor values should be consumed safely
+        #? Generator factor values should be consumed safely
         def gen() -> iter:
             yield from (1, 2)
 
         res = parameter_grid({"num": gen()})
         self.assertEqual(res, [{"num": 1}, {"num": 2}])
 
-        # Empty generator / sequence
+        #? Empty generator / sequence
         with self.assertRaises(ValueError):
             parameter_grid({"num": ()})
 
@@ -78,7 +89,10 @@ class TestWave2Experiments(unittest.TestCase):
         )
 
         with self.assertRaises(TypeError):
-            metric_improvement("invalid_matrix", variant="better", metric="loss")  # type: ignore[arg-type]
+            metric_improvement(
+    "invalid_matrix",
+    variant="better",
+     metric="loss")  # type: ignore[arg-type]
 
         with self.assertRaises(ValueError):
             metric_improvement(matrix, variant="   ", metric="loss")
@@ -86,12 +100,19 @@ class TestWave2Experiments(unittest.TestCase):
         with self.assertRaises(ValueError):
             metric_improvement(matrix, variant="better", metric="   ")
 
-        res = metric_improvement(matrix, variant="better", metric="loss", direction="lower")
+        res = metric_improvement(
+    matrix,
+    variant="better",
+    metric="loss",
+     direction="lower")
         self.assertTrue(res["supported"])
         self.assertAlmostEqual(res["relative_improvement"], 0.5)
 
     def test_item19_experiment_matrix_helpers(self) -> None:
-        def run_fn(_s: None, c: dict[str, object]) -> dict[str, float]:
+        def run_fn(
+            _s: None,
+            c: dict[str, object],
+        ) -> dict[str, float]:
             if c.get("err"):
                 raise ValueError("variant failed")
             return {"score": float(c["score"])}
@@ -162,17 +183,17 @@ class TestWave2Formatting(unittest.TestCase):
         with self.assertRaises(TypeError):
             escape_terminal("hello", multiline="no")  # type: ignore[arg-type]
 
-        # Trojan Source Bidi overrides: \u202e (RLO)
+        #? Trojan Source Bidi overrides: \u202e (RLO)
         dangerous = "access_\u202e_admin"
         escaped = escape_terminal(dangerous)
         self.assertNotIn("\u202e", escaped)
         self.assertIn(r"\u202e", escaped)
 
-        # Zero-width space: \u200b
+        #? Zero-width space: \u200b
         zwsp = "hidden\u200btext"
         self.assertIn(r"\u200b", escape_terminal(zwsp))
 
-        # BOM: \ufeff
+        #? BOM: \ufeff
         bom = "\ufeffhello"
         self.assertIn(r"\ufeff", escape_terminal(bom))
 
@@ -200,15 +221,17 @@ class TestWave2Formatting(unittest.TestCase):
             format_table(headers, ["not_a_row_list"])  # type: ignore[list-item]
 
         with self.assertRaises(ValueError):
-            format_table(headers, rows, alignments=["left"])  # wrong length
+            format_table(headers, rows, alignments=["left"])  #? wrong length
 
         with self.assertRaises(ValueError):
-            format_table(headers, rows, alignments=["left", "invalid_align"])  # type: ignore[list-item]
+            format_table(
+    headers, rows, alignments=[
+        "left", "invalid_align"])  # type: ignore[list-item]
 
         table = format_table(headers, rows, alignments=["left", "right"])
         self.assertIn("| Algorithm", table)
         self.assertIn("| SHA256", table)
-        self.assertIn("---:", table)  # Right aligned separator
+        self.assertIn("---:", table)  #? Right aligned separator
 
     def test_item26_format_percentage(self) -> None:
         with self.assertRaises(TypeError):

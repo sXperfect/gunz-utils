@@ -166,11 +166,13 @@ class PartitionManifest:
             raise ValueError("invalid partition manifest format")
         manifest = cls(partitions=data["partitions"])
         stored_fingerprint = data.get("fingerprint")
-        if stored_fingerprint is not None and stored_fingerprint != manifest.fingerprint:
+        if (
+            stored_fingerprint is not None
+            and stored_fingerprint != manifest.fingerprint
+        ):
             raise ValueError(
-                f"partition manifest fingerprint mismatch: expected {stored_fingerprint!r}, "
-                f"computed {manifest.fingerprint!r}"
-            )
+    f"partition manifest fingerprint mismatch: expected {stored_fingerprint!r}, "
+    f"computed {manifest.fingerprint!r}" )
         return manifest
 
 
@@ -208,7 +210,8 @@ def partition_overlaps(
             )
         if isinstance(values, (str, bytes, bytearray)):
             raise TypeError(
-                f"partition {name!r} items must be an iterable of hashables, not a string"
+                f"partition {name!r} items must be an "
+                    f"iterable of hashables, not a string"
             )
         try:
             groups[name] = set(values)

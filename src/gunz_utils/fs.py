@@ -6,8 +6,6 @@ from __future__ import annotations
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import contextlib
-
-
 import errno
 import fnmatch
 import hashlib
@@ -498,7 +496,8 @@ def matches_any_glob(
     """
     if isinstance(patterns, (str, bytes, bytearray)):
         raise TypeError(
-            f"patterns must be an iterable of pattern strings, not {type(patterns).__name__}"
+            f"patterns must be an iterable of pattern "
+                f"strings, not {type(patterns).__name__}"
         )
     normalized = Path(path)
     path_parts = tuple(
@@ -545,9 +544,11 @@ def _walk_files_iter(
 
         dir_names.sort()
         dir_names[:] = [
-            d for d in dir_names
-            if not (exc_patterns and matches_any_glob(rel_current / d if current_depth > 0 else Path(d), exc_patterns))
-        ]
+    d for d in dir_names if not (
+        exc_patterns and matches_any_glob(
+            rel_current /
+            d if current_depth > 0 else Path(d),
+             exc_patterns)) ]
 
         file_names.sort()
         for f in file_names:
@@ -624,7 +625,8 @@ def walk_files(
         )
     if isinstance(extensions, (str, bytes, bytearray)):
         raise TypeError(
-            f"extensions must be an iterable of extensions, not {type(extensions).__name__}"
+            f"extensions must be an iterable of "
+                f"extensions, not {type(extensions).__name__}"
         )
 
     base = Path(root).resolve()
@@ -683,7 +685,8 @@ def tree_fingerprint(
         )
     if isinstance(extensions, (str, bytes, bytearray)):
         raise TypeError(
-            f"extensions must be an iterable of extensions, not {type(extensions).__name__}"
+            f"extensions must be an iterable of "
+                f"extensions, not {type(extensions).__name__}"
         )
     if algorithm not in SUPPORTED_ALGOS:
         allowed = sorted(SUPPORTED_ALGOS)
@@ -860,7 +863,12 @@ def walk_directory(
 ) -> Iterator[Path]:
     """Walk files and directories matching pattern with optional depth bounds."""
     depth = max_depth if recursive else (1 if max_depth is None else min(max_depth, 1))
-    return walk_files(base_dir, include=(pattern,) if pattern != "*" else (), max_depth=depth)
+    return walk_files(
+    base_dir,
+    include=(
+        pattern,
+        ) if pattern != "*" else (),
+         max_depth=depth)
 
 
 def find_files(
@@ -880,7 +888,12 @@ def find_files(
         raise ValueError("min_size cannot exceed max_size")
 
     ext_iter = extensions if extensions is not None else ()
-    for p in walk_files(base_dir, include=(pattern,) if pattern != "*" else (), extensions=ext_iter):
+    for p in walk_files(
+    base_dir,
+    include=(
+        pattern,
+        ) if pattern != "*" else (),
+         extensions=ext_iter):
         sz = p.stat().st_size
         if min_size is not None and sz < min_size:
             continue

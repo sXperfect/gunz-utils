@@ -1,5 +1,9 @@
 """Tests for Wave 7: enums, sentinels, and extensions (#84–#92)."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import copy
@@ -7,10 +11,13 @@ import inspect
 import pathlib
 import unittest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.enums import BaseIntEnum, BaseStrEnum
 from gunz_utils.ext.project_stdlib import resolve_project_root
 from gunz_utils.ext.validation_stdlib import type_checked
-from gunz_utils.sentinels import UNSET, UnsetType, default, default_factory, is_unset
+from gunz_utils.sentinels import UNSET, UnsetType, default_factory
 
 
 class Color(BaseStrEnum):
@@ -49,7 +56,7 @@ class TestWave7Sentinels(unittest.TestCase):
         self.assertIs(copy.copy(UNSET), UNSET)
         self.assertIs(copy.deepcopy(UNSET), UNSET)
 
-        # default_factory
+        #? default_factory
         called = False
 
         def factory() -> str:
@@ -71,23 +78,27 @@ class TestWave7Sentinels(unittest.TestCase):
 class TestWave7ValidationStdlib(unittest.IsolatedAsyncioTestCase):
     def test_item88_pep484_int_for_float_and_bool_rejection(self) -> None:
         @type_checked
-        def compute_ratio(val: float) -> float:
+        def compute_ratio(
+            val: float,
+        ) -> float:
             return val * 2.0
 
-        # float is valid
+        #? float is valid
         self.assertEqual(compute_ratio(2.5), 5.0)
-        # int for float is valid under PEP 484
+        #? int for float is valid under PEP 484
         self.assertEqual(compute_ratio(3), 6.0)
-        # bool is rejected for float
+        #? bool is rejected for float
         with self.assertRaises(TypeError):
             compute_ratio(True)
 
     async def test_item89_coroutine_function_preservation(self) -> None:
         @type_checked
-        async def fetch_data(name: str) -> str:
+        async def fetch_data(
+            name: str,
+        ) -> str:
             return f"data-{name}"
 
-        # iscoroutinefunction must remain True!
+        #? iscoroutinefunction must remain True!
         self.assertTrue(inspect.iscoroutinefunction(fetch_data))
         res = await fetch_data("abc")
         self.assertEqual(res, "data-abc")
@@ -101,8 +112,10 @@ class TestWave7Project(unittest.TestCase):
         with self.assertRaises(TypeError):
             resolve_project_root(subpaths="bare string")  # type: ignore[arg-type]
 
-        # Anchor as current file
-        root = resolve_project_root(anchor=pathlib.Path(__file__), inject_to_sys_path=False)
+        #? Anchor as current file
+        root = resolve_project_root(
+    anchor=pathlib.Path(__file__),
+     inject_to_sys_path=False)
         self.assertTrue(root.is_dir())
         self.assertTrue((root / "pyproject.toml").exists() or (root / ".git").exists())
 

@@ -72,25 +72,35 @@ def validate_constraints(
         expected_type = rules.get("type")
         if expected_type is not None and not isinstance(val, expected_type):
             errors.append(
-                f"field '{field}' expected type {expected_type}, got {type(val).__name__}"
+                f"field '{field}' expected type "
+                    f"{expected_type}, got {type(val).__name__}"
             )
             continue
 
         #? Min / Max numeric value
         if "min" in rules and isinstance(val, (int, float)) and val < rules["min"]:
-            errors.append(f"field '{field}' ({val}) is less than minimum {rules['min']}")
+            errors.append(
+                f"field '{field}' ({val}) is less than minimum {rules['min']}")
         if "max" in rules and isinstance(val, (int, float)) and val > rules["max"]:
             errors.append(f"field '{field}' ({val}) exceeds maximum {rules['max']}")
 
         #? Min / Max length
-        if "min_len" in rules and hasattr(val, "__len__") and len(val) < rules["min_len"]:
-            errors.append(f"field '{field}' length ({len(val)}) is less than minimum {rules['min_len']}")
-        if "max_len" in rules and hasattr(val, "__len__") and len(val) > rules["max_len"]:
-            errors.append(f"field '{field}' length ({len(val)}) exceeds maximum {rules['max_len']}")
+        if "min_len" in rules and hasattr(
+    val, "__len__") and len(val) < rules["min_len"]:
+            errors.append(
+                f"field '{field}' length ({len(val)}) "
+                    f"is less than minimum {rules['min_len']}")
+        if "max_len" in rules and hasattr(
+    val, "__len__") and len(val) > rules["max_len"]:
+            errors.append(
+                f"field '{field}' length ({len(val)}) "
+                    f"exceeds maximum {rules['max_len']}")
 
         #? Allowed values
         if "allowed" in rules and val not in rules["allowed"]:
-            errors.append(f"field '{field}' value {val!r} is not in allowed set {rules['allowed']!r}")
+            errors.append(
+                f"field '{field}' value {val!r} is not "
+                    f"in allowed set {rules['allowed']!r}")
 
     return errors
 
@@ -205,7 +215,8 @@ def coerce_spec_sequence(
     if not isinstance(spec_cls, type):
         raise TypeError(f"spec_cls must be a type, got {type(spec_cls).__name__}")
     if isinstance(items, (str, bytes, bytearray)):
-        raise TypeError("items must be an iterable of specs or mappings, not string or bytes")
+        raise TypeError(
+            "items must be an iterable of specs or mappings, not string or bytes")
     coerced = []
     for item in items:
         if isinstance(item, spec_cls):

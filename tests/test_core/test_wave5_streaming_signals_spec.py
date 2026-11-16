@@ -1,18 +1,22 @@
 """Tests for Wave 5: streaming I/O, signals, and specs (#57–#70)."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import array
-import asyncio
 import io
-import math
 import signal
 import unittest
 from dataclasses import dataclass
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.sentinels import UNSET
 from gunz_utils.signals import (
-    AsyncSignalRegistration,
     GracefulShutdown,
     SignalRegistration,
     install_async_signal_handlers,
@@ -26,7 +30,6 @@ from gunz_utils.spec import (
 from gunz_utils.streaming import (
     BoundedWriter,
     DigestWriter,
-    StreamCopyResult,
     copy_and_hash,
     iter_jsonl,
     write_jsonl,
@@ -41,7 +44,7 @@ class DummyConfig:
 
 class TestWave5Streaming(unittest.TestCase):
     def test_item57_iter_jsonl_eager_validation_and_float_check(self) -> None:
-        # Eager validation raises immediately, without next()
+        #? Eager validation raises immediately, without next()
         with self.assertRaises(TypeError):
             iter_jsonl("not-a-stream")  # type: ignore[arg-type]
         with self.assertRaises(ValueError):
@@ -49,7 +52,7 @@ class TestWave5Streaming(unittest.TestCase):
         with self.assertRaises(ValueError):
             iter_jsonl(io.StringIO(""), max_line_length=-5)
 
-        # Non-finite float rejection
+        #? Non-finite float rejection
         stream = io.StringIO('{"val": 1e999}\n')
         with self.assertRaises(ValueError):
             list(iter_jsonl(stream))
@@ -61,7 +64,7 @@ class TestWave5Streaming(unittest.TestCase):
         with self.assertRaises(TypeError):
             write_jsonl(buf, b"bare bytes")  # type: ignore[arg-type]
 
-        # Valid write
+        #? Valid write
         count = write_jsonl(buf, [{"b": 2, "a": 1}])
         self.assertEqual(count, 1)
         self.assertEqual(buf.getvalue(), '{"a":1,"b":2}\n')
@@ -71,18 +74,18 @@ class TestWave5Streaming(unittest.TestCase):
         writer = BoundedWriter(buf, max_bytes=8)
         self.assertEqual(writer.remaining_bytes, 8)
 
-        # multi-byte array
-        arr = array.array("I", [1, 2])  # 2 unsigned ints = 8 bytes
+        #? multi-byte array
+        arr = array.array("I", [1, 2])  #? 2 unsigned ints = 8 bytes
         written = writer.write(memoryview(arr))
         self.assertEqual(written, 8)
         self.assertEqual(writer.remaining_bytes, 0)
         self.assertEqual(writer.bytes_written, 8)
 
-        # Exceed limit
+        #? Exceed limit
         with self.assertRaises(ValueError):
             writer.write(b"1")
 
-        # Context manager
+        #? Context manager
         with BoundedWriter(io.BytesIO(), max_bytes=10) as bw:
             bw.write(b"hello")
             self.assertEqual(bw.remaining_bytes, 5)
@@ -125,23 +128,27 @@ class TestWave5Signals(unittest.IsolatedAsyncioTestCase):
 
         gs.trigger_shutdown(signal.SIGINT)
         self.assertEqual(gs.signal_received, signal.SIGINT)
-        # Calling trigger_shutdown() without a signum does not wipe existing signal
+        #? Calling trigger_shutdown() without a signum does not wipe existing signal
         gs.trigger_shutdown(None)
         self.assertEqual(gs.signal_received, signal.SIGINT)
 
     async def test_item64_graceful_shutdown_wait(self) -> None:
         gs = GracefulShutdown()
-        # Timeout expiration returns False
+        #? Timeout expiration returns False
         done = await gs.wait(timeout=0.01)
         self.assertFalse(done)
 
-        # Triggered shutdown returns True
+        #? Triggered shutdown returns True
         gs.trigger_shutdown()
         done = await gs.wait(timeout=0.1)
         self.assertTrue(done)
 
     def test_item65_signal_registration_slots_and_restored(self) -> None:
-        reg = SignalRegistration(signum=signal.SIGUSR1, previous=signal.SIG_DFL, handler=lambda s, f: None)
+        reg = SignalRegistration(
+    signum=signal.SIGUSR1,
+    previous=signal.SIG_DFL,
+    handler=lambda s,
+     f: None)
         self.assertFalse(reg.restored)
         self.assertTrue(hasattr(reg, "__slots__"))
 
@@ -157,12 +164,19 @@ class TestWave5Spec(unittest.TestCase):
         with self.assertRaises(TypeError):
             from_object_or_fields("not-a-class", None, {})  # type: ignore[arg-type]
         with self.assertRaises(TypeError):
-            from_object_or_fields(DummyConfig, None, "not-a-dict")  # type: ignore[arg-type]
+            from_object_or_fields(
+    DummyConfig, None, "not-a-dict")  # type: ignore[arg-type]
         with self.assertRaises(TypeError):
-            from_object_or_fields(DummyConfig, None, {}, allow_none="yes")  # type: ignore[arg-type]
+            from_object_or_fields(
+    DummyConfig,
+    None,
+    {},
+     allow_none="yes")  # type: ignore[arg-type]
 
-        # Valid build from fields
-        cfg = from_object_or_fields(DummyConfig, None, {"host": "127.0.0.1", "port": UNSET})
+        #? Valid build from fields
+        cfg = from_object_or_fields(
+    DummyConfig, None, {
+        "host": "127.0.0.1", "port": UNSET})
         self.assertEqual(cfg, DummyConfig(host="127.0.0.1", port=8080))
 
     def test_item68_coerce_spec_sequence_guards(self) -> None:

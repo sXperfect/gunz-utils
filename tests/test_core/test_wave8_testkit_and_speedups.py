@@ -1,12 +1,19 @@
 """Tests for Wave 8: Testkit, timing, testing helpers, and suite speedups."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
-import asyncio
 import math
 import sys
 from unittest import IsolatedAsyncioTestCase, TestCase
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
+from gunz_utils.testing import eventually, eventually_async
 from gunz_utils.testkit import (
     ManualClock,
     fuzz_bytes,
@@ -16,7 +23,6 @@ from gunz_utils.testkit import (
     fuzz_primitives,
     fuzz_strings,
 )
-from gunz_utils.testing import eventually, eventually_async
 from gunz_utils.time_utils import expired, monotonic_deadline, remaining
 from gunz_utils.timing import Timer, timer
 
@@ -52,7 +58,7 @@ class Wave8TestkitFuzzValidationTest(TestCase):
             list(fuzz_json_objects(seed="bad", count=5))
 
     def test_fuzz_floats_extreme_range(self) -> None:
-        # Extreme range where max_f - min_f is infinite
+        #? Extreme range where max_f - min_f is infinite
         min_val = -1e308
         max_val = 1e308
         samples = list(
@@ -86,7 +92,7 @@ class Wave8TestingHelpersTest(IsolatedAsyncioTestCase):
         eventually(cond, timeout=1.0, interval=0.005)
         self.assertGreaterEqual(counter, 3)
 
-        # Timeout overshoot clamp
+        #? Timeout overshoot clamp
         with self.assertRaises(TimeoutError):
             eventually(lambda: False, timeout=0.02, interval=0.5)
 

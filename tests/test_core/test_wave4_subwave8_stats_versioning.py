@@ -1,10 +1,22 @@
 """Tests for Wave 4 Sub-Wave 8: Statistics, Versioning & Testkit (#90–#100)."""
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import logging
 import math
 import os
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.limits import Limits, ResourceBudget, merge_limits
 from gunz_utils.provenance import capture_execution_manifest
 from gunz_utils.stats import (
@@ -17,7 +29,6 @@ from gunz_utils.stats import (
 )
 from gunz_utils.testkit import CapturingLogHandler, TemporaryEnvironment
 from gunz_utils.versioning import SemanticVersion
-
 
 # =============================================================================
 # #90–#94: Statistical Helpers
@@ -68,15 +79,15 @@ def test_min_max_scale():
 
 
 def test_skewness_and_kurtosis():
-    # Symmetric data has skewness ~ 0
+    #? Symmetric data has skewness ~ 0
     sym = [1.0, 2.0, 3.0, 4.0, 5.0]
     assert math.isclose(skewness(sym), 0.0, abs_tol=1e-7)
 
-    # Right skewed
+    #? Right skewed
     right_skew = [1.0, 1.0, 1.0, 2.0, 10.0]
     assert skewness(right_skew) > 0.0
 
-    # Kurtosis of uniform distribution is negative (platykurtic)
+    #? Kurtosis of uniform distribution is negative (platykurtic)
     assert kurtosis([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]) < 0.0
 
     with pytest.raises(ValueError, match="at least 3 values"):
@@ -101,14 +112,14 @@ def test_semantic_version():
     assert v1_alpha.prerelease == "alpha.1"
     assert v1_alpha.build == "build.01"
 
-    # Comparison
-    assert v1_alpha < v1  # Prerelease is lower precedence than release
+    #? Comparison
+    assert v1_alpha < v1  #? Prerelease is lower precedence than release
     assert SemanticVersion.parse("1.0.0") < SemanticVersion.parse("2.0.0")
     assert SemanticVersion.parse("1.1.0") < SemanticVersion.parse("1.2.0")
     assert SemanticVersion.parse("1.1.1") < SemanticVersion.parse("1.1.2")
     assert SemanticVersion.parse("1.2.3") == SemanticVersion(1, 2, 3)
 
-    # Bumping
+    #? Bumping
     assert str(v1.bump_major()) == "2.0.0"
     assert str(v1.bump_minor()) == "1.3.0"
     assert str(v1.bump_patch()) == "1.2.4"
@@ -143,8 +154,8 @@ def test_resource_budget_is_exhausted_and_merge_limits():
     l1 = Limits(max_bytes=1000, max_items=50)
     l2 = Limits(max_bytes=500, max_items=100, max_depth=10)
     merged = merge_limits(l1, l2)
-    assert merged.max_bytes == 500  # Strictest (min)
-    assert merged.max_items == 50   # Strictest (min)
+    assert merged.max_bytes == 500  #? Strictest (min)
+    assert merged.max_items == 50   #? Strictest (min)
     assert merged.max_depth == 10
 
     budget = ResourceBudget(max_items=2)

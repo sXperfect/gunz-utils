@@ -20,9 +20,9 @@ import re
 import sys
 import time
 import types
-from typing import Any
 import unittest
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
@@ -37,44 +37,68 @@ def _ensure_pytest_shim() -> None:
         import pytest  # noqa: F401
     except ImportError:
         class _MarkHelper:
-            def __getattr__(self, name: str) -> Any:
-                def _decorator(*args: Any, **kwargs: Any) -> Any:
+            def __getattr__(self,
+                name: str,
+            ) -> Any:
+                def _decorator(
+                    *args: Any,
+                    **kwargs: Any,
+                ) -> Any:
                     if len(args) == 1 and callable(args[0]) and not kwargs:
                         return args[0]
-                    def _inner(fn: Any) -> Any:
+                    def _inner(
+                        fn: Any,
+                    ) -> Any:
                         return fn
                     return _inner
                 return _decorator
 
         class _RaisesContext:
-            def __init__(self, exc: Any, match: str | None = None) -> None:
+            def __init__(self,
+                exc: Any,
+                match: str | None = None,
+            ) -> None:
                 self.exc = exc
                 self.match = match
                 self.value: Any = None
             def __enter__(self) -> _RaisesContext:
                 return self
-            def __exit__(self, et: Any, ev: Any, tb: Any) -> bool:
+            def __exit__(self,
+                et: Any,
+                ev: Any,
+                tb: Any,
+            ) -> bool:
                 if et is None:
                     raise AssertionError(f"Expected exception {self.exc} not raised")
                 if not issubclass(et, self.exc):
                     return False
                 self.value = ev
                 if self.match and not re.search(self.match, str(ev)):
-                    raise AssertionError(f"Pattern {self.match!r} not found in {str(ev)!r}")
+                    raise AssertionError(
+                        f"Pattern {self.match!r} not found in {str(ev)!r}")
                 return True
 
         class _Approx:
-            def __init__(self, expected: Any, rel: float = 1e-6, abs: float = 1e-12) -> None:
+            def __init__(self,
+                expected: Any,
+                rel: float = 1e-6,
+                abs: float = 1e-12,
+            ) -> None:
                 self.expected = expected
                 self.rel = rel
                 self.abs = abs
-            def __eq__(self, actual: Any) -> bool:
+            def __eq__(self,
+                actual: Any,
+            ) -> bool:
                 try:
-                    return bool(abs(actual - self.expected) <= max(self.rel * abs(self.expected), self.abs))
+                    return bool(abs(actual - self.expected) <=
+                                max(self.rel * abs(self.expected), self.abs))
                 except Exception:
                     return False
 
-        def _skip(reason: str = "") -> None:
+        def _skip(
+            reason: str = "",
+        ) -> None:
             raise unittest.SkipTest(reason)
 
         shim = types.ModuleType("pytest")
@@ -83,13 +107,16 @@ def _ensure_pytest_shim() -> None:
         shim.approx = _Approx
         shim.skip = _skip
         shim.MonkeyPatch = object
-        shim.fixture = lambda *a, **k: (lambda fn: fn) if (len(a) == 0 or not callable(a[0])) else a[0]
-        def _importorskip(modname: str) -> Any:
+        shim.fixture = lambda *a, **k: (lambda fn: fn) if (len(a)
+                                        == 0 or not callable(a[0])) else a[0]
+        def _importorskip(
+            modname: str,
+        ) -> Any:
             try:
                 import importlib
                 return importlib.import_module(modname)
-            except ImportError:
-                raise unittest.SkipTest(f"missing {modname}")
+            except ImportError as error:
+                raise unittest.SkipTest(f"missing {modname}") from error
         shim.importorskip = _importorskip
         sys.modules["pytest"] = shim
 
@@ -198,7 +225,8 @@ def load_test_suite(
 
         # 2. Standalone test_* functions (excluding pytest fixture-dependent functions)
         for name, obj in inspect.getmembers(module):
-            if name.startswith("test_") and (inspect.isfunction(obj) or inspect.iscoroutinefunction(obj)):
+            if name.startswith("test_") and (
+    inspect.isfunction(obj) or inspect.iscoroutinefunction(obj)):
                 try:
                     sig = inspect.signature(obj)
                     if len(sig.parameters) > 0:
@@ -212,9 +240,11 @@ def load_test_suite(
                     if inspect.iscoroutinefunction(obj):
                         sync_fn = (lambda fn=obj: lambda: asyncio.run(fn()))()
                         sync_fn.__name__ = name
-                        test_case = unittest.FunctionTestCase(sync_fn, description=full_name)
+                        test_case = unittest.FunctionTestCase(
+                            sync_fn, description=full_name)
                     else:
-                        test_case = unittest.FunctionTestCase(obj, description=full_name)
+                        test_case = unittest.FunctionTestCase(
+                            obj, description=full_name)
                     suite.addTest(test_case)
 
     return suite, skipped_modules
@@ -251,16 +281,23 @@ def main(
     print(msg + ".\n")
 
     class _TimingResult(unittest.TextTestResult):
-        def __init__(self, *a: Any, **kw: Any) -> None:
+        def __init__(self,
+            *a: Any,
+            **kw: Any,
+        ) -> None:
             super().__init__(*a, **kw)
             self._case_starts: dict[unittest.TestCase, float] = {}
             self.durations: list[tuple[float, str]] = []
 
-        def startTest(self, test: unittest.TestCase) -> None:
+        def startTest(self,
+            test: unittest.TestCase,
+        ) -> None:
             super().startTest(test)
             self._case_starts[test] = time.perf_counter()
 
-        def stopTest(self, test: unittest.TestCase) -> None:
+        def stopTest(self,
+            test: unittest.TestCase,
+        ) -> None:
             super().stopTest(test)
             start = self._case_starts.pop(test, None)
             if start is not None:

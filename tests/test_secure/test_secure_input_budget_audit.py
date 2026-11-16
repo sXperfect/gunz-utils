@@ -147,7 +147,7 @@ def test_store_releases_unreferenced_fernet_after_lifecycle_transition(
             store.rotate_master_key()
         else:
             getattr(store, operation)()
-        gc.collect()  # noqa: GS020
+        gc.collect()  # gunz-style: ignore[GS020]
         assert reference() is None
     finally:
         store.close()

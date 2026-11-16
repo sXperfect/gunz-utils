@@ -1,5 +1,9 @@
 """Arbitrary-length bit array with memory-efficient limb storage and bitwise algebra."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 
@@ -8,7 +12,9 @@ class BitSet:
 
     _LIMB_BITS = 64
 
-    def __init__(self, size: int = 0) -> None:
+    def __init__(self,
+        size: int = 0,
+    ) -> None:
         if size < 0:
             raise ValueError("size must be non-negative")
         self._size = size
@@ -18,14 +24,19 @@ class BitSet:
     def __len__(self) -> int:
         return self._size
 
-    def _ensure_capacity(self, index: int) -> None:
+    def _ensure_capacity(self,
+        index: int,
+    ) -> None:
         if index >= self._size:
             self._size = index + 1
             needed_limbs = (self._size + self._LIMB_BITS - 1) // self._LIMB_BITS
             while len(self._limbs) < needed_limbs:
                 self._limbs.append(0)
 
-    def set(self, index: int, value: bool = True) -> None:
+    def set(self,
+        index: int,
+        value: bool = True,
+    ) -> None:
         """Set or clear the bit at index."""
         if index < 0:
             raise IndexError("negative bit index not allowed")
@@ -37,7 +48,9 @@ class BitSet:
         else:
             self._limbs[limb_idx] &= ~(1 << bit_idx)
 
-    def get(self, index: int) -> bool:
+    def get(self,
+        index: int,
+    ) -> bool:
         """Get the boolean value of the bit at index."""
         if index < 0:
             raise IndexError("negative bit index not allowed")
@@ -47,7 +60,9 @@ class BitSet:
         bit_idx = index % self._LIMB_BITS
         return bool(self._limbs[limb_idx] & (1 << bit_idx))
 
-    def flip(self, index: int) -> None:
+    def flip(self,
+        index: int,
+    ) -> None:
         """Invert the bit at index."""
         self.set(index, not self.get(index))
 
@@ -55,13 +70,20 @@ class BitSet:
         """Return the number of set (1) bits."""
         return sum(limb.bit_count() for limb in self._limbs)
 
-    def __getitem__(self, index: int) -> bool:
+    def __getitem__(self,
+        index: int,
+    ) -> bool:
         return self.get(index)
 
-    def __setitem__(self, index: int, value: bool) -> None:
+    def __setitem__(self,
+        index: int,
+        value: bool,
+    ) -> None:
         self.set(index, value)
 
-    def __and__(self, other: BitSet) -> BitSet:
+    def __and__(self,
+        other: BitSet,
+    ) -> BitSet:
         max_size = max(self._size, other._size)
         res = BitSet(max_size)
         min_limbs = min(len(self._limbs), len(other._limbs))
@@ -69,7 +91,9 @@ class BitSet:
             res._limbs[i] = self._limbs[i] & other._limbs[i]
         return res
 
-    def __or__(self, other: BitSet) -> BitSet:
+    def __or__(self,
+        other: BitSet,
+    ) -> BitSet:
         max_size = max(self._size, other._size)
         res = BitSet(max_size)
         for i in range(len(res._limbs)):
@@ -78,7 +102,9 @@ class BitSet:
             res._limbs[i] = v1 | v2
         return res
 
-    def __xor__(self, other: BitSet) -> BitSet:
+    def __xor__(self,
+        other: BitSet,
+    ) -> BitSet:
         max_size = max(self._size, other._size)
         res = BitSet(max_size)
         for i in range(len(res._limbs)):
@@ -92,7 +118,7 @@ class BitSet:
         mask = (1 << self._LIMB_BITS) - 1
         for i in range(len(self._limbs)):
             res._limbs[i] = (~self._limbs[i]) & mask
-        # Mask off extra bits in last limb
+        #? Mask off extra bits in last limb
         extra = self._size % self._LIMB_BITS
         if extra != 0 and res._limbs:
             res._limbs[-1] &= (1 << extra) - 1
@@ -108,7 +134,10 @@ class BitSet:
         return bytes(out)
 
     @classmethod
-    def from_bytes(cls, data: bytes, size: int | None = None) -> BitSet:
+    def from_bytes(cls,
+        data: bytes,
+        size: int | None = None,
+    ) -> BitSet:
         """Deserialize bitset from compact bytes."""
         effective_size = len(data) * 8 if size is None else size
         bs = cls(effective_size)

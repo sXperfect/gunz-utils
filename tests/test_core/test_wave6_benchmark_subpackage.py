@@ -1,17 +1,24 @@
 """Tests for Wave 6: Benchmark Subpackage Correctness, Safety & Performance."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.benchmark.compare import compare_results
 from gunz_utils.benchmark.diagnostics import analyze_stability
 from gunz_utils.benchmark.gate import evaluate_regression_gate
 from gunz_utils.benchmark.history import BenchmarkHistory, HistoryPoint
-from gunz_utils.benchmark.io import capture_git_info, save_result
+from gunz_utils.benchmark.io import save_result
 from gunz_utils.benchmark.perf import perf_record, perf_stat
 from gunz_utils.benchmark.performance import PerformanceRun
 from gunz_utils.benchmark.plot import plot_benchmark, plot_history
@@ -25,7 +32,9 @@ from gunz_utils.benchmark.trends import summarize_history
 from gunz_utils.benchmark.worker import run_python_worker
 
 
-def _make_dummy_result(name: str = "test_bench") -> BenchmarkResult:
+def _make_dummy_result(
+    name: str = "test_bench",
+) -> BenchmarkResult:
     stats = BenchmarkStats(
         minimum=0.01,
         median=0.02,
@@ -87,7 +96,7 @@ class TestBenchmarkWave6(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             file_path = Path(tmpdir) / "bad_stats.json"
             data = result.to_dict()
-            # Violate minimum <= median <= maximum: set minimum > maximum
+            #? Violate minimum <= median <= maximum: set minimum > maximum
             data["stats"]["minimum"] = 1.0
             file_path.write_text(json.dumps(data), encoding="utf-8")
             with self.assertRaises(ValueError) as ctx:

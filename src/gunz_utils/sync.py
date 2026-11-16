@@ -297,7 +297,8 @@ def rsync_mirror(
         raise ValueError("target must not be empty")
     if target_text.startswith("-"):
         raise ValueError("target must not start with a dash")
-    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in target_text):
+    if any(ord(character) < 0x20 or ord(character)
+           == 0x7F for character in target_text):
         raise ValueError("target contains invalid control characters")
     if shutil.which("rsync") is None:
         raise FileNotFoundError("rsync command not found")

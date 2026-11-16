@@ -55,7 +55,8 @@ def evaluate_regression_gate(
     if not isinstance(baseline, Mapping):
         raise TypeError(f"expected Mapping for baseline, got {type(baseline).__name__}")
     if not isinstance(candidate, Mapping):
-        raise TypeError(f"expected Mapping for candidate, got {type(candidate).__name__}")
+        raise TypeError(
+            f"expected Mapping for candidate, got {type(candidate).__name__}")
     decisions: list[MetricDecision] = []
     for policy in policies:
         if policy.name not in baseline or policy.name not in candidate:

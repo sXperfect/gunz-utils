@@ -1,9 +1,21 @@
 """Tests for Wave 5 Sub-Wave 3: Advanced Hashing & Merkle Trees (#27–#39)."""
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import pytest
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.hashing import (
     MerkleTree,
     RollingHash,
@@ -22,13 +34,13 @@ def test_murmurhash3_32():
     h1 = murmurhash3_32("hello world")
     assert isinstance(h1, int)
     assert 0 <= h1 <= 0xFFFFFFFF
-    # Deterministic
+    #? Deterministic
     assert murmurhash3_32("hello world") == h1
-    # Seed influence
+    #? Seed influence
     h2 = murmurhash3_32("hello world", seed=42)
     assert h1 != h2
 
-    # Empty string
+    #? Empty string
     assert isinstance(murmurhash3_32(""), int)
 
 
@@ -45,13 +57,12 @@ def test_fnv1a_32_and_64():
 
 
 def test_rolling_hash_rabin_karp():
-    text = b"abcdef"
-    # Window size 3: "abc" -> "bcd"
+    #? Window size 3: "abc" -> "bcd"
     rh = RollingHash(window_size=3)
     h_abc = rh.feed(b"abc")
     assert h_abc == rabin_karp_hash(b"abc")
 
-    # Slide to "bcd": drop 'a' (ord 97), add 'd' (ord 100)
+    #? Slide to "bcd": drop 'a' (ord 97), add 'd' (ord 100)
     h_bcd_slide = rh.slide(ord("a"), ord("d"))
     h_bcd_direct = rabin_karp_hash(b"bcd")
     assert h_bcd_slide == h_bcd_direct
@@ -92,11 +103,11 @@ def test_merkle_tree():
     assert isinstance(root, str)
     assert len(root) == 64
 
-    # Verify proof for leaf 1 ("tx2")
+    #? Verify proof for leaf 1 ("tx2")
     proof = tree.get_proof(1)
     assert MerkleTree.verify_proof(b"tx2", proof, root) is True
 
-    # Tampered leaf fails
+    #? Tampered leaf fails
     assert MerkleTree.verify_proof(b"tampered_tx2", proof, root) is False
 
     with pytest.raises(ValueError, match="at least one leaf"):

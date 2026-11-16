@@ -1,9 +1,20 @@
 """Tests for Wave 5 Sub-Wave 7: Event Bus, Signals & Observer Patterns."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import asyncio
 import time
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import pytest
 
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.events import (
     AsyncEvent,
     EventBus,
@@ -17,7 +28,9 @@ def test_event_bus_sync():
     bus = EventBus()
     received = []
 
-    def handler(msg):
+    def handler(
+        msg,
+    ):
         received.append(msg)
         return f"ack:{msg}"
 
@@ -26,7 +39,7 @@ def test_event_bus_sync():
     assert res == ["ack:hello"]
     assert received == ["hello"]
 
-    # Test unsubscribe
+    #? Test unsubscribe
     unsub()
     res2 = bus.publish("greeting", "world")
     assert res2 == []
@@ -46,7 +59,10 @@ def test_event_bus_subscribe_once():
 def test_event_bus_error_policy():
     errors = []
 
-    def on_error(exc, topic):
+    def on_error(
+        exc,
+        topic,
+    ):
         errors.append((type(exc).__name__, topic))
 
     bus = EventBus(on_error=on_error)
@@ -70,7 +86,9 @@ async def test_event_bus_async():
     bus = EventBus()
     received = []
 
-    async def async_handler(val):
+    async def async_handler(
+        val,
+    ):
         await asyncio.sleep(0.01)
         received.append(val)
         return val * 2
@@ -87,7 +105,7 @@ def test_signal_observer():
 
     unsub = obs.subscribe(lambda old, new: history.append((old, new)))
     obs.value = 20
-    obs.value = 20  # no change
+    obs.value = 20  #? no change
     obs.value = 30
     assert history == [(10, 20), (20, 30)]
 
@@ -101,7 +119,7 @@ async def test_async_event():
     ev = AsyncEvent()
     assert not ev.is_set()
 
-    # Timeout case
+    #? Timeout case
     res = await ev.wait_with_timeout(timeout=0.01)
     assert not res
 
@@ -124,7 +142,7 @@ def test_throttle():
         return called
 
     assert inc() == 1
-    assert inc() == 1  # throttled
+    assert inc() == 1  #? throttled
     time.sleep(0.06)
     assert inc() == 2
 
@@ -140,7 +158,7 @@ def test_debounce():
     ping()
     ping()
     ping()
-    # Not executed yet
+    #? Not executed yet
     assert called == 0
     time.sleep(0.08)
     assert called == 1

@@ -1,6 +1,14 @@
 """Tests for Wave 7 Sub-Wave 5: Safe System Process & Subprocess Streaming."""
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
+
 import sys
+
+# =============================================================================
+# LOCAL APPLICATION IMPORTS
+# =============================================================================
 from gunz_utils.subprocess import (
     clean_subprocess_env,
     find_open_port,
@@ -24,13 +32,19 @@ def test_find_and_test_open_port():
 
 
 def test_clean_subprocess_env():
-    env = clean_subprocess_env(extra_env={"CUSTOM_KEY": "CUSTOM_VAL"}, remove_keys=["PATH"])
+    env = clean_subprocess_env(
+    extra_env={
+        "CUSTOM_KEY": "CUSTOM_VAL"},
+         remove_keys=["PATH"])
     assert env.get("CUSTOM_KEY") == "CUSTOM_VAL"
     assert "PATH" not in env
 
 
 def test_stream_command_output():
-    cmd = [sys.executable, "-c", "print('hello'); import sys; print('world', file=sys.stderr)"]
+    cmd = [
+    sys.executable,
+    "-c",
+     "print('hello'); import sys; print('world', file=sys.stderr)"]
     lines = list(stream_command_output(cmd))
     outputs = [(tag, line.strip()) for _, tag, line in lines]
     assert ("stdout", "hello") in outputs

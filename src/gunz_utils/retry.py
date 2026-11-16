@@ -125,7 +125,8 @@ class RetryExhaustedError(RuntimeError):
         ):
             raise ValueError("total_delay must be a finite non-negative number")
         if last_exception is not None and not isinstance(last_exception, BaseException):
-            raise TypeError("last_exception must be an instance of BaseException or None")
+            raise TypeError(
+                "last_exception must be an instance of BaseException or None")
 
         super().__init__(message)
         self.attempts = attempts
@@ -160,12 +161,14 @@ class RetryPolicy(Generic[T]):
         if not isinstance(self.jitter, bool):
             raise TypeError("jitter must be bool")
         if isinstance(self.exceptions, (str, bytes, bytearray)):
-            raise TypeError("exceptions must be an iterable of exception classes, not a string")
+            raise TypeError(
+                "exceptions must be an iterable of exception classes, not a string")
         try:
             excs = tuple(self.exceptions)
         except TypeError as exc:
             raise TypeError(
-                f"exceptions must be an iterable of exception classes, got {type(self.exceptions).__name__}"
+                f"exceptions must be an iterable of exception "
+                    f"classes, got {type(self.exceptions).__name__}"
             ) from exc
         if not excs:
             raise ValueError("exceptions must not be empty")
@@ -173,7 +176,8 @@ class RetryPolicy(Generic[T]):
             if not isinstance(exc_cls, type) or not issubclass(exc_cls, BaseException):
                 raise TypeError(f"expected BaseException subclass, got {exc_cls!r}")
         object.__setattr__(self, "exceptions", excs)
-        if self.retry_if_exception is not None and not callable(self.retry_if_exception):
+        if self.retry_if_exception is not None and not callable(
+            self.retry_if_exception):
             raise TypeError("retry_if_exception must be callable or None")
         if self.retry_if_result is not None and not callable(self.retry_if_result):
             raise TypeError("retry_if_result must be callable or None")
@@ -492,12 +496,14 @@ def retry(
     if on_retry is not None and not callable(on_retry):
         raise TypeError("on_retry must be callable or None")
     if isinstance(exceptions, (str, bytes, bytearray)):
-        raise TypeError("exceptions must be an iterable of exception classes, not a string")
+        raise TypeError(
+            "exceptions must be an iterable of exception classes, not a string")
     try:
         excs = tuple(exceptions)
     except TypeError as exc:
         raise TypeError(
-            f"exceptions must be an iterable of exception classes, got {type(exceptions).__name__}"
+            f"exceptions must be an iterable of exception "
+                f"classes, got {type(exceptions).__name__}"
         ) from exc
     if not excs:
         raise ValueError("exceptions must not be empty")
@@ -620,12 +626,14 @@ def async_retry(
     if on_retry is not None and not callable(on_retry):
         raise TypeError("on_retry must be callable or None")
     if isinstance(exceptions, (str, bytes, bytearray)):
-        raise TypeError("exceptions must be an iterable of exception classes, not a string")
+        raise TypeError(
+            "exceptions must be an iterable of exception classes, not a string")
     try:
         excs = tuple(exceptions)
     except TypeError as exc:
         raise TypeError(
-            f"exceptions must be an iterable of exception classes, got {type(exceptions).__name__}"
+            f"exceptions must be an iterable of exception "
+                f"classes, got {type(exceptions).__name__}"
         ) from exc
     if not excs:
         raise ValueError("exceptions must not be empty")
@@ -674,7 +682,9 @@ def async_retry(
             for attempt in range(1, attempts + 1):
                 try:
                     return await func(*args, **kwargs)
-                except (asyncio.CancelledError, KeyboardInterrupt, SystemExit, GeneratorExit):
+                except (
+                    asyncio.CancelledError, KeyboardInterrupt, SystemExit, GeneratorExit
+                ):
                     raise
                 except excs as exc:
                     if attempt == attempts or (

@@ -33,7 +33,9 @@ class DemoSpec:
 
 def test_returns_instance_unchanged() -> None:
     spec = DemoSpec(size=8)
-    assert from_object_or_fields(DemoSpec, spec, {"size": UNSET, "label": UNSET}) is spec
+    assert from_object_or_fields(
+    DemoSpec, spec, {
+        "size": UNSET, "label": UNSET}) is spec
 
 
 def test_builds_from_mapping() -> None:
@@ -42,7 +44,9 @@ def test_builds_from_mapping() -> None:
 
 
 def test_builds_from_fields_ignoring_unset() -> None:
-    spec = from_object_or_fields(DemoSpec, None, {"size": 8, "label": UNSET, "flag": UNSET})
+    spec = from_object_or_fields(
+    DemoSpec, None, {
+        "size": 8, "label": UNSET, "flag": UNSET})
     assert spec == DemoSpec(size=8)
 
 

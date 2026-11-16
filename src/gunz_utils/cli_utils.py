@@ -1,4 +1,9 @@
-"""Zero-dependency command-line argument parser for options, flags, and help formatting."""
+"""Zero-dependency command-line argument parser for options, flags, and help formatting.
+"""
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 
 from __future__ import annotations
 
@@ -16,21 +21,23 @@ class _ArgRule:
     type: type
     default: Any
     help: str
-    nargs: str  # "1", "?", "*", "+"
+    nargs: str  #? "1", "?", "*", "+"
 
 
 class SimpleArgParser:
     """Lightweight command-line parser with zero third-party dependencies."""
 
-    def __init__(self, prog: str = "", description: str = "") -> None:
+    def __init__(self,
+        prog: str = "",
+        description: str = "",
+    ) -> None:
         self.prog = prog or (sys.argv[0] if sys.argv else "app")
         self.description = description
         self._flags_and_options: dict[str, _ArgRule] = {}
         self._short_map: dict[str, str] = {}
         self._positionals: list[_ArgRule] = []
 
-    def add_flag(
-        self,
+    def add_flag(self,
         name: str,
         short: str | None = None,
         default: bool = False,
@@ -52,8 +59,7 @@ class SimpleArgParser:
             self._short_map[rule.short] = clean_name
         return self
 
-    def add_option(
-        self,
+    def add_option(self,
         name: str,
         short: str | None = None,
         type: type = str,
@@ -76,8 +82,7 @@ class SimpleArgParser:
             self._short_map[rule.short] = clean_name
         return self
 
-    def add_argument(
-        self,
+    def add_argument(self,
         name: str,
         nargs: str = "1",
         default: Any = None,
@@ -96,7 +101,9 @@ class SimpleArgParser:
         self._positionals.append(rule)
         return self
 
-    def parse_args(self, args: Sequence[str] | None = None) -> dict[str, Any]:
+    def parse_args(self,
+        args: Sequence[str] | None = None,
+    ) -> dict[str, Any]:
         """Parse arguments into a dictionary of names and values."""
         argv = list(sys.argv[1:] if args is None else args)
         result: dict[str, Any] = {
@@ -132,22 +139,22 @@ class SimpleArgParser:
                     result[key] = rule.type(val)
             elif arg.startswith("-") and len(arg) > 1:
                 short_key = arg[1:]
-                key = self._short_map.get(short_key)
-                if key is None:
+                short_option = self._short_map.get(short_key)
+                if short_option is None:
                     raise ValueError(f"unknown short option: -{short_key}")
-                rule = self._flags_and_options[key]
+                rule = self._flags_and_options[short_option]
                 if rule.is_flag:
-                    result[key] = not rule.default
+                    result[short_option] = not rule.default
                 else:
                     i += 1
                     if i >= len(argv):
                         raise ValueError(f"option -{short_key} requires an argument")
-                    result[key] = rule.type(argv[i])
+                    result[short_option] = rule.type(argv[i])
             else:
                 positional_vals.append(arg)
             i += 1
 
-        # Match positionals
+        #? Match positionals
         pos_idx = 0
         for rule in self._positionals:
             if rule.nargs == "1":
@@ -173,7 +180,9 @@ class SimpleArgParser:
             short_str = f"-{rule.short}, " if rule.short else "    "
             flag_str = f"{short_str}--{rule.name}"
             help_str = f": {rule.help}" if rule.help else ""
-            default_str = f" (default: {rule.default})" if rule.default is not None else ""
+            default_str = (
+                f" (default: {rule.default})" if rule.default is not None else ""
+            )
             lines.append(f"  {flag_str:<25} {help_str}{default_str}")
 
         return "\n".join(lines)

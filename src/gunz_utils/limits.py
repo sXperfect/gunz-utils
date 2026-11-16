@@ -11,6 +11,7 @@ import time
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Any
 
 
 class BudgetExceededError(ValueError):
@@ -178,7 +179,8 @@ class ResourceBudget:
             The result of the operation.
         """
         if not isinstance(limits, Limits):
-            raise TypeError(f"limits must be a Limits instance, got {type(limits).__name__}")
+            raise TypeError(
+                f"limits must be a Limits instance, got {type(limits).__name__}")
         return cls(
             max_bytes=limits.max_bytes,
             max_items=limits.max_items,
@@ -412,7 +414,8 @@ class ResourceBudget:
 def merge_limits(
     *limits: Limits,
 ) -> Limits:
-    """Combine multiple Limits instances taking the strictest (minimum non-None) bound."""
+    """Combine multiple Limits instances taking the strictest (minimum non-None) bound.
+    """
     if not limits:
         return Limits()
     for lim in limits:
@@ -426,11 +429,11 @@ def merge_limits(
         return min(non_nones) if non_nones else None
 
     return Limits(
-        max_bytes=_min_bound(*(l.max_bytes for l in limits)),
-        max_items=_min_bound(*(l.max_items for l in limits)),
-        max_depth=_min_bound(*(l.max_depth for l in limits)),
-        timeout=_min_bound(*(l.timeout for l in limits)),
-        max_steps=_min_bound(*(l.max_steps for l in limits)),
+        max_bytes=_min_bound(*(limit.max_bytes for limit in limits)),
+        max_items=_min_bound(*(limit.max_items for limit in limits)),
+        max_depth=_min_bound(*(limit.max_depth for limit in limits)),
+        timeout=_min_bound(*(limit.timeout for limit in limits)),
+        max_steps=_min_bound(*(limit.max_steps for limit in limits)),
     )
 
 
